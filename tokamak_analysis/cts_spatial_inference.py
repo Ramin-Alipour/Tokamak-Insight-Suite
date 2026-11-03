@@ -81,8 +81,8 @@ def analyze_full_em_cts_spatial_profiles(
     fixed_background_spectrum=None, fit_electron_density_profile=True,
     fit_electron_temperature_profile=True, fit_ion_temperature_profile=False,
     initial_profiles=None, regularization_matrix=None,
-    regularization_strength=1.0, profile_bounds_relative=(0.05, 20.0),
-    max_nfev=300,
+    regularization_strength=1.0, regularization_sensitivity_strengths=None,
+    profile_bounds_relative=(0.05, 20.0), max_nfev=300,
 ):
     """Infer node-wise relative profiles using repeated local Full-EM solves.
 
@@ -200,6 +200,44 @@ def analyze_full_em_cts_spatial_profiles(
     whitened = np.linalg.solve(chol, residual_spectrum)
     chi2 = float(whitened @ whitened)
     dof = max(y.size - rank, 1)
+    sensitivity = None
+    if regularization_sensitivity_strengths is not None:
+        grid = _vector(regularization_sensitivity_strengths, "regularization_sensitivity_strengths", positive=True)
+        if grid.size < 2 or np.any(np.diff(grid) <= 0):
+            raise ValueError("regularization_sensitivity_strengths must be strictly increasing with at least two values")
+        repeated = []
+        for strength in grid:
+            repeated.append(analyze_full_em_cts_spatial_profiles(
+                frequency_shift_Hz, measured_spectrum,
+                probe_frequency_Hz=probe_frequency_Hz,
+                scattering_geometry=scattering_geometry,
+                forward_model_kwargs=forward_model_kwargs,
+                spectral_covariance=covariance,
+                instrument_response=response,
+                fixed_background_spectrum=background,
+                fit_electron_density_profile=fit_electron_density_profile,
+                fit_electron_temperature_profile=fit_electron_temperature_profile,
+                fit_ion_temperature_profile=fit_ion_temperature_profile,
+                initial_profiles=initial,
+                regularization_matrix=penalty,
+                regularization_strength=float(strength),
+                regularization_sensitivity_strengths=None,
+                profile_bounds_relative=profile_bounds_relative,
+                max_nfev=max_nfev,
+            ))
+        sensitivity = {
+            "regularization_strengths": grid.copy(),
+            "profiles_relative_to_reference": {
+                name: np.stack([item["profiles_relative_to_reference"][name] for item in repeated])
+                for name in active
+            },
+            "profile_standard_deviation_across_regularization": {
+                name: np.std(np.stack([item["profiles_relative_to_reference"][name] for item in repeated]), axis=0, ddof=1)
+                for name in active
+            },
+            "interpretation": "regularization-choice sensitivity; not measurement uncertainty",
+            "measurement_covariance_unchanged": True,
+        }
     return {
         "model": "spatially_varying_magnetized_full_electromagnetic_CTS",
         "optimizer_success": bool(fit.success), "optimizer_message": str(fit.message),
@@ -221,6 +259,7 @@ def analyze_full_em_cts_spatial_profiles(
         "degrees_of_freedom": int(dof), "reduced_chi_squared": chi2/dof,
         "regularization_matrix": penalty.copy(), "regularization_strength": dict(lambdas),
         "regularization_is_measurement_covariance": False,
+        "regularization_sensitivity": sensitivity,
         "reference_bulk_parameters": {k: base[k] for k in ("electron_density_m3", "electron_temperature_eV", "ion_temperature_eV")},
         "forward_model_evaluations_use_local_full_em_kinetics": True,
         "limitations": [
