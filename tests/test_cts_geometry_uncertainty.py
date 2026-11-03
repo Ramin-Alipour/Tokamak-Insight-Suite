@@ -217,3 +217,31 @@ def test_cold_plasma_ray_traces_supplied_paraxial_beam_covariance():
     assert result["paraxial_beam_propagation_status"] == "propagated_from_supplied_symplectic_ABCD_maps"
     assert result["transverse_position_covariance_m2"].shape == (4,2,2)
     assert np.all(np.linalg.eigvalsh(result["transverse_position_covariance_m2"]) > 0)
+
+
+
+def test_cold_plasma_ray_propagates_full_6d_covariance_from_dispersion_hessian():
+    from tokamak_analysis.cts_em_geometry import trace_cold_plasma_ray
+
+    electron_charge = -1.602176634e-19
+    electron_mass = 9.1093837015e-31
+    ion_charge = 1.602176634e-19
+    ion_mass = 2.0*1.66053906660e-27
+    def equilibrium(position):
+        return {
+            "magnetic_field_T": np.array([0.0, 0.0, 2.0]),
+            "species": [
+                {"density_m3": 1.0e12, "charge_C": electron_charge, "mass_kg": electron_mass},
+                {"density_m3": 1.0e12, "charge_C": ion_charge, "mass_kg": ion_mass},
+            ],
+        }
+    sigma0 = np.diag([1e-6, 1e-6, 1e-6, 1e-3, 1e-3, 1e-3])
+    result = trace_cold_plasma_ray(
+        [0.0,0.0,0.0], [1000.0,0.0,0.0], 2*np.pi*100e9,
+        equilibrium=equilibrium, mode_index=0, path_parameter_max=1.0,
+        sample_count=4, initial_ray_phase_space_covariance=sigma0,
+    )
+    assert result["paraxial_beam_propagation_status"] == "propagated_from_full_cold_plasma_dispersion_Hessian"
+    assert result["phase_space_covariance"].shape == (4,6,6)
+    assert result["transverse_position_covariance_m2"].shape == (4,2,2)
+    assert np.all(np.linalg.eigvalsh(result["transverse_position_covariance_m2"]) > 0)
