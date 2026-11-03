@@ -865,3 +865,15 @@ def fit_noncollective_kinetic_thomson_with_background(*args, **kwargs):
     """
     from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background as _fit
     return _fit(*args, **kwargs)
+
+
+def collective_tabulated_electron_thomson_spectrum(*args, **kwargs):
+    """Evaluate electrostatic collective Thomson response for a supplied 1-D EVDF."""
+    from .thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
+    return collective_tabulated_electron_spectral_density(*args, **kwargs)
+
+
+def generalized_thomson_landau_integral(*args, **kwargs):
+    """Evaluate the piecewise-linear first-order generalized Landau integral."""
+    from .thomson_generalized_dispersion import generalized_landau_integral
+    return generalized_landau_integral(*args, **kwargs)
