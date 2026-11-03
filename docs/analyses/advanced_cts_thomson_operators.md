@@ -1,179 +1,205 @@
-# Advanced CTS and optical Thomson inverse operators
+# Advanced CTS and optical Thomson operators
 
-This page records the scientific scope of the advanced operators added to
-Analysis 1. All measured inputs remain researcher-prepared and calibrated.
-No detector calibration, data repair, empirical validation or synthetic-to-
-experimental equivalence is claimed.
+This document is the authoritative scope note for advanced Analysis 1 operators.
+All physical inference starts from measured, prepared and calibrated diagnostic
+data. TIS does not calibrate instruments, repair detector data, estimate a
+missing instrument response, or perform experimental validation.
 
-## Optical Thomson: independent Poisson likelihood
+## Calibrated Optical Thomson inference
 
-The separate public API
-`fit_optical_thomson_poisson_counts` uses signed square-root Poisson-deviance
-residuals for raw integer photon-count bins. It requires a uniform wavelength
-grid and a measured instrument-response matrix. It returns count-space
-observables, including captured fitted signal counts, and does not report
-watts or infer absolute electron density.
+The canonical optical path accepts calibrated measured spectra, a wavelength
+axis, the selected scattering geometry, and the measured instrument-response
+operator. The researcher explicitly selects one of three implemented
+non-collective forward models:
 
-This API is currently restricted to the non-collective Maxwellian model.
-Kappa, relativistic Maxwell-Jüttner and collective fits retain their existing
-Gaussian/GLS likelihood paths. Do not pass calibrated power-density data to
-the Poisson API.
+1. Isotropic non-relativistic Maxwellian.
+2. Isotropic finite-variance Kappa, represented by its analytic one-dimensional
+   Student-t projection.
+3. Isotropic relativistic Maxwell-Juttner, with the declared elastic Thomson
+   or single-scattering recoil/Klein-Nishina option.
 
-## Independent model discrepancy
+The canonical optical inference uses Gaussian/GLS residuals. There is no public
+raw integer photon-count/Poisson-likelihood input path in Analysis 1. Do not
+pass raw counts to the calibrated-spectrum APIs and do not describe the
+retired count-space route as a supported capability.
 
-`gaussian_process_discrepancy_covariance` constructs a correlated additive
-covariance using squared-exponential, Matérn-3/2 or Matérn-5/2 kernels.
-Amplitude, length scale and nugget are explicit inputs; no values are inferred
-from reduced chi-square. Electrostatic CTS accepts this covariance through
-`model_discrepancy_covariance` and adds it to the measurement covariance
-before GLS whitening. Optical Thomson accepts a shared wavelength covariance
-or one covariance block per channel and uses it in the Maxwellian GLS residual.
-When supplied, the legacy reduced-chi-square overdispersion inflation is not
-added on top.
+### Model-discrepancy covariance
 
-The GP helper does not estimate hyperparameters. They must be selected using a
-declared likelihood/model-comparison procedure. Optical Thomson currently
-consumes this covariance in the non-collective Maxwellian fit only; Kappa,
-relativistic and collective optical fits and the Full-EM CTS fit do not yet
-consume it.
+The canonical single-channel Maxwellian, Kappa and relativistic
+Maxwell-Juttner optical fits accept a researcher-supplied wavelength-space
+`model_discrepancy_covariance`. It is an independent additive covariance
+component and is combined with the supplied measurement covariance before
+GLS whitening. It is not estimated from reduced chi-square.
 
-## CTS reference-PCA basis uncertainty
+For multi-channel inference, the supported discrepancy representation is
+shared wavelength covariance or one within-channel covariance block per
+channel. With a full channel-major measurement covariance, cross-channel
+measurement covariance is retained, while the supplied discrepancy blocks
+are added to the corresponding diagonal channel blocks. Arbitrary
+cross-channel discrepancy covariance and measurement-noise/discrepancy
+cross-covariance are not inferred.
 
-The electrostatic CTS inverse bootstraps the supplied calibrated reference
-spectra and returns covariance for the reference mean and sign/rotation-aligned
-PCA basis, plus singular-value gap diagnostics. Rank-deficient bootstrap
-subspaces are discarded.
+The separate structured-background kinetic workflow for Kappa and
+Maxwell-Juttner also accepts its own single-spectrum discrepancy covariance.
+This is not a universal covariance API for all CTS branches.
 
-The finite-reference bootstrap is also propagated through repeated CTS
-refits (30 resamples by default; at least 20 may be requested). The resulting
-parameter covariance is added to the base plasma parameter covariance when
-at least 70% of the requested refits, and at least 12 refits, succeed.
-This propagation covers density, electron temperature, each thermal-ion
-temperature and the fitted electron/ion flow projections. Fast-ion shape
-parameters are not included in this reference-PCA contribution. The
-nuisance-coefficient covariance remains conditional on each sampled basis.
+### Model comparison
 
-## Full-EM thermal background: free-free and ECE
+`tokamak_analysis.thomson_model_comparison.compare_thomson_forward_models`
+compares at least two already-computed candidate forward spectra on identical
+calibrated wavelength bins and under one common Gaussian likelihood. It reports
+the weighted residual objective, AIC, AICc and BIC, with the appropriate
+common unknown-variance parameter counted when no measurement covariance is
+provided.
 
-`cts_em_background` computes non-relativistic Maxwellian thermal
-Bremsstrahlung emissivity and integrates the LTE radiative-transfer equation.
-ECE is represented using Kirchhoff's law with a supplied mode-resolved
-absorption coefficient from a magnetized dielectric/radiative-transfer solver.
-The solver does not fabricate an ECE absorption coefficient from only
-`B`, `n_e` and `T_e`.
+This helper does not refit model parameters, select a physical model
+automatically, establish physical truth, or validate a model. Candidate
+predictions and their fitted-parameter counts must come from the researcher's
+completed fits. Information criteria are only comparable when the data bins,
+likelihood, covariance convention and treatment of nuisance parameters are
+consistent.
 
-The output is spectral radiance. Use
-`radiance_to_receiver_spectral_power` to convert it to receiver-plane spectral
-power using measured receiver etendue and end-to-end efficiency exactly once.
-`analyze_full_em_cts_spectrum` accepts a fixed additive
-`physical_background_spectrum_W_Hz` already expressed at the same receiver
-plane and in the same spectral units as the measured spectrum.
+## Spectral-distribution subanalysis
 
-Free-free emissivity is non-relativistic and unmagnetized. Use a relativistic,
-magnetized emissivity model outside that regime. The mode-resolved ECE
-absorption coefficient must come from the appropriate magnetized plasma
-calculation.
+`analyze_thomson_spectral_distribution` reports descriptive wavelength-space
+moments and response-convolved Gaussian shape-fit diagnostics. It is not a
+substitute for the physical Maxwellian/Kappa/Maxwell-Juttner inference and does
+not identify an electron velocity distribution from moments alone.
 
-## Ray tracing and paraxial beam covariance
+Exactly one background representation is explicit: a supplied fitted
+background spectrum, a researcher-supplied mask, or an explicitly selected
+spectral-edge fraction. No spectral-edge region is silently assumed. Signed
+background-subtracted samples are retained for moment calculations; negative
+samples are not silently clipped. Moment outputs describe the measured
+wavelength-space signal and are not intrinsic thermal widths or electron
+temperatures.
 
-`trace_cold_plasma_ray` now supports two propagation paths. The 4-D transverse
-path accepts a covariance plus one supplied symplectic 4x4 ABCD map per adjacent
-ray sample. The 6-D path accepts an initial covariance in
-`[x,y,z,kx,ky,kz]` and derives the local linearized Hamiltonian transfer from
-the Hessian of the selected cold-plasma dispersion eigenvalue along the ray.
-The 6-D path rejects propagation across an eigenvalue-order branch crossing.
-`trace_cts_frequency_resolved_beams` uses the propagated 2-D transverse
-covariances in the local Gaussian overlap integral. The transverse overlap is
-two-dimensional; its units and path-integrated units are returned explicitly.
+## Spatial profile reconstruction
 
-The 6-D method is a paraxial Gaussian phase-space approximation based on the
-local dispersion Hessian, not a complete full-vector quasi-optical solver.
-Non-paraxial diffraction, general vector mode conversion, absorption and
-non-Gaussian beam evolution are not implied by this interface.
+The channel-wise workflow first infers identifiable physical parameters from
+each calibrated spectrum, then reconstructs their radial profiles using
+PCHIP and/or generalized-cross-validation smoothing splines with the
+available parameter covariance.
 
-## Full-EM relativistic electron and fast-ion VDF shape inversion
+The joint spatial-spectral inverse is a distinct route: it fits all measured
+channel-by-wavelength spectra through a researcher-supplied fixed spatial
+mixing operator and measured spectral-response operator. It supports the
+declared Maxwellian, finite-variance Kappa and relativistic Maxwell-Juttner
+kernels. It does not estimate or calibrate the mixing operator/PSF.
 
-`fit_full_em_gyrotropic_population_shape` performs a nonlinear,
-regularized inversion of a tabulated gyrotropic momentum-space distribution.
-Each optimizer evaluation calls the Full-EM relativistic kinetic forward model,
-including the conductivity, Klimontovich fluctuation covariance and
-second-order kinetic vertex. This is not a linear superposition of
-single-particle kernels.
+The PSF-aware profile inverse operates on already inferred channel values and
+a fixed researcher-supplied mixing matrix. It is not a joint fit to the raw
+spectra. It reports data-only rank and suppresses a unique primary profile
+when the latent spatial nodes are not identifiable. Its conditional
+regularized covariance excludes uncertainty in the supplied mixing operator.
 
-Two population modes are available:
+Coordinate covariance is supported in the downstream profile reconstruction
+path where declared. Coordinate/value cross-covariance and automatic
+equilibrium or flux-coordinate mapping are not inferred. Interpolated or
+regularized nodes are not independent measurements.
 
-- `population_kind="electron"`: infer the relativistic gyrotropic electron
-  distribution shape.
-- `population_kind="fast_ion"`: infer the relativistic gyrotropic fast-ion
-  distribution shape.
+## Electrostatic CTS
 
-The inversion is conditional on fixed bulk `n_e`, `T_e`, thermal-ion
-temperatures, magnetic field, geometry, mode polarizations, instrument
-response and population density. The electron branch requires an explicitly
-zero projected electron flow because a drifted relativistic gyrotropic VDF is
-not implemented. Identifiability is assessed from the data Jacobian, not from
-regularization rows. A rank-deficient fit returns a conditional regularized
-candidate rather than claiming a uniquely measured distribution.
+Electrostatic CTS is a microwave collective-scattering model, not an optical
+Thomson model. It uses the longitudinal dielectric response and requires
+explicit ion species, charge states/fractions, geometry and calibrated
+frequency-shifted spectral power. It supports Maxwellian thermal species and
+the documented projected fast-ion distribution options.
 
-## Multi-view 3-D EVDF reconstruction
+The optional reference-spectrum PCA background requires at least two supplied
+calibrated background-only spectra on the same frequency grid and detector
+intensity scale. The retained component count is selected explicitly by the
+researcher. The finite-reference bootstrap can quantify reference-basis
+uncertainty and propagate it through repeated plasma-parameter refits. This is
+not claimed to reproduce the modulation-aware physics-informed PCA algorithm
+of Verdier et al. (2025).
 
-`reconstruct_multiview_3d_evdf` solves a non-negative, regularized 3-D
-velocity-space inverse problem from stacked view/frequency kernels. For a
-relativistic Thomson result, each view's kernel must be generated using the
-relativistic Doppler mapping, polarization and differential cross-section
-appropriate to that view. A single view or rank-deficient stacked operator
-cannot identify an unrestricted 3-D EVDF; the routine returns only a
-conditional candidate in that case.
+A correlated additive `model_discrepancy_covariance` is supported in the
+electrostatic CTS likelihood. It is not silently passed into the Full-EM
+solver. The discrepancy covariance is independent of measurement covariance;
+cross-covariance between those sources is not inferred.
 
-The current API consumes per-view spectral kernels. Automatic generation of
-those kernels from arbitrary experimental geometry and a fully relativistic
-3-D optical Thomson forward solver remains separate work.
+## Full-electromagnetic CTS
 
-## Completion and limitations
+The Full-EM branch uses the magnetized kinetic electromagnetic response,
+species-resolved thermal-ion response, fluctuation covariance, and the
+documented nonlinear scattering closure. Explicit relativistic gyrotropic
+electron/fast-ion distributions are supported by the forward spectral-density
+model and by the separate conditional population-shape inversion.
 
-The code now contains working API-level implementations for the count
-likelihood, independent CTS discrepancy covariance, free-free/ECE background
-transfer, paraxial covariance propagation, nonlinear Full-EM gyrotropic shape
-inversion and multi-view 3-D EVDF inversion. The following uncertainty and
-integration boundaries remain explicit:
+The main measured-spectrum inversion has its own input contract. It does not
+silently infer an arbitrary drifted relativistic electron VDF. The separate
+shape inversion is conditional on fixed bulk plasma parameters, geometry,
+polarization, response and population density; a rank-deficient result is a
+regularized candidate, not a uniquely identified distribution.
 
-1. CTS PCA basis covariance is propagated to the base plasma parameter
-   covariance by bootstrap refits; fast-ion shape-parameter covariance is
-   not included in that contribution.
-2. Optical Thomson Poisson likelihood is a separate count-space Maxwellian
-   API; it is not a likelihood option for Kappa or relativistic fits.
-3. The GP discrepancy covariance is consumed by electrostatic CTS, not every
-   optical and Full-EM inverse.
-4. Full-EM ECE requires externally supplied mode-resolved absorption.
-5. The 6-D ray covariance path derives a linearized paraxial transfer from the
-   selected cold-plasma dispersion Hessian; the alternative 4-D path accepts
-   supplied ABCD maps. Full vector quasi-optical mode conversion and
-   non-paraxial diffraction are not solved.
-6. Drifted relativistic electron VDF inversion is not implemented.
-7. 3-D EVDF kernels must be supplied per view and must themselves contain the
-   appropriate relativistic scattering physics.
-8. The new APIs are registered in the diagnostic registry, but not all have
-   dedicated dashboard controls or automated orchestration paths.
+The Full-EM measured-spectrum inversion fits scalar flow projections along
+the scattering wavevector, not unrestricted three-dimensional flow vectors.
+It reports local fit covariance, identifiability diagnostics and numerical
+harmonic/quadrature convergence. Numerical convergence is a discretization
+check, not physical-model uncertainty or experimental validation.
 
-## Scientific references
+Cold-plasma ray tracing and paraxial beam covariance are conditional
+geometrical-optics tools. Branch tracking and the optional lossless
+coupled-mode propagation utility do not constitute a complete dissipative
+full-wave mode-conversion solver. Non-paraxial diffraction, general
+non-Gaussian beam evolution, absorption/collisional mode coupling and
+arbitrary inhomogeneous wave propagation are not implied.
 
-- Rybicki, G. B. & Lightman, A. P., *Radiative Processes in Astrophysics*
-  (1979): thermal free-free emissivity and radiative-transfer conventions.
-- Bekefi, G., *Radiation Processes in Plasmas* (1966): magnetized plasma
-  emission and absorption framework.
-- Verdier et al. (2025), *Review of Scientific Instruments* 96, 043513,
-  DOI: 10.1063/5.0238948: CTS thermal/fast-ion background estimation.
+The Full-EM measured-spectrum inversion currently fits spatially uniform
+plasma parameters over the sampled scattering volume. Spatially varying
+magnetic field and beam geometry do not imply that arbitrary node-wise
+`n_e`, `T_e` and species-resolved `T_i` profiles are being fitted. A
+profile-varying kinetic inversion requires evaluating the local kinetic
+forward response at each spatial quadrature point and jointly identifying
+the profile degrees of freedom.
+
+Thermal free-free background and LTE ECE transfer are available as separate
+forward radiative-transfer operators. ECE requires an externally supplied
+mode-resolved absorption coefficient from a suitable magnetized dielectric
+calculation; it is not fabricated from `B`, `n_e` and `T_e` alone.
+Radiance-to-receiver-power conversion requires supplied receiver etendue and
+end-to-end efficiency. The resulting physical background is an explicit
+receiver-plane input to the Full-EM spectral inversion.
+
+## Deliberate scientific boundaries
+
+The following are not claimed as completed universal capabilities:
+
+- Arbitrary non-Maxwellian optical Thomson inversion using a general
+  generalized-Landau kernel for every supplied distribution.
+- Unrestricted drifted relativistic electron-VDF inference in the main
+  Full-EM measured-spectrum optimizer.
+- Automatic inference of ion composition, fast-ion populations, PSF,
+  equilibrium, ray geometry, polarization or missing radiative-transfer data.
+- Finite-orbit-width corrections or a general collisional kinetic response
+  across all CTS regimes.
+- Full-vector, non-paraxial, dissipative quasi-optical propagation.
+- Full covariance propagation for every geometry, profile, model-discrepancy
+  and nuisance-input source, including all cross-source correlations.
+
+These boundaries must remain explicit until a physically derived model,
+well-defined measured-input contract, numerical implementation and regression
+tests are added. No synthetic software test is experimental validation.
+
+## Recent peer-reviewed method context
+
 - Carole et al. (2025), *Journal of Instrumentation* 20, P07014,
-  DOI: 10.1088/1748-0221/20/07/P07014: high-resolution Thomson spectral
-  modelling for WEST.
-- Skolar, Longley & Goodwin (2025), *Physics of Plasmas*,
-  DOI: 10.1063/5.0261966: generalized plasma-dispersion treatment for
-  non-Maxwellian Thomson scattering.
+  DOI: 10.1088/1748-0221/20/07/P07014 — high-resolution optical Thomson
+  spectral modelling.
+- Skolar, Longley & Goodwin (2025), *Physics of Plasmas* 32, 043907,
+  DOI: 10.1063/5.0261966 — generalized plasma-dispersion treatment for
+  non-Maxwellian plasmas and Thomson scattering.
 - Sakai et al. (2026), *Journal of Instrumentation* 21, C01002,
-  DOI: 10.1088/1748-0221/21/01/C01002: Monte Carlo Thomson spectra from
+  DOI: 10.1088/1748-0221/21/01/C01002 — Monte Carlo Thomson spectra from
   arbitrary electron distributions.
-- Flocken et al. (2026), *Fusion Engineering and Design*,
-  DOI: 10.1016/j.fusengdes.2026.115845: accuracy-driven CTS optimisation,
+- Verdier et al. (2025), *Review of Scientific Instruments* 96, 043513,
+  DOI: 10.1063/5.0238948 — CTS thermal/fast-ion background estimation.
+- Flocken, Korsholm & Rasmussen (2026), *Fusion Engineering and Design*,
+  DOI: 10.1016/j.fusengdes.2026.115845 — accuracy-driven CTS modelling,
   ray tracing and Bayesian inversion.
 
-No experimental validation has been performed.
+The recent papers guide selected extensions; they do not replace the
+underlying Thomson cross-section, kinetic dielectric response or
+three-wave-coupling equations. No experimental validation is performed or
+claimed.
