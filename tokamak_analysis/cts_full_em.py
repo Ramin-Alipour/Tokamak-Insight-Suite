@@ -1030,7 +1030,6 @@ def _resonance_broadening_metadata(damping_rate_rad_s, *, caller_supplied, probe
         ),
         "collisional_cts_model_status": "not_implemented",
         "collision_operator": None,
-        "probe_frequency_Hz_for_default_scaling": float(frequency),
     }
 
 
