@@ -91,3 +91,24 @@ def test_spatial_full_em_inverse_requires_positive_regularization():
             scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
             signal_uncertainty=np.ones(8), regularization_strength=0.0,
         )
+
+
+
+def test_spatial_inverse_is_registered_in_dispatcher_and_dashboard():
+    from tokamak_analysis.cts_analysis import analyze_cts_spectrum_model
+    from tokamak_analysis.analysis_registry import get_analysis
+    from pathlib import Path
+    import inspect
+    import tokamak_analysis.cts_spatial_inference as spatial
+
+    assert callable(spatial.analyze_full_em_cts_spatial_profiles)
+    assert "forward_model_kwargs" in inspect.signature(
+        spatial.analyze_full_em_cts_spatial_profiles
+    ).parameters
+    contract = get_analysis(30)["execution_contract"]
+    modes = {item["name"] for item in contract["workflow_modes"]}
+    assert "spatially_varying_magnetized_full_electromagnetic_cts_profile_inverse" in modes
+    app = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "full_em_spatial_profiles" in app
+    assert "run_cts_spatial_profiles" in app
+    assert callable(analyze_cts_spectrum_model)
