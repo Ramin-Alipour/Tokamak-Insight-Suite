@@ -93,3 +93,22 @@ This supports a forward model with externally supplied spatial variation. It doe
 ## Validation state
 
 The code changes and regression tests have been committed to `main`. A CI pass and empirical validation must be reported only after their respective runs have completed and their results have been inspected. No experimental validation is claimed in this note.
+
+
+### Kappa optical model-discrepancy covariance integration
+
+The non-collective Kappa channel fitter now accepts researcher-supplied
+within-channel spectral covariance. A per-channel covariance may include
+measurement covariance plus supplied model-discrepancy covariance; it is
+Cholesky-whitened in the Kappa residual, and the local parameter covariance
+and Jacobian identifiability calculation use the same whitening. The analysis
+dispatcher permits `model_discrepancy_covariance` for non-collective
+Maxwellian and Kappa models, and rejects unsupported relativistic
+Maxwell-Juttner/CTS branches.
+
+This closure is within-channel only. It does not create cross-channel
+model-discrepancy covariance, and it does not retrofit the Kappa profile-
+likelihood scan with a full-covariance likelihood. That profile-likelihood
+diagnostic remains separate and conditional; covariance-aware quantities are
+the local fit and Jacobian diagnostics. Relativistic Maxwell-Juttner and CTS
+model-discrepancy covariance remain open.
