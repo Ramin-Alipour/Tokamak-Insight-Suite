@@ -1343,23 +1343,29 @@ from .cts_full_em import (
 
 
 def analyze_cts_spectrum_model(model=None, **kwargs):
-    """Dispatch to exactly one CTS model using a common public spectrum argument.
+    """Dispatch to one explicitly selected CTS inverse model.
 
-    The standard public contract names the calibrated measured spectral-power
-    vector ``spectrum`` for electrostatic and Full-EM bulk fits. The separate
-    ``full_em_gyrotropic_vdf_shape`` mode accepts its explicit shape-inverse
-    arguments and holds bulk plasma/geometry/population density fixed.
+    The spatial Full-EM mode fits node-wise relative profiles over supplied
+    frequency-resolved scattering-volume geometry; it is distinct from the
+    single-volume bulk fit and the fixed-bulk gyrotropic VDF-shape inverse.
     """
     if model is None:
-        raise ValueError("Select model='electrostatic', 'full_electromagnetic' or 'full_em_gyrotropic_vdf_shape' explicitly; no default model is selected.")
+        raise ValueError("Select an explicit CTS model; no default model is selected.")
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
     if model == "full_em_gyrotropic_vdf_shape":
         return fit_full_em_gyrotropic_population_shape(**kwargs)
+    if model == "full_em_spatial_profiles":
+        if "spectrum" in kwargs and "measured_spectrum" in kwargs:
+            raise ValueError("Supply the calibrated CTS spectrum once, as 'spectrum' or 'measured_spectrum', not both.")
+        if "spectrum" in kwargs:
+            kwargs["measured_spectrum"] = kwargs.pop("spectrum")
+        from .cts_spatial_inference import analyze_full_em_cts_spatial_profiles
+        return analyze_full_em_cts_spatial_profiles(**kwargs)
     if model == "full_electromagnetic":
         if "spectrum" in kwargs and "measured_spectrum" in kwargs:
             raise ValueError("Supply the calibrated CTS spectrum once, as 'spectrum' or 'measured_spectrum', not both.")
         if "spectrum" in kwargs:
             kwargs["measured_spectrum"] = kwargs.pop("spectrum")
         return analyze_full_em_cts_spectrum(**kwargs)
-    raise ValueError("model must be 'electrostatic', 'full_electromagnetic' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
+    raise ValueError("model must be 'electrostatic', 'full_electromagnetic', 'full_em_spatial_profiles' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
