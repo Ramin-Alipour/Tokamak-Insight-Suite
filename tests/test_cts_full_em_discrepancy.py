@@ -87,3 +87,23 @@ def test_cts_registry_declares_discrepancy_covariance_for_both_models():
         if item["name"] == "model_discrepancy_covariance"
     )
     assert "Electrostatic and Full-EM" in spec["description"]
+
+
+def test_full_em_resonance_broadening_is_never_reported_as_physical_collisions():
+    from tokamak_analysis.cts_full_em import _resonance_broadening_metadata
+
+    supplied = _resonance_broadening_metadata(
+        2.0e6, caller_supplied=True, probe_frequency_Hz=100.0e9
+    )
+    assert supplied["damping_rate_is_physical_collision_frequency"] is False
+    assert supplied["collisional_cts_model_status"] == "not_implemented"
+    assert supplied["collision_operator"] is None
+    assert supplied["damping_rate_source"] == "caller_supplied_numerical_regularization"
+
+    defaulted = _resonance_broadening_metadata(
+        2.0e6, caller_supplied=False, probe_frequency_Hz=100.0e9
+    )
+    assert "documented_numerical_default" in defaulted["damping_rate_source"]
+    assert defaulted["resonance_broadening_semantics"] == (
+        "numerical_resonance_regularization_in_kinetic_denominators_only"
+    )
