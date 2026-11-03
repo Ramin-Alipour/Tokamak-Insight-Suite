@@ -315,3 +315,119 @@ def reconstruct_multiview_3d_evdf(
         },
         "experimental_validation": "not_performed",
     }
+
+
+
+def fit_nonlinear_nonnegative_distribution(
+    measured_spectrum, initial_distribution, quadrature_weights, *,
+    forward_model, regularization_matrix, regularization_strength,
+    measurement_uncertainty=None, measurement_covariance=None,
+    max_nfev=2000,
+):
+    """Fit a normalized non-negative distribution through a nonlinear forward model.
+
+    The forward_model(pdf) callback must evaluate the complete physical
+    spectrum for the supplied distribution. A softmax mass parameterization
+    enforces non-negativity and exact normalization. The regularizer is explicit
+    and acts on the physical PDF, not on an arbitrary optimizer parameter.
+    """
+    from scipy.optimize import least_squares
+    y = _real_array(measured_spectrum, "measured_spectrum", 1)
+    pdf0 = _real_array(initial_distribution, "initial_distribution", 1)
+    weights = _real_array(quadrature_weights, "quadrature_weights", 1)
+    penalty = _real_array(regularization_matrix, "regularization_matrix", 2)
+    if pdf0.shape != weights.shape or penalty.shape[1] != pdf0.size:
+        raise ValueError("initial distribution, quadrature weights and regularization matrix dimensions must agree")
+    if np.any(pdf0 < 0) or np.any(weights <= 0) or float(pdf0 @ weights) <= 0:
+        raise ValueError("initial distribution must be non-negative with positive weighted integral; quadrature weights must be positive")
+    if not callable(forward_model):
+        raise ValueError("forward_model must be callable")
+    lam = float(regularization_strength)
+    if not np.isfinite(lam) or lam <= 0:
+        raise ValueError("regularization_strength must be positive and finite")
+    if isinstance(max_nfev, bool) or not isinstance(max_nfev, (int, np.integer)) or max_nfev < 10:
+        raise ValueError("max_nfev must be an integer >=10")
+    if measurement_uncertainty is not None and measurement_covariance is not None:
+        raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
+    if measurement_uncertainty is not None:
+        sigma = _real_array(measurement_uncertainty, "measurement_uncertainty", 1)
+        if sigma.shape != y.shape or np.any(sigma <= 0):
+            raise ValueError("measurement_uncertainty must be positive and match measured_spectrum")
+        whiten = lambda z: np.asarray(z) / sigma
+        noise_status = "supplied_pointwise_measurement_uncertainty"
+    elif measurement_covariance is not None:
+        covariance = _real_array(measurement_covariance, "measurement_covariance", 2)
+        if covariance.shape != (y.size, y.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
+            raise ValueError("measurement_covariance must be symmetric and match measured_spectrum")
+        chol = np.linalg.cholesky(covariance)
+        whiten = lambda z: np.linalg.solve(chol, np.asarray(z))
+        noise_status = "supplied_full_measurement_covariance"
+    else:
+        whiten = lambda z: np.asarray(z)
+        noise_status = "unweighted_no_measurement_uncertainty_supplied"
+    masses0 = np.maximum(pdf0 * weights, np.finfo(float).tiny)
+    masses0 /= masses0.sum()
+    logits0 = np.log(masses0[:-1] / masses0[-1])
+    def decode(logits):
+        values = np.r_[np.asarray(logits, dtype=float), 0.0]
+        values -= np.max(values)
+        masses = np.exp(values)
+        masses /= masses.sum()
+        return masses / weights
+    def profiled_spectrum(pdf):
+        spectrum = _real_array(forward_model(pdf), "forward_model spectrum", 1)
+        if spectrum.shape != y.shape or np.any(spectrum < 0):
+            raise ValueError("forward_model must return a non-negative spectrum matching measured_spectrum")
+        design = whiten(np.column_stack((spectrum, np.ones_like(spectrum))))
+        target = whiten(y)
+        amplitude, offset = np.linalg.lstsq(design, target, rcond=None)[0]
+        if amplitude < 0:
+            amplitude = 0.0
+            one = whiten(np.ones_like(y))
+            offset = float(one @ target / (one @ one))
+        residual = whiten(amplitude * spectrum + offset - y)
+        return residual, amplitude, offset, spectrum
+    penalty_scale = max(float(np.linalg.norm(penalty, ord="fro")), np.finfo(float).tiny)
+    def residual(logits):
+        pdf = decode(logits)
+        data_residual, _, _, _ = profiled_spectrum(pdf)
+        smoothness = np.sqrt(lam) * (penalty @ pdf) / max(float(np.max(pdf)), np.finfo(float).tiny)
+        return np.r_[data_residual, smoothness]
+    fit = least_squares(residual, logits0, method="trf", x_scale="jac", max_nfev=int(max_nfev))
+    if not fit.success or np.any(~np.isfinite(fit.x)):
+        raise ValueError(f"nonlinear distribution-shape inversion failed: {fit.message}")
+    pdf = decode(fit.x)
+    data_residual, amplitude, offset, intrinsic = profiled_spectrum(pdf)
+    jac = np.asarray(fit.jac, dtype=float)
+    singular = np.linalg.svd(jac, compute_uv=False)
+    tolerance = np.finfo(float).eps * max(jac.shape) * (singular[0] if singular.size else 0.0)
+    rank = int(np.count_nonzero(singular > tolerance))
+    condition = float(singular[0] / singular[-1]) if singular.size and singular[-1] > tolerance else float("inf")
+    identifiable = rank == fit.x.size and np.isfinite(condition) and condition < 1e12
+    covariance_logits = np.linalg.pinv(jac.T @ jac, hermitian=True)
+    if noise_status == "unweighted_no_measurement_uncertainty_supplied":
+        covariance_logits *= float(fit.fun @ fit.fun / max(1, y.size - fit.x.size))
+    # Exact softmax Jacobian from logits to normalized PDF.
+    masses = pdf * weights
+    softmax_jac = (np.diag(masses) - np.outer(masses, masses))[:, :-1]
+    pdf_jac = softmax_jac / weights[:, None]
+    covariance_pdf = pdf_jac @ covariance_logits @ pdf_jac.T
+    fitted = amplitude * intrinsic + offset
+    return {
+        "status": "identified_conditional_distribution_shape" if identifiable else "conditional_regularized_distribution_candidate",
+        "distribution": pdf if identifiable else None,
+        "regularized_candidate_distribution": pdf,
+        "distribution_covariance": covariance_pdf if identifiable else None,
+        "fitted_spectrum": fitted,
+        "residual": y - fitted,
+        "profiled_amplitude": float(amplitude),
+        "profiled_offset": float(offset),
+        "data_only_or_regularized_jacobian_rank": rank,
+        "parameter_count": int(fit.x.size),
+        "jacobian_condition_number": condition,
+        "regularization_strength": lam,
+        "noise_model": noise_status,
+        "normalization": float(pdf @ weights),
+        "uncertainty_interpretation": "local covariance conditional on the physical forward model, momentum grid, regularization and fixed plasma/geometry inputs",
+        "experimental_validation": "not_performed",
+    }
