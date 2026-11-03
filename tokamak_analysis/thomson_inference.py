@@ -1013,15 +1013,6 @@ def analyze_thomson_spectra(
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
             "is implemented as a separate child subanalysis of primary Analysis 1."
         )
-    if model == "non_collective_relativistic_maxwell_juttner" and (
-        background_model != "linear" or background_templates is not None
-        or background_degree != 2 or background_interior_knots != 3
-    ):
-        raise ValueError(
-            "Structured channel-wise background bases are not yet implemented for the "
-            "relativistic Maxwell-Juttner optimizer; use its explicit linear background "
-            "contract or the joint spatial-spectral structured-background workflow."
-        )
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
             "Beam-direction component uncertainty is supported only by the relativistic "
@@ -1415,13 +1406,138 @@ def analyze_thomson_spectra(
                 ),
             )
         elif model == "non_collective_relativistic_maxwell_juttner":
-            fit = fit_relativistic_maxwell_juttner(
+            # First obtain a deterministic physical seed with the established
+            # relativistic fitter, then refit the measured channel with the
+            # selected detector-space background basis in the same GLS problem.
+            seed_fit = fit_relativistic_maxwell_juttner(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
                 response, channel_covariance if channel_covariance is not None else ui,
                 incident_direction=probe_vec, scattered_direction=scatter_vec,
                 incident_polarization=incident_polarization,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                 include_compton_recoil=include_compton_recoil,
+            )
+            from .thomson_kinetic_background import (
+                fit_noncollective_kinetic_thomson_with_joint_background,
+            )
+            channel_background_templates = (
+                background_templates[i]
+                if background_templates is not None and np.asarray(background_templates).ndim == 3
+                else background_templates
+            )
+            joint_background_fit = fit_noncollective_kinetic_thomson_with_joint_background(
+                xi, y[i],
+                physical_model="relativistic_maxwell_juttner",
+                laser_wavelength_nm=float(laser_wavelength_nm),
+                scattering_angle_rad=float(scattering_angle_rad),
+                instrument_response=response,
+                physical_initial=[
+                    float(seed_fit["electron_temperature_eV"]),
+                    float(seed_fit["electron_velocity_projection_m_s"]),
+                ],
+                background_model=background_model,
+                background_degree=background_degree,
+                background_interior_knots=background_interior_knots,
+                background_templates=channel_background_templates,
+                measurement_uncertainty=(ui if channel_covariance is None else None),
+                measurement_covariance=channel_covariance,
+                incident_polarization=incident_polarization,
+                maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
+            )
+            fit = dict(seed_fit)
+            fit.update(joint_background_fit)
+            physical_covariance = np.asarray(
+                joint_background_fit["physical_parameter_covariance"], dtype=float
+            )
+            joint_parameter_covariance = np.asarray(
+                joint_background_fit["joint_parameter_covariance"], dtype=float
+            )
+            fit.update({
+                "electron_temperature_eV": float(joint_background_fit["physical_parameters"][0]),
+                "electron_velocity_projection_m_s": float(joint_background_fit["physical_parameters"][1]),
+                "electron_temperature_uncertainty_eV": float(
+                    np.sqrt(max(physical_covariance[0, 0], 0.0))
+                ),
+                "electron_velocity_projection_uncertainty_m_s": float(
+                    np.sqrt(max(physical_covariance[1, 1], 0.0))
+                ),
+                "fit_covariance": joint_parameter_covariance,
+                "fit_covariance_parameter_order": list(
+                    joint_background_fit["joint_parameter_order"]
+                ),
+                "fit_covariance_includes_background_cross_terms": True,
+                "background_fit_method": "joint_nonlinear_physical_and_linear_nuisance_fit",
+                "background_covariance_scope": (
+                    "full local covariance including physical-amplitude-background "
+                    "cross terms, conditional on the supplied measured response and "
+                    "spectral noise covariance"
+                ),
+            })
+            # The absolute-power integral must correspond to the refitted
+            # Thomson component, not the seed fit. Propagate its uncertainty
+            # through Te, projected flow and fitted amplitude using the complete
+            # joint covariance; background coefficients do not enter this integral.
+            from .thomson_kinetic_models import (
+                relativistic_maxwell_juttner_spectrum as _mj_forward,
+                _apply_response as _mj_apply_response,
+            )
+            physical_parameters = np.asarray(
+                joint_background_fit["physical_parameters"], dtype=float
+            )
+            fitted_amplitude = float(joint_background_fit["amplitude"])
+            def _integrated_power_at(parameters):
+                physical = _mj_forward(
+                    xi, float(laser_wavelength_nm), float(scattering_angle_rad),
+                    float(parameters[0]),
+                    flow_projection_m_s=float(parameters[1]),
+                    incident_polarization=np.asarray(incident_polarization, dtype=float),
+                    maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                    include_compton_recoil=include_compton_recoil,
+                    require_full_spectrum=False,
+                )
+                convolved_shape = _mj_apply_response(
+                    response, np.asarray(physical["spectral_density_per_nm"], dtype=float), xi
+                )
+                return (
+                    float(parameters[2]) * float(np.trapz(convolved_shape, xi)),
+                    float(physical["effective_differential_cross_section_m2_sr"]),
+                )
+            power_point = np.r_[physical_parameters, fitted_amplitude]
+            integrated_power, effective_cross_section = _integrated_power_at(power_point)
+            power_gradient = np.zeros(joint_parameter_covariance.shape[0], dtype=float)
+            for parameter_index in range(3):
+                step = np.cbrt(np.finfo(float).eps) * max(
+                    abs(float(power_point[parameter_index])), 1.0
+                )
+                plus, minus = power_point.copy(), power_point.copy()
+                plus[parameter_index] += step
+                minus[parameter_index] -= step
+                if parameter_index == 0 and minus[0] <= 0.0:
+                    minus[0] = power_point[0]
+                    derivative = (
+                        _integrated_power_at(plus)[0] - integrated_power
+                    ) / step
+                elif parameter_index == 2 and minus[2] <= 0.0:
+                    minus[2] = power_point[2]
+                    derivative = (
+                        _integrated_power_at(plus)[0] - integrated_power
+                    ) / step
+                else:
+                    derivative = (
+                        _integrated_power_at(plus)[0] - _integrated_power_at(minus)[0]
+                    ) / (plus[parameter_index] - minus[parameter_index])
+                power_gradient[parameter_index] = derivative
+            power_variance = float(
+                power_gradient @ joint_parameter_covariance @ power_gradient
+            )
+            fit["integrated_scattered_power_W"] = integrated_power
+            fit["integrated_scattered_power_uncertainty_W"] = float(
+                np.sqrt(max(power_variance, 0.0))
+            )
+            fit["effective_differential_cross_section_m2_sr"] = effective_cross_section
+            fit["integrated_power_uncertainty_method"] = (
+                "finite_difference_delta_method_from_full_joint_physical_amplitude_background_covariance"
             )
         elif model == "collective_kappa":
             fit = fit_collective_kappa(
@@ -1626,9 +1742,14 @@ def analyze_thomson_spectra(
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
         expected_parameter_count = (
-            2 if model == "collective_maxwellian" else
-            3 if model == "collective_kappa" else
-            6 if model == "non_collective_kappa" else 5
+            int(np.asarray(fit["fit_covariance"]).shape[0])
+            if model == "non_collective_relativistic_maxwell_juttner"
+            and fit.get("fit_covariance") is not None
+            else (
+                2 if model == "collective_maxwellian" else
+                3 if model == "collective_kappa" else
+                6 if model == "non_collective_kappa" else 5
+            )
         )
         quality = _fit_identifiability(
             fit.get("fit_covariance"), fit.get("residual"), ui, expected_parameter_count,
