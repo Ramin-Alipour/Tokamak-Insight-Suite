@@ -917,10 +917,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         trans[fast_offset+1,fast_offset+1]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
     alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
-    names=["electron_density_m3","electron_temperature_eV"] + [
-        f"ion_temperature_{ions[i]['name']}" if 'name' in ions[i] else f"ion_temperature_species_{i}"
+    ion_names = ["ion_temperature_eV"] if n_species == 1 else [
+        f"ion_temperature_{ions[i]['name']}" if "name" in ions[i] else f"ion_temperature_species_{i}"
         for i in range(n_species)
-    ] + ["electron_velocity_projection_m_s","ion_velocity_projection_m_s"]
+    ]
+    names = ["electron_density_m3", "electron_temperature_eV"] + ion_names + [
+        "electron_velocity_projection_m_s", "ion_velocity_projection_m_s"
+    ]
     out={**d,"optimizer_initial_estimates":initialization_record,
       "electron_velocity_projection_is_fitted":True,"electron_velocity_projection_uncertainty_m_s":float(su[2+n_species]),
       "electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
