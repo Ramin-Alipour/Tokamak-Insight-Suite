@@ -78,7 +78,7 @@ def analyze_full_em_cts_spatial_profiles(
     frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
     scattering_geometry, forward_model_kwargs, spectral_covariance=None,
     signal_uncertainty=None, instrument_response=None,
-    fixed_background_spectrum=None, fit_electron_density_profile=True,
+    fixed_background_spectrum=None, background_mode=None, fit_electron_density_profile=True,
     fit_electron_temperature_profile=True, fit_ion_temperature_profile=False,
     initial_profiles=None, regularization_matrix=None,
     regularization_strength=None, regularization_sensitivity_strengths=None,
@@ -141,7 +141,16 @@ def analyze_full_em_cts_spatial_profiles(
     response = np.eye(f.size) if instrument_response is None else np.asarray(instrument_response, dtype=float)
     if response.shape != (f.size, f.size) or not np.all(np.isfinite(response)) or np.any(response < 0):
         raise ValueError("instrument_response must be a finite non-negative square matrix")
-    background = np.zeros_like(y) if fixed_background_spectrum is None else _vector(fixed_background_spectrum, "fixed_background_spectrum")
+    if background_mode not in {"zero", "spectrum"}:
+        raise ValueError("background_mode must be explicitly set to 'zero' or 'spectrum'; zero background is never assumed")
+    if background_mode == "zero" and fixed_background_spectrum is not None:
+        raise ValueError("fixed_background_spectrum must be omitted when background_mode='zero'")
+    if background_mode == "spectrum" and fixed_background_spectrum is None:
+        raise ValueError("fixed_background_spectrum is required when background_mode='spectrum'")
+    background = (
+        np.zeros_like(y) if background_mode == "zero"
+        else _vector(fixed_background_spectrum, "fixed_background_spectrum")
+    )
     if background.shape != y.shape:
         raise ValueError("fixed_background_spectrum must match measured_spectrum")
     initial = initial_profiles or {}
@@ -260,7 +269,8 @@ def analyze_full_em_cts_spatial_profiles(
                 forward_model_kwargs=forward_model_kwargs,
                 spectral_covariance=covariance,
                 instrument_response=response,
-                fixed_background_spectrum=background,
+                fixed_background_spectrum=(background if background_mode == 'spectrum' else None),
+                background_mode=background_mode,
                 fit_electron_density_profile=fit_electron_density_profile,
                 fit_electron_temperature_profile=fit_electron_temperature_profile,
                 fit_ion_temperature_profile=fit_ion_temperature_profile,

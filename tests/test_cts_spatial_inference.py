@@ -59,7 +59,7 @@ def test_spatial_full_em_inverse_uses_local_profiles_and_full_covariance(monkeyp
     result = spatial.analyze_full_em_cts_spatial_profiles(
         frequency, measured, probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
-        spectral_covariance=np.eye(8) * 1e-4,
+        spectral_covariance=np.eye(8) * 1e-4, background_mode="zero",
         fit_electron_density_profile=True,
         fit_electron_temperature_profile=True,
         initial_profiles={
@@ -130,7 +130,7 @@ def test_spatial_full_em_inverse_reports_regularization_choice_sensitivity(monke
     result = spatial.analyze_full_em_cts_spatial_profiles(
         frequency, np.ones(8), probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
-        signal_uncertainty=np.ones(8), fit_electron_density_profile=True,
+        signal_uncertainty=np.ones(8), background_mode="zero", fit_electron_density_profile=True,
         fit_electron_temperature_profile=False, regularization_strength=0.2, profile_bounds_relative=(0.05, 20.0),
         regularization_sensitivity_strengths=[0.1, 0.2, 1.0],
         max_nfev=40,
@@ -169,7 +169,7 @@ def test_regularization_cannot_create_full_em_profile_identifiability(monkeypatc
     result = spatial.analyze_full_em_cts_spatial_profiles(
         frequency, measured, probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
-        signal_uncertainty=np.full(frequency.size, 0.01),
+        signal_uncertainty=np.full(frequency.size, 0.01), background_mode="zero",
         fit_electron_density_profile=True,
         fit_electron_temperature_profile=False,
         regularization_strength=0.5, profile_bounds_relative=(0.05, 20.0),
@@ -236,7 +236,7 @@ def test_spatial_full_em_inverse_requires_explicit_profile_bounds_and_regulariza
     base = dict(
         frequency_shift_Hz=np.linspace(-1.0, 1.0, 8), measured_spectrum=np.ones(8),
         probe_frequency_Hz=140e9, scattering_geometry=_geometry(),
-        forward_model_kwargs=_kwargs(), signal_uncertainty=np.ones(8),
+        forward_model_kwargs=_kwargs(), signal_uncertainty=np.ones(8), background_mode="zero",
     )
     with pytest.raises(ValueError, match="profile_bounds_relative must be supplied explicitly"):
         spatial.analyze_full_em_cts_spatial_profiles(
@@ -245,4 +245,21 @@ def test_spatial_full_em_inverse_requires_explicit_profile_bounds_and_regulariza
     with pytest.raises(ValueError, match="regularization_strength must be supplied explicitly"):
         spatial.analyze_full_em_cts_spatial_profiles(
             **base, profile_bounds_relative=(0.05, 20.0)
+        )
+
+
+def test_spatial_full_em_inverse_requires_explicit_background_state():
+    base = dict(
+        frequency_shift_Hz=np.linspace(-1.0, 1.0, 8), measured_spectrum=np.ones(8),
+        probe_frequency_Hz=140e9, scattering_geometry=_geometry(),
+        forward_model_kwargs=_kwargs(), signal_uncertainty=np.ones(8),
+        regularization_strength=0.1, profile_bounds_relative=(0.05, 20.0),
+    )
+    with pytest.raises(ValueError, match="background_mode must be explicitly set"):
+        spatial.analyze_full_em_cts_spatial_profiles(**base)
+    with pytest.raises(ValueError, match="fixed_background_spectrum is required"):
+        spatial.analyze_full_em_cts_spatial_profiles(**base, background_mode="spectrum")
+    with pytest.raises(ValueError, match="must be omitted"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            **base, background_mode="zero", fixed_background_spectrum=np.zeros(8)
         )

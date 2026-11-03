@@ -3879,6 +3879,8 @@ elif page=='Advanced Analysis':
                 spatial_fit_ti=st.checkbox('Fit spatial ion-temperature profile',value=False,key='cts_spatial_fit_ti')
             with c2:
                 spatial_geometry_upload=st.file_uploader('Frequency-resolved scattering-volume geometry JSON',type=['json'],key='cts_spatial_geometry')
+                spatial_background_mode=st.selectbox('Background state (required)',['zero','spectrum'],index=None,placeholder='Declare zero background or upload a fixed spectrum',key='cts_spatial_background_mode')
+                spatial_background_upload=st.file_uploader('Fixed background spectrum CSV (required when background=spectrum)',type=['csv','txt'],key='cts_spatial_background')
                 spatial_response_upload=st.file_uploader('Optional measured frequency-response matrix CSV',type=['csv','txt'],key='cts_spatial_response')
                 spatial_covariance_upload=st.file_uploader('Optional full frequency-bin covariance CSV',type=['csv','txt'],key='cts_spatial_covariance')
                 spatial_bfield=st.text_input('Reference magnetic field vector (T; x,y,z)',key='cts_spatial_bfield')
@@ -3934,11 +3936,20 @@ elif page=='Advanced Analysis':
                         'fit_electron_temperature_profile':bool(spatial_fit_te),
                         'fit_ion_temperature_profile':bool(spatial_fit_ti),
                         'regularization_strength':_parse_ts_scalar(spatial_regularization,'Profile smoothness strength',minimum=0.0),
+                        'background_mode':spatial_background_mode,
                         'profile_bounds_relative':(
                             _parse_ts_scalar(spatial_profile_lower,'Relative profile lower bound',minimum=0.0),
                             _parse_ts_scalar(spatial_profile_upper,'Relative profile upper bound',minimum=0.0),
                         ),
                     }
+                    if spatial_background_mode is None:
+                        raise ValueError('Explicitly declare whether the fixed background is zero or a supplied spectrum.')
+                    if spatial_background_mode=='spectrum':
+                        if spatial_background_upload is None:
+                            raise ValueError('Upload the fixed background spectrum when background=spectrum.')
+                        kwargs_spatial['fixed_background_spectrum']=pd.read_csv(spatial_background_upload,header=None).to_numpy(dtype=float).reshape(-1)
+                    elif spatial_background_upload is not None:
+                        raise ValueError('Do not upload a background spectrum when background=zero.')
                     if spatial_reg_sensitivity_text.strip():
                         kwargs_spatial['regularization_sensitivity_strengths']=_parse_ts_float_list(spatial_reg_sensitivity_text,'Regularization sensitivity grid')
                     if spatial_unc_col!='<none>' and spatial_covariance_upload is not None:
