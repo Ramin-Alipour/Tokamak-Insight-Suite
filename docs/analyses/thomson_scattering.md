@@ -460,3 +460,21 @@ validation.
 ## Input-contract enforcement: calibrated spectra only
 
 The Analysis 1 optical Thomson API accepts measured spectra that are already prepared and calibrated by the instrument/operator. Raw integer photon-count fitting is not part of this analysis contract. The former standalone `fit_optical_thomson_poisson_counts` entry point has been removed, together with its internal Poisson-likelihood branch and registry exposure. Use the canonical calibrated-intensity Gaussian/GLS inference path. This does not imply that calibrated spectral uncertainties must be Gaussian; the supplied uncertainty/covariance model is consumed according to the selected API. No count-to-power conversion, detector correction or calibration is performed by TIS.
+
+
+## Spatial-coordinate uncertainty in profile reconstruction
+
+The downstream profile-reconstruction API accepts the optional
+`profile_coordinate_covariance_m2` argument: a finite, symmetric, positive
+semidefinite covariance matrix with shape (N_channel, N_channel), in m² and
+in the supplied channel order. It is propagated by Monte Carlo together with
+the inferred profile-value covariance/uncertainty, when supplied. The
+coordinate and profile-value perturbations are sampled independently because
+the current input contract has no cross-covariance block between them; this
+independence assumption is recorded in the result provenance. A draw is
+discarded if perturbed coordinates are not strictly increasing or do not
+cover the fixed reconstruction grid. The input coordinates are never sorted,
+repaired or silently reordered. If the argument is omitted, coordinates are
+treated as exact. This is uncertainty propagation for supplied spatial
+coordinates, not an equilibrium or flux-surface mapping, and it does not
+estimate coordinate uncertainty from the spectra.
