@@ -1574,6 +1574,42 @@ def test_cts_reference_pca_background_is_used_as_fixed_calibrated_nuisance_basis
     np.testing.assert_array_equal(references, original_references)
 
 
+def test_cts_reference_pca_bootstrap_covariance_is_included_in_total_fit_covariance():
+    f0, f, g, ions, frac, response = _case()
+    truth = (2e19, 1200.0, 800.0, 1.5e4, 2.5e5)
+    physical = cts_spectral_density(
+        f, f0, g,
+        electron_density_m3=truth[0], electron_temperature_eV=truth[1],
+        ion_temperature_eV=truth[2], ion_species=ions, ion_fractions=frac,
+        electron_velocity_projection_m_s=truth[4], ion_velocity_projection_m_s=truth[3],
+    )
+    coordinate = np.linspace(-1.0, 1.0, f.size)
+    mode = np.sin(np.pi * coordinate)
+    references = np.vstack([
+        3.0 + 0.20 * mode, 3.0 + 0.10 * mode,
+        3.0 - 0.10 * mode, 3.0 - 0.20 * mode,
+    ])
+    measured = 2.4e4 * physical + 3.0 + 0.15 * mode
+    result = analyze_cts_spectrum(
+        f, measured, probe_frequency_Hz=f0, scattering_geometry=g,
+        ion_species=ions, ion_fractions=frac, instrument_response=response,
+        signal_uncertainty=np.full_like(measured, 0.02 * np.max(measured)),
+        electron_density_initial_m3=truth[0], electron_temperature_initial_eV=truth[1],
+        ion_temperature_initial_eV=truth[2], ion_velocity_initial_m_s=truth[3],
+        global_search=False, inversion_method="local_least_squares",
+        background_reference_spectra=references, background_components=1,
+        background_reference_basis_mc_samples=30,
+        background_reference_parameter_mc_samples=20,
+    )
+    assert result["background_reference_basis_uncertainty_propagated"] is True
+    assert result["background_reference_parameter_covariance_included"] is True
+    reference_covariance = result["background_reference_parameter_covariance"]
+    assert reference_covariance.shape == result["fit_covariance"].shape
+    assert np.all(np.isfinite(reference_covariance))
+    assert np.allclose(result["fit_covariance"], result["total_fit_covariance_including_discrepancy"])
+    assert np.allclose(result["parameter_uncertainties"]**2, np.diag(result["fit_covariance"]))
+
+
 def test_cts_reference_pca_background_requires_explicit_component_count():
     f0, f, g, ions, frac, response = _case()
     references = np.vstack([np.ones_like(f), 1.0 + 0.1 * np.sin(f / np.max(np.abs(f)))])
