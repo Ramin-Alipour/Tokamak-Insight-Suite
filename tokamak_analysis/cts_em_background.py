@@ -47,8 +47,8 @@ def thermal_bremsstrahlung_emissivity_si(
     ni = np.asarray(ion_densities_m3, dtype=float)
     z = np.asarray(ion_charge_states, dtype=float)
     g = np.asarray(gaunt_factor, dtype=float)
-    if not np.isfinite(ne) or ne <= 0 or not np.isfinite(te) or te <= 0:
-        raise ValueError("electron_density_m3 and electron_temperature_eV must be positive finite scalars")
+    if not np.isfinite(ne) or ne < 0 or not np.isfinite(te) or te <= 0:
+        raise ValueError("electron_density_m3 must be finite and non-negative; electron_temperature_eV must be positive and finite")
     if ni.ndim != 1 or z.shape != ni.shape or ni.size == 0 or np.any(~np.isfinite(ni)) or np.any(ni < 0) or np.any(~np.isfinite(z)) or np.any(z <= 0):
         raise ValueError("ion densities and charge states must be matching finite vectors with n_i>=0 and Z_i>0")
     if np.any(~np.isfinite(g)) or np.any(g <= 0):
@@ -92,8 +92,10 @@ def integrate_thermal_microwave_background(
         raise ValueError("path_length_m, electron_temperature_eV and electron_density_m3 must be matching 1-D path arrays")
     if ni.ndim != 2 or ni.shape[0] != length.size or z.shape != (ni.shape[1],):
         raise ValueError("ion_densities_m3 must be (n_path,n_species) and ion_charge_states one value per species")
-    if np.any(~np.isfinite(length)) or np.any(length <= 0) or np.any(~np.isfinite(te)) or np.any(te <= 0) or np.any(~np.isfinite(ne)) or np.any(ne <= 0):
-        raise ValueError("path lengths, temperatures and electron densities must be positive finite")
+    if (np.any(~np.isfinite(length)) or np.any(length <= 0)
+            or np.any(~np.isfinite(te)) or np.any(te <= 0)
+            or np.any(~np.isfinite(ne)) or np.any(ne < 0)):
+        raise ValueError("path lengths and temperatures must be positive finite; electron densities must be finite and non-negative")
     gaunt = np.asarray(gaunt_factor, dtype=float)
     if np.any(~np.isfinite(gaunt)) or np.any(gaunt <= 0.0):
         raise ValueError("gaunt_factor must contain positive finite values")
@@ -146,6 +148,9 @@ def integrate_thermal_microwave_background(
             raise ValueError("ece_absorption_coefficient_m_inverse must have shape (n_path,n_frequency) or (n_path,n_frequency,n_mode)")
         if np.any(~np.isfinite(ece_alpha)) or np.any(ece_alpha < 0.0):
             raise ValueError("ece absorption coefficients must be finite and non-negative")
+        vacuum_path = ne == 0.0
+        if np.any(vacuum_path) and np.any(ece_alpha[vacuum_path] != 0.0):
+            raise ValueError("ECE absorption must be zero on path elements with zero electron density")
     incident = np.asarray(incident_radiance_W_m2_sr_Hz, dtype=float)
     if incident.ndim == 0:
         incident = np.full(nu.size, float(incident))
@@ -168,8 +173,19 @@ def integrate_thermal_microwave_background(
         alpha_ff_total += alpha_ff * length[index]
         tau_ece_modes += ece_alpha[index].T * length[index]
     intensity = mode_weights @ intensity_modes
+    has_free_free = bool(np.any(alpha_ff_total > 0.0))
+    has_ece = bool(np.any(tau_ece_modes > 0.0))
+    has_incident = bool(np.any(incident > 0.0))
+    if has_free_free or has_ece:
+        background_status = "plasma_emission_or_absorption_present"
+    elif has_incident:
+        background_status = "incident_radiance_only_no_plasma_background"
+    else:
+        background_status = "zero_background_exact_zero_radiance"
     return {
         "spectral_radiance_W_m2_sr_Hz": intensity,
+        "background_status": background_status,
+        "zero_background": not (has_free_free or has_ece or has_incident),
         "spectral_radiance_by_mode_W_m2_sr_Hz": intensity_modes,
         "receiver_mode_weights": mode_weights.copy(),
         "thermal_bremsstrahlung_optical_depth": alpha_ff_total,
