@@ -1289,25 +1289,30 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
 
 
 # Separate magnetized electromagnetic CTS path; the electrostatic API remains unchanged.
-from .cts_full_em import full_em_cts_spectral_density, analyze_full_em_cts_spectrum
+from .cts_full_em import (
+    full_em_cts_spectral_density, analyze_full_em_cts_spectrum,
+    fit_full_em_gyrotropic_population_shape,
+)
 
 
 def analyze_cts_spectrum_model(model=None, **kwargs):
     """Dispatch to exactly one CTS model using a common public spectrum argument.
 
-    The public contract names the calibrated measured spectral-power vector
-    ``spectrum`` for both models. The Full-EM implementation retains its
-    descriptive internal parameter name ``measured_spectrum``; this adapter
-    performs that keyword translation and rejects ambiguous duplicate inputs.
+    The standard public contract names the calibrated measured spectral-power
+    vector ``spectrum`` for electrostatic and Full-EM bulk fits. The separate
+    ``full_em_gyrotropic_vdf_shape`` mode accepts its explicit shape-inverse
+    arguments and holds bulk plasma/geometry/population density fixed.
     """
     if model is None:
         raise ValueError("Select model='electrostatic' or model='full_electromagnetic' explicitly; no default model is selected.")
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
+    if model == "full_em_gyrotropic_vdf_shape":
+        return fit_full_em_gyrotropic_population_shape(**kwargs)
     if model == "full_electromagnetic":
         if "spectrum" in kwargs and "measured_spectrum" in kwargs:
             raise ValueError("Supply the calibrated CTS spectrum once, as 'spectrum' or 'measured_spectrum', not both.")
         if "spectrum" in kwargs:
             kwargs["measured_spectrum"] = kwargs.pop("spectrum")
         return analyze_full_em_cts_spectrum(**kwargs)
-    raise ValueError("model must be 'electrostatic' or 'full_electromagnetic'; no automatic model substitution is performed")
+    raise ValueError("model must be 'electrostatic', 'full_electromagnetic' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
