@@ -42,7 +42,7 @@ def _combine_independent_parameter_covariances(base_covariance, *components):
             raise ValueError("parameter covariance components must be symmetric and match the base covariance")
         cov = 0.5 * (cov + cov.T)
         eigenvalues = np.linalg.eigvalsh(cov)
-        scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
         if float(eigenvalues.min()) < -1e-10 * scale:
             raise ValueError("parameter covariance components must be positive semidefinite")
         total = total + cov
