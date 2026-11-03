@@ -140,3 +140,46 @@ def test_spatial_full_em_inverse_reports_regularization_choice_sensitivity(monke
     assert sensitivity["profiles_relative_to_reference"]["electron_density_relative"].shape == (3, 3)
     assert sensitivity["measurement_covariance_unchanged"] is True
     assert "not measurement uncertainty" in sensitivity["interpretation"]
+
+
+def test_regularization_cannot_create_full_em_profile_identifiability(monkeypatch):
+    frequency = np.linspace(-3e6, 3e6, 8)
+    coordinate = np.linspace(-1.0, 1.0, frequency.size)
+
+    def fake_forward(frequency_shift_Hz, probe_frequency_Hz, geometry, **kwargs):
+        profiles = np.asarray([
+            sample["electron_density_relative"]
+            for sample in geometry["frequency_resolved_geometry"][0]["scattering_samples"]
+        ])
+        # The measured spectrum sees only the profile mean and one slope
+        # combination.  The second-difference penalty supplies the remaining
+        # curvature direction, but that is prior information, not data.
+        mean = float(np.mean(profiles))
+        slope = float(profiles[-1] - profiles[0])
+        return {"spectral_density": mean + slope * coordinate}
+
+    monkeypatch.setattr(spatial, "full_em_cts_spectral_density", fake_forward)
+    truth_geometry = _geometry()
+    for i, sample in enumerate(
+        truth_geometry["frequency_resolved_geometry"][0]["scattering_samples"]
+    ):
+        sample["electron_density_relative"] = (0.8, 1.0, 1.2)[i]
+    measured = fake_forward(frequency, 140e9, truth_geometry)["spectral_density"]
+
+    result = spatial.analyze_full_em_cts_spatial_profiles(
+        frequency, measured, probe_frequency_Hz=140e9,
+        scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+        signal_uncertainty=np.full(frequency.size, 0.01),
+        fit_electron_density_profile=True,
+        fit_electron_temperature_profile=False,
+        regularization_strength=0.5,
+        max_nfev=100,
+    )
+
+    identifiability = result["profile_identifiability"]
+    assert identifiability["data_only_jacobian_rank"] == 2
+    assert identifiability["augmented_jacobian_rank"] == 3
+    assert identifiability["regularization_contributed_to_identifiability"] is True
+    assert identifiability["locally_identifiable"] is False
+    assert result["profile_covariance_relative"] is None
+    assert result["log_profile_covariance"] is None
