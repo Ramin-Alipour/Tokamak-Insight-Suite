@@ -40,10 +40,13 @@ spectra and returns covariance for the reference mean and sign/rotation-aligned
 PCA basis, plus singular-value gap diagnostics. Rank-deficient bootstrap
 subspaces are discarded.
 
-Important scope: this estimates finite-reference-sample uncertainty of the
-PCA basis. It is **not yet propagated into the fitted plasma-parameter
-covariance**. The fitted nuisance-coefficient covariance remains conditional
-on the selected basis. The result reports this distinction explicitly.
+The finite-reference bootstrap is also propagated through repeated CTS
+refits. The resulting parameter covariance is added to the base plasma
+parameter covariance when the required refit success fraction is achieved.
+This propagation covers density, electron temperature, each thermal-ion
+temperature and the fitted electron/ion flow projections. Fast-ion shape
+parameters are not included in this reference-PCA contribution. The
+nuisance-coefficient covariance remains conditional on each sampled basis.
 
 ## Full-EM thermal background: free-free and ECE
 
@@ -129,8 +132,9 @@ transfer, paraxial covariance propagation, nonlinear Full-EM gyrotropic shape
 inversion and multi-view 3-D EVDF inversion. The following uncertainty and
 integration boundaries remain explicit:
 
-1. CTS PCA basis covariance is estimated but not propagated into plasma
-   parameter covariance.
+1. CTS PCA basis covariance is propagated to the base plasma parameter
+   covariance by bootstrap refits; fast-ion shape-parameter covariance is
+   not included in that contribution.
 2. Optical Thomson Poisson likelihood is a separate count-space Maxwellian
    API; it is not a likelihood option for Kappa or relativistic fits.
 3. The GP discrepancy covariance is consumed by electrostatic CTS, not every
