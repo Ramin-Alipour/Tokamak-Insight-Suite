@@ -958,6 +958,7 @@ def analyze_full_em_cts_spectrum(
     response_mc_samples=100, external_input_covariance=None,
     external_input_parameter_order=None, external_input_mc_samples=100,
     external_input_mc_seed=84622,
+    physical_background_spectrum_W_Hz=None,
     numerical_convergence=True, convergence_harmonic_orders=None,
     convergence_quadrature_orders=None, convergence_relative_tolerance=1e-3,
 ):
@@ -1051,6 +1052,14 @@ def analyze_full_em_cts_spectrum(
         raise ValueError("frequency_shift_Hz and measured_spectrum must be matching vectors with >=8 bins")
     if np.any(~np.isfinite(f)) or np.any(~np.isfinite(y)) or np.any(np.diff(f) <= 0) or np.any(y < 0):
         raise ValueError("frequency axis must increase; measured spectrum must be finite and non-negative")
+    if physical_background_spectrum_W_Hz is None:
+        physical_background = np.zeros_like(y)
+        physical_background_status = "no_fixed_physical_background_supplied"
+    else:
+        physical_background = _real_array(physical_background_spectrum_W_Hz, "physical_background_spectrum_W_Hz", 1)
+        if physical_background.shape != y.shape or np.any(physical_background < 0):
+            raise ValueError("physical_background_spectrum_W_Hz must be non-negative and match the measured receiver-plane spectrum")
+        physical_background_status = "fixed_additive_receiver_plane_spectral_power_from_physical_radiative_transfer"
     response = _real_array(instrument_response, "instrument_response", 2)
     if response.shape != (f.size, f.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
         raise ValueError("instrument_response must be a non-negative square matrix with non-zero columns")
@@ -1314,13 +1323,13 @@ def analyze_full_em_cts_spectrum(
     def residual(p, return_profile=False, response_matrix=None, external_values=None):
         z = model(p, response_matrix=response_matrix, external_values=external_values)
         design = whiten(np.column_stack((z, np.ones_like(z))))
-        target = whiten(y)
+        target = whiten(y - physical_background)
         amplitude, offset = np.linalg.lstsq(design, target, rcond=None)[0]
         if amplitude < 0:
             amplitude = 0.0
             one = whiten(np.ones_like(y))
             offset = float(one @ target / (one @ one))
-        r = whiten(amplitude * z + offset - y)
+        r = whiten(amplitude * z + offset - (y - physical_background))
         return (r, amplitude, offset, z) if return_profile else r
 
     # Full-EM CTS is a strongly nonlinear inverse problem.  A single
@@ -1445,8 +1454,11 @@ def analyze_full_em_cts_spectrum(
         "parameter_bounds": applied_bounds,
         "fit_covariance": covariance,
         "parameter_uncertainties": np.sqrt(np.maximum(np.diag(covariance), 0.0)),
-        "fitted_spectrum": amplitude * convolved + offset,
-        "residual": y - (amplitude * convolved + offset),
+        "fitted_spectrum": amplitude * convolved + offset + physical_background,
+        "residual": y - (amplitude * convolved + offset + physical_background),
+        "physical_background_spectrum_W_Hz": physical_background.copy(),
+        "physical_background_status": physical_background_status,
+        "physical_background_role": "fixed_additive_receiver_plane_spectral_power; radiance_to_power conversion uses measured receiver_etendue and efficiency exactly once",
         "profiled_amplitude": float(amplitude),
         "profiled_offset": float(offset),
         "reduced_chi_square": (
@@ -1454,7 +1466,7 @@ def analyze_full_em_cts_spectrum(
             if spectral_covariance is not None or signal_uncertainty is not None
             else None
         ),
-        "fit_residual_rms": float(np.sqrt(np.mean((y - (amplitude * convolved + offset)) ** 2))),
+        "fit_residual_rms": float(np.sqrt(np.mean((y - (amplitude * convolved + offset + physical_background)) ** 2))),
         "spectral_uncertainty_supplied": bool(
             spectral_covariance is not None or signal_uncertainty is not None
         ),
