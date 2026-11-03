@@ -1571,8 +1571,11 @@ def analyze_full_em_cts_spectrum(
             else "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         ),
         "parameter_covariance_scope": (
-            "local_jacobian_covariance_conditional_on_fixed_external_inputs; "
-            "does_not_include_external_geometry_field_composition_polarization_ray_or_beam_covariance_uncertainty"
+            "local_jacobian_covariance conditional on fixed external inputs; "
+            "the GLS covariance includes supplied measurement covariance and the "
+            "independent model-discrepancy covariance when provided; it excludes "
+            "external geometry, field, composition, polarization, ray and beam "
+            "covariance uncertainty unless separately propagated"
         ),
         "numerical_convergence_status": "not_assessed_in_single_inversion; use assess_full_em_cts_numerical_convergence",
         "jacobian_rank": rank,
