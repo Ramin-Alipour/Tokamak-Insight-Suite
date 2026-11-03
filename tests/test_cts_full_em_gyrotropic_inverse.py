@@ -10,16 +10,7 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
     n_voxel = p_perp.size*p_parallel.size
     frequency = np.linspace(-2e9, 2e9, 24)
     kernel = rng.uniform(0.1, 1.0, size=(frequency.size, n_voxel))
-    edges_perp = np.empty(p_perp.size+1)
-    edges_perp[1:-1] = 0.5*(p_perp[:-1]+p_perp[1:])
-    edges_perp[0] = p_perp[0]-0.5*(p_perp[1]-p_perp[0])
-    edges_perp[-1] = p_perp[-1]+0.5*(p_perp[-1]-p_perp[-2])
-    edges_parallel = np.empty(p_parallel.size+1)
-    edges_parallel[1:-1] = 0.5*(p_parallel[:-1]+p_parallel[1:])
-    edges_parallel[0] = p_parallel[0]-0.5*(p_parallel[1]-p_parallel[0])
-    edges_parallel[-1] = p_parallel[-1]+0.5*(p_parallel[-1]-p_parallel[-2])
-    weights = 2*np.pi*p_perp*np.diff(edges_perp)
-    weights = weights[:,None]*np.diff(edges_parallel)[None,:]
+    weights = 2*np.pi*p_perp[:,None]*np.gradient(p_perp)[:,None]*np.gradient(p_parallel)[None,:]
     truth = np.arange(1, n_voxel+1, dtype=float).reshape(4,4)
     truth /= np.sum(truth*weights)
     measured = 250.0*(kernel@truth.ravel()) + 0.03
