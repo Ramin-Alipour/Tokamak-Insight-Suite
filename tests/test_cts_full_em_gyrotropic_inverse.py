@@ -1,6 +1,7 @@
 import numpy as np
 
 import tokamak_analysis.cts_full_em as full_em
+from tokamak_analysis.cts_analysis import analyze_cts_spectrum_model
 
 
 def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(monkeypatch):
@@ -20,8 +21,9 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
         return {"spectral_density": kernel@np.asarray(distribution).ravel()}
 
     monkeypatch.setattr(full_em, "full_em_cts_spectral_density", fake_forward)
-    result = full_em.fit_full_em_gyrotropic_population_shape(
-        frequency, measured,
+    result = analyze_cts_spectrum_model(
+        model="full_em_gyrotropic_vdf_shape",
+        frequency_shift_Hz=frequency, measured_spectrum=measured,
         probe_frequency_Hz=140e9,
         scattering_geometry={"incident_direction": [1,0,0], "scattered_direction": [0,1,0]},
         population_kind="electron",
