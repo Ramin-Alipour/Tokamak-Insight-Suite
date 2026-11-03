@@ -1531,7 +1531,7 @@ def test_full_channel_major_model_discrepancy_covariance_preserves_cross_channel
     assert out["joint_inference"]["fit_covariance"].shape[0] > 0
     assert all(
         channel["spectral_weighting_status"]
-        == "full_channel_major_generalized_least_squares_including_cross_channel_covariance"
+        == "within_channel_marginal_gls_cross_channel_covariance_used_in_joint_shared_parameter_fit"
         for channel in out["channels"]
     )
     assert all(
