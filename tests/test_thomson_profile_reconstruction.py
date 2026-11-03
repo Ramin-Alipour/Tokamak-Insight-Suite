@@ -156,3 +156,14 @@ def test_profile_reconstruction_rejects_invalid_coordinate_covariance():
             radius, values, coordinate_covariance=np.ones((4, 4)),
             method="pchip",
         )
+
+
+def test_joint_spatial_spectral_rejects_unpropagated_coordinate_covariance():
+    from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
+
+    with pytest.raises(ValueError, match="not supported by the raw joint"):
+        reconstruct_thomson_profile_from_spectra(
+            joint_spatial_spectral=True,
+            spatial_mixing_matrix=np.eye(2),
+            profile_coordinate_covariance_m2=np.eye(2) * 1.0e-6,
+        )
