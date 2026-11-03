@@ -129,7 +129,7 @@ def integrate_thermal_microwave_background(
             ece_alpha = supplied_alpha[:, :, None]
             n_modes = 1
             mode_weights = np.ones(1, dtype=float)
-            ece_status = "single-effective-mode ECE absorption supplied; Kirchhoff LTE source function used"
+            ece_status = "mode-resolved single-effective-mode ECE absorption supplied; Kirchhoff LTE source function used"
         elif supplied_alpha.ndim == 3 and supplied_alpha.shape[:2] == (length.size, nu.size):
             n_modes = supplied_alpha.shape[2]
             if n_modes < 1:
