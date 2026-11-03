@@ -1304,7 +1304,7 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
     arguments and holds bulk plasma/geometry/population density fixed.
     """
     if model is None:
-        raise ValueError("Select model='electrostatic' or model='full_electromagnetic' explicitly; no default model is selected.")
+        raise ValueError("Select model='electrostatic', 'full_electromagnetic' or 'full_em_gyrotropic_vdf_shape' explicitly; no default model is selected.")
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
     if model == "full_em_gyrotropic_vdf_shape":
