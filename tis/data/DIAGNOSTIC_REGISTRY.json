@@ -4657,7 +4657,7 @@
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
     "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family. Electrostatic CTS optionally fits a fixed detector-space PCA nuisance background from explicitly supplied calibrated background-only reference spectra on the same frequency grid; the number of retained components is researcher-selected. The Full-EM branch does not accept this option. Scattering-volume samples may additionally carry externally prescribed electron_density_relative, electron_temperature_relative and ion_temperature_relative factors, plus sample-local species/flow/polarization overrides.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; reference-ensemble uncertainty is not propagated and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948). Per-sample relative plasma profiles are fixed external forward-model inputs. The inversion does not fit arbitrary node-wise plasma profiles and does not propagate covariance of those factors or cross-sample profile covariance. New independent operators include correlated GP model-discrepancy covariance for electrostatic CTS, bootstrap covariance of the reference-PCA mean/basis (not yet propagated into plasma-parameter covariance), free-free plus LTE ECE radiative transfer with externally supplied mode-resolved ECE absorption, and Full-EM nonlinear gyrotropic electron/fast-ion shape inversion conditional on fixed bulk plasma and geometry. Paraxial beam covariance is propagated only through supplied symplectic ABCD maps; full dispersion-Hessian quasi-optics is not derived internally.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; reference-ensemble uncertainty is not propagated and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948). Per-sample relative plasma profiles are fixed external forward-model inputs. The inversion does not fit arbitrary node-wise plasma profiles and does not propagate covariance of those factors or cross-sample profile covariance. New independent operators include correlated GP model-discrepancy covariance for electrostatic CTS, bootstrap covariance of the reference-PCA mean/basis (not yet propagated into plasma-parameter covariance), free-free plus LTE ECE radiative transfer with externally supplied mode-resolved ECE absorption, and Full-EM nonlinear gyrotropic electron/fast-ion shape inversion conditional on fixed bulk plasma and geometry. Paraxial beam covariance is propagated only through supplied symplectic ABCD maps; full dispersion-Hessian quasi-optics is not derived internally. A 6-D ray phase-space covariance can now be propagated from the local cold-plasma dispersion Hessian along a continuous non-degenerate eigenmode branch; the 4-D alternative uses supplied symplectic ABCD maps. This is paraxial Gaussian phase-space propagation, not a full vector quasi-optical mode-conversion solver.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -4994,6 +4994,12 @@
           "unit": "integer >=30",
           "required": false,
           "description": "Bootstrap count for reference-PCA basis uncertainty; estimated basis covariance is not yet propagated into plasma parameter covariance."
+        },
+        {
+          "name": "initial_ray_phase_space_covariance",
+          "unit": "6x6 covariance of [x,y,z,kx,ky,kz]",
+          "required": false,
+          "description": "Full-EM ray helper only. Optional positive-semidefinite initial ray phase-space covariance; propagated by the local cold-plasma dispersion Hessian on a continuous eigenmode branch."
         }
       ],
       "output_specs": [
@@ -5598,6 +5604,11 @@
           "name": "gyrotropic_population_distribution",
           "unit": "p_perp x p_parallel",
           "description": "Conditional nonlinear Full-EM electron or fast-ion VDF shape."
+        },
+        {
+          "name": "ray_phase_space_covariance",
+          "unit": "n_ray_samples x 6 x 6",
+          "description": "Propagated 6-D position/wavevector covariance from the local cold-plasma dispersion Hessian."
         }
       ],
       "assumptions": [
@@ -5965,10 +5976,10 @@
     ],
     "limitations": [
       "Full-EM local external-input covariance supports local magnetic-field, direction and complex-polarization components only; frequency-resolved ray/equilibrium/beam covariance and cross-source covariance are not represented.",
-      "Reference-PCA basis bootstrap covariance is estimated but not yet propagated into the electrostatic CTS plasma-parameter covariance.",
+      "Reference-PCA basis bootstrap covariance is propagated into base plasma-parameter covariance by repeated refits when the configured success fraction is met; fast-ion shape-parameter covariance is not included in this component.",
       "Thermal ECE absorption must be supplied by a mode-resolved magnetized radiative-transfer solver; the background module does not infer it from scalar B, ne and Te.",
       "The nonlinear Full-EM gyrotropic VDF shape inverse fixes bulk parameters and population density; drifted relativistic electron VDF fitting is not implemented.",
-      "The paraxial covariance path uses supplied symplectic transfer maps and is not a self-contained full vector quasi-optical solver."
+      "The 6-D paraxial covariance path derives its linearized transfer from the local cold-plasma dispersion Hessian; the 4-D alternative uses supplied symplectic maps. Full vector quasi-optical mode conversion and non-paraxial diffraction are not solved."
     ],
     "inputs": [
       {
@@ -6000,6 +6011,12 @@
         "unit": "receiver-plane spectral power per Hz",
         "required": false,
         "description": "Full-EM CTS only. Fixed additive background already converted from radiance using receiver etendue and end-to-end efficiency exactly once."
+      },
+      {
+        "name": "background_reference_parameter_mc_samples",
+        "unit": "integer >=20",
+        "required": false,
+        "description": "Electrostatic CTS only. Number of repeated plasma-parameter refits over bootstrap resamples of the supplied PCA reference ensemble; adds reference-basis sampling covariance to base plasma parameters when enough refits succeed."
       }
     ],
     "outputs": [
@@ -6042,6 +6059,11 @@
         "name": "distribution_kg_m_s_inverse3",
         "unit": "p_perp x p_parallel",
         "description": "Full-EM relativistic gyrotropic VDF shape fit, conditional on fixed bulk plasma and geometry."
+      },
+      {
+        "name": "background_reference_parameter_covariance",
+        "unit": "physical plasma-parameter covariance",
+        "description": "Bootstrap refit covariance contribution from finite reference-PCA basis uncertainty; covers ne, Te, species Ti and fitted flow projections, not fast-ion shape parameters."
       }
     ],
     "uncertainty_model": "undefined Electrostatic CTS can add an explicitly supplied correlated model-discrepancy covariance to the measurement covariance before GLS; when supplied, reduced-chi-square overdispersion inflation is disabled. Reference-PCA bootstrap covariance is reported separately and remains conditional in the plasma-parameter covariance."
