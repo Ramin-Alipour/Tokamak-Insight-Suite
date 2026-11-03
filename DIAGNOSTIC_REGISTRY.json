@@ -24,7 +24,11 @@
       "tokamak_analysis.cts_geometry_uncertainty.propagate_full_em_cts_ray_geometry_uncertainty",
       "tokamak_analysis.thomson_workflow.fit_thomson_spectrum_with_structured_background",
       "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
-      "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract"
+      "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract",
+      "tokamak_analysis.thomson_workflow.collective_tabulated_electron_thomson_spectrum",
+      "tokamak_analysis.thomson_workflow.generalized_thomson_landau_integral",
+      "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "tokamak_analysis.thomson_generalized_dispersion.generalized_landau_integral"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags.",
     "execution_contract": {
@@ -762,7 +766,10 @@
       "tests/test_thomson_dashboard.py",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles",
-      "tests/test_thomson_inference.py::test_one_dimensional_response_kernel_uncertainty_is_monte_carlo_propagated"
+      "tests/test_thomson_inference.py::test_one_dimensional_response_kernel_uncertainty_is_monte_carlo_propagated",
+      "tests/test_thomson_kinetic_background.py",
+      "tests/test_thomson_generalized_dispersion.py",
+      "tests/test_thomson_inference_closure.py"
     ],
     "subanalyses": [
       {
@@ -781,7 +788,9 @@
           "hot_temperature_initial_eV",
           "hot_population_fraction_initial",
           "flow_projection_initial_m_s",
-          "signal_uncertainty or spectral_covariance (optional)"
+          "signal_uncertainty or spectral_covariance (optional)",
+          "include_compton_recoil (boolean; selects elastic Thomson or single-scattering Compton/Klein-Nishina)",
+          "maximum_recoil_correction_fraction (Thomson-limit validity screen)"
         ],
         "outputs": [
           "cold_electron_temperature_eV",
@@ -793,7 +802,7 @@
           "residual",
           "fit_jacobian_condition_number"
         ],
-        "scope": "Two isotropic Maxwell-Juttner populations with one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred.",
+        "scope": "Two isotropic Maxwell-Juttner populations with one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred. Compton recoil selection is explicit and records the selected cross-section model; it does not imply multiple-scattering transport.",
         "reference": "Sakai et al., JINST 21 (2026) C01002, DOI 10.1088/1748-0221/21/01/C01002; the TIS two-component model is a parametric approximation, not the cited Monte Carlo algorithm.",
         "experimental_validation": "not_performed"
       },
@@ -883,6 +892,92 @@
         ],
         "covariance_order": "[physical parameters, spectral amplitude, background coefficients]",
         "uncertainty_semantics": "Local joint GLS covariance conditional on the supplied measurement uncertainty/covariance, fixed instrument response, selected physical model and background basis. If no measurement noise is supplied, covariance is residual-scaled and is not measurement uncertainty.",
+        "experimental_validation": "not_performed"
+      },
+      {
+        "name": "Generalized tabulated-EVDF collective CTS forward model",
+        "module": "tokamak_analysis.thomson_generalized_dispersion",
+        "callable": "collective_tabulated_electron_spectral_density",
+        "inputs": [
+          "wavelength_nm",
+          "laser_wavelength_nm",
+          "scattering_angle_rad",
+          "electron_density_m3",
+          "electron_velocity_grid_m_s",
+          "electron_probability_density_s_m",
+          "electron_velocity_m_s",
+          "ion_species",
+          "ion_fractions",
+          "ion_temperature_eV",
+          "ion_velocity_m_s",
+          "incident_direction",
+          "scattered_direction",
+          "pole_imaginary_part_m_s (optional; positive retarded-pole displacement)"
+        ],
+        "outputs": [
+          "spectral_density_per_nm",
+          "electron_susceptibility",
+          "ion_susceptibility",
+          "dielectric_function",
+          "dynamic_structure_factor",
+          "flow projections",
+          "pole quadrature diagnostics"
+        ],
+        "scope": "Unmagnetized electrostatic collective Thomson forward spectrum for a researcher-supplied normalized 1-D projected electron VDF with Maxwellian ions. The first-order Landau pole is integrated analytically interval-by-interval for a piecewise-linear VDF. This is a Skolar-inspired simple-pole quadrature primitive, not a full arbitrary-order-pole reproduction and not a VDF inversion.",
+        "covariance_order": "No fit covariance; forward model only. Inference must wrap this forward model with an explicitly identifiable measured-spectrum inverse and supplied noise covariance.",
+        "experimental_validation": "not_performed"
+      },
+      {
+        "name": "Full-EM CTS ray/equilibrium/beam geometry uncertainty",
+        "module": "tokamak_analysis.cts_geometry_uncertainty",
+        "callable": "propagate_full_em_cts_ray_geometry_uncertainty",
+        "workflow_callable": "tokamak_analysis.thomson_workflow.propagate_full_em_cts_ray_geometry_uncertainty",
+        "inputs": [
+          "inference_kwargs (baseline measured Full-EM CTS fit)",
+          "geometry_sampler(rng,index) that resamples equilibrium, ray paths, local beam covariance, scattering volume and overlap for every draw",
+          "samples >= 20",
+          "seed",
+          "minimum_success_fraction"
+        ],
+        "outputs": [
+          "conditional_fit_covariance",
+          "ray_geometry_parameter_covariance",
+          "total fit_covariance",
+          "parameter_uncertainties",
+          "successful/failed draw diagnostics"
+        ],
+        "scope": "Every accepted draw regenerates the equilibrium and beam covariance, retraces probe/receiver rays, recomputes scattering-volume locations, path weights and Gaussian beam overlap, and performs a complete nonlinear Full-EM spectral refit. Correlated geometry/external inputs must be sampled jointly by the caller.",
+        "covariance_order": "Physical parameter order returned by the baseline Full-EM fit; full cross-parameter sample covariance.",
+        "experimental_validation": "not_performed"
+      },
+      {
+        "name": "Joint measured-spectrum ne-Te-Ti profile inversion",
+        "module": "tokamak_analysis.thomson_inference_closure",
+        "callable": "reconstruct_joint_thomson_profiles",
+        "workflow_callable": "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
+        "inputs": [
+          "wavelength_nm",
+          "measured_spectra (channel x wavelength)",
+          "radius_m",
+          "forward_model(channel_index,wavelength,ne,Te,Ti)",
+          "initial_profiles (3 x n_channels)",
+          "profile_bounds",
+          "measurement_uncertainty or full measurement_covariance",
+          "regularization_strength"
+        ],
+        "outputs": [
+          "ne(r)",
+          "Te(r)",
+          "Ti(r)",
+          "joint_profile_covariance",
+          "fitted_spectra",
+          "residual_spectra",
+          "data-only Jacobian rank",
+          "regularized Jacobian rank",
+          "optimizer status"
+        ],
+        "scope": "Simultaneous measured-spectrum inversion for ne(r), Te(r), Ti(r). Full cross-profile and cross-radius covariance is returned only when the data-only Jacobian has full column rank and the optimizer converges. Regularization does not make null-space components primary measurements; Ti requires an ion-sensitive feature in the supplied forward model.",
+        "covariance_order": "[ne(r_0..r_n), Te(r_0..r_n), Ti(r_0..r_n)]",
         "experimental_validation": "not_performed"
       }
     ],
