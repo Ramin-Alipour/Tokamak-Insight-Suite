@@ -103,8 +103,8 @@ def _generalized_least_squares_smoothing_spline(
 
 
 def _reconstruct_inferred_parameter_profile(
-    radius_m, values, *, uncertainty=None, covariance=None, positive=False,
-    method="both", points=200, mc_samples=200, random_seed=18473,
+    radius_m, values, *, uncertainty=None, covariance=None, coordinate_covariance=None,
+    positive=False, method="both", points=200, mc_samples=200, random_seed=18473,
 ):
     """Reconstruct one spectrum-inferred physical profile without extrapolation.
 
@@ -153,6 +153,14 @@ def _reconstruct_inferred_parameter_profile(
     elif sigma is not None:
         cov = np.diag(sigma**2)
 
+    coordinate_cov = None
+    if coordinate_covariance is not None:
+        coordinate_cov = np.asarray(coordinate_covariance, dtype=float)
+        if (coordinate_cov.shape != (radius.size, radius.size)
+                or not np.all(np.isfinite(coordinate_cov))
+                or not np.allclose(coordinate_cov, coordinate_cov.T, rtol=1e-10, atol=0.0)
+                or not _covariance_is_positive_semidefinite(coordinate_cov)):
+            raise ValueError("Coordinate covariance must be finite, symmetric, positive semidefinite and match the channel count.")
     grid = np.linspace(float(radius[0]), float(radius[-1]), int(points))
     selected = ("pchip", "smoothing_spline") if method == "both" else (method,)
     output = {
@@ -167,14 +175,23 @@ def _reconstruct_inferred_parameter_profile(
             if sigma is not None
             else "not_available"
         ),
+        "coordinate_uncertainty_model": (
+            "researcher_supplied_full_coordinate_covariance_independent_of_profile_values"
+            if coordinate_cov is not None else "coordinates_treated_as_exact"
+        ),
         "extrapolation": "forbidden; reconstruction is restricted to the measured channel-coordinate interval",
     }
 
     spline_diagnostics = {}
 
-    def fit_profile(sample, selected_method):
+    def fit_profile(sample, selected_method, sample_radius=None):
+        sample_radius = radius if sample_radius is None else np.asarray(sample_radius, dtype=float)
+        if sample_radius.shape != radius.shape or np.any(np.diff(sample_radius) <= 0):
+            raise ValueError("Sampled spatial coordinates must remain strictly increasing.")
+        if grid[0] < sample_radius[0] or grid[-1] > sample_radius[-1]:
+            raise ValueError("Sampled spatial coordinates do not cover the fixed reconstruction grid.")
         if selected_method == "pchip":
-            fit = PchipInterpolator(radius, sample, extrapolate=False)
+            fit = PchipInterpolator(sample_radius, sample, extrapolate=False)
             reconstructed = np.asarray(fit(grid), dtype=float)
             gradient = np.asarray(fit.derivative()(grid), dtype=float)
         elif selected_method == "smoothing_spline" and full_covariance_supplied:
@@ -183,13 +200,13 @@ def _reconstruct_inferred_parameter_profile(
                     raise ValueError("Positive profile samples must remain strictly positive.")
                 log_covariance = cov / np.outer(value, value)
                 log_profile, log_gradient, diagnostics = _generalized_least_squares_smoothing_spline(
-                    radius, np.log(sample), log_covariance, grid,
+                    sample_radius, np.log(sample), log_covariance, grid,
                 )
                 reconstructed = np.exp(log_profile)
                 gradient = reconstructed * log_gradient
             else:
                 reconstructed, gradient, diagnostics = _generalized_least_squares_smoothing_spline(
-                    radius, sample, cov, grid,
+                    sample_radius, sample, cov, grid,
                 )
             spline_diagnostics[selected_method] = diagnostics
         elif positive:
@@ -209,7 +226,7 @@ def _reconstruct_inferred_parameter_profile(
                     np.sqrt(np.finfo(float).tiny),
                 )
                 weights = 1.0 / np.maximum(relative_sigma, sigma_floor)
-            fit = make_smoothing_spline(radius, log_sample, w=weights, lam=None)
+            fit = make_smoothing_spline(sample_radius, log_sample, w=weights, lam=None)
             log_profile = np.asarray(fit(grid), dtype=float)
             reconstructed = np.exp(log_profile)
             gradient = reconstructed * np.asarray(fit.derivative()(grid), dtype=float)
@@ -222,18 +239,29 @@ def _reconstruct_inferred_parameter_profile(
                     np.sqrt(np.finfo(float).tiny),
                 )
                 weights = 1.0 / np.maximum(sigma, sigma_floor)
-            fit = make_smoothing_spline(radius, sample, w=weights, lam=None)
+            fit = make_smoothing_spline(sample_radius, sample, w=weights, lam=None)
             reconstructed = np.asarray(fit(grid), dtype=float)
             gradient = np.asarray(fit.derivative()(grid), dtype=float)
         return reconstructed, gradient
 
     rng = np.random.default_rng(random_seed)
     draws = None
-    if cov is not None and np.any(np.diag(cov) > 0):
+    coordinate_draws = None
+    if ((cov is not None and np.any(np.diag(cov) > 0))
+            or (coordinate_cov is not None and np.any(np.diag(coordinate_cov) > 0))):
         try:
-            draws = rng.multivariate_normal(value, cov, size=int(mc_samples), check_valid="raise")
+            draws = (
+                rng.multivariate_normal(value, cov, size=int(mc_samples), check_valid="raise")
+                if cov is not None and np.any(np.diag(cov) > 0)
+                else np.repeat(value[None, :], int(mc_samples), axis=0)
+            )
+            coordinate_draws = (
+                rng.multivariate_normal(radius, coordinate_cov, size=int(mc_samples), check_valid="raise")
+                if coordinate_cov is not None and np.any(np.diag(coordinate_cov) > 0)
+                else np.repeat(radius[None, :], int(mc_samples), axis=0)
+            )
         except (ValueError, np.linalg.LinAlgError) as exc:
-            raise ValueError(f"Profile uncertainty covariance could not be sampled: {exc}") from exc
+            raise ValueError(f"Profile or coordinate uncertainty covariance could not be sampled: {exc}") from exc
 
     for selected_method in selected:
         if selected_method == "smoothing_spline" and radius.size < 5:
@@ -243,7 +271,7 @@ def _reconstruct_inferred_parameter_profile(
                 "available_channels": int(radius.size),
             }
             continue
-        reconstructed, gradient = fit_profile(value, selected_method)
+        reconstructed, gradient = fit_profile(value, selected_method, radius)
         item = {
             "status": "completed",
             "values": reconstructed,
@@ -259,11 +287,13 @@ def _reconstruct_inferred_parameter_profile(
             item["smoothing_diagnostics"] = spline_diagnostics[selected_method]
         if draws is not None:
             sampled_profiles, sampled_gradients = [], []
-            for sample in draws:
+            for sample, sample_radius in zip(draws, coordinate_draws):
                 if positive and np.any(sample <= 0):
                     continue
+                if np.any(np.diff(sample_radius) <= 0):
+                    continue
                 try:
-                    sample_profile, sample_gradient = fit_profile(sample, selected_method)
+                    sample_profile, sample_gradient = fit_profile(sample, selected_method, sample_radius)
                     if np.all(np.isfinite(sample_profile)) and np.all(np.isfinite(sample_gradient)):
                         sampled_profiles.append(sample_profile)
                         sampled_gradients.append(sample_gradient)
@@ -291,6 +321,7 @@ def _reconstruct_inferred_parameter_profile(
 def reconstruct_thomson_profile_from_spectra(
     *args, profile_reconstruction_method="both",
     profile_reconstruction_points=200, profile_reconstruction_mc_samples=200,
+    profile_coordinate_covariance_m2=None,
     joint_spatial_spectral=False, spatial_mixing_matrix=None,
     spatial_mixing_covariance=None, spatial_mixing_mc_samples=200,
     spatial_mixing_mc_seed=84622,
@@ -664,6 +695,7 @@ def reconstruct_thomson_profile_from_spectra(
                 points=profile_reconstruction_points,
                 mc_samples=profile_reconstruction_mc_samples,
                 random_seed=18473 + len(profiles),
+                coordinate_covariance=profile_coordinate_covariance_m2,
             )
         except ValueError as exc:
             profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
