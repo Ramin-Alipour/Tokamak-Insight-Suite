@@ -37,8 +37,8 @@ def conserving_bgk_longitudinal_susceptibility(
     The returned matrix R[i,j] = delta(n_i)/delta(U_j), where U_j is an
     externally applied potential energy (J) coupled to species j. It is a
     bare response to prescribed external potentials; self-consistent
-    electrostatic screening and the CTS fluctuation spectrum are not included.  Do not convert it to CTS
-    power without a separately derived and validated fluctuation-dissipation
+    electrostatic screening and the CTS fluctuation spectrum are not included.
+    Do not convert it to CTS power without a separately derived and validated fluctuation-dissipation
     closure and Thomson-scattering normalization.
     """
     def positive_scalar(value, name):
@@ -58,11 +58,10 @@ def conserving_bgk_longitudinal_susceptibility(
     m = np.asarray(species_masses_kg, dtype=float)
     nu = np.asarray(collision_frequencies_s_inverse, dtype=float)
     if n.ndim != 1 or n.size == 0 or m.shape != n.shape or nu.shape != n.shape:
-        raise ValueError("species density, charge, mass and collision-frequency arrays must match")
-    if (np.any(~np.isfinite(n)) or np.any(n <= 0) or np.any(~np.isfinite(q))
-            or np.any(~np.isfinite(m)) or np.any(m <= 0)
+        raise ValueError("species density, mass and collision-frequency arrays must match")
+    if (np.any(~np.isfinite(n)) or np.any(n <= 0) or np.any(~np.isfinite(m)) or np.any(m <= 0)
             or np.any(~np.isfinite(nu)) or np.any(nu <= 0)):
-        raise ValueError("species densities/masses/frequencies must be positive; charges must be finite nonzero")
+        raise ValueError("species densities, masses and collision frequencies must be positive and finite")
     if isinstance(quadrature_order, (bool, np.bool_)) or int(quadrature_order) != quadrature_order or quadrature_order < 24:
         raise ValueError("quadrature_order must be an integer >= 24")
     flow = float(bulk_flow_m_s)
