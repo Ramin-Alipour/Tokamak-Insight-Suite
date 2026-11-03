@@ -245,3 +245,14 @@ def test_cold_plasma_ray_propagates_full_6d_covariance_from_dispersion_hessian()
     assert result["phase_space_covariance"].shape == (4,6,6)
     assert result["transverse_position_covariance_m2"].shape == (4,2,2)
     assert np.all(np.linalg.eigvalsh(result["transverse_position_covariance_m2"]) > 0)
+
+
+
+def test_full_em_geometry_ensemble_is_exposed_by_dashboard():
+    from pathlib import Path
+
+    app = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "cts_full_geometry_ensemble_upload" in app
+    assert "cts_full_geometry_mc_samples" in app
+    assert "propagate_full_em_cts_ray_geometry_uncertainty" in app
+    assert "_sample_precomputed_geometry" in app
