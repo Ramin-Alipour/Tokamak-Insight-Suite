@@ -20,6 +20,7 @@ from tokamak_analysis.thomson_inference import analyze_thomson_spectra
 from tokamak_analysis.thomson_scattering import infer_thomson_path_averaged_density
 from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
 from tokamak_analysis.cts_analysis import analyze_cts_spectrum, analyze_cts_spectrum_model
+from tokamak_analysis.cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
 from tokamak_analysis.poloidal_flux import reconstruct_poloidal_flux
@@ -3812,6 +3813,15 @@ elif page=='Advanced Analysis':
                     value=100,step=20,key='cts_full_local_external_mc_samples',
                 ))
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
+                cts_geometry_ensemble_upload=st.file_uploader(
+                    'Optional precomputed ensemble of independently ray-traced geometry realizations JSON',
+                    type=['json'],key='cts_full_geometry_ensemble_upload',
+                    help='Provide a JSON array of complete scattering_geometry objects. Each realization must come from its own equilibrium/beam-uncertainty draw and ray/overlap recomputation.',
+                )
+                cts_geometry_mc_samples=int(st.number_input(
+                    'Geometry-ensemble nonlinear refits',min_value=20,max_value=2000,
+                    value=100,step=20,key='cts_full_geometry_mc_samples',
+                ))
                 cts_physical_background_json=st.text_area(
                     'Optional physical CTS receiver-background radiative-transfer JSON',
                     placeholder='{"path_length_m":[0.1,0.2],"electron_temperature_eV":[1200,1400],"electron_density_m3":[2e19,1.8e19],"ion_densities_m3":[[2e19],[1.8e19]],"ion_charge_states":[1],"gaunt_factor":1.1,"ece_absorption_coefficient_m_inverse":[[0.0002,0.0002]],"incident_radiance_W_m2_sr_Hz":0,"receiver_etendue_m2_sr":2e-5,"end_to_end_efficiency":0.4}',
@@ -3999,6 +4009,30 @@ elif page=='Advanced Analysis':
                             minimum=1e-12,maximum=0.999999,
                         )
                     result_cts=analyze_cts_spectrum_model(model='full_electromagnetic',**kwargs_cts)
+                    if cts_geometry_ensemble_upload is not None:
+                        geometry_ensemble=json.load(cts_geometry_ensemble_upload)
+                        if (not isinstance(geometry_ensemble,list) or len(geometry_ensemble)<20
+                                or any(not isinstance(item,dict) or 'frequency_resolved_geometry' not in item
+                                       for item in geometry_ensemble)):
+                            raise ValueError(
+                                'Geometry ensemble must be a JSON array of at least 20 complete '
+                                'frequency-resolved ray-geometry mappings.'
+                            )
+                        if cts_local_external_covariance_upload is not None:
+                            raise ValueError(
+                                'Do not combine the separate local external covariance upload '
+                                'with the geometry ensemble. Correlated geometry and local inputs '
+                                'must be represented in one jointly sampled ensemble.'
+                            )
+                        def _sample_precomputed_geometry(rng,index):
+                            selected=geometry_ensemble[int(rng.integers(0,len(geometry_ensemble)))]
+                            return {'scattering_geometry':selected}
+                        result_cts=propagate_full_em_cts_ray_geometry_uncertainty(
+                            inference_kwargs=kwargs_cts,
+                            geometry_sampler=_sample_precomputed_geometry,
+                            samples=cts_geometry_mc_samples,
+                            seed=84623,
+                        )
                     st.success('Magnetized full-EM CTS inversion completed within the declared model scope.')
                     st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
                     st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
