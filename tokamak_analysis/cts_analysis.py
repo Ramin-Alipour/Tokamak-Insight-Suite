@@ -1013,7 +1013,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied.",
        "The optional structured background uses PCA modes from explicitly supplied calibrated reference spectra; it is conditional on those references and does not infer or calibrate missing background measurements."]}
-    if background_basis is not None:
+    if background_basis is not None and not _skip_reference_basis_mc:
         if isinstance(background_reference_basis_mc_samples, (bool, np.bool_)) or not isinstance(background_reference_basis_mc_samples, (int, np.integer)) or background_reference_basis_mc_samples < 30:
             raise ValueError("background_reference_basis_mc_samples must be an integer >=30 when PCA reference background is selected")
         if isinstance(background_reference_parameter_mc_samples, (bool, np.bool_)) or not isinstance(background_reference_parameter_mc_samples, (int, np.integer)) or background_reference_parameter_mc_samples < 20:
@@ -1086,21 +1086,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 full_reference_covariance = np.zeros_like(out["fit_covariance"])
                 full_reference_covariance[:base_count, :base_count] = reference_parameter_covariance
                 out["background_reference_parameter_covariance"] = full_reference_covariance
-                out["fit_covariance"] = out["fit_covariance"] + full_reference_covariance
                 out["background_reference_basis_uncertainty_propagated"] = True
                 out["background_reference_basis_uncertainty_status"] = "bootstrap_reference_basis_covariance_propagated_to_base_plasma_parameter_covariance"
-                total_covariance = out["fit_covariance"]
-                if out.get("model_discrepancy_covariance") is not None:
-                    total_covariance = total_covariance + out["model_discrepancy_covariance"]
-                out["total_fit_covariance_including_discrepancy"] = total_covariance
-                total_sigma = np.sqrt(np.maximum(np.diag(total_covariance), 0.0))
-                out["parameter_uncertainties"] = total_sigma
-                out["electron_density_uncertainty_m3"] = float(total_sigma[0])
-                out["electron_temperature_uncertainty_eV"] = float(total_sigma[1])
-                out["ion_temperature_uncertainty_eV"] = (float(total_sigma[2]) if n_species == 1 else total_sigma[2:2+n_species].copy())
-                out["ion_temperature_species_uncertainties_eV"] = total_sigma[2:2+n_species].copy()
-                out["electron_velocity_projection_uncertainty_m_s"] = float(total_sigma[2+n_species])
-                out["ion_velocity_projection_uncertainty_m_s"] = float(total_sigma[3+n_species])
             else:
                 out["background_reference_parameter_covariance"] = None
                 out["background_reference_basis_uncertainty_status"] = "basis_covariance_estimated_but_parameter_refit_success_fraction_insufficient"
@@ -1277,6 +1264,20 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["response_uncertainty_propagated"]=False
         out["external_parameter_uncertainty_propagated"]=False
         out["external_parameter_covariance_propagated"]=False
+    if out.get("background_reference_parameter_covariance") is not None:
+        out["fit_covariance"] = out["fit_covariance"] + out["background_reference_parameter_covariance"]
+        total_covariance = out["fit_covariance"]
+        if out.get("model_discrepancy_covariance") is not None:
+            total_covariance = total_covariance + out["model_discrepancy_covariance"]
+        out["total_fit_covariance_including_discrepancy"] = total_covariance
+        total_sigma = np.sqrt(np.maximum(np.diag(total_covariance), 0.0))
+        out["parameter_uncertainties"] = total_sigma
+        out["electron_density_uncertainty_m3"] = float(total_sigma[0])
+        out["electron_temperature_uncertainty_eV"] = float(total_sigma[1])
+        out["ion_temperature_uncertainty_eV"] = (float(total_sigma[2]) if n_species == 1 else total_sigma[2:2+n_species].copy())
+        out["ion_temperature_species_uncertainties_eV"] = total_sigma[2:2+n_species].copy()
+        out["electron_velocity_projection_uncertainty_m_s"] = float(total_sigma[2+n_species])
+        out["ion_velocity_projection_uncertainty_m_s"] = float(total_sigma[3+n_species])
     from .thomson_identifiability import cts_electrostatic_identifiability
     out["parameter_identifiability"] = cts_electrostatic_identifiability(
         fast_ion_model=fast.get("kind") if fast else None
