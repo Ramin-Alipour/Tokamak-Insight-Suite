@@ -188,3 +188,28 @@ def test_radiance_to_receiver_power_applies_etendue_and_efficiency_once():
         end_to_end_efficiency=0.5,
     )
     np.testing.assert_allclose(power, radiance*0.01)
+
+
+
+def test_optical_thomson_uses_independent_model_discrepancy_covariance():
+    from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+
+    wavelength = np.linspace(530.0, 532.0, 121)
+    expected = 1.2e-3*np.exp(-0.5*((wavelength-531.0)/0.18)**2) + 3.0e-5
+    discrepancy = gaussian_process_discrepancy_covariance(
+        wavelength, amplitude=2.0e-5, length_scale=0.12,
+        kernel="matern32", nugget=1.0e-6,
+    )
+    result = analyze_thomson_spectra(
+        wavelength, expected[None, :], np.array([0.5]),
+        laser_wavelength_nm=531.0, scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(wavelength.size),
+        model="non_collective_maxwellian",
+        model_discrepancy_covariance=discrepancy,
+        background_model="linear",
+    )
+    channel = result["channel_results"][0] if "channel_results" in result else result["results"][0]
+    assert channel["independent_model_discrepancy_supplied"] is True
+    assert channel["model_discrepancy_diagnostics"]["covariance_included"] is True
+    assert channel["model_discrepancy_diagnostics"]["independent_of_reduced_chi_square"] is True
+    assert "model_discrepancy_scale" not in channel
