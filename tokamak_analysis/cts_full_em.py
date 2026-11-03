@@ -974,8 +974,9 @@ def build_full_em_cts_physical_background(
         "incident_radiance_W_m2_sr_Hz", "receiver_etendue_m2_sr",
         "end_to_end_efficiency",
     }
+    optional = {"ece_mode_weights"}
     missing = sorted(required - set(radiative_transfer))
-    unknown = sorted(set(radiative_transfer) - required)
+    unknown = sorted(set(radiative_transfer) - required - optional)
     if missing or unknown:
         raise ValueError(
             "physical_background_radiative_transfer must contain exactly the "
@@ -994,6 +995,7 @@ def build_full_em_cts_physical_background(
         ion_densities_m3=radiative_transfer["ion_densities_m3"],
         ion_charge_states=radiative_transfer["ion_charge_states"],
         ece_absorption_coefficient_m_inverse=radiative_transfer["ece_absorption_coefficient_m_inverse"],
+        ece_mode_weights=radiative_transfer.get("ece_mode_weights"),
         gaunt_factor=radiative_transfer["gaunt_factor"],
         incident_radiance_W_m2_sr_Hz=radiative_transfer["incident_radiance_W_m2_sr_Hz"],
     )
