@@ -1271,12 +1271,33 @@ def analyze_full_em_cts_spectrum(
             if "ECE absorption" in physical_background_transfer_diagnostics["ece_model_status"]
             else "free_free_radiative_transfer_ECE_explicitly_omitted_convolved_with_measured_response"
         )
+        # Preserve the lower-level radiative-transfer vacuum semantics at the
+        # public inversion boundary. A zero *modelled* background is distinct
+        # from an omitted background, which is unknown rather than assumed zero.
+        physical_background_zero = bool(
+            physical_background_transfer_diagnostics.get("zero_background", False)
+        )
+        physical_background_zero_status = physical_background_transfer_diagnostics.get(
+            "background_status", "radiative_transfer_status_unavailable"
+        )
     elif supplied_physical_background is not None:
         physical_background = supplied_physical_background
-        physical_background_status = "fixed_additive_receiver_grid_spectrum_supplied_by_researcher"
+        physical_background_zero = bool(np.all(supplied_physical_background == 0.0))
+        physical_background_status = (
+            "explicit_zero_receiver_grid_background_supplied"
+            if physical_background_zero
+            else "fixed_additive_receiver_grid_spectrum_supplied_by_researcher"
+        )
+        physical_background_zero_status = (
+            "zero_background_exact_zero_receiver_grid_spectrum"
+            if physical_background_zero
+            else "nonzero_fixed_receiver_grid_background"
+        )
     else:
         physical_background = np.zeros_like(y)
+        physical_background_zero = None
         physical_background_status = "no_fixed_physical_background_supplied"
+        physical_background_zero_status = "background_not_supplied_not_assumed_zero"
     physical_background_covariance = None
     if physical_background_covariance_W2_per_Hz2 is not None:
         if supplied_physical_background is None and physical_background_radiative_transfer is None:
@@ -1676,6 +1697,8 @@ def analyze_full_em_cts_spectrum(
         "residual": y - (amplitude * convolved + offset + physical_background),
         "physical_background_spectrum_W_Hz": physical_background.copy(),
         "physical_background_status": physical_background_status,
+        "physical_background_zero": physical_background_zero,
+        "physical_background_zero_status": physical_background_zero_status,
         "physical_background_transfer_diagnostics": physical_background_transfer_diagnostics,
         "physical_background_covariance_W2_per_Hz2": None if physical_background_covariance is None else physical_background_covariance.copy(),
         "physical_background_covariance_used_in_gls": physical_background_covariance is not None,
