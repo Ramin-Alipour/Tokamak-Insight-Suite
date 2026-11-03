@@ -5109,6 +5109,12 @@
           "unit": "node-space regularization operator and positive strength",
           "required": true,
           "description": "required for spatial profile inversion"
+        },
+        {
+          "name": "regularization_sensitivity_strengths",
+          "unit": "strictly increasing positive regularization-strength grid",
+          "required": false,
+          "description": "Optional repeated spatial Full-EM profile inversions over a regularization grid; returned profile spread is regularization-choice sensitivity, not measurement uncertainty."
         }
       ],
       "output_specs": [
@@ -5976,7 +5982,8 @@
             "exactly one of spectral_covariance or signal_uncertainty",
             "optional measured instrument_response and fixed_background_spectrum",
             "fit_electron_density_profile, fit_electron_temperature_profile and fit_ion_temperature_profile",
-            "regularization_matrix and positive regularization_strength"
+            "regularization_matrix and positive regularization_strength",
+            "optional regularization_sensitivity_strengths: strictly increasing positive grid; profile spread is reported separately from measurement uncertainty"
           ],
           "outputs": [
             "node-wise relative density/temperature/optional ion-temperature profiles",
