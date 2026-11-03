@@ -69,15 +69,18 @@ def integrate_thermal_microwave_background(
     frequency_Hz, path_length_m, electron_temperature_eV, *,
     electron_density_m3, ion_densities_m3, ion_charge_states,
     ece_absorption_coefficient_m_inverse=None,
-    gaunt_factor=1.0, incident_radiance_W_m2_sr_Hz=0.0,
+    ece_mode_weights=None, gaunt_factor=1.0,
+    incident_radiance_W_m2_sr_Hz=0.0,
 ):
-    """Integrate thermal free-free + mode-resolved ECE radiative transfer.
+    """Integrate free-free and mode-resolved ECE radiative transfer.
 
-    Arrays are sampled along the line of sight. ECE absorption is supplied per
-    receiver mode by an external magnetized dielectric/radiative-transfer
-    solver. In LTE, j_ECE = alpha_ECE B_nu(T_e). Free-free absorption follows
-    Kirchhoff's law using its computed emissivity. The exact constant-slab
-    transfer update is applied segment by segment.
+    ECE absorption may be supplied as (path,frequency) for a single effective
+    mode, or (path,frequency,mode) for independently propagated receiver modes.
+    In the latter case ece_mode_weights is the measured receiver power fraction
+    for each mode and must be non-negative and sum to one.  Each mode is
+    propagated independently with Kirchhoff's LTE source function before the
+    receiver-weighted radiances are combined.  This does not model mode
+    conversion or coherent cross-mode coupling.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
     length = np.asarray(path_length_m, dtype=float)
@@ -112,21 +115,45 @@ def integrate_thermal_microwave_background(
             "or (n_path,n_frequency)"
         )
     if ece_absorption_coefficient_m_inverse is None:
-        ece_alpha = np.zeros((length.size, nu.size), dtype=float)
+        if ece_mode_weights is not None:
+            raise ValueError("ece_mode_weights requires mode-resolved ECE absorption")
+        n_modes = 1
+        ece_alpha = np.zeros((length.size, nu.size, n_modes), dtype=float)
         ece_status = "ECE omitted; no mode-resolved absorption supplied"
+        mode_weights = np.ones(n_modes, dtype=float)
     else:
-        ece_alpha = np.asarray(ece_absorption_coefficient_m_inverse, dtype=float)
-        if ece_alpha.shape != (length.size, nu.size) or np.any(~np.isfinite(ece_alpha)) or np.any(ece_alpha < 0):
-            raise ValueError("ece_absorption_coefficient_m_inverse must be non-negative with shape (n_path,n_frequency)")
-        ece_status = "mode-resolved ECE absorption supplied; Kirchhoff LTE source function used"
+        supplied_alpha = np.asarray(ece_absorption_coefficient_m_inverse, dtype=float)
+        if supplied_alpha.ndim == 2 and supplied_alpha.shape == (length.size, nu.size):
+            if ece_mode_weights is not None:
+                raise ValueError("ece_mode_weights is only valid with a 3-D mode-resolved ECE absorption array")
+            ece_alpha = supplied_alpha[:, :, None]
+            n_modes = 1
+            mode_weights = np.ones(1, dtype=float)
+            ece_status = "single-effective-mode ECE absorption supplied; Kirchhoff LTE source function used"
+        elif supplied_alpha.ndim == 3 and supplied_alpha.shape[:2] == (length.size, nu.size):
+            n_modes = supplied_alpha.shape[2]
+            if n_modes < 1:
+                raise ValueError("mode-resolved ECE absorption must contain at least one mode")
+            if ece_mode_weights is None:
+                raise ValueError("ece_mode_weights is required for mode-resolved ECE absorption")
+            mode_weights = np.asarray(ece_mode_weights, dtype=float)
+            if (mode_weights.shape != (n_modes,) or np.any(~np.isfinite(mode_weights))
+                    or np.any(mode_weights < 0.0) or not np.isclose(mode_weights.sum(), 1.0, rtol=1e-8, atol=1e-10)):
+                raise ValueError("ece_mode_weights must be a non-negative length-n_modes vector summing to one")
+            ece_alpha = supplied_alpha
+            ece_status = "independently propagated mode-resolved ECE absorption; Kirchhoff LTE source function used"
+        else:
+            raise ValueError("ece_absorption_coefficient_m_inverse must have shape (n_path,n_frequency) or (n_path,n_frequency,n_mode)")
+        if np.any(~np.isfinite(ece_alpha)) or np.any(ece_alpha < 0.0):
+            raise ValueError("ece absorption coefficients must be finite and non-negative")
     incident = np.asarray(incident_radiance_W_m2_sr_Hz, dtype=float)
     if incident.ndim == 0:
         incident = np.full(nu.size, float(incident))
     if incident.shape != nu.shape or np.any(~np.isfinite(incident)) or np.any(incident < 0):
         raise ValueError("incident_radiance_W_m2_sr_Hz must be non-negative scalar or frequency vector")
-    intensity = incident.copy()
+    intensity_modes = np.broadcast_to(incident, (n_modes, nu.size)).copy()
     alpha_ff_total = np.zeros(nu.size)
-    tau_ece_total = np.zeros(nu.size)
+    tau_ece_modes = np.zeros((n_modes, nu.size), dtype=float)
     for index in range(length.size):
         j_ff = thermal_bremsstrahlung_emissivity_si(
             nu, ne[index], ni[index], z, te[index],
@@ -134,31 +161,35 @@ def integrate_thermal_microwave_background(
         )
         b_nu = planck_spectral_radiance(nu, te[index] * E_CHARGE / K_B)
         alpha_ff = j_ff / np.maximum(b_nu, np.finfo(float).tiny)
-        alpha_total = alpha_ff + ece_alpha[index]
+        alpha_total = alpha_ff[None, :] + ece_alpha[index].T
         optical_depth = alpha_total * length[index]
         transmission = np.exp(-np.minimum(optical_depth, 700.0))
-        source = b_nu  # LTE free-free and thermal ECE have the same Planck source function.
-        intensity = intensity * transmission + source * (1.0 - transmission)
+        intensity_modes = intensity_modes * transmission + b_nu[None, :] * (1.0 - transmission)
         alpha_ff_total += alpha_ff * length[index]
-        tau_ece_total += ece_alpha[index] * length[index]
+        tau_ece_modes += ece_alpha[index].T * length[index]
+    intensity = mode_weights @ intensity_modes
     return {
         "spectral_radiance_W_m2_sr_Hz": intensity,
+        "spectral_radiance_by_mode_W_m2_sr_Hz": intensity_modes,
+        "receiver_mode_weights": mode_weights.copy(),
         "thermal_bremsstrahlung_optical_depth": alpha_ff_total,
-        "ece_optical_depth": tau_ece_total,
-        "total_optical_depth": alpha_ff_total + tau_ece_total,
+        "ece_optical_depth": tau_ece_modes.T @ mode_weights,
+        "ece_optical_depth_by_mode": tau_ece_modes,
+        "total_optical_depth": alpha_ff_total + tau_ece_modes.T @ mode_weights,
         "ece_model_status": ece_status,
         "gaunt_factor_resolution": gaunt_status,
         "free_free_model": "nonrelativistic_Maxwellian_thermal_bremsstrahlung_with_supplied_Gaunt_factor",
-        "radiative_transfer": "slab-by-slab exact formal solution with LTE Kirchhoff source function",
+        "radiative_transfer": "independent mode-by-mode slab formal solution with LTE Kirchhoff source function; receiver-mode weighted after propagation",
+        "mode_coupling_model": "neglected; modes propagated independently",
         "receiver_plane_conversion": "multiply radiance by measured receiver etendue and end-to-end efficiency; do not count the same throughput twice",
         "limitations": [
             "Free-free emissivity is non-relativistic and unmagnetized; use a relativistic/magnetized emissivity kernel outside that regime.",
             "The supplied Gaunt factor may be scalar, frequency-resolved, path-resolved, or path-and-frequency-resolved; it is not inferred from incomplete plasma inputs.",
-            "ECE absorption must be supplied by a mode-resolved magnetized plasma solver; no scalar approximation is silently substituted.",
+            "ECE absorption must be supplied by a mode-resolved magnetized plasma solver; no scalar approximation is silently substituted for multiple supplied modes.",
+            "Mode conversion and coherent cross-mode coupling are not included; the receiver mode weights are external measured inputs.",
             "The result is spectral radiance, not detector power; receiver etendue and efficiency are external measured inputs.",
         ],
     }
-
 
 
 def radiance_to_receiver_spectral_power(
