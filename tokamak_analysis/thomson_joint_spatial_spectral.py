@@ -166,6 +166,8 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("include_compton_recoil must be boolean")
     if include_compton_recoil and physical_model != "relativistic_maxwell_juttner":
         raise ValueError("Compton recoil is available only for relativistic_maxwell_juttner")
+    if include_compton_recoil and laser_spectrum_wavelength_nm is not None:
+        raise ValueError("Measured laser-profile convolution is not yet implemented for the recoil/Klein-Nishina kernel.")
     if not isinstance(fit_kappa_index, (bool, np.bool_)):
         raise ValueError("fit_kappa_index must be boolean")
     if physical_model == "kappa":
