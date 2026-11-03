@@ -33,7 +33,7 @@ def test_generalized_electron_susceptibility_has_explicit_retarded_pole():
     assert np.isfinite(result["electron_susceptibility"].real)
     assert np.isfinite(result["electron_susceptibility"].imag)
     assert result["pole"].imag > 0
-    assert "first-order Landau pole only" in result["limitation"]
+    assert "one complex pole per call" in result["limitation"]
 
 
 def test_collective_tabulated_evdf_forward_model_returns_finite_positive_spectrum():
