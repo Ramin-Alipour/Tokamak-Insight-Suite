@@ -3856,6 +3856,7 @@ elif page=='Advanced Analysis':
                 spatial_te=st.text_input('Reference electron temperature (eV)',key='cts_spatial_te')
                 spatial_ti=st.text_input('Reference ion temperatures (eV; one per species)',key='cts_spatial_ti')
                 spatial_regularization=st.number_input('Profile smoothness strength',min_value=0.0,value=1.0,format='%.4g',key='cts_spatial_regularization')
+                spatial_reg_sensitivity_text=st.text_input('Optional regularization-sensitivity grid (comma-separated positive values)',value='',key='cts_spatial_reg_sensitivity')
                 spatial_fit_ne=st.checkbox('Fit spatial electron-density profile',value=True,key='cts_spatial_fit_ne')
                 spatial_fit_te=st.checkbox('Fit spatial electron-temperature profile',value=True,key='cts_spatial_fit_te')
                 spatial_fit_ti=st.checkbox('Fit spatial ion-temperature profile',value=False,key='cts_spatial_fit_ti')
@@ -3917,6 +3918,8 @@ elif page=='Advanced Analysis':
                         'fit_ion_temperature_profile':bool(spatial_fit_ti),
                         'regularization_strength':float(spatial_regularization),
                     }
+                    if spatial_reg_sensitivity_text.strip():
+                        kwargs_spatial['regularization_sensitivity_strengths']=_parse_ts_float_list(spatial_reg_sensitivity_text,'Regularization sensitivity grid')
                     if spatial_unc_col!='<none>':
                         sigma=pd.to_numeric(df[spatial_unc_col],errors='coerce').to_numpy(dtype=float)
                         if not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
