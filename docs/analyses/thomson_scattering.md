@@ -543,3 +543,29 @@ likelihood, covariance convention and consistent treatment/counting of
 nuisance parameters. Information criteria are model-comparison diagnostics,
 not experimental validation.
 
+
+
+## Relativistic multi-channel GLS and detector-background nuisance models
+
+The channel-joint relativistic Maxwell-Juttner fit uses the complete supplied
+positive-definite spectral covariance in channel-major ordering, including
+non-zero cross-channel blocks. It shares electron temperature and the
+scattering-vector flow projection across channels while retaining independent
+channel amplitudes and detector-background coefficients.
+
+The detector-space background basis is selected explicitly as
+`constant`, `linear`, `polynomial`, `cubic_spline` or
+researcher-supplied `templates`. The same basis is fitted simultaneously
+with the relativistic plasma spectrum, after the supplied measured response
+operator is applied to the plasma component. Shared templates or one template
+matrix per channel are accepted. Background coefficients, their cross-terms
+with the physical parameters, fitted spectra and the complete local
+parameter covariance are returned. The basis is a nuisance model and is not
+interpreted as plasma emission.
+
+The common-Te/common-flow assumption, identical wavelength sampling and
+scattering geometry, positive-definite covariance requirement, fixed measured
+response, and single-scattering model assumptions remain in force. A
+rank-deficient or ill-conditioned joint Jacobian is rejected. The reported
+local covariance is conditional on the selected basis, supplied covariance,
+response and physical model; it is not an experimental validation.
