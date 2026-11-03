@@ -334,7 +334,7 @@ def fit_two_population_relativistic_thomson_spectrum(
             "two-population Thomson fit rejected: population parameters are not jointly identifiable "
             f"(scaled Jacobian rank {rank}/{fit.x.size}, condition number {condition:.6g})"
         )
-    dof = max(1, y.size-fit.x.size-2)
+    dof = max(1, y.size-fit.x.size-(background_degree + 2))
     covariance_optimizer = np.linalg.pinv(jac.T@jac)
     if signal_uncertainty is None and spectral_covariance is None:
         covariance_optimizer *= float(residual(fit.x)@residual(fit.x)/dof)
