@@ -214,3 +214,22 @@ The recent papers guide selected extensions; they do not replace the
 underlying Thomson cross-section, kinetic dielectric response or
 three-wave-coupling equations. No experimental validation is performed or
 claimed.
+
+
+## Drifted relativistic Maxwell-Juttner electron populations
+
+Full-EM CTS now accepts an explicit
+`drifted_relativistic_maxwell_juttner` electron distribution with
+`temperature_eV` and signed parallel `drift_velocity_m_s`. The momentum-space
+equilibrium is evaluated by a Lorentz boost of the isotropic rest-frame
+Maxwell-Juttner distribution. The parallel momentum quadrature is widened for
+the boosted support, and the momentum derivatives are evaluated by the chain
+rule before the relativistic kinetic response and three-wave vertex are
+assembled. The distribution is normalized on the numerical momentum grid.
+
+Do not also supply a non-zero `electron_flow_projection_m_s`: drift is encoded
+in the distribution itself, and a second frequency-shift approximation would
+double count it. The drift must be strictly subluminal. Quadrature convergence
+must be checked for the selected temperature and drift; this is a numerical
+forward-model capability, not an assertion that a drifted VDF has been
+identified from a single CTS spectrum.
