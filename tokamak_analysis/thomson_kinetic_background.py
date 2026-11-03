@@ -267,6 +267,8 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         raise ValueError("incident_polarization is required for relativistic Maxwell-Juttner")
     if not isinstance(recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
+    if model == "kappa" and recoil:
+        raise ValueError("Compton recoil selection is available only for the relativistic Maxwell-Juttner model")
     if uncertainty is not None and covariance is not None:
         raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
     if uncertainty is not None:
