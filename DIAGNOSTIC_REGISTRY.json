@@ -4753,9 +4753,10 @@
       "tokamak_analysis.cts_em_background.integrate_thermal_microwave_background",
       "tokamak_analysis.cts_em_background.radiance_to_receiver_spectral_power",
       "tokamak_analysis.cts_full_em.fit_full_em_gyrotropic_population_shape",
-      "tokamak_analysis.cts_em_geometry.gaussian_beam_overlap_transverse"
+      "tokamak_analysis.cts_em_geometry.gaussian_beam_overlap_transverse",
+      "tokamak_analysis.cts_spatial_inference.analyze_full_em_cts_spatial_profiles"
     ],
-    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs. Full-EM inversion additionally supports joint Monte Carlo propagation of explicitly supplied local magnetic-field, incident/scattered direction and complex polarization covariance for local (non-ray-resolved) geometry. Frequency-resolved ray/equilibrium/beam covariance and cross-covariance between distinct external covariance sources remain unsupported and are reported as such. Full-EM measured-spectrum inversion now accepts an independent additive model_discrepancy_covariance and combines it with supplied measurement covariance before GLS; discrepancy-only weighting is explicitly labelled, and singular total covariance is rejected without silent regularization.",
+    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs. Full-EM inversion additionally supports joint Monte Carlo propagation of explicitly supplied local magnetic-field, incident/scattered direction and complex polarization covariance for local (non-ray-resolved) geometry. Frequency-resolved ray/equilibrium/beam covariance and cross-covariance between distinct external covariance sources remain unsupported and are reported as such. Full-EM measured-spectrum inversion now accepts an independent additive model_discrepancy_covariance and combines it with supplied measurement covariance before GLS; discrepancy-only weighting is explicitly labelled, and singular total covariance is rejected without silent regularization. Spatially varying Full-EM profile inversion is available through the dedicated spatial-profile mode; it uses node-wise local Full-EM kinetic evaluations and reports identifiability-conditioned profile covariance.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -5090,6 +5091,24 @@
           "unit": "6x6 covariance of [x,y,z,kx,ky,kz]",
           "required": false,
           "description": "Full-EM ray helper only. Optional positive-semidefinite initial ray phase-space covariance; propagated by the local cold-plasma dispersion Hessian on a continuous eigenmode branch."
+        },
+        {
+          "name": "spatial_profile_geometry",
+          "unit": "frequency-resolved scattering-volume quadrature with stable node IDs",
+          "required": true,
+          "description": "required for model='full_em_spatial_profiles'"
+        },
+        {
+          "name": "forward_model_kwargs",
+          "unit": "explicit reference Full-EM plasma/species/field/polarization inputs",
+          "required": true,
+          "description": "required for model='full_em_spatial_profiles'"
+        },
+        {
+          "name": "profile_regularization",
+          "unit": "node-space regularization operator and positive strength",
+          "required": true,
+          "description": "required for spatial profile inversion"
         }
       ],
       "output_specs": [
@@ -5785,7 +5804,8 @@
         "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence",
         "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators",
         "tokamak_analysis.cts_em_geometry.trace_cold_plasma_ray",
-        "tokamak_analysis.cts_geometry_uncertainty.propagate_full_em_cts_ray_geometry_uncertainty"
+        "tokamak_analysis.cts_geometry_uncertainty.propagate_full_em_cts_ray_geometry_uncertainty",
+        "tokamak_analysis.cts_spatial_inference.analyze_full_em_cts_spatial_profiles"
       ],
       "raw_data_to_physics": false,
       "note": "Registered CTS subanalysis under primary Analysis 1; its two CTS models are separate from the three optical Thomson models and are never substituted automatically.",
@@ -5941,6 +5961,29 @@
             "data-Jacobian identifiability diagnostics"
           ],
           "scope": "Nonlinear tabulated relativistic gyrotropic electron or fast-ion VDF shape inversion through the full Full-EM forward model. Bulk parameters, geometry, receiver response and population density are fixed; drifted relativistic electron VDFs are not implemented."
+        },
+        {
+          "name": "spatially_varying_magnetized_full_electromagnetic_cts_profile_inverse",
+          "function": "tokamak_analysis.cts_spatial_inference.analyze_full_em_cts_spatial_profiles",
+          "inputs": [
+            "model='full_em_spatial_profiles'",
+            "frequency_shift_Hz and calibrated measured spectrum",
+            "probe_frequency_Hz",
+            "frequency-resolved scattering_geometry with stable sample_id values and normalized sample_weight at every frequency",
+            "forward_model_kwargs containing reference ne, Te, species-resolved Ti, ion species/fractions, magnetic field and mode polarizations",
+            "exactly one of spectral_covariance or signal_uncertainty",
+            "optional measured instrument_response and fixed_background_spectrum",
+            "fit_electron_density_profile, fit_electron_temperature_profile and fit_ion_temperature_profile",
+            "regularization_matrix and positive regularization_strength"
+          ],
+          "outputs": [
+            "node-wise relative density/temperature/optional ion-temperature profiles",
+            "full local profile covariance when the augmented Jacobian is full column rank",
+            "Jacobian rank, singular values and local identifiability diagnostics",
+            "fitted spectrum, residual, chi-squared and degrees of freedom",
+            "explicit regularization metadata and fixed-reference parameter record"
+          ],
+          "scope": "At every objective evaluation the magnetized Full-EM kinetic forward solver is evaluated at each frequency-resolved scattering-volume quadrature point with node-specific fitted relative profiles. The response matrix is applied once after spatial integration. Geometry and reference bulk values are conditioned on supplied inputs; profile covariance is omitted when local identifiability fails."
         }
       ],
       "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened.",
@@ -6121,7 +6164,7 @@
       }
     ],
     "primary_analysis_id": 1,
-    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both consume measured calibrated frequency-shift spectra; no device calibration or independent experimental validation is performed.",
+    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both consume measured calibrated frequency-shift spectra; no device calibration or independent experimental validation is performed. The spatial profile inverse is a distinct Full-EM mode and is not substituted for the bulk single-volume inverse.",
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
     "model_branch_contract": {
@@ -6141,7 +6184,8 @@
       "tests/test_cts_numerical_convergence.py",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_reports_exact_degeneracy_as_ambiguous",
-      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing"
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing",
+      "tests/test_cts_spatial_inference.py"
     ],
     "limitations": [
       "Full-EM local external-input covariance supports local magnetic-field, direction and complex-polarization components only; frequency-resolved ray/equilibrium/beam covariance and cross-source covariance are not represented.",
