@@ -377,6 +377,29 @@ collision operator to the CTS dielectric response: numerical resonance
 damping remains distinct from physical collisional kinetics. No experimental
 validation is claimed; tests are synthetic software-contract checks only.
 
+### Collisional longitudinal response kernel (TS-01 groundwork)
+
+`tokamak_analysis.cts_collisional_bgk.conserving_bgk_longitudinal_susceptibility`
+implements a multispecies, one-dimensional, isothermal BGK *density-response
+matrix*. The linearized relaxation target preserves each species' particle
+number and chooses a shared perturbed flow so that the sum of species momentum
+moments of the collision term vanishes. The routine returns
+`delta(n_i)/delta(U_j)` for externally applied species potential energies,
+with explicit collision frequencies and Gauss-Hermite quadrature.
+
+This is deliberately **not** advertised as a completed collisional CTS spectrum.
+The kernel is BGK rather than the velocity-dependent linearized Landau
+operator; it assumes a common equilibrium temperature and flow, does not
+conserve total energy, and does not yet provide the equilibrium fluctuation
+source / fluctuation-dissipation closure needed to construct the partial
+electron-density dynamic structure factor measured by CTS. It is not connected
+to the electrostatic or Full-EM spectral-density dispatchers. In particular,
+its response matrix must not be treated as a measured CTS power spectrum or
+used as an arbitrary resonance-width correction. The Full-EM magnetized
+gyroharmonic collision operator remains unimplemented. TS-01 therefore
+remains open pending a validated fluctuation closure and spectral integration.
+
+
 ## Dashboard input for Full-EM receiver backgrounds
 
 The Full-EM CTS dashboard exposes the same physical receiver-background
