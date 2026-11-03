@@ -4026,7 +4026,16 @@ elif page=='Advanced Analysis':
                             )
                         def _sample_precomputed_geometry(rng,index):
                             selected=geometry_ensemble[int(rng.integers(0,len(geometry_ensemble)))]
-                            return {'scattering_geometry':selected}
+                            if not isinstance(selected,dict):
+                                raise ValueError('Every geometry ensemble realization must be a JSON object.')
+                            realization={'scattering_geometry':selected}
+                            for key in (
+                                'magnetic_field_T','incident_polarization',
+                                'scattered_polarization','inference_updates',
+                            ):
+                                if key in selected:
+                                    realization[key]=selected[key]
+                            return realization
                         result_cts=propagate_full_em_cts_ray_geometry_uncertainty(
                             inference_kwargs=kwargs_cts,
                             geometry_sampler=_sample_precomputed_geometry,
