@@ -23,7 +23,7 @@ __all__ = [
     "thomson_inference_closure", "thomson_evdf", "thomson_gap_closure", "thomson_external_uncertainty",
     "thomson_joint_spatial_spectral", "thomson_model_comparison", "thomson_n_population",
     "thomson_scattering", "thomson_spatial_mixing", "thomson_workflow", "cts_analysis",
-    "cts_full_em", "cts_collisions", "cts_spatial_inference", "thomson_joint_uncertainty",
+    "cts_full_em", "cts_full_wave", "ece_kinetic", "cts_collisions", "cts_spatial_inference", "thomson_joint_uncertainty",
     "transport", "turbulence", "vacuum_pressure", "visible_imaging", "wall_recycling",
     "wavelet_analysis", "x_point", "xray_spectrum",
 ]
