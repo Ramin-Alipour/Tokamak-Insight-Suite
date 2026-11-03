@@ -44,14 +44,24 @@ def _whitener(n, uncertainty=None, covariance=None):
 
 def _identifiability(jacobian, rtol=None):
     j = np.asarray(jacobian, dtype=float)
-    singular = np.linalg.svd(j, compute_uv=False)
-    threshold = (np.finfo(float).eps * max(j.shape) if rtol is None else float(rtol)) * (singular[0] if singular.size else 0.0)
+    # Rank/conditioning must not depend on arbitrary parameter units (e.g.
+    # density in m^-3 versus temperature in eV). Normalize Jacobian columns
+    # before SVD; retain the raw Jacobian for physical covariance propagation.
+    column_norms = np.linalg.norm(j, axis=0)
+    scaled = np.divide(
+        j, column_norms[None, :], out=np.zeros_like(j),
+        where=column_norms[None, :] > np.finfo(float).tiny,
+    )
+    singular = np.linalg.svd(scaled, compute_uv=False)
+    threshold = (np.finfo(float).eps * max(scaled.shape) if rtol is None else float(rtol)) * (singular[0] if singular.size else 0.0)
     rank = int(np.count_nonzero(singular > threshold))
     return {
         "rank": rank, "parameter_count": int(j.shape[1]),
         "identifiable": rank == j.shape[1],
         "singular_values": singular,
         "rank_tolerance": float(threshold),
+        "jacobian_column_norms": column_norms,
+        "jacobian_column_scaling": "unit_2_norm_for_unit_invariant_rank_and_condition_diagnostics",
         "condition_number": float(singular[0] / singular[-1]) if singular.size and singular[-1] > 0 else float("inf"),
     }
 
