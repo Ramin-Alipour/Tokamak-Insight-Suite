@@ -990,7 +990,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "background_spectrum_uncertainty":background_spectrum_uncertainty.copy(),
       "background_uncertainty_status":(
           "conditional_linear_nuisance_covariance_from_supplied_spectral_uncertainty"
-          if unc is not None or spectral_covariance is not None else
+          if unc is not None or spectral_covariance is not None or independent_discrepancy_covariance is not None else
           "conditional_linear_nuisance_covariance_scaled_by_fit_residual_variance"
       ),
       "background_reference_basis_uncertainty_propagated":False,
@@ -1014,7 +1014,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "The electrostatic inversion independently infers one Maxwellian ion temperature per supplied species; projected ion flow remains a shared scalar because independent species flows are not generally identifiable from one spectrum without additional constraints.",
        "Only the electron-flow component projected along the scattering wavevector is inferred; transverse vector components are not identifiable from one scattering geometry.",
        "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
-       "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied.",
+       "Reduced-chi-square overdispersion is retained only as a diagnostic when no independent discrepancy covariance is supplied; independent correlated discrepancy covariance is added directly to the GLS noise model.","Reference-PCA finite-sample uncertainty is propagated to base plasma parameters by bootstrap refits when reference PCA is selected.","Response-matrix uncertainty is propagated by Monte Carlo when supplied.",
        "The optional structured background uses PCA modes from explicitly supplied calibrated reference spectra; it is conditional on those references and does not infer or calibrate missing background measurements."]}
     if background_basis is not None and not _skip_reference_basis_mc:
         if isinstance(background_reference_basis_mc_samples, (bool, np.bool_)) or not isinstance(background_reference_basis_mc_samples, (int, np.integer)) or background_reference_basis_mc_samples < 30:
