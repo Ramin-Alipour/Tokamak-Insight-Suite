@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import numpy as np
 from scipy.optimize import least_squares
-from .cts_full_em import full_em_cts_spectral_density
+from .cts_full_em import full_em_cts_spectral_density, _apply_frequency_response
 
 
 def _vector(value, name, positive=False):
@@ -176,7 +176,7 @@ def analyze_full_em_cts_spatial_profiles(
                 "scattering_samples": samples,
             })
         local = full_em_cts_spectral_density(f, probe_frequency_Hz, local_geometry, **base)
-        return response @ np.asarray(local["spectral_density"], dtype=float)
+        return _apply_frequency_response(response, np.asarray(local["spectral_density"], dtype=float), f)
 
     def residual(x):
         spectral = np.linalg.solve(chol, forward(x) + background - y)
