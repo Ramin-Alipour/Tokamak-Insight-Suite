@@ -1,0 +1,48 @@
+import numpy as np
+import pytest
+
+from tokamak_analysis.cts_full_em import _prepare_full_em_cts_spectral_whitener
+
+
+def test_full_em_cts_adds_independent_discrepancy_to_measurement_covariance():
+    measurement = np.diag(np.full(5, 0.04))
+    discrepancy = np.full((5, 5), 0.002)
+    np.fill_diagonal(discrepancy, 0.01)
+    whiten, effective, status = _prepare_full_em_cts_spectral_whitener(
+        5,
+        spectral_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+    )
+    np.testing.assert_allclose(effective, measurement + discrepancy)
+    assert status == "measurement_covariance_plus_independent_correlated_model_discrepancy"
+    residual = np.arange(1.0, 6.0)
+    assert np.all(np.isfinite(whiten(residual)))
+
+
+def test_full_em_cts_accepts_discrepancy_only_without_inventing_measurement_noise():
+    discrepancy = np.diag(np.linspace(0.1, 0.5, 6))
+    whiten, effective, status = _prepare_full_em_cts_spectral_whitener(
+        6, model_discrepancy_covariance=discrepancy
+    )
+    np.testing.assert_array_equal(effective, discrepancy)
+    assert status == "model_discrepancy_covariance_only_no_measurement_uncertainty_supplied"
+    assert np.all(np.isfinite(whiten(np.ones(6))))
+
+
+def test_full_em_cts_rejects_non_psd_or_mismatched_discrepancy():
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        _prepare_full_em_cts_spectral_whitener(
+            4, model_discrepancy_covariance=np.diag([1.0, 1.0, 1.0, -0.1])
+        )
+    with pytest.raises(ValueError, match="match the measured frequency grid"):
+        _prepare_full_em_cts_spectral_whitener(
+            4, model_discrepancy_covariance=np.eye(3)
+        )
+
+
+def test_full_em_cts_does_not_silently_regularize_singular_total_covariance():
+    singular = np.ones((4, 4))
+    with pytest.raises(ValueError, match="not silently regularized"):
+        _prepare_full_em_cts_spectral_whitener(
+            4, model_discrepancy_covariance=singular
+        )
