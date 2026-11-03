@@ -28,6 +28,7 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
         physical_initial=[260.0, 0.0, 4.2],
         background_model="linear",
         measurement_uncertainty=np.full(wavelength.size, 0.003),
+        model_discrepancy_covariance=np.eye(wavelength.size) * 1.0e-6,
         max_nfev=5000,
     )
     assert result["optimizer_success"]
@@ -36,4 +37,6 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
     assert result["jacobian_rank"] == result["jacobian_parameter_count"]
     assert np.allclose(result["physical_parameters"], truth, rtol=0.04, atol=1e-3)
     assert result["absolute_density_inferred"] is False
+    assert result["model_discrepancy_covariance_included"] is True
+    assert result["noise_model"] == "measurement_plus_model_discrepancy_covariance"
     assert result["cross_section_model"] == "isotropic_finite_variance_Kappa_projection"
