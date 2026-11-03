@@ -1566,7 +1566,15 @@ def analyze_thomson_spectra(
             fit.get("model_discrepancy_covariance") is not None
             and float(fit.get("model_discrepancy_scale", 0.0)) > 0.0
         ) or independent_discrepancy_blocks is not None
-        if fit.get("model_discrepancy_covariance") is None:
+        if independent_discrepancy_blocks is not None:
+            fit["model_discrepancy_diagnostics"] = {
+                "residual_rms": fit.get("fit_residual_rms"),
+                "covariance_included": True,
+                "model": "researcher_supplied_correlated_spectral_covariance",
+                "independent_of_reduced_chi_square": True,
+                "interpretation": "The supplied correlated discrepancy covariance was added to the channel spectral covariance before GLS fitting; no reduced-chi-square rescaling was applied.",
+            }
+        elif fit.get("model_discrepancy_covariance") is None:
             fit["model_discrepancy_diagnostics"] = {
                 "residual_rms": fit.get("fit_residual_rms"),
                 "reduced_chi_square": fit.get("fit_reduced_chi_square"),
