@@ -2980,6 +2980,10 @@ def analyze_thomson_spectra(
                     signal_uncertainty=channel_uncertainty,
                     signal_covariance=channel_covariance,
                 )
+                evdf["laser_spectral_profile"] = (
+                    source_profile_metadata if source_profile_metadata is not None
+                    else {"assumption": "monochromatic_incident_laser"}
+                )
                 evdf["analysis_status"] = "completed"
                 evdf["background_source"] = "nuisance background fitted by the selected primary Thomson physical forward model"
                 evdf["interpretation"] = (
