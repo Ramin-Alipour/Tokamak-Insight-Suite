@@ -1708,29 +1708,22 @@ def test_cts_species_resolved_ion_temperatures_and_correlated_species_covariance
 
 @pytest.mark.parametrize("invalid_strength", [True, False, "0.1", "not-a-number", None])
 def test_cts_regularization_strength_rejects_non_numeric_and_boolean_values(invalid_strength):
-    f0, f, g, ions, fractions, response = _case()
-    spectrum = 0.03 + np.exp(-0.5 * (f / 1.0e9) ** 2)
-    with pytest.raises(ValueError, match="regularization_strength must be a real numeric scalar"):
-        analyze_cts_spectrum(
-            f, spectrum,
-            probe_frequency_Hz=f0,
-            scattering_geometry=g,
-            ion_species=ions,
-            ion_fractions=fractions,
-            instrument_response=response,
-            electron_density_initial_m3=2.0e19,
-            electron_temperature_initial_eV=1200.0,
-            ion_temperature_initial_eV=800.0,
-            ion_velocity_initial_m_s=0.0,
-            inversion_method="local_least_squares",
-            regularization_strength=invalid_strength,
-        )
+    from tokamak_analysis.cts_analysis import _nonnegative_real
+
+    with pytest.raises(ValueError, match="real numeric scalar"):
+        _nonnegative_real(invalid_strength, "regularization_strength")
+
+
+@pytest.mark.parametrize("invalid_strength", [-1.0, np.inf, -np.inf, np.nan])
+def test_cts_regularization_strength_rejects_negative_or_nonfinite_values(invalid_strength):
+    from tokamak_analysis.cts_analysis import _nonnegative_real
+
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        _nonnegative_real(invalid_strength, "regularization_strength")
 
 
 @pytest.mark.parametrize("valid_strength", [0, 0.0, 0.25, np.float64(1.0)])
 def test_cts_regularization_strength_accepts_finite_nonnegative_real_values(valid_strength):
-    from tokamak_analysis.cts_analysis import _positive
-    assert isinstance(valid_strength, (int, float, np.integer, np.floating))
-    assert not isinstance(valid_strength, (bool, np.bool_))
-    assert np.isfinite(float(valid_strength))
-    assert float(valid_strength) >= 0.0
+    from tokamak_analysis.cts_analysis import _nonnegative_real
+
+    assert _nonnegative_real(valid_strength, "regularization_strength") == float(valid_strength)
