@@ -82,7 +82,12 @@ def test_analysis_1_declares_channelwise_background_basis_and_mj_joint_gls():
     assert {
         "background_model", "background_degree",
         "background_interior_knots", "background_templates",
+        "model_discrepancy_covariance",
     } <= set(inputs)
+    from pathlib import Path
+    dashboard_source = Path("app.py").read_text(encoding="utf-8")
+    assert "ts_infer_model_discrepancy_covariance" in dashboard_source
+    assert "model_discrepancy_covariance" in inspect.signature(analyze_thomson_spectra).parameters
     assert "non_collective_relativistic_maxwell_juttner" in inputs["model"]["unit"]
     assert "background_model" in inspect.signature(analyze_thomson_spectra).parameters
     parameters = inspect.signature(fit_relativistic_maxwell_juttner_channels).parameters

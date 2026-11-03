@@ -948,6 +948,13 @@ elif page=='Spectral Analysis':
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
+            model_discrepancy_covariance_upload=None
+            if not joint_spatial_spectral:
+                model_discrepancy_covariance_upload=st.file_uploader(
+                    'Optional full channel-major model-discrepancy covariance CSV (Nchannel × Nλ square matrix)',
+                    type=['csv','txt'],key='ts_infer_model_discrepancy_covariance',
+                    help='Supply the complete calibrated spectral model-discrepancy covariance, including cross-channel blocks. It is added to measurement covariance before GLS; do not include measurement noise again.',
+                )
             channel_background_model='linear'
             channel_background_degree=2
             channel_background_interior_knots=3
@@ -1089,6 +1096,7 @@ elif page=='Spectral Analysis':
                 'response_uncertainty_upload': _ts_upload_digest(response_unc_upload),
                 'channel_response_uncertainty_upload': _ts_upload_digest(response_channel_unc_upload),
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
+                'model_discrepancy_covariance_upload': _ts_upload_digest(model_discrepancy_covariance_upload),
                 'joint_spatial_spectral': joint_spatial_spectral,
                 'channel_background_model': channel_background_model,
                 'channel_background_degree': channel_background_degree,
@@ -1199,6 +1207,11 @@ elif page=='Spectral Analysis':
                     joint_spectral_covariance=None
                     if joint_covariance_upload is not None:
                         joint_spectral_covariance=pd.read_csv(joint_covariance_upload,header=None).to_numpy(dtype=float)
+                    model_discrepancy_covariance=None
+                    if model_discrepancy_covariance_upload is not None:
+                        model_discrepancy_covariance=pd.read_csv(
+                            model_discrepancy_covariance_upload,header=None
+                        ).to_numpy(dtype=float)
                     laser_nm=_parse_ts_scalar(laser_nm_text,'Laser wavelength',minimum=1e-9)
                     angle_rad=_parse_ts_scalar(angle_rad_text,'Scattering angle',minimum=1e-9,maximum=float(np.pi))
                     laser_unc_value=None if laser_unc_text is None else _parse_ts_scalar(laser_unc_text,'Laser-wavelength uncertainty',minimum=0.0)
@@ -1214,6 +1227,8 @@ elif page=='Spectral Analysis':
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
+                    if model_discrepancy_covariance is not None:
+                        kwargs['model_discrepancy_covariance']=model_discrepancy_covariance
                     if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                         kwargs.update({
                             'background_model':channel_background_model,
