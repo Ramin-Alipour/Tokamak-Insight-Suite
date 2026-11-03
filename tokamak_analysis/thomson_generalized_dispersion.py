@@ -1,9 +1,10 @@
 """Generalized unmagnetized electrostatic CTS response for tabulated 1-D EVDFs.
 
 The susceptibility integral uses exact interval integration of the derivative
-of a piecewise-linear projected VDF for the first-order Landau pole. This is a
-transparent, Skolar-inspired real-axis quadrature primitive; it is not a
-reimplementation of every arbitrary-order-pole feature in Skolar et al. (2025).
+of a piecewise-linear projected VDF. The primitive supports one complex pole
+of any positive integer order per call; the CTS dielectric uses the physical
+first-order Landau pole. It is Skolar-inspired and does not implement a
+multiple-pole summation or the paper's full kinetic closure.
 """
 from __future__ import annotations
 
@@ -21,9 +22,9 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
     """Evaluate integral f'(v)/(v-zeta) dv for a tabulated projected VDF.
 
     f is linearly interpolated on the supplied velocity grid, so f' is
-    piecewise constant and each interval integral is analytic. A positive
-    imaginary pole displacement selects the retarded/Landau branch and avoids
-    evaluating a singular real-axis logarithm exactly at a VDF knot.
+    piecewise constant and each interval integral is analytic for any positive
+    integer pole_order. A positive imaginary pole displacement selects the
+    retarded/Landau branch and avoids singular real-axis evaluation.
     """
     v = np.asarray(velocity_grid_m_s, dtype=float)
     f = np.asarray(probability_density_s_m, dtype=float)
@@ -67,7 +68,7 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
         "pole_imaginary_part_m_s": eta,
         "quadrature": "analytic_interval_integral_of_piecewise_constant_derivative_of_piecewise_linear_VDF",
         "pole_order": pole_order,
-        "limitation": "first-order Landau pole only; finite velocity support and positive pole displacement are explicit numerical inputs",
+        "limitation": "one complex pole per call; finite velocity support and positive pole displacement are explicit numerical inputs",
     }
 
 
