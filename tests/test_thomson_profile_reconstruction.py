@@ -118,3 +118,41 @@ def test_full_cross_channel_covariance_is_used_in_gls_smoothing_objective():
     assert diagnostics["covariance_regularization"] == "none; non-positive-definite covariance is rejected"
     assert np.isfinite(diagnostics["system_condition_number"])
     assert np.isfinite(diagnostics["effective_degrees_of_freedom"])
+
+
+def test_profile_reconstruction_propagates_supplied_coordinate_covariance():
+    from tokamak_analysis.thomson_workflow import _reconstruct_inferred_parameter_profile
+
+    radius = np.linspace(0.0, 0.5, 7)
+    values = np.array([10.0, 18.0, 27.0, 34.0, 31.0, 22.0, 12.0])
+    coordinate_sigma = np.full(radius.size, 2.0e-3)
+    correlation = np.fromfunction(
+        lambda i, j: 0.4 ** np.abs(i - j), (radius.size, radius.size)
+    )
+    coordinate_covariance = correlation * np.outer(coordinate_sigma, coordinate_sigma)
+
+    result = _reconstruct_inferred_parameter_profile(
+        radius, values, coordinate_covariance=coordinate_covariance,
+        positive=True, method="pchip", points=101, mc_samples=100,
+        random_seed=91,
+    )
+    profile = result["methods"]["pchip"]
+    assert result["coordinate_uncertainty_model"] == (
+        "researcher_supplied_full_coordinate_covariance_independent_of_profile_values"
+    )
+    assert profile["uncertainty_available"] is True
+    assert profile["uncertainty_mc_successful_samples"] >= 80
+    assert np.all(np.isfinite(profile["standard_uncertainty"]))
+    assert np.any(profile["standard_uncertainty"] > 0.0)
+
+
+def test_profile_reconstruction_rejects_invalid_coordinate_covariance():
+    from tokamak_analysis.thomson_workflow import _reconstruct_inferred_parameter_profile
+
+    radius = np.linspace(0.0, 0.5, 5)
+    values = np.linspace(10.0, 20.0, 5)
+    with pytest.raises(ValueError, match="Coordinate covariance"):
+        _reconstruct_inferred_parameter_profile(
+            radius, values, coordinate_covariance=np.ones((4, 4)),
+            method="pchip",
+        )
