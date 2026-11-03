@@ -145,12 +145,69 @@ def gaussian_beam_overlap(center_incident_m, covariance_incident_m2,
     return float(np.exp(log_overlap))
 
 
+
+
+def _transverse_frame(direction):
+    d = _vector(direction, "beam_direction")
+    d = d / np.linalg.norm(d)
+    trial = np.array([1.0, 0.0, 0.0])
+    if abs(float(np.dot(trial, d))) > 0.9:
+        trial = np.array([0.0, 1.0, 0.0])
+    e1 = trial - np.dot(trial, d) * d
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(d, e1)
+    return np.column_stack((e1, e2))
+
+
+def gaussian_beam_overlap_transverse(
+    center_incident_m, direction_incident, covariance_incident_m2,
+    center_scattered_m, direction_scattered, covariance_scattered_m2,
+):
+    """Overlap two normalized transverse Gaussian intensity profiles.
+
+    Each covariance is the propagated 2x2 position block in its own ray frame.
+    Both are projected into the plane normal to the mean ray direction before
+    evaluating the analytic 2-D Gaussian product integral.
+    """
+    ci = _vector(center_incident_m, "center_incident_m")
+    cs = _vector(center_scattered_m, "center_scattered_m")
+    ei = _transverse_frame(direction_incident)
+    es = _transverse_frame(direction_scattered)
+    di = _vector(direction_incident, "direction_incident")
+    ds = _vector(direction_scattered, "direction_scattered")
+    common_direction = di / np.linalg.norm(di) + ds / np.linalg.norm(ds)
+    if np.linalg.norm(common_direction) <= 1e-10:
+        raise ValueError("incident and scattered directions are antiparallel; common transverse overlap plane is undefined")
+    common = _transverse_frame(common_direction)
+    si = np.asarray(covariance_incident_m2, dtype=float)
+    ss = np.asarray(covariance_scattered_m2, dtype=float)
+    if si.shape != (2, 2) or ss.shape != (2, 2):
+        raise ValueError("transverse beam covariance matrices must be 2x2")
+    for matrix, name in ((si, "incident"), (ss, "scattered")):
+        if not np.all(np.isfinite(matrix)) or not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-13):
+            raise ValueError(f"{name} transverse covariance must be finite and symmetric")
+        if np.min(np.linalg.eigvalsh(matrix)) <= 0:
+            raise ValueError(f"{name} transverse covariance must be positive definite")
+    ai = common.T @ ei
+    ass = common.T @ es
+    si_common = ai @ si @ ai.T
+    ss_common = ass @ ss @ ass.T
+    total = si_common + ss_common
+    delta = common.T @ (ci - cs)
+    sign, logdet = np.linalg.slogdet(total)
+    if sign <= 0:
+        raise ValueError("projected transverse covariance sum must be positive definite")
+    exponent = -0.5 * float(delta @ np.linalg.solve(total, delta))
+    return float(np.exp(-np.log(2.0 * np.pi) - 0.5 * logdet + exponent))
+
+
 def trace_cold_plasma_ray(
     initial_position_m, initial_wavevector_rad_m, omega_rad_s, *,
     equilibrium: Callable[[np.ndarray], Mapping],
     mode_index=None, path_parameter_max=1.0, sample_count=256,
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
     initial_mode_amplitudes=None, propagation_constants_rad_m=None,
+    initial_beam_phase_space_covariance=None, paraxial_transfer_matrices=None,
 ):
     """Trace a cold-plasma eigenmode ray through a supplied 3-D equilibrium.
 
@@ -177,6 +234,16 @@ def trace_cold_plasma_ray(
     smax = _positive(path_parameter_max, "path_parameter_max")
     rtol = _positive(relative_tolerance, "relative_tolerance")
     atol = _positive(absolute_tolerance, "absolute_tolerance")
+    if (initial_beam_phase_space_covariance is None) != (paraxial_transfer_matrices is None):
+        raise ValueError("initial_beam_phase_space_covariance and paraxial_transfer_matrices must be supplied together")
+    propagated_beam = None
+    if initial_beam_phase_space_covariance is not None:
+        from .advanced_inference import propagate_paraxial_beam_covariance
+        propagated_beam = propagate_paraxial_beam_covariance(
+            initial_beam_phase_space_covariance, paraxial_transfer_matrices
+        )
+        if np.asarray(paraxial_transfer_matrices).shape[0] != int(sample_count) - 1:
+            raise ValueError("paraxial_transfer_matrices must contain one symplectic map per adjacent ray-sample pair")
 
     def eigenvalue(position, wavevector):
         state = equilibrium(np.asarray(position, dtype=float))
@@ -253,6 +320,15 @@ def trace_cold_plasma_ray(
         "wavevector_rad_m": wavevectors,
         "dispersion_eigenvalue": eigenvalues,
         "electric_polarization": polarizations,
+        "transverse_position_covariance_m2": (
+            propagated_beam["transverse_position_covariance_m2"] if propagated_beam is not None else None
+        ),
+        "phase_space_covariance": (
+            propagated_beam["phase_space_covariance"] if propagated_beam is not None else None
+        ),
+        "paraxial_beam_propagation_status": (
+            "propagated_from_supplied_symplectic_ABCD_maps" if propagated_beam is not None else "not_requested"
+        ),
         "mode_index": int(mode_index),
         "mode_branch_tracking": branch_tracking,
         "coherent_mode_conversion": mode_conversion,
@@ -277,7 +353,7 @@ def trace_cold_plasma_ray(
 def trace_cts_frequency_resolved_beams(
     frequency_shift_Hz, probe_frequency_Hz, *,
     incident_ray, receiver_rays, equilibrium,
-    incident_beam_covariance_m2, receiver_beam_covariances_m2,
+    incident_beam_covariance_m2=None, receiver_beam_covariances_m2=None,
     mode_index=None, path_parameter_max=1.0, sample_count=256,
     scattering_sample_count=16,
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
@@ -333,13 +409,20 @@ def trace_cts_frequency_resolved_beams(
         relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
         initial_mode_amplitudes=incident_ray.get("initial_mode_amplitudes"),
         propagation_constants_rad_m=incident_ray.get("propagation_constants_rad_m"),
+        initial_beam_phase_space_covariance=incident_ray.get("initial_beam_phase_space_covariance"),
+        paraxial_transfer_matrices=incident_ray.get("paraxial_transfer_matrices"),
     )
     incident_positions = np.asarray(incident["position_m"], dtype=float)
-    incident_cov = np.asarray(incident_beam_covariance_m2, dtype=float)
-    if incident_cov.shape == (3, 3):
-        incident_cov = np.broadcast_to(incident_cov, (incident_positions.shape[0], 3, 3))
-    if incident_cov.shape != (incident_positions.shape[0], 3, 3):
-        raise ValueError("incident_beam_covariance_m2 must be (3,3) or (n_incident_ray,3,3)")
+    if incident.get("transverse_position_covariance_m2") is not None:
+        incident_cov = np.asarray(incident["transverse_position_covariance_m2"], dtype=float)
+    else:
+        if incident_beam_covariance_m2 is None:
+            raise ValueError("supply incident_beam_covariance_m2 or incident_ray paraxial covariance propagation inputs")
+        incident_cov = np.asarray(incident_beam_covariance_m2, dtype=float)
+        if incident_cov.shape == (3, 3):
+            incident_cov = np.broadcast_to(incident_cov, (incident_positions.shape[0], 3, 3))
+        if incident_cov.shape != (incident_positions.shape[0], 3, 3):
+            raise ValueError("incident_beam_covariance_m2 must be (3,3) or (n_incident_ray,3,3)")
     sample_indices = np.unique(np.linspace(
         0, incident_positions.shape[0]-1,
         min(int(scattering_sample_count), incident_positions.shape[0])
@@ -367,17 +450,24 @@ def trace_cts_frequency_resolved_beams(
             relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
             initial_mode_amplitudes=ray_spec.get("initial_mode_amplitudes"),
             propagation_constants_rad_m=ray_spec.get("propagation_constants_rad_m"),
+            initial_beam_phase_space_covariance=ray_spec.get("initial_beam_phase_space_covariance"),
+            paraxial_transfer_matrices=ray_spec.get("paraxial_transfer_matrices"),
         )
         receiver_positions = np.asarray(receiver["position_m"], dtype=float)
-        receiver_cov = np.asarray(receiver_beam_covariances_m2, dtype=float)
-        if receiver_cov.shape == (3, 3):
-            receiver_cov_for_frequency = np.broadcast_to(receiver_cov, (receiver_positions.shape[0], 3, 3))
-        elif receiver_cov.shape == (shifts.size, 3, 3):
-            receiver_cov_for_frequency = np.broadcast_to(receiver_cov[index], (receiver_positions.shape[0], 3, 3))
-        elif receiver_cov.shape == (shifts.size, receiver_positions.shape[0], 3, 3):
-            receiver_cov_for_frequency = receiver_cov[index]
+        if receiver.get("transverse_position_covariance_m2") is not None:
+            receiver_cov_for_frequency = np.asarray(receiver["transverse_position_covariance_m2"], dtype=float)
         else:
-            raise ValueError("receiver_beam_covariances_m2 must be (3,3), (n_frequency,3,3), or (n_frequency,n_receiver_ray,3,3)")
+            if receiver_beam_covariances_m2 is None:
+                raise ValueError(f"supply receiver_beam_covariances_m2 or receiver_rays[{index}] paraxial covariance propagation inputs")
+            receiver_cov = np.asarray(receiver_beam_covariances_m2, dtype=float)
+            if receiver_cov.shape == (3, 3):
+                receiver_cov_for_frequency = np.broadcast_to(receiver_cov, (receiver_positions.shape[0], 3, 3))
+            elif receiver_cov.shape == (shifts.size, 3, 3):
+                receiver_cov_for_frequency = np.broadcast_to(receiver_cov[index], (receiver_positions.shape[0], 3, 3))
+            elif receiver_cov.shape == (shifts.size, receiver_positions.shape[0], 3, 3):
+                receiver_cov_for_frequency = receiver_cov[index]
+            else:
+                raise ValueError("receiver_beam_covariances_m2 must be (3,3), (n_frequency,3,3), (n_frequency,n_receiver_ray,3,3), or be supplied through ray paraxial propagation");
         delta = selected_positions[:, None, :] - receiver_positions[None, :, :]
         distance2 = np.einsum("ijk,ijk->ij", delta, delta)
         nearest_receiver = np.argmin(distance2, axis=1)
@@ -394,10 +484,16 @@ def trace_cts_frequency_resolved_beams(
             b_local = _vector(local["magnetic_field_T"], "local magnetic_field_T")
             ki = np.asarray(incident["wavevector_rad_m"][incident_index], dtype=float)
             ks = np.asarray(receiver["wavevector_rad_m"][receiver_index], dtype=float)
-            overlap = gaussian_beam_overlap(
-                xi, incident_cov[incident_index], xs,
-                receiver_cov_for_frequency[receiver_index],
-            )
+            if incident_cov.shape[-2:] == (2, 2) and receiver_cov_for_frequency.shape[-2:] == (2, 2):
+                overlap = gaussian_beam_overlap_transverse(
+                    xi, ki, incident_cov[incident_index], xs, ks,
+                    receiver_cov_for_frequency[receiver_index],
+                )
+            else:
+                overlap = gaussian_beam_overlap(
+                    xi, incident_cov[incident_index], xs,
+                    receiver_cov_for_frequency[receiver_index],
+                )
             raw_weight = overlap*path_weights[local_index]
             raw_weights.append(raw_weight)
             samples.append({
@@ -466,7 +562,7 @@ def trace_cts_frequency_resolved_beams(
         "limitations": [
             "Cold-plasma geometrical optics; diffraction and quasi-optical beam evolution are not included.",
             "Optional coherent mode-amplitude propagation is diagnostic output only; it does not alter ray trajectories, overlap weights or the full-EM CTS spectral transfer.",
-            "Beam covariance matrices are supplied by the caller along the rays; covariance propagation is not inferred.",
+            "Beam covariance is either supplied locally or propagated from explicit symplectic paraxial transfer matrices; those matrices are not inferred by this ray solver.",
             "Fitted ne, Te and thermal-ion temperatures are treated as uniform across the sampled scattering volume; local ray directions and magnetic field vary.",
             "Ray branch continuity near eigenvalue crossings must be checked by the caller.",
             "The equilibrium callback supplies all magnetic and species profiles; no equilibrium is fabricated."
