@@ -321,6 +321,7 @@ def _fit_noncollective(
     wavelength, signal, laser_nm, angle, response, uncertainty, *,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
+    likelihood="gaussian",
 ):
     """Fit the Maxwellian Thomson feature jointly with a detector-space background basis."""
     from .thomson_background import _background_design
@@ -356,6 +357,14 @@ def _fit_noncollective(
 
     def residual(parameters):
         difference = predict(parameters)-y
+        if likelihood == "poisson":
+            from .advanced_inference import poisson_deviance_residual
+            expected_counts = signal_scale * predict(parameters)
+            if np.any(~np.isfinite(expected_counts)) or np.any(expected_counts <= 0.0):
+                return np.full(signal.size, 1e12, dtype=float)
+            return poisson_deviance_residual(np.asarray(signal, dtype=float), expected_counts)
+        if likelihood != "gaussian":
+            raise ValueError("likelihood must be 'gaussian' or 'poisson'")
         return difference if sigma_y is None else difference/sigma_y
 
     fit = least_squares(
@@ -441,7 +450,9 @@ def _fit_noncollective(
         "fit_covariance": covariance, "residual": residual_physical,
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_unc,
-        "reduced_chi_square": float(fit.fun@fit.fun/dof) if uncertainty is not None else None,
+        "reduced_chi_square": float(fit.fun@fit.fun/dof) if uncertainty is not None and likelihood == "gaussian" else None,
+        "likelihood": likelihood,
+        "likelihood_interpretation": ("independent_Poisson_count_likelihood_using_signed_deviance_residuals" if likelihood == "poisson" else "Gaussian_or_GLS_residual_likelihood"),
         "fitted_spectrum": fitted,
         "fit_parameters": fit_parameters,
         "fit_parameter_names": fit_parameter_names,
@@ -787,6 +798,7 @@ def analyze_thomson_spectra(
     include_compton_recoil=False,
     enable_evdf_reconstruction=True,
     evdf_velocity_points=121,
+    likelihood="gaussian",
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -795,6 +807,15 @@ def analyze_thomson_spectra(
     spectral bins to detector bins. Supplied response matrices must already have unit-sum columns and are used without renormalization. Absolute density is emitted only
     when all optical-power/geometry/polarization factors are supplied.
     """
+    if likelihood not in {"gaussian", "poisson"}:
+        raise ValueError("likelihood must be explicitly 'gaussian' or 'poisson'")
+    if likelihood == "poisson":
+        if model != "non_collective_maxwellian":
+            raise ValueError("Poisson count likelihood is currently integrated only for non_collective_maxwellian; Kappa, relativistic and collective fits retain their declared likelihoods")
+        if signal_uncertainty is not None or joint_spectral_covariance is not None:
+            raise ValueError("Poisson count likelihood cannot be combined with Gaussian signal_uncertainty or joint_spectral_covariance")
+        if np.any(y < 0) or np.any(np.abs(y - np.rint(y)) > 1e-8):
+            raise ValueError("Poisson likelihood requires raw integer photon/count bins, not calibrated power-density values")
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
     if not isinstance(enable_evdf_reconstruction, (bool, np.bool_)):
@@ -1209,7 +1230,8 @@ def analyze_thomson_spectra(
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,
                                 background_model=background_model, background_degree=background_degree,
                                 background_interior_knots=background_interior_knots,
-                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
+                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
+                                likelihood=likelihood)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_relativistic_maxwell_juttner":
@@ -1729,7 +1751,8 @@ def analyze_thomson_spectra(
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,
                             background_model=background_model, background_degree=background_degree,
                             background_interior_knots=background_interior_knots,
-                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
+                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
+                            likelihood=likelihood)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                     area_samples.append(float(draw["integrated_scattered_power_W"])
