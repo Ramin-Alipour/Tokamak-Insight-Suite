@@ -365,6 +365,8 @@ def reconstruct_joint_thomson_spatial_spectra(
         return whiten(y - predict(parameters)[0])
 
     parameter_count = int(fit.x.size)
+    background_start = 3*n + kappa_parameter_count
+    fitted_background_coefficients = fit.x[background_start:].reshape(m, n_background).copy()
     data_jacobian = _bound_aware_jacobian(
         data_residual_only, fit.x, lower, upper
     )
@@ -481,13 +483,13 @@ def reconstruct_joint_thomson_spatial_spectra(
                              for coefficient in range(n_background)]),
         "detector_background_model": background_model,
         "detector_background_basis": background_basis.copy(),
-        "detector_background_coefficients": fit.x[3*n:].reshape(m, n_background).copy(),
+        "detector_background_coefficients": fitted_background_coefficients,
         "detector_background_offset": (
-            fit.x[3*n:].reshape(m, n_background)[:, 0].copy()
+            fitted_background_coefficients[:, 0].copy()
             if background_model in {"linear", "polynomial"} else None
         ),
         "detector_background_slope_per_nm": (
-            fit.x[3*n:].reshape(m, n_background)[:, 1].copy()
+            fitted_background_coefficients[:, 1].copy()
             * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
         ),
         "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
