@@ -67,3 +67,23 @@ def test_full_em_cts_pointwise_measurement_error_combines_as_diagonal_covariance
     )
     np.testing.assert_allclose(effective, np.diag(sigma**2) + discrepancy)
     assert status == "measurement_covariance_plus_independent_correlated_model_discrepancy"
+
+
+def test_cts_registry_declares_discrepancy_covariance_for_both_models():
+    import json
+    from pathlib import Path
+
+    registry = json.loads(
+        (Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    entry = next(
+        item for item in registry
+        if item.get("diagnostic") == "Collective Thomson / coherent scattering (CTS)"
+    )
+    spec = next(
+        item for item in entry["execution_contract"]["input_specs"]
+        if item["name"] == "model_discrepancy_covariance"
+    )
+    assert "Electrostatic and Full-EM" in spec["description"]
