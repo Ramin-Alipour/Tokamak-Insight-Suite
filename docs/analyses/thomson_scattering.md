@@ -156,26 +156,24 @@ The canonical channel-wise optical API
 (`analyze_thomson_spectra`) accepts a researcher-supplied
 `model_discrepancy_covariance` for each of the three selected non-collective
 optical models: Maxwellian, isotropic Kappa and relativistic Maxwell-Juttner.
-The accepted shapes are `(n_wavelength, n_wavelength)` (one common spectral
-covariance broadcast to every channel) or
-`(n_channels, n_wavelength, n_wavelength)` (channel-specific blocks).
-Values are in calibrated spectral-intensity units squared. Each block must
-be finite, symmetric and positive semidefinite. It is added once to the
-corresponding measurement covariance; if only pointwise measurement
-uncertainties are supplied, their diagonal variance is combined with the
-discrepancy block. If neither measurement uncertainty nor measurement
-covariance is supplied, the discrepancy block is the spectral weighting
-covariance and must be usable by the GLS factorization (positive definite).
+The accepted shapes are `(n_wavelength, n_wavelength)` (one common
+within-channel covariance broadcast to every channel),
+`(n_channels, n_wavelength, n_wavelength)` (channel-specific blocks), or
+the full `(n_channels*n_wavelength, n_channels*n_wavelength)` channel-major
+matrix. Values are in calibrated spectral-intensity units squared. Every
+matrix must be finite, symmetric and positive semidefinite. The full
+channel-major form preserves off-diagonal cross-channel model-discrepancy
+blocks; it is added once to the supplied full measurement covariance. If
+pointwise measurement uncertainties are supplied instead, their diagonal
+variances are assembled in channel-major order before adding the full
+discrepancy matrix. If no measurement uncertainty is supplied, the
+discrepancy covariance itself must be positive definite for GLS weighting.
 No silent diagonal jitter or eigenvalue clipping is applied.
 
-For a relativistic Maxwell-Juttner fit with a supplied full channel-major
-`joint_spectral_covariance`, the channel discrepancy blocks are added to
-the matching diagonal blocks while the supplied cross-channel measurement
-covariance is retained. The current discrepancy input does not describe
-cross-channel model-discrepancy correlations; those off-diagonal discrepancy
-blocks are therefore not inferred or fabricated. Maxwellian and Kappa use
-channel-wise fits, so their current discrepancy contract is likewise
-channel-block based rather than a shared-parameter multichannel GLS model.
+The same additive rule applies to the full channel-major GLS paths for
+Maxwellian, Kappa and relativistic Maxwell-Juttner models. The independent
+block forms remain available for callers who only have within-channel
+discrepancy estimates. No unspecified cross-channel correlations are inferred.
 
 A separate joint structured-background Kappa/MJ workflow
 (`fit_noncollective_kinetic_thomson_with_background`) accepts its own
@@ -235,7 +233,7 @@ References:
 
 ## Uncertainty and deliberate limitations
 
-- Full channel-major generalized least squares with Cholesky whitening is implemented for non-collective Maxwellian and Kappa fits. The relativistic Maxwell-Juttner path also supports a joint full cross-channel spectral covariance fit when all channels share identical wavelength sampling, scattering geometry and calibrated response; it fits shared electron temperature/flow with channel-specific amplitudes and background nuisance terms. Independent channel fits are retained, and supplied laser-wavelength, scalar scattering-angle or beam-direction, incident-polarization and response-matrix uncertainties have separate Monte Carlo propagation routes.
+- Full channel-major generalized least squares with Cholesky whitening is implemented for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner fits. The joint fit uses the supplied complete covariance, including cross-channel measurement and (when supplied) model-discrepancy blocks, and retains channel-specific amplitudes and selected detector-space background nuisance coefficients. Independent channel fits are retained. Supplied laser-wavelength, scalar scattering-angle or beam-direction, incident-polarization and response-matrix uncertainties have separate Monte Carlo propagation routes.
 - The relativistic Maxwell-Juttner external-parameter Monte Carlo samples the supplied 1σ component uncertainties and reprojects the polarization into the plane transverse to each sampled incident direction. Scalar angle uncertainty and beam-direction component uncertainties are alternative geometry descriptions and cannot be supplied together.
 - Absolute-density uncertainty can combine the full channel-major spectral covariance, measured-response Monte Carlo and optical-factor covariance. When spectral/response uncertainty supplies the scattered-power term, the first row and column of the 6×6 (or 6N×6N) optical-input covariance must be zero; the measured-power contribution is then propagated separately without double counting. Scalar scattering-angle uncertainty is an additional common geometry contribution, including cross-channel covariance. Duplicate scalar optical-factor uncertainties remain prohibited.
 - Kappa is a parameterized finite-variance distribution, not an unrestricted VDF inversion.
@@ -253,7 +251,7 @@ The registry deliberately distinguishes `raw_data_to_physics=false` from `calibr
 
 Every fitted optical Thomson channel now reports `spectral_weighting_status` and `fit_covariance_interpretation`. A supplied pointwise uncertainty produces diagonal weighted least squares; a supplied channel-major covariance produces joint generalized least squares for Maxwellian/Kappa models. If neither is supplied, the fit is unweighted and its local covariance is residual-variance-scaled; it is **not** a measurement-noise-calibrated uncertainty. Do not interpret that covariance as a complete experimental uncertainty budget.
 
-The Maxwellian and Kappa physical fits use a two-parameter linear nuisance baseline (intercept and slope). Curved, structured, line-contaminated or time-varying backgrounds are outside that model. This is a declared model limitation, not an automatic background-separation capability.
+The channel-wise Maxwellian, Kappa and relativistic Maxwell-Juttner fits accept a researcher-selected detector-space nuisance basis: constant, linear, Legendre polynomial, cubic spline or supplied templates. In the joint channel-major GLS path each channel has its own coefficients and basis matrix, and the complete physical/background parameter covariance is retained. Basis adequacy and signal/background degeneracy remain researcher responsibilities; this is not an automatic physical decomposition of bremsstrahlung, ECE, line emission or other plasma backgrounds.
 
 The spectral-distribution subanalysis is deliberately descriptive. It uses signed background-subtracted spectral measure for moments, retains negative residuals rather than clipping them, and reports the negative-area fraction. The moments require a positive signed integrated area and variance; strong cancellation or background error can make them unstable. Its Gaussian shape-fit covariance is conditional on the selected fixed background and fixed measured response. The result now explicitly reports whether the background was researcher-supplied or estimated from a selected edge fraction, and whether Gaussian fitting was weighted by measurement uncertainties. Edge-fraction estimation is a heuristic assumption, not an independently identified background. Moment uncertainty and Gaussian shape-fit uncertainty are separate from the physical parameter covariance of the parent Thomson fit.
 

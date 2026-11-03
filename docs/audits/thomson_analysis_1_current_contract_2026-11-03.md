@@ -9,9 +9,11 @@ This page supersedes stale statements in older Analysis 1 notes.
   public runtime and registries. References describing it as available are
   obsolete.
 - Optical model-discrepancy covariance is supported in the calibrated
-  Maxwellian, finite-variance Kappa and relativistic Maxwell-Juttner
-  single-channel inference paths. This does not imply arbitrary cross-channel
-  discrepancy covariance or a universal covariance API across CTS.
+  Maxwellian, finite-variance Kappa and relativistic Maxwell-Juttner inference
+  paths as common within-channel, channel-specific, or full channel-major
+  covariance. The full channel-major form retains supplied cross-channel
+  discrepancy blocks in the joint GLS objective. This remains an optical
+  Analysis 1 contract and is not a universal covariance API across CTS.
 - Full-EM CTS branch tracking and its optional lossless coupled-mode utility
   are conditional local propagation tools, not a complete dissipative
   full-wave mode-conversion solver.
@@ -58,3 +60,26 @@ fluctuation source, and non-paraxial dissipative full-vector beam propagation,
 remain outside the implemented model scope. Classical collision-rate estimates
 and paraxial/cold-plasma ray propagation must not be described as those
 complete operators.
+
+## Addendum — full cross-channel optical model-discrepancy covariance (2026-11-03)
+
+The canonical optical Analysis 1 API now accepts a complete channel-major
+`model_discrepancy_covariance` matrix with shape
+`(n_channels*n_wavelength, n_channels*n_wavelength)`. Its off-diagonal
+channel blocks are validated and retained rather than discarded. The matrix is
+added exactly once to a supplied full measurement covariance; if pointwise
+measurement uncertainties are supplied, their diagonal variances are first
+assembled in channel-major order. A discrepancy-only matrix must be positive
+definite to define GLS weights. The same addition logic applies to the
+Maxwellian, finite-variance Kappa and relativistic Maxwell-Juttner joint
+optical fits. Existing common and per-channel discrepancy-block forms remain
+supported.
+
+The full channel-major GLS route also accepts the selected structured
+detector-space background basis for Maxwellian, Kappa and relativistic
+Maxwell-Juttner models. Registry copies and the canonical Thomson analysis
+documentation describe the expanded covariance shape and background contract.
+Regression tests cover a correlated two-channel discrepancy matrix and reject
+an indefinite full matrix. These are software regressions, not experimental
+validation.
+
