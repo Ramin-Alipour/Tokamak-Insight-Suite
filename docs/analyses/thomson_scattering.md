@@ -91,7 +91,7 @@ instrument function as separate broadening operators and often combines them
 into a source-and-instrument convolution only under a stated narrow-band
 approximation. The present optical implementation follows that separation,
 rather than adding source linewidth in quadrature to an inferred electron
-temperature. See the 2026 XRTS source/instrument broadening review and the
+temperature. Source-profile convolution is rejected when the optional Compton-recoil/Klein-Nishina mode is selected because a source-frequency-resolved recoil kernel is not yet implemented. See the 2026 XRTS source/instrument broadening review and the
 2026 source-and-instrument function treatment (DOI:
 10.1007/s41614-026-00227-9; 10.1063/5.0309991). These X-ray papers support the
 general forward-model structure; they are not claimed as direct validation of
@@ -167,6 +167,33 @@ The physical fit must pass its identifiability and fit-quality gates. Rank-defic
 - Fitted spectra, residuals, local fit covariance, identifiability diagnostics and model provenance.
 - Model-independent spectral-distribution diagnostics for each channel where the signed moments are identifiable.
 - Spatial PCHIP and/or generalized-cross-validation spline reconstructions, with propagated uncertainty bands where the supplied covariance supports them.
+
+## Recent optical Thomson developments
+
+The 2025 WEST photonic-model paper describes a synthetic diagnostic spanning
+the scattering spectrum, scattering volume, light collection, optical
+components and polychromator response through to detector voltage. That is a
+broader instrument-level forward chain than TIS's calibrated-spectrum
+inference contract; TIS deliberately begins at measured calibrated spectra
+and does not reproduce detector calibration or photon-transport calibration.
+Tomita's 2025 perspective discusses practical laser Thomson scattering across
+different plasma regimes and highlights the importance of optical design and
+spectral analysis. Foo et al. (2026) present a regularized optical Thomson
+inverse for improved temporal plasma-parameter reconstruction, reinforcing
+the need to expose regularization, resolution and uncertainty assumptions
+rather than report a unique distribution without qualification. These
+publications motivate the source-profile option and the explicit limitations
+of the projected-EVDF inverse; they do not constitute validation of TIS.
+
+References:
+- Carole et al. (2025), *JINST* 20, P07014,
+  DOI: 10.1088/1748-0221/20/07/P07014.
+- Tomita (2025), *Oyo Buturi* 94(9), 490–494,
+  DOI: 10.11470/oubutsu.94.9_490.
+- Foo et al. (2026), *Review of Scientific Instruments* 97, 103535,
+  DOI: 10.1063/5.0350497.
+- Sakai et al. (2026), *JINST* 21, C01002,
+  DOI: 10.1088/1748-0221/21/01/C01002.
 
 ## Uncertainty and deliberate limitations
 
