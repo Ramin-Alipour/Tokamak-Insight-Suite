@@ -146,6 +146,17 @@ full-wave mode-conversion solver. Non-paraxial diffraction, general
 non-Gaussian beam evolution, absorption/collisional mode coupling and
 arbitrary inhomogeneous wave propagation are not implied.
 
+The Full-EM measured-spectrum inversion accepts an optional independent
+additive `model_discrepancy_covariance` on the measured frequency-shift grid.
+It combines this with either the supplied full measurement covariance or the
+diagonal covariance formed from pointwise measurement uncertainty. A
+discrepancy-only covariance is permitted and is labelled as such; without
+either source the fit remains unweighted. The discrepancy covariance must be
+positive semidefinite and the total covariance must be positive definite for
+Cholesky GLS. No jitter, eigenvalue clipping or residual-derived discrepancy
+is introduced. Measurement/discrepancy cross-covariance and
+discrepancy-hyperparameter inference are not included.
+
 The Full-EM measured-spectrum inversion currently fits spatially uniform
 plasma parameters over the sampled scattering volume. Spatially varying
 magnetic field and beam geometry do not imply that arbitrary node-wise
