@@ -65,7 +65,7 @@ def test_multiview_3d_evdf_requires_data_supported_rank():
     true = np.array([1., 2., 3., 4., 5., 6.])
     volume = np.full(6, 0.1)
     data = (kernels.reshape(6, 6) @ (true * volume)).reshape(3, 2)
-    penalty = np.zeros((0, 6))
+    penalty = np.zeros((1, 6))
     result = reconstruct_multiview_3d_evdf(
         kernels, data, np.arange(18).reshape(6, 3), voxel_volume_m3_s3=volume,
         regularization_matrix=penalty, regularization_strength=1e-6,
@@ -96,3 +96,29 @@ def test_free_free_and_ece_radiative_transfer():
     )
     assert result["spectral_radiance_W_m2_sr_Hz"].shape == nu.shape
     assert np.all(result["ece_optical_depth"] > 0)
+
+
+
+def test_nonlinear_nonnegative_distribution_fit_uses_full_forward_callback():
+    from tokamak_analysis.advanced_inference import fit_nonlinear_nonnegative_distribution
+
+    rng = np.random.default_rng(12)
+    kernel = rng.uniform(0.2, 1.2, size=(24, 6))
+    weights = np.linspace(0.5, 1.0, 6)
+    truth = np.array([0.05, 0.1, 0.2, 0.25, 0.25, 0.15])
+    truth /= weights @ truth
+    measured = 3.0 * (kernel @ truth) + 0.1
+    initial = np.ones(6) / (weights @ np.ones(6))
+    regularizer = np.diff(np.eye(6), n=2, axis=0)
+    result = fit_nonlinear_nonnegative_distribution(
+        measured, initial, weights,
+        forward_model=lambda pdf: kernel @ pdf,
+        regularization_matrix=regularizer,
+        regularization_strength=1e-5,
+        measurement_uncertainty=np.full(measured.size, 0.01),
+        max_nfev=500,
+    )
+    assert result["status"] == "identified_conditional_distribution_shape"
+    assert result["distribution"] is not None
+    assert np.all(result["distribution"] >= 0)
+    assert result["normalization"] == pytest.approx(1.0, rel=1e-8)
