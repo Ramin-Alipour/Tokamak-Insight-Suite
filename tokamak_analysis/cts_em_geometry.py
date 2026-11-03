@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 import numpy as np
 from scipy.integrate import solve_ivp
+from scipy.linalg import expm
 
 EPS0 = 8.8541878128e-12
 C = 299792458.0
@@ -208,6 +209,7 @@ def trace_cold_plasma_ray(
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
     initial_mode_amplitudes=None, propagation_constants_rad_m=None,
     initial_beam_phase_space_covariance=None, paraxial_transfer_matrices=None,
+    initial_ray_phase_space_covariance=None,
 ):
     """Trace a cold-plasma eigenmode ray through a supplied 3-D equilibrium.
 
@@ -234,6 +236,8 @@ def trace_cold_plasma_ray(
     smax = _positive(path_parameter_max, "path_parameter_max")
     rtol = _positive(relative_tolerance, "relative_tolerance")
     atol = _positive(absolute_tolerance, "absolute_tolerance")
+    if initial_ray_phase_space_covariance is not None and initial_beam_phase_space_covariance is not None:
+        raise ValueError("choose either a 6-D ray phase-space covariance or a 4-D paraxial covariance with supplied ABCD maps")
     if (initial_beam_phase_space_covariance is None) != (paraxial_transfer_matrices is None):
         raise ValueError("initial_beam_phase_space_covariance and paraxial_transfer_matrices must be supplied together")
     propagated_beam = None
@@ -314,6 +318,62 @@ def trace_cold_plasma_ray(
         )
     selected_branch_order = branch_tracking["eigenvalue_order_permutation"][:, int(mode_index)]
     fixed_order_branch_consistent = bool(np.all(selected_branch_order == int(mode_index)))
+    propagated_ray_covariance = None
+    propagated_ray_transverse_covariance = None
+    if initial_ray_phase_space_covariance is not None:
+        if not fixed_order_branch_consistent:
+            raise ValueError("ray phase-space covariance propagation is undefined across a cold-plasma eigenmode branch-order crossing")
+        sigma0 = np.asarray(initial_ray_phase_space_covariance, dtype=float)
+        if sigma0.shape != (6, 6) or not np.all(np.isfinite(sigma0)) or not np.allclose(sigma0, sigma0.T, rtol=1e-10, atol=1e-13):
+            raise ValueError("initial_ray_phase_space_covariance must be a finite symmetric 6x6 matrix for [x,y,z,kx,ky,kz]")
+        sigma_eigenvalues = np.linalg.eigvalsh(sigma0)
+        sigma_scale = max(float(np.max(np.abs(sigma_eigenvalues))), np.finfo(float).tiny)
+        if float(np.min(sigma_eigenvalues)) < -1e-10*sigma_scale:
+            raise ValueError("initial_ray_phase_space_covariance must be positive semidefinite")
+        canonical = np.block([
+            [np.zeros((3,3)), -np.eye(3)],
+            [np.eye(3), np.zeros((3,3))],
+        ])
+        ray_states = np.column_stack((positions, wavevectors))
+        fundamental = np.eye(6)
+        covariance_states = []
+        transverse_states = []
+        for sample_index, state_vector in enumerate(ray_states):
+            if sample_index > 0:
+                midpoint = 0.5*(ray_states[sample_index-1] + state_vector)
+                h = np.power(np.finfo(float).eps, 0.25) * np.maximum(
+                    np.abs(midpoint),
+                    np.r_[np.full(3, max(float(np.linalg.norm(midpoint[:3])), 1.0)),
+                          np.full(3, max(float(np.linalg.norm(midpoint[3:])), 1.0))]
+                )
+                hessian = np.zeros((6,6), dtype=float)
+                center_value = eigenvalue(midpoint[:3], midpoint[3:])
+                for axis in range(6):
+                    delta = np.zeros(6); delta[axis] = h[axis]
+                    plus = eigenvalue((midpoint+delta)[:3], (midpoint+delta)[3:])
+                    minus = eigenvalue((midpoint-delta)[:3], (midpoint-delta)[3:])
+                    hessian[axis,axis] = (plus - 2.0*center_value + minus)/(h[axis]**2)
+                for row in range(6):
+                    for column in range(row+1,6):
+                        dr = np.zeros(6); dc = np.zeros(6)
+                        dr[row] = h[row]; dc[column] = h[column]
+                        ppv = eigenvalue((midpoint+dr+dc)[:3], (midpoint+dr+dc)[3:])
+                        pmv = eigenvalue((midpoint+dr-dc)[:3], (midpoint+dr-dc)[3:])
+                        mpv = eigenvalue((midpoint-dr+dc)[:3], (midpoint-dr+dc)[3:])
+                        mmv = eigenvalue((midpoint-dr-dc)[:3], (midpoint-dr-dc)[3:])
+                        value = (ppv-pmv-mpv+mmv)/(4.0*h[row]*h[column])
+                        hessian[row,column] = value
+                        hessian[column,row] = value
+                hamiltonian_matrix = canonical @ hessian
+                ds = float(solution.t[sample_index]-solution.t[sample_index-1])
+                fundamental = expm(hamiltonian_matrix*ds) @ fundamental
+            sigma = fundamental @ sigma0 @ fundamental.T
+            sigma = 0.5*(sigma+sigma.T)
+            covariance_states.append(sigma)
+            transverse_basis = _transverse_frame(wavevectors[sample_index])
+            transverse_states.append(transverse_basis.T @ sigma[:3,:3] @ transverse_basis)
+        propagated_ray_covariance = np.asarray(covariance_states)
+        propagated_ray_transverse_covariance = np.asarray(transverse_states)
     return {
         "ray_parameter": solution.t,
         "position_m": positions,
@@ -321,12 +381,15 @@ def trace_cold_plasma_ray(
         "dispersion_eigenvalue": eigenvalues,
         "electric_polarization": polarizations,
         "transverse_position_covariance_m2": (
+            propagated_ray_transverse_covariance if propagated_ray_transverse_covariance is not None else
             propagated_beam["transverse_position_covariance_m2"] if propagated_beam is not None else None
         ),
         "phase_space_covariance": (
+            propagated_ray_covariance if propagated_ray_covariance is not None else
             propagated_beam["phase_space_covariance"] if propagated_beam is not None else None
         ),
         "paraxial_beam_propagation_status": (
+            "propagated_from_full_cold_plasma_dispersion_Hessian" if propagated_ray_covariance is not None else
             "propagated_from_supplied_symplectic_ABCD_maps" if propagated_beam is not None else "not_requested"
         ),
         "mode_index": int(mode_index),
@@ -411,6 +474,7 @@ def trace_cts_frequency_resolved_beams(
         propagation_constants_rad_m=incident_ray.get("propagation_constants_rad_m"),
         initial_beam_phase_space_covariance=incident_ray.get("initial_beam_phase_space_covariance"),
         paraxial_transfer_matrices=incident_ray.get("paraxial_transfer_matrices"),
+        initial_ray_phase_space_covariance=incident_ray.get("initial_ray_phase_space_covariance"),
     )
     incident_positions = np.asarray(incident["position_m"], dtype=float)
     if incident.get("transverse_position_covariance_m2") is not None:
@@ -452,6 +516,7 @@ def trace_cts_frequency_resolved_beams(
             propagation_constants_rad_m=ray_spec.get("propagation_constants_rad_m"),
             initial_beam_phase_space_covariance=ray_spec.get("initial_beam_phase_space_covariance"),
             paraxial_transfer_matrices=ray_spec.get("paraxial_transfer_matrices"),
+            initial_ray_phase_space_covariance=ray_spec.get("initial_ray_phase_space_covariance"),
         )
         receiver_positions = np.asarray(receiver["position_m"], dtype=float)
         if receiver.get("transverse_position_covariance_m2") is not None:
@@ -566,7 +631,7 @@ def trace_cts_frequency_resolved_beams(
         "limitations": [
             "Cold-plasma geometrical optics; diffraction and quasi-optical beam evolution are not included.",
             "Optional coherent mode-amplitude propagation is diagnostic output only; it does not alter ray trajectories, overlap weights or the full-EM CTS spectral transfer.",
-            "Beam covariance is either supplied locally or propagated from explicit symplectic paraxial transfer matrices; those matrices are not inferred by this ray solver.",
+            "Beam covariance is supplied locally, propagated from explicit symplectic paraxial maps, or propagated from the full cold-plasma dispersion Hessian; the latter is valid only along a continuous non-degenerate eigenmode branch.",
             "Fitted ne, Te and thermal-ion temperatures are treated as uniform across the sampled scattering volume; local ray directions and magnetic field vary.",
             "Ray branch continuity near eigenvalue crossings must be checked by the caller.",
             "The equilibrium callback supplies all magnetic and species profiles; no equilibrium is fabricated."
