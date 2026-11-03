@@ -1565,15 +1565,18 @@ def analyze_full_em_cts_spectrum(
         "spectral_weighting_status": spectral_weighting_status,
         "parameter_covariance_interpretation": (
             "local_jacobian_covariance_from_measurement_plus_independent_model_discrepancy_covariance"
-            if model_discrepancy_covariance is not None and effective_spectral_covariance is not None
+            if model_discrepancy_covariance is not None
+            and (spectral_covariance is not None or signal_uncertainty is not None)
+            else "local_jacobian_covariance_from_model_discrepancy_only_no_measurement_uncertainty_supplied"
+            if model_discrepancy_covariance is not None
             else "local_jacobian_covariance_from_supplied_measurement_uncertainty"
             if effective_spectral_covariance is not None
             else "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         ),
         "parameter_covariance_scope": (
             "local_jacobian_covariance conditional on fixed external inputs; "
-            "the GLS covariance includes supplied measurement covariance and the "
-            "independent model-discrepancy covariance when provided; it excludes "
+            "the GLS covariance includes whichever of measurement covariance and "
+            "independent model-discrepancy covariance are supplied; it excludes "
             "external geometry, field, composition, polarization, ray and beam "
             "covariance uncertainty unless separately propagated"
         ),
