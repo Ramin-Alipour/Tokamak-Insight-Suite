@@ -575,7 +575,8 @@
         "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
         "tokamak_analysis.thomson_workflow.fit_thomson_spectrum_with_structured_background",
         "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
-        "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract"
+        "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract",
+        "tokamak_analysis.thomson_workflow.fit_n_population_relativistic_thomson_spectrum"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected.",
@@ -624,6 +625,29 @@
             "residual_spectra"
           ],
           "scope": "Multi-view 3-D inverse from supplied view-specific kernels. Relativistic interpretation requires each kernel to contain the correct relativistic Doppler, polarization and differential-cross-section physics; rank-deficient data never produce a unique 3-D EVDF."
+        },
+        {
+          "name": "n_population_relativistic_optical_thomson",
+          "function": "tokamak_analysis.thomson_workflow.fit_n_population_relativistic_thomson_spectrum",
+          "inputs": [
+            "wavelength_nm and measured_spectrum: calibrated one-dimensional spectrum",
+            "laser_wavelength_nm, scattering_angle_rad, measured instrument_response and incident_polarization",
+            "population_count: integer 2–8",
+            "initial_temperatures_eV: one positive, strictly increasing optimizer seed per population",
+            "initial_fractions: one strictly positive number-fraction seed per population, summing to one",
+            "initial_flow_projection_m_s: subluminal optimizer seed",
+            "optional signal_uncertainty or full spectral_covariance",
+            "optional model_discrepancy_covariance independent of measurement noise",
+            "optional constant, linear, polynomial, cubic-spline or supplied-template detector background"
+          ],
+          "outputs": [
+            "population_temperatures_eV and population_number_fractions",
+            "electron_flow_projection_m_s",
+            "fitted_thomson_spectrum, fitted_background, fitted_spectrum and residual",
+            "full joint_parameter_covariance including physical/amplitude/background cross terms",
+            "data-only Jacobian rank and condition diagnostics"
+          ],
+          "scope": "Finite-dimensional N-component isotropic relativistic Maxwell-Juttner mixture with ordered temperatures, simplex-constrained number fractions and one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred."
         }
       ],
       "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1. No detector calibration or independent experimental validation is performed.",
