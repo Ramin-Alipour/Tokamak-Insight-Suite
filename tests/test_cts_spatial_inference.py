@@ -112,3 +112,31 @@ def test_spatial_inverse_is_registered_in_dispatcher_and_dashboard():
     assert "full_em_spatial_profiles" in app
     assert "run_cts_spatial_profiles" in app
     assert callable(analyze_cts_spectrum_model)
+
+
+def test_spatial_full_em_inverse_reports_regularization_choice_sensitivity(monkeypatch):
+    frequency = np.linspace(-3e6, 3e6, 8)
+
+    def fake_forward(frequency_shift_Hz, probe_frequency_Hz, geometry, **kwargs):
+        values = []
+        for j, record in enumerate(geometry["frequency_resolved_geometry"]):
+            values.append(sum(
+                sample["sample_weight"] * sample["electron_density_relative"]
+                for sample in record["scattering_samples"]
+            ) * (1.0 + 0.1*j))
+        return {"spectral_density": np.asarray(values)}
+
+    monkeypatch.setattr(spatial, "full_em_cts_spectral_density", fake_forward)
+    result = spatial.analyze_full_em_cts_spatial_profiles(
+        frequency, np.ones(8), probe_frequency_Hz=140e9,
+        scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+        signal_uncertainty=np.ones(8), fit_electron_density_profile=True,
+        fit_electron_temperature_profile=False, regularization_strength=0.2,
+        regularization_sensitivity_strengths=[0.1, 0.2, 1.0],
+        max_nfev=40,
+    )
+    sensitivity = result["regularization_sensitivity"]
+    assert sensitivity["regularization_strengths"].shape == (3,)
+    assert sensitivity["profiles_relative_to_reference"]["electron_density_relative"].shape == (3, 3)
+    assert sensitivity["measurement_covariance_unchanged"] is True
+    assert "not measurement uncertainty" in sensitivity["interpretation"]
