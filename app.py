@@ -3957,7 +3957,7 @@ elif page=='Advanced Analysis':
                     st.error(f'Spatial Full-EM CTS profile inversion failed: {e}')
 
         elif cts_model=='full_electromagnetic':
-            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev low-temperature Maxwellian-electron vertex, and species-resolved ion temperatures. Explicit stationary and Lorentz-boosted drifted relativistic gyrotropic electron VDFs are supported by the forward model; the bulk measured-spectrum optimizer does not fit their shape or drift. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.') Relativistic gyrotropic electron VDFs are supported by the forward model only; measured-spectrum inversion currently rejects them because a drifted relativistic electron VDF fit is not implemented. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
+            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev low-temperature Maxwellian-electron vertex, and species-resolved ion temperatures. Stationary and Lorentz-boosted drifted relativistic gyrotropic electron VDFs are available to the forward model; the bulk measured-spectrum optimizer does not infer an arbitrary relativistic EVDF or its drift. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
             c1,c2=st.columns(2)
             with c1:
                 cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_full_frequency_col')
