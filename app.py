@@ -3671,8 +3671,8 @@ elif page=='Advanced Analysis':
     elif workflow=='Analysis 1 / Microwave CTS subanalysis':
         st.markdown('Analysis 1 subanalysis — microwave CTS: infer plasma and ion parameters from a measured, calibrated frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
-            'electrostatic','full_electromagnetic'
-        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else 'Magnetized full-electromagnetic CTS',key='cts_physical_model')
+            'electrostatic','full_electromagnetic','full_em_spatial_profiles'
+        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else 'Magnetized full-electromagnetic CTS'),key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
         elif cts_model is None:
@@ -3844,8 +3844,100 @@ elif page=='Advanced Analysis':
                 except Exception as e:
                     st.error(f'CTS inversion failed: {e}')
 
-        else:
-            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev low-temperature Maxwellian-electron vertex, and species-resolved ion temperatures. Relativistic gyrotropic electron VDFs are supported by the forward model only; measured-spectrum inversion currently rejects them because a drifted relativistic electron VDF fit is not implemented. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
+        elif cts_model=='full_em_spatial_profiles':
+            st.caption('Spatial Full-EM inversion fits node-wise relative density/temperature profiles. Every objective evaluation calls the local magnetized Full-EM kinetic model over the supplied scattering-volume quadrature; geometry and beam weights remain fixed inputs.')
+            c1,c2=st.columns(2)
+            with c1:
+                spatial_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_spatial_frequency_col')
+                spatial_spectrum_col=col_select('Calibrated CTS spectral power',[x for x in numeric if x!=spatial_frequency_col] or numeric,'cts_spatial_spectrum_col')
+                spatial_unc_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {spatial_frequency_col,spatial_spectrum_col}],key='cts_spatial_unc_col')
+                spatial_probe=st.text_input('Probe frequency (Hz)',key='cts_spatial_probe')
+                spatial_density=st.text_input('Reference electron density (m⁻³)',key='cts_spatial_density')
+                spatial_te=st.text_input('Reference electron temperature (eV)',key='cts_spatial_te')
+                spatial_ti=st.text_input('Reference ion temperatures (eV; one per species)',key='cts_spatial_ti')
+                spatial_regularization=st.number_input('Profile smoothness strength',min_value=0.0,value=1.0,format='%.4g',key='cts_spatial_regularization')
+                spatial_fit_ne=st.checkbox('Fit spatial electron-density profile',value=True,key='cts_spatial_fit_ne')
+                spatial_fit_te=st.checkbox('Fit spatial electron-temperature profile',value=True,key='cts_spatial_fit_te')
+                spatial_fit_ti=st.checkbox('Fit spatial ion-temperature profile',value=False,key='cts_spatial_fit_ti')
+            with c2:
+                spatial_geometry_upload=st.file_uploader('Frequency-resolved scattering-volume geometry JSON',type=['json'],key='cts_spatial_geometry')
+                spatial_response_upload=st.file_uploader('Optional measured frequency-response matrix CSV',type=['csv','txt'],key='cts_spatial_response')
+                spatial_covariance_upload=st.file_uploader('Optional full frequency-bin covariance CSV',type=['csv','txt'],key='cts_spatial_covariance')
+                spatial_bfield=st.text_input('Reference magnetic field vector (T; x,y,z)',key='cts_spatial_bfield')
+                spatial_ion_names=st.text_input('Ion species names (comma-separated)',key='cts_spatial_ions')
+                spatial_ion_charges=st.text_input('Ion charge states (comma-separated)',key='cts_spatial_charges')
+                spatial_ion_masses=st.text_input('Ion masses (amu; comma-separated)',key='cts_spatial_masses')
+                spatial_ion_fractions=st.text_input('Ion charge-density fractions (comma-separated; sum to 1)',key='cts_spatial_fractions')
+                spatial_incident_pol=st.text_input('Incident polarization (x,y,z or complex JSON vector)',key='cts_spatial_incident_pol')
+                spatial_scattered_pol=st.text_input('Scattered polarization (x,y,z or complex JSON vector)',key='cts_spatial_scattered_pol')
+            if st.button('Run spatial Full-EM CTS profile inversion',type='primary',key='run_cts_spatial_profiles'):
+                try:
+                    frequency=pd.to_numeric(df[spatial_frequency_col],errors='coerce').to_numpy(dtype=float)
+                    spectrum=pd.to_numeric(df[spatial_spectrum_col],errors='coerce').to_numpy(dtype=float)
+                    if not np.all(np.isfinite(frequency)) or not np.all(np.isfinite(spectrum)) or np.any(np.diff(frequency)<=0):
+                        raise ValueError('Frequency and spectrum must be finite; frequency bins must be strictly increasing.')
+                    if spatial_geometry_upload is None:
+                        raise ValueError('Upload the frequency-resolved scattering-volume geometry JSON.')
+                    geometry=json.load(spatial_geometry_upload)
+                    if not isinstance(geometry,dict) or 'frequency_resolved_geometry' not in geometry:
+                        raise ValueError('Geometry JSON must contain frequency_resolved_geometry.')
+                    records=geometry['frequency_resolved_geometry']
+                    if len(records)!=len(frequency):
+                        raise ValueError('Geometry JSON must contain one scattering-volume record per measured frequency bin.')
+                    for record in records:
+                        samples=record.get('scattering_samples',[])
+                        for index,sample in enumerate(samples):
+                            sample.setdefault('sample_id',f'node-{index}')
+                    names=[v.strip() for v in spatial_ion_names.split(',') if v.strip()]
+                    charges=[float(v.strip()) for v in spatial_ion_charges.split(',') if v.strip()]
+                    masses=[float(v.strip()) for v in spatial_ion_masses.split(',') if v.strip()]
+                    fractions=[float(v.strip()) for v in spatial_ion_fractions.split(',') if v.strip()]
+                    if not names or not (len(names)==len(charges)==len(masses)==len(fractions)):
+                        raise ValueError('Ion names, charges, masses and fractions must have equal non-zero lengths.')
+                    if not np.isclose(sum(fractions),1.0,rtol=1e-6,atol=1e-8):
+                        raise ValueError('Ion charge-density fractions must sum to one.')
+                    ion_species=[{'name':n,'charge_state':z,'mass_amu':m} for n,z,m in zip(names,charges,masses)]
+                    ion_temps=_parse_ts_float_list(spatial_ti,'Reference ion temperatures')
+                    if len(ion_temps)!=len(names):
+                        raise ValueError('Enter one reference ion temperature per ion species.')
+                    kwargs_spatial={
+                        'probe_frequency_Hz':float(spatial_probe),
+                        'scattering_geometry':geometry,
+                        'forward_model_kwargs':{
+                            'electron_density_m3':float(spatial_density),
+                            'electron_temperature_eV':float(spatial_te),
+                            'ion_temperature_eV':{n:t for n,t in zip(names,ion_temps)},
+                            'ion_species':ion_species,'ion_fractions':fractions,
+                            'magnetic_field_T':_parse_ts_vector(spatial_bfield,'Reference magnetic field'),
+                            'incident_polarization':_parse_ts_complex_vector(spatial_incident_pol,'Incident polarization'),
+                            'scattered_polarization':_parse_ts_complex_vector(spatial_scattered_pol,'Scattered polarization'),
+                        },
+                        'fit_electron_density_profile':bool(spatial_fit_ne),
+                        'fit_electron_temperature_profile':bool(spatial_fit_te),
+                        'fit_ion_temperature_profile':bool(spatial_fit_ti),
+                        'regularization_strength':float(spatial_regularization),
+                    }
+                    if spatial_unc_col!='<none>':
+                        sigma=pd.to_numeric(df[spatial_unc_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
+                            raise ValueError('Spectral 1σ uncertainties must be finite and positive.')
+                        kwargs_spatial['signal_uncertainty']=sigma
+                    elif spatial_covariance_upload is not None:
+                        kwargs_spatial['spectral_covariance']=pd.read_csv(spatial_covariance_upload,header=None).to_numpy(dtype=float)
+                    else:
+                        raise ValueError('Supply either a spectral uncertainty column or a full covariance matrix.')
+                    if spatial_response_upload is not None:
+                        kwargs_spatial['instrument_response']=pd.read_csv(spatial_response_upload,header=None).to_numpy(dtype=float)
+                    result_cts=analyze_cts_spectrum_model(model='full_em_spatial_profiles',frequency_shift_Hz=frequency,spectrum=spectrum,**kwargs_spatial)
+                    st.success('Spatial Full-EM CTS profile inversion completed.')
+                    st.json(result_cts)
+                    json_download('Export spatial Full-EM CTS profiles and covariance',result_cts,'tis_cts_spatial_profiles.json')
+                    add_report_section('Spatial Full-EM CTS profile inversion',result_cts)
+                except Exception as e:
+                    st.error(f'Spatial Full-EM CTS profile inversion failed: {e}')
+
+        elif cts_model=='full_electromagnetic':
+            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev low-temperature Maxwellian-electron vertex, and species-resolved ion temperatures. Relativistic gyrotropic electron VDFs are supported by the forward model only; measured-spectrum inversion currently rejects them because a drifted relativistic electron VDF fit is not implemented. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.') Relativistic gyrotropic electron VDFs are supported by the forward model only; measured-spectrum inversion currently rejects them because a drifted relativistic electron VDF fit is not implemented. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
             c1,c2=st.columns(2)
             with c1:
                 cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_full_frequency_col')
