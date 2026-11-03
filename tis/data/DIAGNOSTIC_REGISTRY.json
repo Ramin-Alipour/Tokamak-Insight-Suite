@@ -6006,14 +6006,16 @@
             "optional measured instrument_response and fixed_background_spectrum",
             "fit_electron_density_profile, fit_electron_temperature_profile and fit_ion_temperature_profile",
             "regularization_matrix and positive regularization_strength",
-            "optional regularization_sensitivity_strengths: strictly increasing positive grid; profile spread is reported separately from measurement uncertainty"
+            "optional regularization_sensitivity_strengths: strictly increasing positive grid; profile spread is reported separately from measurement uncertainty",
+            "optional independent model_discrepancy_covariance added once to measurement covariance"
           ],
           "outputs": [
             "node-wise relative density/temperature/optional ion-temperature profiles",
             "full local profile covariance only when the data-only spectral Jacobian has full column rank; regularization rows cannot establish data identifiability",
             "data-only and augmented Jacobian ranks, singular values, condition diagnostics and regularization contribution",
             "fitted spectrum, residual, chi-squared and degrees of freedom",
-            "explicit regularization metadata and fixed-reference parameter record"
+            "explicit regularization metadata and fixed-reference parameter record",
+            "measurement covariance, model-discrepancy covariance and effective GLS covariance separately reported"
           ],
           "scope": "At every objective evaluation the magnetized Full-EM kinetic forward solver is evaluated at each frequency-resolved scattering-volume quadrature point with node-specific fitted relative profiles. The response matrix is applied once after spatial integration. Geometry and reference bulk values are conditioned on supplied inputs; profile covariance is omitted when local identifiability fails."
         }

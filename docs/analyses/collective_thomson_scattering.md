@@ -458,3 +458,26 @@ double count it. The drift must be strictly subluminal. Quadrature convergence
 must be checked for the selected temperature and drift; this is a numerical
 forward-model capability, not an assertion that a drifted VDF has been
 identified from a single CTS spectrum.
+
+
+## Spatial Full-EM covariance and measured-response contract
+
+The spatial-profile inverse accepts exactly one measurement-noise representation
+(`spectral_covariance` or `signal_uncertainty`) and an optional independent
+`model_discrepancy_covariance`. The effective GLS covariance is the sum of
+the measurement covariance and the supplied discrepancy covariance, added
+exactly once. The discrepancy matrix must be finite, symmetric and positive
+semidefinite; the effective covariance must be positive definite for
+Cholesky whitening. No diagonal jitter, eigenvalue clipping or residual-derived
+discrepancy is applied. Results retain the measurement covariance, discrepancy
+covariance, effective covariance and an explicit weighting status separately.
+Regularization remains a deterministic prior penalty and is never added to the
+measurement covariance.
+
+The spatial inverse now enforces the same calibrated measured-response
+contract as the Electrostatic and ordinary Full-EM CTS paths: the response
+matrix must be finite, non-negative, square and already have unit-sum columns.
+It is applied unchanged after scattering-volume integration; TIS does not
+silently renormalize the supplied base operator. These are software contract
+and synthetic regression checks, not instrument calibration or experimental
+validation.

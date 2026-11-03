@@ -77,7 +77,8 @@ def _geometry_nodes(geometry, n_frequency):
 def analyze_full_em_cts_spatial_profiles(
     frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
     scattering_geometry, forward_model_kwargs, spectral_covariance=None,
-    signal_uncertainty=None, instrument_response=None,
+    signal_uncertainty=None, model_discrepancy_covariance=None,
+    instrument_response=None,
     fixed_background_spectrum=None, background_mode=None, fit_electron_density_profile=True,
     fit_electron_temperature_profile=True, fit_ion_temperature_profile=False,
     initial_profiles=None, regularization_matrix=None,
@@ -101,10 +102,47 @@ def analyze_full_em_cts_spatial_profiles(
         sigma = _vector(signal_uncertainty, "signal_uncertainty", positive=True)
         if sigma.shape != y.shape:
             raise ValueError("signal_uncertainty must match measured_spectrum")
-        covariance = np.diag(sigma**2)
+        measurement_covariance = np.diag(sigma**2)
     else:
-        covariance = _covariance(spectral_covariance, y.size)
-    chol = np.linalg.cholesky(covariance)
+        measurement_covariance = _covariance(spectral_covariance, y.size)
+
+    discrepancy_covariance = None
+    if model_discrepancy_covariance is not None:
+        raw_discrepancy = np.asarray(model_discrepancy_covariance)
+        if raw_discrepancy.dtype.kind not in "iuf":
+            raise ValueError("model_discrepancy_covariance must be real")
+        discrepancy_covariance = raw_discrepancy.astype(float, copy=False)
+        if (discrepancy_covariance.shape != (y.size, y.size)
+                or not np.all(np.isfinite(discrepancy_covariance))):
+            raise ValueError("model_discrepancy_covariance must be finite and match the measured spectrum")
+        discrepancy_scale = max(
+            float(np.max(np.abs(discrepancy_covariance))), np.finfo(float).tiny
+        )
+        if not np.allclose(
+            discrepancy_covariance, discrepancy_covariance.T,
+            rtol=1e-9, atol=1e-11 * discrepancy_scale,
+        ):
+            raise ValueError("model_discrepancy_covariance must be symmetric")
+        discrepancy_covariance = 0.5 * (
+            discrepancy_covariance + discrepancy_covariance.T
+        )
+        discrepancy_eigenvalues = np.linalg.eigvalsh(discrepancy_covariance)
+        eigen_scale = max(
+            float(np.max(np.abs(discrepancy_eigenvalues))), np.finfo(float).tiny
+        )
+        if float(discrepancy_eigenvalues[0]) < -1e-10 * eigen_scale:
+            raise ValueError("model_discrepancy_covariance must be positive semidefinite")
+
+    covariance = measurement_covariance.copy()
+    if discrepancy_covariance is not None:
+        covariance += discrepancy_covariance
+    try:
+        chol = np.linalg.cholesky(covariance)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError(
+            "measurement covariance plus model discrepancy must be positive definite; "
+            "no silent regularization is applied"
+        ) from exc
     node_ids = _geometry_nodes(scattering_geometry, f.size)
     n_nodes = len(node_ids)
     flags = {
@@ -141,6 +179,10 @@ def analyze_full_em_cts_spatial_profiles(
     response = np.eye(f.size) if instrument_response is None else np.asarray(instrument_response, dtype=float)
     if response.shape != (f.size, f.size) or not np.all(np.isfinite(response)) or np.any(response < 0):
         raise ValueError("instrument_response must be a finite non-negative square matrix")
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError(
+            "instrument_response columns must already sum to one; the calibrated response is applied unchanged"
+        )
     if background_mode not in {"zero", "spectrum"}:
         raise ValueError("background_mode must be explicitly set to 'zero' or 'spectrum'; zero background is never assumed")
     if background_mode == "zero" and fixed_background_spectrum is not None:
@@ -267,7 +309,8 @@ def analyze_full_em_cts_spatial_profiles(
                 probe_frequency_Hz=probe_frequency_Hz,
                 scattering_geometry=scattering_geometry,
                 forward_model_kwargs=forward_model_kwargs,
-                spectral_covariance=covariance,
+                spectral_covariance=measurement_covariance,
+                model_discrepancy_covariance=discrepancy_covariance,
                 instrument_response=response,
                 fixed_background_spectrum=(background if background_mode == 'spectrum' else None),
                 background_mode=background_mode,
@@ -322,7 +365,17 @@ def analyze_full_em_cts_spatial_profiles(
         "frequency_shift_Hz": f.copy(), "measured_spectrum": y.copy(),
         "fitted_spectrum": predicted + background, "physical_signal_spectrum": predicted,
         "fixed_background_spectrum": background, "residual": residual_spectrum,
-        "spectral_covariance": covariance.copy(), "chi_squared": chi2,
+        "spectral_covariance": covariance.copy(),
+        "measurement_spectral_covariance": measurement_covariance.copy(),
+        "model_discrepancy_covariance": (
+            None if discrepancy_covariance is None else discrepancy_covariance.copy()
+        ),
+        "spectral_covariance_status": (
+            "measurement_covariance_plus_independent_model_discrepancy"
+            if discrepancy_covariance is not None
+            else "measurement_covariance_only"
+        ),
+        "chi_squared": chi2,
         "degrees_of_freedom": int(dof), "reduced_chi_squared": chi2/dof,
         "regularization_matrix": penalty.copy(), "regularization_strength": dict(lambdas),
         "regularization_is_measurement_covariance": False,

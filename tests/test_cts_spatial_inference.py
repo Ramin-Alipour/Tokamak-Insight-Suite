@@ -263,3 +263,59 @@ def test_spatial_full_em_inverse_requires_explicit_background_state():
         spatial.analyze_full_em_cts_spatial_profiles(
             **base, background_mode="zero", fixed_background_spectrum=np.zeros(8)
         )
+
+
+
+def test_spatial_full_em_inverse_adds_model_discrepancy_covariance_once(monkeypatch):
+    frequency = np.linspace(-3e6, 3e6, 8)
+
+    def fake_forward(frequency_shift_Hz, probe_frequency_Hz, geometry, **kwargs):
+        return {"spectral_density": np.ones(len(frequency_shift_Hz))}
+
+    monkeypatch.setattr(spatial, "full_em_cts_spectral_density", fake_forward)
+    measurement = np.eye(8) * 0.04
+    discrepancy = np.eye(8) * 0.01
+    result = spatial.analyze_full_em_cts_spatial_profiles(
+        frequency, np.ones(8), probe_frequency_Hz=140e9,
+        scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+        spectral_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        background_mode="zero", fit_electron_density_profile=True,
+        fit_electron_temperature_profile=False,
+        regularization_strength=0.1, profile_bounds_relative=(0.05, 20.0),
+        max_nfev=20,
+    )
+    np.testing.assert_allclose(result["measurement_spectral_covariance"], measurement)
+    np.testing.assert_allclose(result["model_discrepancy_covariance"], discrepancy)
+    np.testing.assert_allclose(result["spectral_covariance"], measurement + discrepancy)
+    assert result["spectral_covariance_status"] == (
+        "measurement_covariance_plus_independent_model_discrepancy"
+    )
+
+
+def test_spatial_full_em_inverse_rejects_indefinite_model_discrepancy(monkeypatch):
+    frequency = np.linspace(-3e6, 3e6, 8)
+    discrepancy = np.eye(8)
+    discrepancy[0, 0] = -0.1
+
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            frequency, np.ones(8), probe_frequency_Hz=140e9,
+            scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+            signal_uncertainty=np.ones(8),
+            model_discrepancy_covariance=discrepancy,
+            background_mode="zero", regularization_strength=0.1,
+            profile_bounds_relative=(0.05, 20.0),
+        )
+
+
+def test_spatial_full_em_inverse_requires_unit_column_sum_response():
+    frequency = np.linspace(-3e6, 3e6, 8)
+    with pytest.raises(ValueError, match="columns must already sum to one"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            frequency, np.ones(8), probe_frequency_Hz=140e9,
+            scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+            signal_uncertainty=np.ones(8), instrument_response=0.9*np.eye(8),
+            background_mode="zero", regularization_strength=0.1,
+            profile_bounds_relative=(0.05, 20.0),
+        )
