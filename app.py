@@ -4111,6 +4111,30 @@ elif page=='Advanced Analysis':
                     st.metric('Electron-flow projection along scattering wavevector',
                               f"{result_cts['electron_flow_projection_m_s']:.5g} ± {result_cts['electron_flow_projection_uncertainty_m_s']:.2g} m/s")
                     st.caption('Only the component along the local scattering wavevector is inferred; a single CTS geometry does not determine the transverse velocity components.')
+                    geometry_uncertainty=result_cts.get('ray_geometry_uncertainty')
+                    if isinstance(geometry_uncertainty,dict):
+                        st.subheader('Full-forward ray / equilibrium / beam uncertainty')
+                        g1,g2,g3=st.columns(3)
+                        g1.metric('Successful geometry refits',str(geometry_uncertainty.get('successful_samples',0)))
+                        g2.metric('Failed geometry refits',str(geometry_uncertainty.get('failed_samples',0)))
+                        g3.metric('Propagation status','Propagated' if geometry_uncertainty.get('propagated') else 'Not propagated')
+                        if geometry_uncertainty.get('propagated'):
+                            geometry_covariance=np.asarray(
+                                result_cts.get('ray_geometry_parameter_covariance'),dtype=float
+                            )
+                            total_covariance=np.asarray(result_cts.get('fit_covariance'),dtype=float)
+                            parameter_names=result_cts.get('parameter_names',[])
+                            if (geometry_covariance.ndim==2 and total_covariance.shape==geometry_covariance.shape
+                                    and len(parameter_names)==geometry_covariance.shape[0]):
+                                uncertainty_table=pd.DataFrame({
+                                    'parameter':parameter_names,
+                                    'ray_geometry_sigma':np.sqrt(np.maximum(np.diag(geometry_covariance),0.0)),
+                                    'total_sigma':np.sqrt(np.maximum(np.diag(total_covariance),0.0)),
+                                })
+                                st.dataframe(uncertainty_table,use_container_width=True)
+                            st.caption('The geometry contribution comes from complete geometry-dependent forward refits; it is kept separate from numerical convergence and conditional fit covariance.')
+                        elif geometry_uncertainty.get('warning'):
+                            st.warning(geometry_uncertainty['warning'])
                     st.json(result_cts)
                     json_download('Export full-EM CTS inversion and uncertainty diagnostics',result_cts,'tis_cts_full_em_inversion.json')
                     add_report_section('Magnetized full-EM CTS inversion',result_cts)
