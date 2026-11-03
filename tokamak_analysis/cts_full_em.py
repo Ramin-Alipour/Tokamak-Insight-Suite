@@ -66,6 +66,14 @@ def _positive(value, name):
     return value
 
 
+def _charge_state(value, name):
+    """Validate an integer ionic charge state (in elementary-charge units)."""
+    charge = _positive(value, name)
+    if not charge.is_integer():
+        raise ValueError(f"{name} must be a positive integer number of elementary charges")
+    return int(charge)
+
+
 def _hermitian_psd(matrix, name, tolerance=1e-9):
     h = 0.5 * (matrix + matrix.conj().T)
     eigenvalues = np.linalg.eigvalsh(h)
@@ -112,7 +120,7 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
         if not isinstance(item, Mapping):
             raise ValueError("each ion species must be a mapping")
         name = names[i]
-        z = _positive(item.get("charge_state"), f"ion_species[{i}].charge_state")
+        z = _charge_state(item.get("charge_state"), f"ion_species[{i}].charge_state")
         mass = _positive(item.get("mass_amu"), f"ion_species[{i}].mass_amu") * AMU
         flow = np.zeros(3, dtype=float) if ion_flow_m_s is None else ion_flow_m_s.get(name)
         if flow is None:
@@ -587,7 +595,7 @@ def full_em_cts_spectral_density(
             if not isinstance(population, Mapping):
                 raise ValueError(f"fast_ion_populations[{index}] must be a mapping")
             name = str(population.get("name", f"fast_ion_{index}"))
-            charge_state = _positive(population.get("charge_state"), f"fast_ion_populations[{index}].charge_state")
+            charge_state = _charge_state(population.get("charge_state"), f"fast_ion_populations[{index}].charge_state")
             mass_amu = _positive(population.get("mass_amu"), f"fast_ion_populations[{index}].mass_amu")
             density = _positive(population.get("density_m3"), f"fast_ion_populations[{index}].density_m3")
             distribution = population.get("distribution")
