@@ -1916,3 +1916,76 @@ def test_describe_cts_spectrum_rejects_zero_contrast():
         describe_cts_spectrum(
             np.array([0.0, 1.0, 2.0]), np.ones(3), baseline_level=1.0
         )
+
+def test_cts_frequency_resolved_geometry_uses_each_bin_scattering_vector():
+    from tokamak_analysis.cts_analysis import _maximum_geometry_wave_number
+
+    f0, f, geometry, ions, fractions, _ = _case()
+    entries = [
+        {"scattering_angle_rad": np.deg2rad(angle)}
+        for angle in np.linspace(65.0, 125.0, f.size)
+    ]
+    resolved = {"frequency_resolved_geometry": entries}
+    actual = cts_spectral_density(
+        f, f0, resolved,
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=fractions,
+        electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=0.0,
+    )
+    expected = np.asarray([
+        cts_spectral_density(
+            np.asarray([frequency]), f0, entry,
+            electron_density_m3=2.0e19,
+            electron_temperature_eV=1200.0,
+            ion_temperature_eV=800.0,
+            ion_species=ions,
+            ion_fractions=fractions,
+            electron_velocity_projection_m_s=0.0,
+            ion_velocity_projection_m_s=0.0,
+        )[0]
+        for frequency, entry in zip(f, entries)
+    ])
+    np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=0.0)
+    assert _maximum_geometry_wave_number(resolved, f0) == pytest.approx(
+        max(_maximum_geometry_wave_number(entry, f0) for entry in entries)
+    )
+
+
+def test_cts_descriptive_spectrum_api_never_claims_physical_parameter_inference():
+    from tokamak_analysis.cts_analysis import describe_cts_spectrum
+
+    frequency = np.linspace(-5.0e8, 5.0e8, 101)
+    spectrum = 0.2 + np.exp(-0.5 * (frequency / 1.2e8) ** 2)
+    result = describe_cts_spectrum(
+        frequency, spectrum, baseline_level=0.2
+    )
+    assert result["analysis_type"] == "descriptive_spectral_shape_only"
+    assert result["physical_parameter_inference_performed"] is False
+    assert result["integrated_spectral_contrast"] > 0.0
+    assert result["spectral_rms_width_Hz"] > 0.0
+    assert "temperature" in result["interpretation_limit"]
+    assert not any(
+        key in result
+        for key in (
+            "electron_density_m3",
+            "electron_temperature_eV",
+            "ion_temperature_eV",
+            "electron_velocity_projection_m_s",
+            "ion_velocity_projection_m_s",
+        )
+    )
+
+
+@pytest.mark.parametrize("baseline", [-1.0, True, "0.1", np.nan, np.inf])
+def test_cts_descriptive_spectrum_requires_explicit_valid_baseline(baseline):
+    from tokamak_analysis.cts_analysis import describe_cts_spectrum
+
+    frequency = np.linspace(-1.0, 1.0, 21)
+    spectrum = np.ones_like(frequency)
+    with pytest.raises(ValueError):
+        describe_cts_spectrum(frequency, spectrum, baseline_level=baseline)
+
