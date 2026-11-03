@@ -952,7 +952,7 @@ elif page=='Spectral Analysis':
             channel_background_degree=2
             channel_background_interior_knots=3
             channel_background_templates_upload=None
-            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa'}:
+            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                 st.markdown('**Channel-wise physical-fit detector background**')
                 channel_background_model=st.selectbox(
                     'Channel-wise detector-background basis',
@@ -1214,7 +1214,7 @@ elif page=='Spectral Analysis':
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
-                    if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa'}:
+                    if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                         kwargs.update({
                             'background_model':channel_background_model,
                             'background_degree':int(channel_background_degree),
