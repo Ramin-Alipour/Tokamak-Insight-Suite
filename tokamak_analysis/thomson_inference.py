@@ -2685,7 +2685,14 @@ def analyze_thomson_spectra(
                 "background_coefficients":background_coefficients.copy(),
                 "background_spectrum":background_spectrum.copy(),
                 "background_model":background_model,
-                "background_basis_matrix":background_designs[channel].copy(),**extra,
+                "background_basis_matrix":background_designs[channel].copy(),
+                "background_coefficient_covariance":block[physical_parameter_count:, physical_parameter_count:].copy(),
+                "physical_background_cross_covariance":block[:physical_parameter_count, physical_parameter_count:].copy(),
+                "fit_parameter_names":(
+                    (["amplitude", "center_nm", "intrinsic_sigma_nm"] if model == "non_collective_maxwellian"
+                     else ["amplitude", "center_nm", "intrinsic_sigma_nm", "kappa_index"])
+                    + [f"background_coefficient_{j}" for j in range(background_parameter_count)]
+                ),**extra,
                 "fit_parameters":p.copy(),"fit_covariance":block.copy(),
                 "electron_temperature_eV":float(base_physical[te_index]),
                 "electron_velocity_projection_m_s":float(base_physical[velocity_index]),
