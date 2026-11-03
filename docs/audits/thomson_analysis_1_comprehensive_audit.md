@@ -875,3 +875,37 @@ input contract, parameter-identifiability treatment, numerical regression
 coverage and documentation. Where a required model cannot be selected
 unambiguously from the cited literature or the supplied diagnostic metadata,
 the software must reject that path rather than silently invent an assumption.
+
+
+## Implementation update — 2026-11-03: joint coordinate/value covariance for profile reconstruction
+
+The downstream spectrum-inferred profile reconstruction now accepts
+`profile_coordinate_value_cross_covariance`, the matrix
+\(C_{rv}[i,j]=\operatorname{Cov}(r_i,v_j)\), in addition to the supplied
+coordinate covariance \(C_r\) and profile-value covariance \(C_v\).
+The three blocks are assembled into the joint covariance
+
+\[
+C_{joint}=\begin{bmatrix}C_r&C_{rv}\\C_{rv}^{T}&C_v\end{bmatrix}.
+\]
+
+The complete block must be finite, symmetric and positive semidefinite.
+Coordinate and profile values are sampled together from this block in the
+same Monte Carlo draw; the previous independent-marginal route is unchanged
+when the cross-covariance is omitted. The cross block is rejected unless both
+marginal covariance models are supplied (pointwise profile uncertainties are
+accepted as the diagonal value covariance). The joint raw spatial-spectral
+optimizer does not accept this downstream reconstruction covariance.
+
+Regression coverage checks a valid correlated block, rejection of a
+non-positive-semidefinite block, and rejection when either marginal covariance
+is missing. The profile input is declared in the Python execution registry and
+both synchronized JSON diagnostic registries. A cross-subanalysis contract
+test also checks Analysis 1, profile reconstruction and spectral-distribution
+registry wiring and output-identifiability declarations.
+
+This closes TS-09 only for the downstream channel-profile reconstruction API.
+It does not infer the cross-covariance, does not propagate it through the raw
+joint spatial-spectral optimizer, and does not solve the full Full-EM CTS
+profile/geometry covariance problem. The new tests have not been executed in
+this environment; no CI-pass or experimental-validation claim is made.
