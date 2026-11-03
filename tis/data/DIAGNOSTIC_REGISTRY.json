@@ -4903,9 +4903,9 @@
         },
         {
           "name": "model",
-          "unit": "electrostatic or full_electromagnetic; explicit selection, no automatic substitution",
+          "unit": "electrostatic, full_electromagnetic, full_em_spatial_profiles or full_em_gyrotropic_vdf_shape; explicit selection",
           "required": true,
-          "description": "Explicitly select electrostatic or full_electromagnetic; no automatic model selection or substitution."
+          "description": "Select one explicit CTS inference mode. full_em_spatial_profiles invokes node-wise relative profile inversion using the same magnetized Full-EM physical forward family; it is not an automatic model substitution."
         },
         {
           "name": "electron_flow_projection_initial_m_s",
