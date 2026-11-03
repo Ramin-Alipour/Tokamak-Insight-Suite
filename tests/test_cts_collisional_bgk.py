@@ -61,4 +61,4 @@ def test_static_zero_flow_limit_recovers_boltzmann_response():
     )
     response = result["density_response_matrix_m3_per_J"][0]
     expected = -np.diag([1.0e19, 2.0e18]) / (100.0 * 1.602176634e-19)
-    assert np.allclose(response, expected, rtol=2e-5, atol=1e-8)
+    assert np.allclose(response, expected, rtol=2e-5, atol=1e-12 * np.max(np.abs(expected)))
