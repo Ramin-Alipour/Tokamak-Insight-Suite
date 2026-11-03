@@ -23,6 +23,32 @@ def _trapezoid(y, x):
     return float(integrate(y, x))
 
 
+def _combine_independent_parameter_covariances(base_covariance, *components):
+    """Combine independent parameter-covariance components exactly once.
+
+    Each component must be finite, symmetric, shape-compatible and positive
+    semidefinite. Cross-covariances are not inferred: correlated uncertainty
+    sources must be propagated jointly by the caller instead of passed here.
+    """
+    base = _array(base_covariance, "base_parameter_covariance", ndim=2)
+    if base.shape[0] != base.shape[1] or not np.allclose(base, base.T, rtol=1e-9, atol=1e-12):
+        raise ValueError("base_parameter_covariance must be square and symmetric")
+    total = 0.5 * (base + base.T)
+    for index, component in enumerate(components):
+        if component is None:
+            continue
+        cov = _array(component, f"parameter_covariance_component_{index}", ndim=2)
+        if cov.shape != total.shape or not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12):
+            raise ValueError("parameter covariance components must be symmetric and match the base covariance")
+        cov = 0.5 * (cov + cov.T)
+        eigenvalues = np.linalg.eigvalsh(cov)
+        scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        if float(eigenvalues.min()) < -1e-10 * scale:
+            raise ValueError("parameter covariance components must be positive semidefinite")
+        total = total + cov
+    return 0.5 * (total + total.T)
+
+
 def _array(value,name,ndim=None):
     a=np.asarray(value)
     if a.dtype.kind not in "iuf" or (ndim is not None and a.ndim!=ndim):
@@ -1287,10 +1313,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["external_parameter_uncertainty_propagated"]=False
         out["external_parameter_covariance_propagated"]=False
     if out.get("background_reference_parameter_covariance") is not None:
-        out["fit_covariance"] = out["fit_covariance"] + out["background_reference_parameter_covariance"]
-        total_covariance = out["fit_covariance"]
-        if out.get("model_discrepancy_covariance") is not None:
-            total_covariance = total_covariance + out["model_discrepancy_covariance"]
+        total_covariance = _combine_independent_parameter_covariances(
+            out["fit_covariance"],
+            out.get("background_reference_parameter_covariance"),
+            out.get("model_discrepancy_covariance"),
+        )
+        out["fit_covariance"] = total_covariance.copy()
         out["total_fit_covariance_including_discrepancy"] = total_covariance
         total_sigma = np.sqrt(np.maximum(np.diag(total_covariance), 0.0))
         out["parameter_uncertainties"] = total_sigma
