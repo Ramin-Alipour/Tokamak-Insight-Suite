@@ -1766,3 +1766,21 @@ def test_cts_public_inversion_api_rejects_invalid_regularization_strength(
             inversion_method="local_least_squares",
             regularization_strength=invalid_strength,
         )
+
+
+def test_relativistic_cts_positive_scalar_rejects_boolean_and_string():
+    from tokamak_analysis.cts_relativistic import _positive
+
+    for value in (True, False, "2", "nan", None):
+        with pytest.raises(ValueError, match="positive finite real scalar"):
+            _positive(value, "temperature_eV")
+
+
+def test_relativistic_cts_positive_scalar_accepts_real_and_rejects_invalid_numbers():
+    from tokamak_analysis.cts_relativistic import _positive
+
+    assert _positive(2, "temperature_eV") == 2.0
+    assert _positive(np.float64(3.5), "temperature_eV") == 3.5
+    for value in (0, -1, np.inf, -np.inf, np.nan):
+        with pytest.raises(ValueError, match="positive finite real scalar"):
+            _positive(value, "temperature_eV")
