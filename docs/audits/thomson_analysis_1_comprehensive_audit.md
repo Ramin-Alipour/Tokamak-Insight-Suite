@@ -793,3 +793,85 @@ This closes the integration gap for the implemented free-free/LTE-ECE
 background kernel; it does not implement a new ECE absorption solver,
 relativistic/magnetized free-free emissivity, or a physical collision operator.
 No experimental validation is performed or claimed.
+
+## Direct-main implementation reconciliation — 2026-11-03
+
+This section supersedes the preliminary open/partial labels above where later
+main-branch commits changed the implementation. It does not convert declared
+model boundaries into completed capabilities.
+
+### Implemented on main
+
+- Full-EM CTS now accepts a path-resolved free-free plus LTE thermal-ECE
+  radiative-transfer background, or a precomputed receiver-grid physical
+  background, with mutually exclusive inputs.
+- The path-resolved route uses absolute receiver frequency
+  `probe_frequency_Hz + frequency_shift_Hz`, explicitly supplied path
+  profiles, ion composition, Gaunt factor, receiver-mode ECE absorption,
+  incident radiance, etendue and efficiency. The measured response is applied
+  once.
+- A supplied positive-semidefinite receiver-grid physical-background
+  covariance is included in GLS under an explicit independence assumption.
+- A new main-branch regression module covers free-free density and charge
+  scaling, LTE equilibrium invariance, mode-resolved ECE opacity response and
+  receiver etendue/efficiency conversion.
+- The optical Kappa and relativistic Maxwell-Juttner structured-background
+  joint workflow, relativistic projected-EVDF route, multi-view 3-D EVDF
+  inverse, generalized Landau-integral route, PSF-aware profile inverse and
+  joint profile reconstruction are already registered in the main branch.
+  Their documented assumptions remain binding; they are not unrestricted
+  arbitrary-distribution inversions.
+
+### Still partial or open — do not mark complete
+
+1. **ECE opacity solver:** the Full-EM background integrator consumes a
+   researcher-supplied mode-resolved ECE absorption coefficient. It does not
+   calculate the magnetized kinetic ECE opacity itself.
+2. **Free-free domain:** the implemented emissivity is non-relativistic and
+   unmagnetized with an explicitly supplied Gaunt factor. Relativistic and
+   magnetized mode-resolved free-free emission remain outside this kernel.
+3. **Physical collisional CTS:** the numerical resonance damping parameter is
+   not a collision operator. A conserving BGK/Mermin or other collision model
+   must not be represented by inserting a damping rate into the collisionless
+   dielectric response. A physically consistent collisional dynamic structure
+   factor, including its fluctuation source terms and species-temperature
+   treatment, remains unimplemented.
+4. **Full-EM propagation:** current cold-plasma ray tracing and local Gaussian
+   overlap do not implement diffraction-resolved quasi-optical propagation,
+   full-vector non-paraxial propagation or general mode conversion/branch
+   tracking through degeneracies.
+5. **Profile-aware Full-EM CTS:** scattering-volume quadrature can vary local
+   ray geometry and magnetic field, but the fitted bulk plasma parameters are
+   still spatially uniform. A node-wise profile inverse with profile/geometry
+   covariance remains unimplemented.
+6. **Relativistic EVDF scope:** the projected relativistic inverse and
+   multi-view 3-D inverse are distinct constrained routes. They do not amount
+   to a universal anisotropic, relativistic, polarized, recoil-inclusive
+   arbitrary-EVDF inversion.
+7. **Optical background parity:** the Maxwellian channel-wise route and the
+   separate joint Kappa/MJ background workflow have different contracts.
+   Structured-background capability must not be claimed for every optimizer
+   unless that exact route exposes and tests it.
+8. **Covariance completeness:** available channel, response, external-input,
+   coordinate and background covariance routes remain conditional on the
+   covariance actually supplied. Unprovided cross-covariances are not
+   inferred. In particular, coordinate/value cross-covariance and
+   cross-channel model-discrepancy covariance are not universally supported.
+9. **Geometry uncertainty integration:** the full-forward geometry ensemble
+   remains a caller-supplied sampler API building block, not a universal
+   dashboard-managed equilibrium/beam covariance solver.
+10. **Verification:** the newly added deterministic tests are software
+    regression tests only. No experimental validation is claimed. GitHub
+    Actions must pass on the exact resulting main commit before reporting a
+    successful CI run.
+
+### Scientific implementation rule
+
+Do not close any item above by relabelling a numerical damping parameter as
+physical collisions, a supplied ECE opacity as an ECE solver, cold ray tracing
+as diffraction-aware propagation, or a uniform-volume fit as a profile
+inversion. Those changes require a complete forward model, explicit measured
+input contract, parameter-identifiability treatment, numerical regression
+coverage and documentation. Where a required model cannot be selected
+unambiguously from the cited literature or the supplied diagnostic metadata,
+the software must reject that path rather than silently invent an assumption.
