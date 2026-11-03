@@ -1080,7 +1080,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 except (ValueError, RuntimeError, np.linalg.LinAlgError, FloatingPointError):
                     continue
             out["background_reference_parameter_mc_successes"] = len(parameter_draws)
-            if len(parameter_draws) >= max(20, int(np.ceil(0.7*background_reference_parameter_mc_samples))):
+            if len(parameter_draws) >= max(12, int(np.ceil(0.7*background_reference_parameter_mc_samples))):
                 reference_parameter_covariance = np.cov(np.asarray(parameter_draws), rowvar=False, ddof=1)
                 base_count = 4 + n_species
                 full_reference_covariance = np.zeros_like(out["fit_covariance"])
