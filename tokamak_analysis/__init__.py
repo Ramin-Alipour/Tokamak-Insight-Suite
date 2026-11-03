@@ -18,7 +18,7 @@ __all__ = [
     "reflectometry", "rf_interaction", "runaway_electrons", "runaway_energy",
     "safety_factor", "shafranov_shift", "shape_reconstruction", "signal_calibration",
     "soft_xray", "spectral_broadening", "spectral_line_identification", "spectral_line_ratio",
-    "svd_analysis", "thomson_background", "thomson_kinetic_background", "thomson_generalized_dispersion", "cts_geometry_uncertainty", "thomson_inference_closure", "thomson_evdf", "thomson_gap_closure", "thomson_external_uncertainty", "thomson_joint_spatial_spectral", "thomson_model_comparison", "thomson_scattering", "thomson_spatial_mixing", "thomson_workflow", "cts_analysis", "cts_full_em", "transport", "turbulence",
+    "svd_analysis", "thomson_background", "thomson_kinetic_background", "thomson_generalized_dispersion", "cts_geometry_uncertainty", "thomson_inference_closure", "thomson_evdf", "thomson_gap_closure", "thomson_external_uncertainty", "thomson_joint_spatial_spectral", "thomson_model_comparison", "thomson_scattering", "thomson_spatial_mixing", "thomson_workflow", "cts_analysis", "cts_full_em", "cts_collisions", "transport", "turbulence",
     "vacuum_pressure", "visible_imaging", "wall_recycling", "wavelet_analysis", "x_point",
     "xray_spectrum",
 ]
