@@ -107,12 +107,23 @@ def density_from_thomson_scattered_power(
     effective_differential_cross_section_uncertainty_m2_sr=None,
     power_cross_section_relative_covariance=None,
 ):
-    """Infer density from calibrated collected Thomson power.
+    """Infer path-averaged density from absolutely calibrated collected power.
 
-    P_s = n_e P_i L (d sigma_eff/d Omega) DeltaOmega eta. The effective
+    scattered_power_W is the wavelength-integrated Thomson power at the same
+    calibrated measurement plane to which optical_efficiency refers.
+    incident_power_W is the laser power in the plasma interaction volume;
+    interaction_length_m is the effective illuminated plasma path length;
+    collection_solid_angle_sr is the solid angle subtended by the collection
+    optics at the scattering volume; and optical_efficiency is the end-to-end
+    fraction of power scattered into that solid angle that reaches the
+    calibrated measurement plane. Do not include the same throughput loss
+    both in scattered_power_W and again in optical_efficiency.
+
+    P_s = n_e P_i L (d sigma_eff/d Omega) DeltaOmega eta. The result is the
+    interaction-length-averaged effective density, not a local density unless
+    the density and collection kernel are uniform along the sightline. The
     cross-section is either the stationary-electron polarized Thomson value
-    or a model-supplied velocity-averaged relativistic value. Optional
-    uncertainties and fitted power/cross-section covariance are propagated.
+    or a model-supplied velocity-averaged relativistic value.
     """
     ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
     pi = _positive_finite_scalar(incident_power_W, "incident_power_W")
