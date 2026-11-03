@@ -547,28 +547,3 @@ must not be interpreted as electron density, electron or ion temperature,
 flow, composition, or an electron/ion velocity distribution. Physical
 parameter inference remains the separate responsibility of
 `analyze_cts_spectrum` and its explicitly selected forward model.
-
-
-## Advanced ECE absorption and stratified vector propagation (experimental API)
-
-The module `tokamak_analysis.thomson_advanced_solvers` exposes two additional
-research APIs:
-
-- `kinetic_ece_absorption_coefficient`: evaluates the existing
-  magnetized-Maxwellian Vlasov conductivity for a selected local cold-plasma
-  propagating eigenmode, with the electric field normalized to unit
-  longitudinal Poynting flux. The resulting dissipated power per flux is
-  reported as an absorption coefficient. Its required damping parameter is
-  only a numerical resonance regularizer; it is not a collision frequency.
-  The routine does not implement a relativistic/non-Maxwellian ECE solver,
-  radiative-transfer integration, or a conserving Landau/FDT closure.
-- `propagate_stratified_vector_maxwell`: integrates the full 4-component
-  tangential Maxwell system for a linear anisotropic dielectric varying only
-  along z. It is non-paraxial and retains off-diagonal polarization coupling,
-  including cross-polarization conversion. It does not solve transverse
-  diffraction, general 3-D inhomogeneity, or a two-sided reflection boundary
-  problem.
-
-These are callable numerical building blocks, not yet the default CTS
-background/beam-transfer path and not yet exposed in the dashboard. Their
-existence must not be interpreted as closing TS-01 through TS-05.
