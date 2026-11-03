@@ -4994,7 +4994,7 @@
           "applies_when_model": "full_electromagnetic"
         },
         {
-          "name": "physical_background_covariance_W2_Hz2",
+          "name": "physical_background_covariance_W2_per_Hz2",
           "unit": "n_frequency x n_frequency receiver-grid spectral-power covariance",
           "required": false,
           "description": "Optional positive-semidefinite covariance of the explicitly supplied receiver-grid physical background. Added to the independent model-discrepancy covariance for GLS; background/discrepancy cross-covariance is not inferred.",
@@ -5628,7 +5628,7 @@
           "description": "Whether the supplied physical-background covariance was added to the independent GLS discrepancy covariance."
         },
         {
-          "name": "physical_background_covariance_W2_Hz2",
+          "name": "physical_background_covariance_W2_per_Hz2",
           "unit": "n_frequency x n_frequency spectral-power covariance",
           "description": "Validated positive-semidefinite covariance of the receiver-grid physical background, conditionally added to GLS covariance."
         },
@@ -5766,7 +5766,7 @@
             "external_input_mc_samples",
             "external_input_mc_seed",
             "optional physical_background_spectrum_W_Hz (already on measured receiver grid) or physical_background_radiative_transfer (path-resolved free-free/ECE; exactly one)",
-            "optional physical_background_covariance_W2_Hz2 (receiver-grid covariance; added independently to model discrepancy)"
+            "optional physical_background_covariance_W2_per_Hz2 (receiver-grid covariance; added independently to model discrepancy)"
           ],
           "outputs": [
             "electron_density_m3",
@@ -5793,7 +5793,7 @@
             "physical_background_spectrum_W_Hz",
             "physical_background_status",
             "physical_background_transfer_diagnostics",
-            "physical_background_covariance_W2_Hz2",
+            "physical_background_covariance_W2_per_Hz2",
             "physical_background_covariance_used_in_gls"
           ],
           "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. A separate nonlinear gyrotropic VDF-shape inverse now exists conditional on fixed bulk plasma, geometry, response and population density; the standard bulk-fit API remains distinct."

@@ -1006,7 +1006,7 @@ def build_full_em_cts_physical_background(
         "pre_response_receiver_spectral_power_W_Hz": pre_response_power.copy(),
         "response_convolved_receiver_spectral_power_W_Hz": measured_grid_power.copy(),
         "instrument_response_applied_once": True,
-        "background_uncertainty": "not inferred; supply physical_background_covariance_W2_Hz2 for conditional GLS propagation",
+        "background_uncertainty": "not inferred; supply physical_background_covariance_W2_per_Hz2 for conditional GLS propagation",
     }
     return measured_grid_power, diagnostics
 
@@ -1118,7 +1118,7 @@ def analyze_full_em_cts_spectrum(
     external_input_mc_seed=84622,
     physical_background_spectrum_W_Hz=None,
     physical_background_radiative_transfer=None,
-    physical_background_covariance_W2_Hz2=None,
+    physical_background_covariance_W2_per_Hz2=None,
     numerical_convergence=True, convergence_harmonic_orders=None,
     convergence_quadrature_orders=None, convergence_relative_tolerance=1e-3,
 ):
@@ -1241,16 +1241,16 @@ def analyze_full_em_cts_spectrum(
         physical_background = np.zeros_like(y)
         physical_background_status = "no_fixed_physical_background_supplied"
     physical_background_covariance = None
-    if physical_background_covariance_W2_Hz2 is not None:
+    if physical_background_covariance_W2_per_Hz2 is not None:
         if supplied_physical_background is None and physical_background_radiative_transfer is None:
-            raise ValueError("physical_background_covariance_W2_Hz2 requires an explicitly supplied physical background")
-        physical_background_covariance = _real_array(physical_background_covariance_W2_Hz2, "physical_background_covariance_W2_Hz2", 2)
+            raise ValueError("physical_background_covariance_W2_per_Hz2 requires an explicitly supplied physical background")
+        physical_background_covariance = _real_array(physical_background_covariance_W2_per_Hz2, "physical_background_covariance_W2_per_Hz2", 2)
         if physical_background_covariance.shape != (f.size, f.size) or not np.allclose(physical_background_covariance, physical_background_covariance.T, rtol=1e-10, atol=1e-14):
-            raise ValueError("physical_background_covariance_W2_Hz2 must be a symmetric (n_frequency,n_frequency) matrix")
+            raise ValueError("physical_background_covariance_W2_per_Hz2 must be a symmetric (n_frequency,n_frequency) matrix")
         background_eigenvalues = np.linalg.eigvalsh(physical_background_covariance)
         background_scale = max(float(np.max(np.abs(background_eigenvalues))), np.finfo(float).tiny)
         if float(np.min(background_eigenvalues)) < -1e-10 * background_scale:
-            raise ValueError("physical_background_covariance_W2_Hz2 must be positive semidefinite")
+            raise ValueError("physical_background_covariance_W2_per_Hz2 must be positive semidefinite")
     effective_discrepancy_covariance = None if model_discrepancy_covariance is None else _real_array(model_discrepancy_covariance, "model_discrepancy_covariance", 2).copy()
     if physical_background_covariance is not None:
         effective_discrepancy_covariance = (
@@ -1640,7 +1640,7 @@ def analyze_full_em_cts_spectrum(
         "physical_background_spectrum_W_Hz": physical_background.copy(),
         "physical_background_status": physical_background_status,
         "physical_background_transfer_diagnostics": physical_background_transfer_diagnostics,
-        "physical_background_covariance_W2_Hz2": None if physical_background_covariance is None else physical_background_covariance.copy(),
+        "physical_background_covariance_W2_per_Hz2": None if physical_background_covariance is None else physical_background_covariance.copy(),
         "physical_background_covariance_used_in_gls": physical_background_covariance is not None,
         "physical_background_role": "receiver-grid additive spectral power; radiative-transfer route converts radiance with supplied etendue/efficiency and applies measured response once",
         "profiled_amplitude": float(amplitude),

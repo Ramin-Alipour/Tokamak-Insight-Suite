@@ -354,7 +354,7 @@ the measured-grid fit. TIS does not estimate any plasma profile, ECE opacity,
 Gaunt factor, etendue, efficiency, geometry or calibration.
 
 An optional positive-semidefinite
-`physical_background_covariance_W2_Hz2` is defined on the final measured
+`physical_background_covariance_W2_per_Hz2` is defined on the final measured
 frequency grid. It is added to the independently supplied model-discrepancy
 covariance for GLS. This addition assumes the two covariance sources are
 independent; their cross-covariance is not inferred. If no uncertainty is
