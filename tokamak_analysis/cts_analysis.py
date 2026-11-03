@@ -462,7 +462,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None, external_parameter_covariance=None, external_parameter_order=None,
     background_reference_spectra=None, background_components=None,
-    background_reference_basis_mc_samples=200, background_reference_basis_mc_seed=1729):
+    background_reference_basis_mc_samples=200, background_reference_basis_mc_seed=1729,
+    model_discrepancy_covariance=None):
     """Infer CTS plasma parameters, including electron flow fitted from the spectrum.
     electron_velocity_projection_m_s is an optional optimizer seed only, never fixed.
     Omission uses zero solely as a numerical seed, not a stationary-flow assumption.
@@ -699,7 +700,38 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("regularized inversion requires fast_ion.kind='infer_tabulated_1d'; initial plasma guesses are not regularization priors")
     if fast and fast["kind"]=="infer_tabulated_1d" and fast["vdf"]["smoothness_parameter"]<=0:
         raise ValueError("infer_tabulated_1d requires a positive VDF smoothness parameter")
-    if spectral_covariance is not None:
+    independent_discrepancy_covariance = None
+    effective_covariance_supplied = (spectral_covariance is not None or unc is not None)
+    if model_discrepancy_covariance is not None:
+        independent_discrepancy_covariance = _array(
+            model_discrepancy_covariance, "model_discrepancy_covariance", 2
+        )
+        if (independent_discrepancy_covariance.shape != (f.size, f.size)
+                or not np.allclose(independent_discrepancy_covariance,
+                                   independent_discrepancy_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError("model_discrepancy_covariance must be symmetric and match the CTS frequency grid")
+        eig = np.linalg.eigvalsh(independent_discrepancy_covariance)
+        scale = max(float(np.max(np.abs(eig))), np.finfo(float).tiny)
+        if float(np.min(eig)) < -1e-10 * scale:
+            raise ValueError("model_discrepancy_covariance must be positive semidefinite")
+        base_covariance = (
+            _array(spectral_covariance, "spectral_covariance", 2)
+            if spectral_covariance is not None else
+            np.diag(unc**2) if unc is not None else
+            np.zeros((f.size, f.size), dtype=float)
+        )
+        if base_covariance.shape != (f.size, f.size) or not np.allclose(base_covariance, base_covariance.T, rtol=1e-9, atol=1e-12):
+            raise ValueError("measurement covariance must be symmetric and match the CTS frequency grid")
+        effective_covariance = base_covariance + independent_discrepancy_covariance
+        try:
+            chol = np.linalg.cholesky(effective_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("measurement plus independent model-discrepancy covariance must be positive definite") from exc
+        whiten = lambda z: np.linalg.solve(chol, z)
+        effective_covariance_supplied = True
+        weighting_status = "measurement_covariance_plus_independent_correlated_model_discrepancy"
+    elif spectral_covariance is not None:
         cov_y=_array(spectral_covariance,"spectral_covariance",2)
         if cov_y.shape!=(f.size,f.size) or not np.allclose(cov_y,cov_y.T,rtol=1e-9,atol=1e-12):
             raise ValueError("spectral_covariance must be a symmetric n_frequency x n_frequency matrix")
@@ -865,7 +897,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     whitened_linear_design = whiten(linear_design)
     linear_normal = whitened_linear_design.T @ whitened_linear_design
     linear_covariance = np.linalg.pinv(linear_normal)
-    if unc is None and spectral_covariance is None:
+    if not effective_covariance_supplied:
         linear_covariance *= float(data_fit_residual @ data_fit_residual / dof)
     background_coefficient_covariance = linear_covariance[
         linear_covariance_slice, linear_covariance_slice
@@ -905,7 +937,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             f"(scaled Jacobian rank {rank}/{len(fit.x)}, condition number {cond:.6g})"
         )
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
-    if unc is None and spectral_covariance is None: cov0*=float(data_fit_residual@data_fit_residual/dof)
+    if not effective_covariance_supplied: cov0*=float(data_fit_residual@data_fit_residual/dof)
     trans=np.eye(len(fit.x))
     trans[0,0]=np.log(10)*d["electron_density_m3"]
     trans[1,1]=np.log(10)*d["electron_temperature_eV"]
@@ -932,7 +964,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "ion_temperature_species_uncertainties_eV":su[2:2+n_species].copy(),
       "ion_velocity_projection_uncertainty_m_s":float(su[3+n_species]),
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
-      "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if (unc is not None or spectral_covariance is not None) else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
+      "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if effective_covariance_supplied else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
       "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"spectral_weighting_status":weighting_status,"spectral_uncertainty_supplied":bool(unc is not None or spectral_covariance is not None),"regularization_scope":"fast-ion VDF curvature and supplied reference-shape regularization only; no plasma-parameter prior","jacobian_rank":rank,"jacobian_condition_number":cond,
       "degrees_of_freedom":int(dof),"scattering_wave_number_m-1":q,"scattering_wavevector_direction":qhat,
       "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),"scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
@@ -994,7 +1026,15 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["background_reference_basis_bootstrap_samples"] = basis_uncertainty["bootstrap_samples"]
         out["background_reference_basis_uncertainty_status"] = "bootstrap_covariance_of_reference_mean_and_PCA_basis;_not_yet_propagated_to_plasma_parameter_covariance"
         out["background_reference_basis_uncertainty_propagated"] = False
-    if out["reduced_chi_square"] is not None:
+    if independent_discrepancy_covariance is not None:
+        out["independent_model_discrepancy_covariance"] = independent_discrepancy_covariance.copy()
+        out["independent_model_discrepancy_supplied"] = True
+        out["model_discrepancy_model"] = "researcher_supplied_correlated_covariance_independent_of_reduced_chi_square"
+        out["model_discrepancy_parameter_covariance_status"] = "included_as_additive_spectral_covariance_in_GLS_whitening"
+    else:
+        out["independent_model_discrepancy_covariance"] = None
+        out["independent_model_discrepancy_supplied"] = False
+    if out["reduced_chi_square"] is not None and independent_discrepancy_covariance is None:
         discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
         discrepancy_covariance=discrepancy_scale*cov
         out["model_discrepancy_scale"]=discrepancy_scale
