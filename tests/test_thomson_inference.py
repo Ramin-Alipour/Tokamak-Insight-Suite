@@ -1290,6 +1290,12 @@ def test_kappa_analysis_accepts_model_discrepancy_covariance():
     channel = result["channels"][0]
     assert channel["spectral_covariance_used"] is True
     assert channel["spectral_covariance_interpretation"].startswith("researcher_supplied")
+    assert channel["spectral_weighting_status"] == (
+        "within_channel_gls_with_model_discrepancy_covariance_only"
+    )
+    assert channel["fit_covariance_interpretation"] == (
+        "local_parameter_covariance_from_supplied_model_discrepancy_covariance_only"
+    )
     assert channel["fit_covariance"].shape == (6, 6)
     assert np.isfinite(channel["reduced_chi_square"])
 
@@ -1526,6 +1532,11 @@ def test_full_channel_major_model_discrepancy_covariance_preserves_cross_channel
     assert all(
         channel["spectral_weighting_status"]
         == "full_channel_major_generalized_least_squares_including_cross_channel_covariance"
+        for channel in out["channels"]
+    )
+    assert all(
+        channel["fit_covariance_interpretation"]
+        == "local_parameter_covariance_from_supplied_measurement_and_model_discrepancy_covariance"
         for channel in out["channels"]
     )
 

@@ -1177,6 +1177,10 @@ def analyze_thomson_spectra(
     unc = None if signal_uncertainty is None else _finite_array(signal_uncertainty, "signal_uncertainty", 2)
     if unc is not None and (unc.shape != y.shape or np.any(unc <= 0)):
         raise ValueError("signal_uncertainty must match spectra and be strictly positive")
+    measurement_covariance_supplied = (
+        unc is not None or joint_spectral_covariance is not None
+    )
+    model_discrepancy_covariance_supplied = model_discrepancy_covariance is not None
     lsf_unc = None if instrument_response_uncertainty is None else _finite_array(instrument_response_uncertainty, "instrument_response_uncertainty")
     kernel_uncertainty = False
     matrix_uncertainty = False
@@ -2009,13 +2013,21 @@ def analyze_thomson_spectra(
             if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner" else
             "full_channel_major_generalized_least_squares"
             if joint_covariance is not None else
+            "within_channel_gls_with_measurement_and_model_discrepancy_covariance"
+            if channel_covariance is not None and measurement_covariance_supplied and model_discrepancy_covariance_supplied else
+            "within_channel_gls_with_model_discrepancy_covariance_only"
+            if channel_covariance is not None and model_discrepancy_covariance_supplied else
             "diagonal_pointwise_measurement_uncertainty_weighted"
             if ui is not None else
             "unweighted_least_squares_no_measurement_uncertainty_supplied"
         )
         fit["fit_covariance_interpretation"] = (
+            "local_parameter_covariance_from_supplied_measurement_and_model_discrepancy_covariance"
+            if measurement_covariance_supplied and model_discrepancy_covariance_supplied else
             "local_parameter_covariance_from_supplied_measurement_noise_model"
-            if joint_covariance is not None or ui is not None else
+            if measurement_covariance_supplied else
+            "local_parameter_covariance_from_supplied_model_discrepancy_covariance_only"
+            if model_discrepancy_covariance_supplied else
             "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         )
         fit["background_model_status"] = (
