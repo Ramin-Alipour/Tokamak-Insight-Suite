@@ -138,6 +138,9 @@ def collective_tabulated_electron_spectral_density(
             or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
             or np.any(np.diff(vgrid) <= 0) or np.any(fgrid < 0)):
         raise ValueError("electron velocity grid and tabulated VDF must be matching finite non-negative arrays")
+    evdf_scale = max(float(np.max(fgrid)), np.finfo(float).tiny)
+    if max(float(fgrid[0]), float(fgrid[-1])) > 1e-6 * evdf_scale:
+        raise ValueError("tabulated electron VDF must decay to negligible values at both finite-support endpoints; otherwise omitted boundary delta contributions invalidate the susceptibility")
     evdf_area = float(np.trapz(fgrid, vgrid))
     if not np.isfinite(evdf_area) or evdf_area <= 0:
         raise ValueError("tabulated electron VDF must have positive finite integral")
