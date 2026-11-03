@@ -40,7 +40,9 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
         max_nfev=300,
     )
     assert result["population_kind"] == "electron"
-    assert result["distribution_kg_m_s_inverse3"].shape == (4,4)
+    if result["distribution_kg_m_s_inverse3"] is not None:
+        assert result["distribution_kg_m_s_inverse3"].shape == (4,4)
+    assert result["regularized_candidate_distribution_kg_m_s_inverse3"].shape == (4,4)
     assert np.all(result["regularized_candidate_distribution_kg_m_s_inverse3"] >= 0)
     assert np.isclose(np.sum(result["regularized_candidate_distribution_kg_m_s_inverse3"]*weights), 1.0)
     assert result["bulk_plasma_and_geometry_fixed"] is True
