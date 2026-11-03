@@ -143,6 +143,9 @@ def fit_two_population_relativistic_thomson_spectrum(
     maximum_recoil_correction_fraction=0.01,
     include_compton_recoil=False,
     background_degree=0,
+    background_model=None,
+    background_interior_knots=3,
+    background_templates=None,
     max_nfev=500,
 ):
     """Fit the two-population model directly to measured calibrated spectra.
@@ -187,9 +190,16 @@ def fit_two_population_relativistic_thomson_spectrum(
         whitening = lambda z: np.linalg.solve(cholesky, z)
         uncertainty_status = "supplied full spectral covariance"
 
-    if isinstance(background_degree, (bool, np.bool_)) or not isinstance(background_degree, (int, np.integer)) or not 0 <= int(background_degree) <= 2:
-        raise ValueError("background_degree must be an integer in {0, 1, 2}")
+    if isinstance(background_degree, (bool, np.bool_)) or not isinstance(background_degree, (int, np.integer)) or not 0 <= int(background_degree) <= 8:
+        raise ValueError("background_degree must be an integer in {0, ..., 8}")
     background_degree = int(background_degree)
+    if background_model is None:
+        background_model = "polynomial" if background_degree else "constant"
+    from .thomson_background import _background_design
+    background_basis = _background_design(
+        x, background_model, degree=background_degree,
+        interior_knots=background_interior_knots, templates=background_templates,
+    )
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
 
@@ -270,12 +280,10 @@ def fit_two_population_relativistic_thomson_spectrum(
         )["spectral_density_per_nm"]
         return _apply_response(response, model, x)
 
-    # Center and scale the wavelength coordinate so polynomial background
-    # columns remain numerically well conditioned across nm-scale axes.
+    # The shared detector-space background basis is fitted simultaneously
+    # with the relativistic Thomson signal.
     x_center = float(np.mean(x))
     x_scale = float(np.ptp(x))
-    x_scaled = (x - x_center) / x_scale
-    background_basis = np.column_stack([x_scaled**degree for degree in range(background_degree + 1)])
 
     def profile(p):
         z = forward(p)
@@ -375,6 +383,8 @@ def fit_two_population_relativistic_thomson_spectrum(
         "fitted_constant_background": float(background_coefficients[0]) if background_degree == 0 else None,
         "fitted_background_coefficients_scaled_wavelength": np.asarray(background_coefficients, dtype=float),
         "fitted_background_degree": background_degree,
+        "fitted_background_model": background_model,
+        "fitted_background_interior_knots": int(background_interior_knots) if background_model == "cubic_spline" else None,
         "background_wavelength_center_nm": x_center,
         "background_wavelength_scale_nm": x_scale,
         "background_coefficient_covariance_conditional": background_covariance,
@@ -399,7 +409,7 @@ def fit_two_population_relativistic_thomson_spectrum(
             "Both populations share one bulk-flow projection along the scattering vector.",
             "The fitted population fraction and temperatures are conditional on the selected two-population model and measured response.",
             "Absolute electron density is not inferred by this normalized shape-only subanalysis.",
-            "Polynomial background is a detector-space nuisance model; inspect fitted_background_degree and coefficients, and do not interpret it as a measured stray-light template.",
+            "Structured background is a detector-space nuisance model fitted jointly with the Thomson signal; inspect fitted_background_model and coefficients, and do not interpret an analytic basis as a measured stray-light template.",
             "Background coefficient covariance is conditional and does not include cross-covariance with nonlinear population parameters.",
             "Compton recoil is included only when include_compton_recoil=True; otherwise the Thomson approximation is used subject to the recoil screen.",
             "No experimental validation is performed or claimed.",
