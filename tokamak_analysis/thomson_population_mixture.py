@@ -65,12 +65,6 @@ def two_population_relativistic_thomson_spectrum(
     wavelength = _vector(wavelength_nm, "wavelength_nm")
     if np.any(wavelength <= 0) or np.any(np.diff(wavelength) <= 0):
         raise ValueError("wavelength_nm must be positive and strictly increasing")
-    if isinstance(background_degree, (bool, np.bool_)) or not isinstance(background_degree, (int, np.integer)) or not 0 <= int(background_degree) <= 2:
-        raise ValueError("background_degree must be an integer in {0, 1, 2}")
-    background_degree = int(background_degree)
-    if not isinstance(include_compton_recoil, (bool, np.bool_)):
-        raise ValueError("include_compton_recoil must be boolean")
-
     laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
     angle = float(scattering_angle_rad)
     if not np.isfinite(angle) or not 0 < angle < np.pi:
@@ -192,6 +186,12 @@ def fit_two_population_relativistic_thomson_spectrum(
             raise ValueError("spectral_covariance must be positive definite") from exc
         whitening = lambda z: np.linalg.solve(cholesky, z)
         uncertainty_status = "supplied full spectral covariance"
+
+    if isinstance(background_degree, (bool, np.bool_)) or not isinstance(background_degree, (int, np.integer)) or not 0 <= int(background_degree) <= 2:
+        raise ValueError("background_degree must be an integer in {0, 1, 2}")
+    background_degree = int(background_degree)
+    if not isinstance(include_compton_recoil, (bool, np.bool_)):
+        raise ValueError("include_compton_recoil must be boolean")
 
     laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
     angle = float(scattering_angle_rad)
