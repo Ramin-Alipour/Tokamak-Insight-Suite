@@ -96,3 +96,52 @@ def test_receiver_conversion_applies_etendue_and_efficiency_once():
         end_to_end_efficiency=efficiency,
     )
     np.testing.assert_allclose(power, radiance * etendue * efficiency, rtol=0.0, atol=0.0)
+
+
+
+def test_free_free_accepts_frequency_resolved_gaunt_factor():
+    frequency = np.array([80.0e9, 120.0e9, 180.0e9])
+    gaunt = np.array([1.05, 1.10, 1.20])
+    result = thermal_bremsstrahlung_emissivity_si(
+        frequency, 2.0e19, np.array([2.0e19]), np.array([1.0]),
+        1500.0, gaunt_factor=gaunt,
+    )
+    unit_gaunt = thermal_bremsstrahlung_emissivity_si(
+        frequency, 2.0e19, np.array([2.0e19]), np.array([1.0]),
+        1500.0,
+    )
+    np.testing.assert_allclose(result, unit_gaunt * gaunt, rtol=1e-13, atol=0.0)
+
+
+def test_free_free_rejects_nonbroadcastable_gaunt_factor():
+    frequency = np.array([80.0e9, 120.0e9, 180.0e9])
+    with np.testing.assert_raises_regex(ValueError, "broadcastable to frequency_Hz"):
+        thermal_bremsstrahlung_emissivity_si(
+            frequency, 2.0e19, np.array([2.0e19]), np.array([1.0]),
+            1500.0, gaunt_factor=np.array([1.0, 1.1]),
+        )
+
+
+def test_path_and_frequency_resolved_gaunt_factor_is_used_per_path():
+    frequency = np.array([90.0e9, 140.0e9])
+    common = dict(
+        frequency_Hz=frequency,
+        path_length_m=np.array([0.1, 0.2]),
+        electron_temperature_eV=np.array([1300.0, 1700.0]),
+        electron_density_m3=np.array([2.0e19, 1.5e19]),
+        ion_densities_m3=np.array([[2.0e19], [1.5e19]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=np.zeros((2, 2)),
+        incident_radiance_W_m2_sr_Hz=0.0,
+    )
+    scalar = integrate_thermal_microwave_background(
+        **common, gaunt_factor=1.0
+    )
+    resolved = integrate_thermal_microwave_background(
+        **common,
+        gaunt_factor=np.array([[1.0, 1.1], [1.2, 1.3]]),
+    )
+    assert resolved["gaunt_factor_resolution"] == "path_and_frequency_resolved"
+    assert np.all(np.isfinite(resolved["spectral_radiance_W_m2_sr_Hz"]))
+    assert np.all(resolved["spectral_radiance_W_m2_sr_Hz"] >=
+                  scalar["spectral_radiance_W_m2_sr_Hz"])
