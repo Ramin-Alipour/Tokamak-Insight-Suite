@@ -2503,7 +2503,15 @@ def analyze_thomson_spectra(
             initial_temperature_eV=initial_joint_te,
             initial_flow_projection_m_s=initial_joint_flow,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
-                include_compton_recoil=include_compton_recoil,
+            include_compton_recoil=include_compton_recoil,
+            background_model=background_model,
+            background_degree=background_degree,
+            background_interior_knots=background_interior_knots,
+            background_templates=(
+                [background_templates[j] for j in range(y.shape[0])]
+                if background_templates is not None and np.asarray(background_templates).ndim == 3
+                else background_templates
+            ),
         )
         joint_summary["integration_status"] = "used_by_canonical_multichannel_thomson_api"
         joint_summary["channel_individual_fits_retained"] = True
