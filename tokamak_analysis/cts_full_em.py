@@ -945,6 +945,97 @@ def _apply_frequency_response(response, spectrum, frequency):
     return (r @ (y*widths))/widths
 
 
+def _prepare_full_em_cts_spectral_whitener(
+    n_bins, *, signal_uncertainty=None, spectral_covariance=None,
+    model_discrepancy_covariance=None,
+):
+    """Build a GLS whitener from measured uncertainty plus independent discrepancy.
+
+    The discrepancy covariance is an additive, researcher-supplied model-error
+    term. It is never estimated from the residual and is never silently
+    regularized. A positive-definite total covariance is required for GLS.
+    """
+    if signal_uncertainty is not None and spectral_covariance is not None:
+        raise ValueError("supply signal_uncertainty or spectral_covariance, not both")
+    measurement_covariance = None
+    if spectral_covariance is not None:
+        measurement_covariance = _real_array(
+            spectral_covariance, "spectral_covariance", 2
+        )
+        if (
+            measurement_covariance.shape != (n_bins, n_bins)
+            or not np.allclose(
+                measurement_covariance, measurement_covariance.T,
+                rtol=1e-10, atol=1e-14,
+            )
+        ):
+            raise ValueError(
+                "spectral_covariance must be a finite symmetric (n,n) matrix"
+            )
+    elif signal_uncertainty is not None:
+        sigma = _real_array(signal_uncertainty, "signal_uncertainty", 1)
+        if sigma.shape != (n_bins,) or np.any(sigma <= 0.0):
+            raise ValueError(
+                "signal_uncertainty must be positive and match measured_spectrum"
+            )
+        measurement_covariance = np.diag(sigma**2)
+
+    discrepancy = None
+    if model_discrepancy_covariance is not None:
+        discrepancy = _real_array(
+            model_discrepancy_covariance, "model_discrepancy_covariance", 2
+        )
+        if discrepancy.shape != (n_bins, n_bins):
+            raise ValueError(
+                "model_discrepancy_covariance must match the measured frequency grid"
+            )
+        if not np.allclose(discrepancy, discrepancy.T, rtol=1e-10, atol=1e-14):
+            raise ValueError("model_discrepancy_covariance must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(discrepancy)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if float(np.min(eigenvalues)) < -1e-10 * scale:
+            raise ValueError(
+                "model_discrepancy_covariance must be positive semidefinite"
+            )
+
+    if measurement_covariance is None:
+        effective_covariance = (
+            None if discrepancy is None else discrepancy.copy()
+        )
+    elif discrepancy is None:
+        effective_covariance = measurement_covariance.copy()
+    else:
+        effective_covariance = measurement_covariance + discrepancy
+
+    if effective_covariance is None:
+        return (
+            lambda value: np.asarray(value, dtype=float),
+            None,
+            "unweighted_least_squares_no_measurement_or_discrepancy_covariance",
+        )
+
+    try:
+        cholesky = np.linalg.cholesky(effective_covariance)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError(
+            "measurement covariance plus model discrepancy must be positive definite for GLS; "
+            "the covariance is not silently regularized"
+        ) from exc
+    if discrepancy is not None and measurement_covariance is not None:
+        status = "measurement_covariance_plus_independent_correlated_model_discrepancy"
+    elif discrepancy is not None:
+        status = "model_discrepancy_covariance_only_no_measurement_uncertainty_supplied"
+    elif spectral_covariance is not None:
+        status = "full_frequency_bin_measurement_covariance_whitened"
+    else:
+        status = "diagonal_pointwise_measurement_uncertainty_weighted"
+    return (
+        lambda value: np.linalg.solve(cholesky, np.asarray(value, dtype=float)),
+        effective_covariance,
+        status,
+    )
+
+
 def analyze_full_em_cts_spectrum(
     frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
     scattering_geometry, electron_density_initial_m3=None,
@@ -953,6 +1044,7 @@ def analyze_full_em_cts_spectrum(
     incident_polarization, scattered_polarization, ion_flow_projection_initial_m_s=None,
     instrument_response, electron_flow_projection_initial_m_s=None,
     signal_uncertainty=None, spectral_covariance=None,
+    model_discrepancy_covariance=None,
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
@@ -1073,28 +1165,17 @@ def analyze_full_em_cts_spectrum(
             raise ValueError("instrument_response_uncertainty must be finite, non-negative, and match instrument_response")
         if isinstance(response_mc_samples, bool) or not isinstance(response_mc_samples, (int, np.integer)) or response_mc_samples < 20:
             raise ValueError("response_mc_samples must be an integer >= 20 when response uncertainty is supplied")
-    if signal_uncertainty is not None and spectral_covariance is not None:
-        raise ValueError("supply signal_uncertainty or spectral_covariance, not both")
-    if spectral_covariance is not None:
-        cov_y = _real_array(spectral_covariance, "spectral_covariance", 2)
-        if cov_y.shape != (f.size, f.size) or np.any(~np.isfinite(cov_y)) or not np.allclose(cov_y, cov_y.T):
-            raise ValueError("spectral_covariance must be a finite symmetric square matrix")
-        try:
-            chol = np.linalg.cholesky(cov_y)
-        except np.linalg.LinAlgError as exc:
-            raise ValueError("spectral_covariance must be positive definite") from exc
-        whiten = lambda value: np.linalg.solve(chol, value)
-    elif signal_uncertainty is not None:
-        unc = _real_array(signal_uncertainty, "signal_uncertainty", 1)
-        if unc.shape != f.shape or np.any(~np.isfinite(unc)) or np.any(unc <= 0):
-            raise ValueError("signal_uncertainty must be positive and match measured_spectrum")
-        whiten = lambda value: value / unc
-    else:
-        # Calibrated spectra remain analyzable when pointwise measurement
-        # uncertainty is unavailable. Use unweighted least squares; the local
-        # Jacobian covariance is residual-variance-scaled below and explicitly
-        # labelled as not measurement-noise-calibrated.
-        whiten = lambda value: value
+    (
+        whiten, effective_spectral_covariance, spectral_weighting_status
+    ) = _prepare_full_em_cts_spectral_whitener(
+        f.size,
+        signal_uncertainty=signal_uncertainty,
+        spectral_covariance=spectral_covariance,
+        model_discrepancy_covariance=model_discrepancy_covariance,
+    )
+    # If neither measurement uncertainty nor a declared discrepancy covariance
+    # is supplied, the calibrated spectrum is fitted unweighted and the local
+    # Jacobian covariance is residual-variance-scaled (not noise-calibrated).
     if not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes)) or len(ion_species) == 0:
         raise ValueError("ion_species must be a non-empty sequence for species-resolved CTS inversion")
     species_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
@@ -1391,7 +1472,7 @@ def analyze_full_em_cts_spectrum(
     r, amplitude, offset, convolved = residual(fit.x, return_profile=True)
     dof = max(1, f.size - (len(names) + 2))
     covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
-    if spectral_covariance is None and signal_uncertainty is None:
+    if effective_spectral_covariance is None:
         covariance_log *= float(r @ r / dof)
     def physical_parameter_values(parameters):
         return np.concatenate((
@@ -1464,23 +1545,29 @@ def analyze_full_em_cts_spectrum(
         "profiled_offset": float(offset),
         "reduced_chi_square": (
             float(r @ r / dof)
-            if spectral_covariance is not None or signal_uncertainty is not None
+            if effective_spectral_covariance is not None
             else None
         ),
         "fit_residual_rms": float(np.sqrt(np.mean((y - (amplitude * convolved + offset + physical_background)) ** 2))),
         "spectral_uncertainty_supplied": bool(
             spectral_covariance is not None or signal_uncertainty is not None
         ),
-        "spectral_weighting_status": (
-            "full_frequency_bin_covariance_whitened"
-            if spectral_covariance is not None else
-            "diagonal_pointwise_measurement_uncertainty_weighted"
-            if signal_uncertainty is not None else
-            "unweighted_least_squares_no_measurement_uncertainty_supplied"
+        "model_discrepancy_covariance_supplied": model_discrepancy_covariance is not None,
+        "model_discrepancy_covariance_used": model_discrepancy_covariance is not None,
+        "model_discrepancy_covariance": (
+            None if model_discrepancy_covariance is None
+            else np.asarray(model_discrepancy_covariance, dtype=float).copy()
         ),
+        "effective_spectral_covariance": (
+            None if effective_spectral_covariance is None
+            else effective_spectral_covariance.copy()
+        ),
+        "spectral_weighting_status": spectral_weighting_status,
         "parameter_covariance_interpretation": (
-            "local_jacobian_covariance_from_supplied_spectral_uncertainty"
-            if spectral_covariance is not None or signal_uncertainty is not None
+            "local_jacobian_covariance_from_measurement_plus_independent_model_discrepancy_covariance"
+            if model_discrepancy_covariance is not None and effective_spectral_covariance is not None
+            else "local_jacobian_covariance_from_supplied_measurement_uncertainty"
+            if effective_spectral_covariance is not None
             else "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         ),
         "parameter_covariance_scope": (
