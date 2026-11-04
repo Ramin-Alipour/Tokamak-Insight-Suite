@@ -594,3 +594,36 @@ def integrate_receiver_spectral_power(
         )
         result["integrated_receiver_power_variance_W2"] = max(variance, 0.0)
     return result
+
+
+
+def brightness_temperature_from_radiance(
+    frequency_Hz, spectral_radiance_W_m2_sr_Hz, *, convention="planck",
+):
+    """Convert spectral radiance to equivalent Planck or Rayleigh-Jeans brightness temperature.
+
+    This is a radiometric brightness temperature, not the local electron
+    temperature. The Planck inversion is exact for an equivalent blackbody
+    radiance; the Rayleigh-Jeans result is the low-photon-energy approximation.
+    Zero radiance maps to zero brightness temperature.
+    """
+    frequency = _positive_array(frequency_Hz, "frequency_Hz")
+    radiance = _real_array(
+        spectral_radiance_W_m2_sr_Hz, "spectral_radiance_W_m2_sr_Hz"
+    )
+    if frequency.ndim != 1 or radiance.shape != frequency.shape or np.any(radiance < 0.0):
+        raise ValueError(
+            "frequency_Hz and non-negative spectral_radiance_W_m2_sr_Hz "
+            "must be matching one-dimensional vectors"
+        )
+    if convention not in {"planck", "rayleigh_jeans"}:
+        raise ValueError("convention must be 'planck' or 'rayleigh_jeans'")
+    if convention == "rayleigh_jeans":
+        return C**2 * radiance / (2.0 * K_B * frequency**2)
+    result = np.zeros_like(radiance)
+    positive = radiance > 0.0
+    log_planck_prefactor = np.log(2.0 * H * frequency[positive]**3 / C**2)
+    log_ratio = log_planck_prefactor - np.log(radiance[positive])
+    log_denominator = np.logaddexp(0.0, log_ratio)
+    result[positive] = H * frequency[positive] / (K_B * log_denominator)
+    return result
