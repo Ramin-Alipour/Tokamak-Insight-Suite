@@ -16,6 +16,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 MODEL_LABELS = {
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
+    "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
     "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
@@ -92,6 +93,32 @@ EXAMPLES = {
         "ion_velocity_initial_m_s": {"D+": -40000.0, "C6+": 80000.0},
         "signal_uncertainty": np.full(41, 1.0).tolist(),
         "ion_velocity_bounds_m_s": [-500000.0, 500000.0]
+    },
+    "cts_electrostatic_measured_spectrum_inference": {
+        "frequency_shift_Hz": np.linspace(-0.5e9, 0.5e9, 41).tolist(),
+        "measured_spectrum": (2.0 + 80.0*np.exp(-0.5*(np.linspace(-0.5e9, 0.5e9, 41)/1.8e8)**2)).tolist(),
+        "probe_frequency_Hz": 140.0e9,
+        "scattering_geometry": {"scattering_angle_rad": 1.9198621771937625},
+        "ion_species": [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        "ion_fractions": [1.0],
+        "instrument_response": np.eye(41).tolist(),
+        "signal_uncertainty": np.full(41, 1.0).tolist(),
+        "electron_density_initial_m3": 2.0e19,
+        "electron_temperature_initial_eV": 1200.0,
+        "ion_temperature_initial_eV": 800.0,
+        "electron_velocity_projection_m_s": 0.0,
+        "ion_velocity_initial_m_s": 0.0,
+        "inversion_method": "local_least_squares",
+        "global_search": False,
+        "fast_ion": {
+            "species_index": 0,
+            "kind": "tabulated_1d",
+            "fraction_initial": 0.08,
+            "fraction_bounds": [0.001, 0.5],
+            "velocity_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),
+            "probability_density_m_s_inverse": np.exp(-0.5*(np.linspace(-2.0e6, 2.0e6, 81)/3.0e5)**2).tolist(),
+            "smoothness": 0.0
+        }
     },
     "kappa_electrostatic_susceptibility": {
         "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
