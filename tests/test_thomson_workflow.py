@@ -99,3 +99,12 @@ def test_gls_smoothing_accepts_small_but_positive_covariance_without_rescaling()
     assert np.all(np.isfinite(fitted))
     assert np.all(np.isfinite(gradient))
     assert diagnostics["covariance_model"] == "researcher_supplied_full_cross_channel_covariance"
+
+
+def test_exact_relativistic_flow_projection_is_exposed_by_canonical_workflow():
+    assert callable(workflow.thomson_velocity_projection_relativistic_exact)
+    result = workflow.thomson_velocity_projection_relativistic_exact(
+        532.0, 532.0, np.pi / 2.0
+    )
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(0.0)
+    assert result["identifiability"] == "one_projected_velocity_only"
