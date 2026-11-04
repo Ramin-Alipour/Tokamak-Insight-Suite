@@ -32,6 +32,7 @@ from .cts_stokes_transfer import (
 from .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
+    cold_plasma_absorbed_power_density,
 )
 
 
@@ -392,6 +393,8 @@ def run_advanced_thomson_physics(model, **kwargs):
       - cold_plasma_dielectric: local multispecies Stix R/L/S/D/P tensor.
       - cold_plasma_magnetoionic_modes: two local cold-plasma n^2 branches
         and electric polarization eigenvectors for a supplied wave-normal.
+      - cold_plasma_absorbed_power_density: local time-averaged collisional
+        wave absorption from the Hermitian dissipative dielectric part.
       - plasma_charge_state_moments: Zeff, ion charge balance and net charge
         density from explicit multispecies densities and charge states.
 
@@ -431,13 +434,15 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_dielectric_tensor
     elif model == "cold_plasma_magnetoionic_modes":
         solver = cold_plasma_magnetoionic_modes
+    elif model == "cold_plasma_absorbed_power_density":
+        solver = cold_plasma_absorbed_power_density
     elif model == "plasma_charge_state_moments":
         solver = plasma_charge_state_moments
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, plasma_charge_state_moments; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, plasma_charge_state_moments; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
@@ -461,6 +466,7 @@ __all__ = [
     "propagate_stratified_polarized_lte_stokes",
     "cold_plasma_dielectric_tensor",
     "cold_plasma_magnetoionic_modes",
+    "cold_plasma_absorbed_power_density",
     "plasma_charge_state_moments",
     "run_advanced_thomson_physics",
 ]
