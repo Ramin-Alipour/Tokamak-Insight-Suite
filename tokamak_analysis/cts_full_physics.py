@@ -487,6 +487,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = reconstruct_psf_aware_thomson_profile
     elif model == "gyrotropic_bi_maxwellian_anisotropy":
         solver = infer_gyrotropic_bi_maxwellian_temperatures
+    elif model == "gyrotropic_bi_maxwellian_spectral_fit":
+        solver = fit_gyrotropic_bi_maxwellian_thomson
     elif model == "thomson_three_dimensional_flow":
         solver = infer_three_dimensional_flow_from_thomson_projections
     elif model == "plasma_charge_state_moments":
@@ -530,6 +532,7 @@ __all__ = [
     "relativistic_projected_compton_kinematics",
     "reconstruct_psf_aware_thomson_profile",
     "infer_gyrotropic_bi_maxwellian_temperatures",
+    "fit_gyrotropic_bi_maxwellian_thomson",
     "infer_three_dimensional_flow_from_thomson_projections",
     "run_advanced_thomson_physics",
 ]
