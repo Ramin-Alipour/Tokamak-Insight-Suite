@@ -2210,6 +2210,22 @@ def fit_full_em_gyrotropic_population_shape(
         measurement_covariance=measurement_covariance,
         max_nfev=max_nfev,
     )
+    candidate_distribution = result["regularized_candidate_distribution"].reshape(pp.size, pa.size)
+    inferred_parallel_velocity_m_s = None
+    candidate_parallel_velocity_m_s = None
+    if population_kind == "electron":
+        from .cts_full_em import ME as _ME
+        momentum_magnitude = np.sqrt(pp[:, None]**2 + pa[None, :]**2)
+        gamma = np.sqrt(1.0 + (momentum_magnitude / (_ME * C))**2)
+        parallel_velocity = pa[None, :] / (gamma * _ME)
+        candidate_parallel_velocity_m_s = float(
+            np.sum(candidate_distribution * weights * parallel_velocity)
+        )
+        if result["distribution"] is not None:
+            fitted_distribution = result["distribution"].reshape(pp.size, pa.size)
+            inferred_parallel_velocity_m_s = float(
+                np.sum(fitted_distribution * weights * parallel_velocity)
+            )
     result.update({
         "model": "magnetized_full_electromagnetic_CTS_relativistic_gyrotropic_Vlasov_inverse",
         "population_kind": population_kind,
@@ -2223,13 +2239,30 @@ def fit_full_em_gyrotropic_population_shape(
         "regularized_candidate_distribution_kg_m_s_inverse3": result["regularized_candidate_distribution"].reshape(pp.size, pa.size),
         "bulk_plasma_and_geometry_fixed": True,
         "population_density_fixed": True,
-        "electron_flow_projection_m_s_fixed": float(electron_flow_projection_m_s),
-        "inversion_scope": "VDF shape only; bulk ne/Te/Ti, magnetic field, geometry, mode polarizations, response and population density are fixed",
+        "electron_flow_projection_m_s_fixed": (
+            float(electron_flow_projection_m_s) if population_kind == "electron" else None
+        ),
+        "electron_parallel_mean_velocity_m_s": inferred_parallel_velocity_m_s,
+        "electron_parallel_mean_velocity_candidate_m_s": candidate_parallel_velocity_m_s,
+        "electron_parallel_mean_velocity_status": (
+            "identified_from_fitted_gyrotropic_EVDF"
+            if inferred_parallel_velocity_m_s is not None
+            else "conditional_candidate_only_shape_not_identifiable"
+            if population_kind == "electron"
+            else "not_applicable_fast_ion_population"
+        ),
+        "electron_parallel_velocity_definition": (
+            "integral(2*pi*p_perp*f*p_parallel/(gamma*m_e) dp_perp dp_parallel); "
+            "parallel to the supplied magnetic field, derived from the fitted EVDF; "
+            "not a 3-D flow vector or a scattering-vector projection"
+            if population_kind == "electron" else None
+        ),
+        "inversion_scope": "VDF shape only; bulk ne/Te/Ti, magnetic field, geometry, mode polarizations, response and population density are fixed externally",
         "physics": "each optimizer evaluation calls the relativistic gyrotropic conductivity, Klimontovich covariance and second-order Full-EM kinetic vertex; no linearized VDF kernel is substituted",
         "limitations": [
             "The inferred shape is conditional on the selected momentum grid and regularization matrix.",
             "A rank-deficient spectral Jacobian yields a conditional candidate, not a uniquely measured distribution.",
-            "Drifted relativistic electron VDFs are not included; the electron branch requires zero projected bulk drift.",
+            "For electron inversion the separate bulk-flow Doppler shift is fixed to zero to avoid double counting; an asymmetric fitted gyrotropic momentum distribution can still encode a non-zero mean velocity parallel to the magnetic field, which is reported separately. A scattering-vector projection and transverse flow components are not inferred by this gyrotropic moment.",
             "No finite-orbit-width, collisional or spatially varying kinetic corrections are included.",
             "No experimental validation is claimed.",
         ],
