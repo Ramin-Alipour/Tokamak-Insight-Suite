@@ -81,3 +81,94 @@ def test_velocity_quadrature_is_included_and_grid_integral_is_resolution_consist
     np.testing.assert_allclose(fine_integral, coarse_integral, rtol=1e-12)
     assert coarse_weights[0] == 0.5 * (coarse[1] - coarse[0])
     assert coarse_weights[-1] == coarse_weights[0]
+
+
+def test_projected_compton_kinematics_matches_rest_electron_compton_shift():
+    from tokamak_analysis.thomson_gap_closure import (
+        relativistic_projected_compton_kinematics,
+    )
+
+    laser = 532.0
+    angle = np.pi / 2.0
+    velocity = np.linspace(-3.0e6, 3.0e6, 121)
+    result = relativistic_projected_compton_kinematics(
+        velocity, laser, angle, incident_polarization=[0.0, 0.0, 1.0],
+    )
+    zero = velocity.size // 2
+    photon_energy_over_rest = (
+        1239.8419843320026 / laser / 510_998.95069
+    )
+    expected = laser * (1.0 + photon_energy_over_rest)
+    assert result["compton_scattered_wavelength_nm"][zero] == pytest.approx(
+        expected, rel=2e-13
+    )
+    assert result["thomson_scattered_wavelength_nm"][zero] == pytest.approx(
+        laser, rel=2e-15
+    )
+    assert result["maximum_recoil_correction_fraction"] > 0.0
+    weights = result["relative_lab_differential_scattering_weight"]
+    assert weights.shape == velocity.shape
+    assert np.all(np.isfinite(weights))
+    assert np.all(weights >= 0.0)
+
+
+def test_projected_compton_inverse_uses_recoil_and_polarized_kn_weight():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    laser = 532.0
+    angle = np.pi / 2.0
+    velocity = np.linspace(-3.0e6, 3.0e6, 121)
+    measured = np.exp(-0.5 * ((wavelength - laser) / 2.0) ** 2)
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(measured),
+        velocity_grid_m_s=velocity,
+        incident_polarization=[0.0, 0.0, 1.0],
+        include_compton_recoil=True,
+        regularization_strength=1e-3,
+    )
+    assert result["recoil_included"] is True
+    assert result["scattering_cross_section_model"] == (
+        "polarized_single_scattering_Klein_Nishina_in_electron_rest_frame"
+    )
+    assert result["maximum_recoil_correction_fraction"] > 0.0
+    assert result["relative_lab_differential_scattering_weight"].shape == velocity.shape
+    assert result["absolute_density_inferred"] is False
+
+
+def test_projected_thomson_inverse_rejects_out_of_domain_no_recoil_approximation():
+    import pytest
+
+    wavelength = np.linspace(0.08, 0.12, 241)
+    laser = 0.1
+    velocity = np.linspace(-3.0e6, 3.0e6, 121)
+    measured = np.exp(-0.5 * ((wavelength - laser) / 0.01) ** 2)
+    with pytest.raises(ValueError, match="exceeds the selected correction limit"):
+        reconstruct_relativistic_projected_thomson_evdf(
+            wavelength, measured, laser_wavelength_nm=laser,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.zeros_like(measured),
+            velocity_grid_m_s=velocity,
+            regularization_strength=1e-3,
+        )
+
+
+def test_projected_compton_inverse_requires_incident_polarization():
+    import pytest
+
+    wavelength = np.linspace(520.0, 544.0, 241)
+    laser = 532.0
+    velocity = np.linspace(-3.0e6, 3.0e6, 121)
+    measured = np.exp(-0.5 * ((wavelength - laser) / 2.0) ** 2)
+    with pytest.raises(ValueError, match="incident_polarization is required"):
+        reconstruct_relativistic_projected_thomson_evdf(
+            wavelength, measured, laser_wavelength_nm=laser,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.zeros_like(measured),
+            velocity_grid_m_s=velocity,
+            include_compton_recoil=True,
+            regularization_strength=1e-3,
+        )
