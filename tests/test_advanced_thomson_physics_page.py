@@ -94,3 +94,16 @@ def test_dashboard_exposes_all_json_callable_advanced_physics_routes():
         "plasma_charge_state_moments",
     }
     assert expected <= set(MODEL_LABELS)
+
+
+def test_dashboard_routes_calibrated_anisotropic_spectra_to_joint_physical_fit():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "gyrotropic_bi_maxwellian_spectral_fit"
+    assert model in MODEL_LABELS
+    result = run_advanced_thomson_physics(model, **EXAMPLES[model])
+    assert result["public_physics_entrypoint"] == model
+    assert result["model"] == "gyrotropic_bi_maxwellian_nonrelativistic_optical_thomson"
+    assert result["model_validity"]["relativistic_corrections"] is False
+    assert result["directional_temperature_eV"].shape == (3,)
