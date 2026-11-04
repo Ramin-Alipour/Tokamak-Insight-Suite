@@ -101,6 +101,49 @@ def thermal_bremsstrahlung_emissivity_si(
     return coefficient_si * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-np.minimum(x, 700.0)) * g
 
 
+
+def thermal_bremsstrahlung_absorption_si(
+    frequency_Hz, electron_density_m3, ion_densities_m3,
+    ion_charge_states, electron_temperature_eV, *, gaunt_factor=1.0,
+):
+    """Thermal free-free absorption coefficient alpha_nu [m^-1].
+
+    Kirchhoff's law in LTE gives alpha_nu = j_nu / B_nu(T), where j_nu
+    is the angle-resolved emissivity and B_nu is the exact Planck radiance.
+    This includes stimulated emission through the Planck denominator; using
+    the Rayleigh-Jeans source function here would be inaccurate when h nu~kT.
+    """
+    nu = _positive_array(frequency_Hz, "frequency_Hz")
+    te = _real_scalar(electron_temperature_eV, "electron_temperature_eV", positive=True)
+    emissivity = thermal_bremsstrahlung_emissivity_si(
+        nu, electron_density_m3, ion_densities_m3, ion_charge_states,
+        te, gaunt_factor=gaunt_factor,
+    )
+    source = planck_spectral_radiance(nu, te * E_CHARGE / K_B)
+    return emissivity / source
+
+
+def ece_lte_emissivity_si(
+    frequency_Hz, absorption_coefficient_m_inverse, electron_temperature_eV,
+):
+    """Mode-resolved LTE ECE emissivity j_nu,m = alpha_nu,m B_nu(T).
+
+    The absorption input may have shape (frequency,) or
+    (frequency, mode). The returned emissivity has the identical shape.
+    This is a Kirchhoff/LTE closure, not a non-LTE ECE model.
+    """
+    nu = _positive_array(frequency_Hz, "frequency_Hz")
+    alpha = _real_array(absorption_coefficient_m_inverse, "absorption_coefficient_m_inverse")
+    te = _real_scalar(electron_temperature_eV, "electron_temperature_eV", positive=True)
+    if alpha.ndim not in (1, 2) or alpha.shape[0] != nu.size or np.any(alpha < 0.0):
+        raise ValueError(
+            "absorption_coefficient_m_inverse must be non-negative with shape "
+            "(n_frequency,) or (n_frequency,n_mode)"
+        )
+    source = planck_spectral_radiance(nu, te * E_CHARGE / K_B)
+    return alpha * (source if alpha.ndim == 1 else source[:, None])
+
+
 def integrate_thermal_microwave_background(
     frequency_Hz, path_length_m, electron_temperature_eV, *,
     electron_density_m3, ion_densities_m3, ion_charge_states,
@@ -236,10 +279,15 @@ def integrate_thermal_microwave_background(
             gaunt_factor=gaunt_path[index],
         )
         b_nu = planck_spectral_radiance(nu, te[index] * E_CHARGE / K_B)
-        alpha_ff = j_ff / np.maximum(b_nu, np.finfo(float).tiny)
+        # Kirchhoff absorption is evaluated with the exact Planck source function.
+        alpha_ff = thermal_bremsstrahlung_absorption_si(
+            nu, ne[index], ni[index], z, te[index], gaunt_factor=gaunt_path[index]
+        )
         alpha_total = alpha_ff[None, :] + ece_alpha[index].T
         j_ece = (
-            ece_alpha[index].T * b_nu[None, :]
+            ece_lte_emissivity_si(
+                nu, ece_alpha[index], te[index]
+            ).T
             if ece_emissivity is None else ece_emissivity[index].T
         )
         j_total = j_ff[None, :] + j_ece
@@ -298,6 +346,8 @@ def integrate_thermal_microwave_background(
         "ece_source_model": ece_source_model,
         "gaunt_factor_resolution": gaunt_status,
         "free_free_model": "nonrelativistic_Maxwellian_thermal_bremsstrahlung_with_supplied_Gaunt_factor",
+        "free_free_absorption_model": "Kirchhoff_alpha_nu_equals_j_nu_over_exact_Planck_B_nu",
+        "ece_lte_emissivity_model": ("Kirchhoff_j_nu_mode_equals_alpha_nu_mode_times_Planck_B_nu" if ece_lte else "explicit_non_LTE_emissivity_or_ECE_omitted"),
         "radiative_transfer": "independent mode-by-mode slab formal solution with LTE Kirchhoff source function; receiver-mode weighted after propagation",
         "mode_coupling_model": "neglected; modes propagated independently",
         "receiver_plane_conversion": "multiply radiance by measured receiver etendue and end-to-end efficiency; do not count the same throughput twice",
