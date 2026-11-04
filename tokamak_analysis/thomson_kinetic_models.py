@@ -123,6 +123,104 @@ def project_bi_maxwellian_electron_vdf(
     }
 
 
+
+def infer_gyrotropic_bi_maxwellian_temperatures(
+    projected_temperature_eV, magnetic_pitch_cosine, *,
+    projected_temperature_covariance_eV2,
+):
+    """Infer T_parallel and T_perpendicular from independent 1-D TS projections.
+
+    For a gyrotropic bi-Maxwellian with zero heat flux, the projected variance
+    along scattering vector q is
+        T_q = T_perp (1-mu**2) + T_parallel mu**2,
+    where mu = b_hat dot q_hat.  This is a two-parameter GLS inversion of
+    measured directional temperatures; it does not use a supplied 3-D flow.
+
+    A single pitch angle (or repeated equivalent |mu|) cannot separate the
+    two temperatures. In that case no anisotropy parameters are returned.
+    The covariance describes only the supplied projected-temperature errors;
+    pitch-angle/geometry uncertainty must be propagated separately.
+    """
+    tq = np.asarray(projected_temperature_eV)
+    mu = np.asarray(magnetic_pitch_cosine)
+    cov = np.asarray(projected_temperature_covariance_eV2)
+    if tq.dtype.kind not in "iuf" or tq.ndim != 1 or tq.size < 1:
+        raise ValueError("projected_temperature_eV must be a non-empty real vector")
+    if mu.dtype.kind not in "iuf" or mu.shape != tq.shape:
+        raise ValueError("magnetic_pitch_cosine must match projected_temperature_eV")
+    if cov.dtype.kind not in "iuf" or cov.shape != (tq.size, tq.size):
+        raise ValueError("projected_temperature_covariance_eV2 must be square and match the observations")
+    tq = tq.astype(float, copy=False)
+    mu = mu.astype(float, copy=False)
+    cov = cov.astype(float, copy=False)
+    if (np.any(~np.isfinite(tq)) or np.any(tq <= 0)
+            or np.any(~np.isfinite(mu)) or np.any(np.abs(mu) > 1.0)
+            or np.any(~np.isfinite(cov))):
+        raise ValueError("projected temperatures must be positive, pitch cosines in [-1,1], and covariance finite")
+    cov = 0.5*(cov+cov.T)
+    eigenvalues = np.linalg.eigvalsh(cov)
+    tolerance = np.finfo(float).eps*max(cov.shape)*max(float(eigenvalues[-1]), 1.0)
+    if eigenvalues[0] <= tolerance:
+        raise ValueError("projected_temperature_covariance_eV2 must be positive definite")
+    mu2 = mu*mu
+    design = np.column_stack((1.0-mu2, mu2))
+    rank = int(np.linalg.matrix_rank(design))
+    result = {
+        "model": "gyrotropic_bi_maxwellian_multi_pitch_gls",
+        "projected_temperature_model_eV": "T_q = T_perp*(1-mu^2) + T_parallel*mu^2",
+        "magnetic_pitch_cosine": mu.copy(),
+        "design_matrix": design,
+        "design_rank": rank,
+        "number_of_independent_pitch_angles": int(np.unique(np.round(mu2, 12)).size),
+        "input_projected_temperature_eV": tq.copy(),
+        "input_projected_temperature_covariance_eV2": cov.copy(),
+        "geometry_uncertainty_included": False,
+        "assumptions": [
+            "Gyrotropic bi-Maxwellian electron distribution",
+            "Zero heat flux and a common magnetic-field axis",
+            "Each input is an independently inferred directional temperature",
+            "Supplied covariance fully describes projected-temperature measurement errors",
+        ],
+    }
+    if rank < 2:
+        return {
+            **result,
+            "identifiability": "non_identifiable",
+            "reportable_as_inferred_parameter": False,
+            "electron_temperature_parallel_eV": None,
+            "electron_temperature_perpendicular_eV": None,
+            "temperature_covariance_eV2": None,
+            "reason": "At least two distinct squared magnetic pitch cosines are required to separate T_parallel and T_perpendicular.",
+        }
+
+    chol = np.linalg.cholesky(cov)
+    whitened_design = np.linalg.solve(chol, design)
+    whitened_data = np.linalg.solve(chol, tq)
+    information = whitened_design.T @ whitened_design
+    parameter_covariance = np.linalg.inv(information)
+    parameters = parameter_covariance @ (whitened_design.T @ whitened_data)
+    residual = tq-design@parameters
+    chi2 = float(residual @ np.linalg.solve(cov, residual))
+    dof = int(tq.size-2)
+    physical = bool(np.all(np.isfinite(parameters)) and np.all(parameters > 0.0))
+    return {
+        **result,
+        "identifiability": "identifiable_under_gyrotropic_bi_maxwellian_assumption",
+        "reportable_as_inferred_parameter": physical,
+        "electron_temperature_perpendicular_eV": float(parameters[0]) if physical else None,
+        "electron_temperature_parallel_eV": float(parameters[1]) if physical else None,
+        "temperature_covariance_eV2": parameter_covariance if physical else None,
+        "parameter_order": ["electron_temperature_perpendicular_eV", "electron_temperature_parallel_eV"],
+        "fit_residual_projected_temperature_eV": residual,
+        "chi_square": chi2,
+        "degrees_of_freedom": dof,
+        "reduced_chi_square": chi2/dof if dof > 0 else None,
+        "identifiability_reason": (
+            "Two directional temperatures are separately identifiable from the supplied pitch-angle diversity."
+        ),
+        "physicality_status": "positive_temperatures" if physical else "non_positive_GLS_temperature_estimate; no physical temperatures reported",
+    }
+
 def _apply_response(response, spectrum, wavelength_nm):
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(spectrum, dtype=float)
