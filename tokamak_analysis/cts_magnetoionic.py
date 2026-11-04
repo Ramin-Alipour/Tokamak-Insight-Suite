@@ -71,7 +71,7 @@ def cold_plasma_dielectric_tensor(
         gyro = charge * bnorm / mass
         plus = omega * (omega + gyro)
         minus = omega * (omega - gyro)
-        scale = max(omega**2, abs(omega * gyro), 1.0)
+        scale = max(omega**2, abs(omega * gyro), np.finfo(float).tiny)
         if abs(plus) <= 1e-14 * scale or abs(minus) <= 1e-14 * scale:
             raise ValueError("frequency lies on a cold-plasma cyclotron pole; supply a kinetic/collisional dielectric model")
         wp2_total += wp2
