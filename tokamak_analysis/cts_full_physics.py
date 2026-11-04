@@ -503,6 +503,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         wave-normal walk-off from the Hellmann-Feynman derivative of the
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
       - thomson_multiview_3d_evdf: non-negative 3-D velocity-space inversion from multiple measured scattering views; the data-only stacked kernel rank gates whether a 3-D EVDF is reportable.
+      - thomson_relativistic_exact_flow_projection: exact relativistic Doppler inversion for one fitted q-parallel bulk-flow projection (not a distribution mean or 3-D flow).
       - thomson_projected_evdf: response-aware non-negative inversion of the
         measured optical Thomson electron feature to its 1-D q-projected VDF;
         absolute density and the unobserved 3-D distribution are not inferred.
@@ -589,7 +590,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
@@ -620,6 +621,7 @@ __all__ = [
     "cold_plasma_mode_radiative_coefficients",
     "cold_plasma_mode_group_velocity",
     "plasma_charge_state_moments",
+    "thomson_velocity_projection_relativistic_exact",
     "reconstruct_thomson_evdf",
     "reconstruct_relativistic_projected_thomson_evdf",
     "relativistic_projected_compton_kinematics",
