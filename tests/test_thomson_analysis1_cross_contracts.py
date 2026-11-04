@@ -235,3 +235,20 @@ def test_analysis1_runtime_and_packaged_registries_are_byte_and_contract_consist
             analysis_id,
             diagnostic_name,
         )
+
+
+def test_optical_model_validity_is_declared_in_python_and_json_registries():
+    import json
+    from pathlib import Path
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    python_outputs = {
+        item["name"]
+        for item in get_analysis(1)["execution_contract"]["output_specs"]
+    }
+    assert "model_validity" in python_outputs
+    root = json.loads((Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    entry = next(item for item in root if item["diagnostic"] == "Thomson scattering")
+    json_outputs = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    assert "model_validity" in json_outputs
+    assert "tokamak_analysis.thomson_identifiability.optical_model_validity" in entry["implementation_functions"]
