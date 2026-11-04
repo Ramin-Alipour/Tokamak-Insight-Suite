@@ -913,6 +913,7 @@ def analyze_thomson_spectra(
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
     instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
     joint_spectral_covariance=None, model_discrepancy_covariance=None,
+    systematic_covariance=None,
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
@@ -1181,6 +1182,7 @@ def analyze_thomson_spectra(
         unc is not None or joint_spectral_covariance is not None
     )
     model_discrepancy_covariance_supplied = model_discrepancy_covariance is not None
+    systematic_covariance_supplied = systematic_covariance is not None
     lsf_unc = None if instrument_response_uncertainty is None else _finite_array(instrument_response_uncertainty, "instrument_response_uncertainty")
     kernel_uncertainty = False
     matrix_uncertainty = False
@@ -1238,6 +1240,7 @@ def analyze_thomson_spectra(
     if density_relative_covariance is not None and (
         joint_spectral_covariance is not None
         or model_discrepancy_covariance is not None
+        or systematic_covariance is not None
         or lsf_unc is not None
     ):
         require_zero_scattered_power_covariance(
@@ -1398,6 +1401,85 @@ def analyze_thomson_spectra(
                     "must be positive definite; a discrepancy-only covariance must "
                     "also be positive definite to define GLS weights"
                 ) from exc
+    independent_systematic_blocks = None
+    systematic_added_to_joint_covariance = False
+    if systematic_covariance is not None:
+        if model not in {
+            "non_collective_maxwellian", "non_collective_kappa",
+            "non_collective_relativistic_maxwell_juttner",
+        }:
+            raise ValueError(
+                "systematic_covariance is supported for non-collective Maxwellian, "
+                "Kappa and relativistic Maxwell-Juttner optical Thomson fits"
+            )
+        systematic = _finite_array(systematic_covariance, "systematic_covariance")
+        nchan_sys, nlam_sys = y.shape
+        if systematic.shape == (y.size, y.size):
+            full_systematic_covariance = systematic.copy()
+            if not np.allclose(
+                full_systematic_covariance, full_systematic_covariance.T,
+                rtol=1e-10, atol=1e-13,
+            ):
+                raise ValueError("full channel-major systematic_covariance must be symmetric")
+            full_systematic_covariance = 0.5 * (
+                full_systematic_covariance + full_systematic_covariance.T
+            )
+            eigenvalues = np.linalg.eigvalsh(full_systematic_covariance)
+            scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+            if float(np.min(eigenvalues)) < -1e-10 * scale:
+                raise ValueError("full channel-major systematic_covariance must be positive semidefinite")
+            independent_systematic_blocks = np.stack([
+                full_systematic_covariance[
+                    channel_index*nlam_sys:(channel_index+1)*nlam_sys,
+                    channel_index*nlam_sys:(channel_index+1)*nlam_sys,
+                ]
+                for channel_index in range(nchan_sys)
+            ])
+            if joint_covariance is None:
+                if unc is not None:
+                    joint_covariance = np.diag(np.asarray(unc, dtype=float).reshape(-1)**2)
+                    unc = None
+                else:
+                    joint_covariance = np.zeros((y.size, y.size), dtype=float)
+            joint_covariance += full_systematic_covariance
+            systematic_added_to_joint_covariance = True
+        elif systematic.shape == (nlam_sys, nlam_sys):
+            independent_systematic_blocks = np.broadcast_to(
+                systematic, (nchan_sys, nlam_sys, nlam_sys)
+            ).copy()
+        elif systematic.shape == (nchan_sys, nlam_sys, nlam_sys):
+            independent_systematic_blocks = systematic.copy()
+        else:
+            raise ValueError(
+                "systematic_covariance must be (n_wavelength,n_wavelength), "
+                "(n_channels,n_wavelength,n_wavelength), or the full "
+                "(n_channels*n_wavelength,n_channels*n_wavelength) channel-major matrix"
+            )
+        for channel_index, block in enumerate(independent_systematic_blocks):
+            if not np.allclose(block, block.T, rtol=1e-10, atol=1e-13):
+                raise ValueError(f"systematic_covariance[{channel_index}] must be symmetric")
+            eigenvalues = np.linalg.eigvalsh(0.5 * (block + block.T))
+            scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+            if float(np.min(eigenvalues)) < -1e-10 * scale:
+                raise ValueError(
+                    f"systematic_covariance[{channel_index}] must be positive semidefinite"
+                )
+        if joint_covariance is not None and not systematic_added_to_joint_covariance:
+            for channel_index, block in enumerate(independent_systematic_blocks):
+                channel_slice = slice(
+                    channel_index*nlam_sys, (channel_index+1)*nlam_sys
+                )
+                joint_covariance[channel_slice, channel_slice] += block
+            systematic_added_to_joint_covariance = True
+        if systematic_added_to_joint_covariance:
+            try:
+                joint_cholesky = np.linalg.cholesky(joint_covariance)
+            except np.linalg.LinAlgError as exc:
+                raise ValueError(
+                    "measurement, model-discrepancy and systematic covariance sum "
+                    "must be positive definite"
+                ) from exc
+
     cross_channel_covariance_present = False
     if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
         nchan_cov, nlam_cov = y.shape
@@ -1438,6 +1520,15 @@ def analyze_thomson_spectra(
                 channel_covariance = np.diag(np.asarray(ui, dtype=float)**2) + discrepancy_block
             else:
                 channel_covariance = discrepancy_block
+            ui = None
+        if independent_systematic_blocks is not None and not systematic_added_to_joint_covariance:
+            systematic_block = independent_systematic_blocks[i]
+            if channel_covariance is not None:
+                channel_covariance = channel_covariance + systematic_block
+            elif ui is not None:
+                channel_covariance = np.diag(np.asarray(ui, dtype=float)**2) + systematic_block
+            else:
+                channel_covariance = systematic_block
             ui = None
         if model == "non_collective_maxwellian":
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,
@@ -2041,6 +2132,19 @@ def analyze_thomson_spectra(
             if model_discrepancy_covariance_supplied else
             "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         )
+        fit["systematic_covariance_supplied"] = systematic_covariance_supplied
+        fit["systematic_covariance_included"] = independent_systematic_blocks is not None
+        fit["systematic_covariance_model"] = (
+            "researcher_supplied_additive_correlated_spectral_systematic_covariance"
+            if systematic_covariance_supplied else None
+        )
+        if systematic_covariance_supplied:
+            fit["fit_covariance_interpretation"] = (
+                "local_parameter_covariance_from_measurement_model_discrepancy_"
+                "and_systematic_covariance_components"
+                if measurement_covariance_supplied or model_discrepancy_covariance_supplied
+                else "local_parameter_covariance_from_supplied_systematic_covariance_only"
+            )
         fit["background_model_status"] = (
             f"{background_model}_detector_space_basis_jointly_fitted"
         )
