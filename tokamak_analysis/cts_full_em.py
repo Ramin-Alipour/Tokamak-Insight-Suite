@@ -2021,7 +2021,13 @@ def analyze_full_em_cts_spectrum(
         out["numerical_convergence_status"] = "not_assessed_by_request"
         out["numerical_convergence_is_uncertainty"] = False
     from .thomson_identifiability import cts_full_em_identifiability
-    out["parameter_identifiability"] = cts_full_em_identifiability(species_names)
+    out["parameter_identifiability"] = cts_full_em_identifiability(
+        species_names,
+        external_input_covariance_supplied=bool(out.get("external_input_covariance_supplied", False)),
+        external_input_covariance_propagated=bool(out.get("external_input_covariance_propagated", False)),
+        instrument_response_uncertainty_supplied=bool(out.get("instrument_response_uncertainty_supplied", False)),
+        instrument_response_uncertainty_propagated=bool(out.get("instrument_response_uncertainty_propagated", False)),
+    )
     return out
 
 
