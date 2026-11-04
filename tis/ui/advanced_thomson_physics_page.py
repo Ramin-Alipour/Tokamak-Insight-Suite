@@ -16,7 +16,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 MODEL_LABELS = {
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
-    "thomson_relativistic_projected_evdf": "Optical Thomson — exact relativistic Doppler kinematics (zero-recoil Thomson limit)",
+    "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
