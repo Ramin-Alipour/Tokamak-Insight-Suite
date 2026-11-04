@@ -12,6 +12,33 @@ from .cts_full_em import _species_conductivity, ME, E_CHARGE
 from .cts_relativistic import relativistic_gyrotropic_species_response
 
 
+def _strict_real_scalar(value, name, *, positive=False, nonnegative=False):
+    """Validate physical scalars before conversion; reject bool/string/complex coercion."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a finite real numeric scalar")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be a finite real numeric scalar")
+    if positive and result <= 0.0:
+        raise ValueError(f"{name} must be positive and finite")
+    if nonnegative and result < 0.0:
+        raise ValueError(f"{name} must be non-negative and finite")
+    return result
+
+
+def _strict_real_vector(value, name):
+    """Return a finite real vector without accepting strings or booleans."""
+    raw = np.asarray(value)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain finite real numeric values")
+    result = raw.astype(float, copy=False)
+    if result.ndim != 1 or np.any(~np.isfinite(result)):
+        raise ValueError(f"{name} must be a finite real vector")
+    return result
+
+
 def kinetic_ece_absorption_coefficient(
     frequency_Hz, wavevector_rad_m, magnetic_field_T, *,
     electron_density_m3, electron_temperature_eV,
@@ -24,11 +51,16 @@ def kinetic_ece_absorption_coefficient(
     alpha=Q/<S_n>. The supplied wavevector and polarization must belong to
     the same local mode. Negative alpha (net kinetic gain) is retained.
     """
-    f, ne, te = map(float, (frequency_Hz, electron_density_m3, electron_temperature_eV))
-    k = np.asarray(wavevector_rad_m, dtype=float)
-    b = np.asarray(magnetic_field_T, dtype=float)
-    e = np.asarray(polarization, dtype=complex)
-    gamma = float(damping_rate_rad_s)
+    f = _strict_real_scalar(frequency_Hz, "frequency_Hz", positive=True)
+    ne = _strict_real_scalar(electron_density_m3, "electron_density_m3", positive=True)
+    te = _strict_real_scalar(electron_temperature_eV, "electron_temperature_eV", positive=True)
+    k = _strict_real_vector(wavevector_rad_m, "wavevector_rad_m")
+    b = _strict_real_vector(magnetic_field_T, "magnetic_field_T")
+    raw_polarization = np.asarray(polarization)
+    if raw_polarization.dtype.kind not in "iufc":
+        raise ValueError("polarization must contain finite numeric values")
+    e = raw_polarization.astype(complex, copy=False)
+    gamma = _strict_real_scalar(damping_rate_rad_s, "damping_rate_rad_s", nonnegative=True)
     if not np.isfinite(f) or f <= 0 or not np.isfinite(ne) or ne <= 0 or not np.isfinite(te) or te <= 0:
         raise ValueError("frequency, density and temperature must be positive and finite")
     if k.shape != (3,) or b.shape != (3,) or e.shape != (3,) or any(np.any(~np.isfinite(x)) for x in (k,b,e)):
@@ -92,12 +124,15 @@ def relativistic_kinetic_ece_absorption_coefficient(
     negative values indicate kinetic gain and are not clipped. The EVDF is an
     explicit physical input, not inferred from electron temperature.
     """
-    f = float(frequency_Hz)
-    ne = float(electron_density_m3)
-    k = np.asarray(wavevector_rad_m, dtype=float)
-    b = np.asarray(magnetic_field_T, dtype=float)
-    e = np.asarray(polarization, dtype=complex)
-    width = float(resonance_width_rad_s)
+    f = _strict_real_scalar(frequency_Hz, "frequency_Hz", positive=True)
+    ne = _strict_real_scalar(electron_density_m3, "electron_density_m3", positive=True)
+    k = _strict_real_vector(wavevector_rad_m, "wavevector_rad_m")
+    b = _strict_real_vector(magnetic_field_T, "magnetic_field_T")
+    raw_polarization = np.asarray(polarization)
+    if raw_polarization.dtype.kind not in "iufc":
+        raise ValueError("polarization must contain finite numeric values")
+    e = raw_polarization.astype(complex, copy=False)
+    width = _strict_real_scalar(resonance_width_rad_s, "resonance_width_rad_s", positive=True)
     if not np.isfinite(f) or f <= 0 or not np.isfinite(ne) or ne <= 0:
         raise ValueError("frequency_Hz and electron_density_m3 must be positive and finite")
     if (k.shape != (3,) or b.shape != (3,) or e.shape != (3,)
