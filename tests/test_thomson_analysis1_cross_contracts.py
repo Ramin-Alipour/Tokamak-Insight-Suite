@@ -138,6 +138,9 @@ def test_thomson_family_maps_all_four_distinct_executable_subanalyses():
     for analysis_id, (diagnostic_name, function_path) in expected_functions.items():
         assert function_path in by_name[diagnostic_name]["implementation_functions"]
         assert callable(resolve_analysis(analysis_id))
+    assert "tokamak_analysis.cts_kappa.kappa_electron_susceptibility" in by_name[
+        "Collective Thomson / coherent scattering (CTS)"
+    ]["implementation_functions"]
 
 
 def test_cts_public_dispatcher_signature_and_conditional_outputs_match_registry():
