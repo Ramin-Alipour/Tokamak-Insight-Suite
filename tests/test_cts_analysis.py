@@ -7,6 +7,25 @@ def _case():
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 
+def test_cts_scattering_wave_number_includes_scattered_photon_frequency():
+    from tokamak_analysis.cts_analysis import _frequency_dependent_scattering_wave_number
+
+    f0 = 140e9
+    shifts = np.array([-7e9, 0.0, 7e9])
+    angle = np.deg2rad(110.0)
+    actual = _frequency_dependent_scattering_wave_number(shifts, f0, angle)
+    scattered = f0 + shifts
+    expected = (2.0 * np.pi / 299792458.0) * np.sqrt(
+        f0**2 + scattered**2 - 2.0 * f0 * scattered * np.cos(angle)
+    )
+    np.testing.assert_allclose(actual, expected, rtol=2e-15, atol=0.0)
+    assert actual[0] != pytest.approx(actual[2], rel=1e-8)
+    assert actual[1] == pytest.approx(
+        4.0 * np.pi * f0 / 299792458.0 * np.sin(angle / 2.0),
+        rel=2e-15,
+    )
+
+
 def test_cts_multi_ion_species_resolved_flow_matches_common_flow_limit():
     f0, f, geometry, _, _, _ = _case()
     ions = [
