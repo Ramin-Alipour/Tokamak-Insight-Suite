@@ -463,13 +463,15 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_mode_group_velocity
     elif model == "gyrotropic_bi_maxwellian_anisotropy":
         solver = infer_gyrotropic_bi_maxwellian_temperatures
+    elif model == "thomson_three_dimensional_flow":
+        solver = infer_three_dimensional_flow_from_thomson_projections
     elif model == "plasma_charge_state_moments":
         solver = plasma_charge_state_moments
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, gyrotropic_bi_maxwellian_anisotropy, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
