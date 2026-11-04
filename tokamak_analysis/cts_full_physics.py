@@ -499,5 +499,6 @@ __all__ = [
     "cold_plasma_mode_radiative_coefficients",
     "cold_plasma_mode_group_velocity",
     "plasma_charge_state_moments",
+    "infer_gyrotropic_bi_maxwellian_temperatures",
     "run_advanced_thomson_physics",
 ]
