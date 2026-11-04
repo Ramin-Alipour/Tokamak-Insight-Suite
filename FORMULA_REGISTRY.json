@@ -6374,5 +6374,99 @@
         "tests/test_cts_analysis.py::test_cts_scattering_wave_number_includes_scattered_photon_frequency"
       ]
     }
+  },
+  {
+    "name": "Gyrotropic anisotropic Kappa projected Thomson marginal",
+    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](2 k_B T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; κ>3/2",
+    "inputs": "Kappa index κ, magnetic pitch cosine b_hat·q_hat, second-moment directional temperature T_q [eV], electron mass m_e, Boltzmann constant k_B",
+    "output": "Normalized one-dimensional electron-velocity marginal along q; mapped to wavelength using λ=λ0[1−2 sin(θ_s/2) v_q/c] in the non-relativistic elastic-Thomson limit",
+    "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+      "formula_key": "optical_thomson_gyrotropic_bi_kappa_projected_marginal",
+      "input_specs": [
+        {
+          "name": "initial_temperature_parallel_eV",
+          "unit": "eV; positive second-moment temperature seed",
+          "required": false
+        },
+        {
+          "name": "initial_temperature_perpendicular_eV",
+          "unit": "eV; positive second-moment temperature seed",
+          "required": false
+        },
+        {
+          "name": "initial_kappa",
+          "unit": "dimensionless; > 3/2",
+          "required": false
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "unit vector",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "unit vector per view",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; identifiable second-moment temperature"
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; identifiable second-moment temperature"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; finite-variance Kappa index"
+        },
+        {
+          "name": "directional_temperature_eV",
+          "unit": "eV per view"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated multi-view optical Thomson spectra",
+        "Measured wavelength response matrix",
+        "Independent magnetic pitch-angle coverage"
+      ],
+      "uncertainty_model": "Full supplied channel-major measurement covariance plus optional positive-semidefinite model-discrepancy covariance; local covariance from the whitened spectral Jacobian, residual-scaled only when no measurement covariance is supplied.",
+      "limitations": [
+        "Non-relativistic elastic-Thomson Doppler approximation only",
+        "Gyrotropic bi-Kappa closure is not an unrestricted measured 3-D EVDF",
+        "Parallel/perpendicular temperatures require rank-two pitch-angle design and full-rank spectral Jacobian",
+        "Kappa finite-variance domain is strictly greater than 3/2"
+      ],
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum",
+    "execution_scope": "multi_view_physical_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+      "function_links": [
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
+      ],
+      "formula_key": "optical_thomson_gyrotropic_bi_kappa_projected_marginal",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle"
+      ]
+    }
   }
 ]
