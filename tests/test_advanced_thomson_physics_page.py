@@ -186,3 +186,35 @@ def test_dashboard_routes_calibrated_anisotropic_spectra_to_joint_physical_fit()
     assert result["model"] == "gyrotropic_bi_maxwellian_nonrelativistic_optical_thomson"
     assert result["model_validity"]["relativistic_corrections"] is False
     assert result["directional_temperature_eV"].shape == (3,)
+
+
+
+def test_dashboard_routes_microwave_background_to_receiver_power_and_brightness_temperature():
+    import json
+    from pathlib import Path
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "microwave_background"
+    assert model in MODEL_LABELS
+    assert model in EXAMPLES
+    result = run_advanced_thomson_physics(model, **EXAMPLES[model])
+    assert result["public_physics_entrypoint"] == model
+    assert result["receiver_conversion_applied_once"] is True
+    assert result["receiver_spectral_power_W_Hz"].shape == (3,)
+    assert result["integrated_receiver_power_W"] > 0.0
+    assert result["planck_brightness_temperature_K"].shape == (3,)
+    assert result["rayleigh_jeans_brightness_temperature_K"].shape == (3,)
+
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    keys = {
+        "cts_receiver_spectral_power_from_radiance",
+        "cts_receiver_spectral_power_joint_covariance",
+        "cts_band_integrated_receiver_power",
+        "cts_radiometric_brightness_temperature",
+    }
+    registered = {item["execution_contract"]["formula_key"] for item in formula}
+    assert keys <= registered
+    assert formula == packaged
