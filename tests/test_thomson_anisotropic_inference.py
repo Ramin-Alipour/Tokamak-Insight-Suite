@@ -111,7 +111,6 @@ def test_nonuniform_response_operator_conserves_bin_integrated_spectral_power():
 
 
 def _synthetic_bi_kappa_spectra():
-    from scipy.special import gammaln
     c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
     coordinate = np.linspace(-1.0, 1.0, 281)
     wavelength = 500.0 + 0.35 * (coordinate + 0.08 * coordinate**3)
@@ -123,14 +122,10 @@ def _synthetic_bi_kappa_spectra():
     tpar, tperp = 900.0, 320.0
     directional = tperp + (tpar-tperp)*pitch
     spectra = []
-    for i, (temp, flow) in enumerate(zip(directional, [1.2e5, -0.7e5, 0.4e5])):
+    for temp, flow in zip(directional, [1.2e5, -0.7e5, 0.4e5]):
         theta2 = ((2.0*kappa-3.0)/kappa)*(e*temp/me)
         theta = np.sqrt(theta2)
-        velocity = (c/qmag)*(1.0-wavelength/laser)-flow
-        log_pdf = (gammaln(kappa)-0.5*np.log(np.pi*kappa)
-                   -gammaln(kappa-0.5)-np.log(theta)
-                   -kappa*np.log1p(velocity**2/(kappa*theta2)))
-        feature = np.exp(log_pdf)*(c/(laser*qmag))
+        feature, _ = _kappa_bin_average(wavelength, laser, qmag, flow, theta, kappa)
         spectra.append(2.5e3*feature + 3.0 + 0.2*(wavelength-laser))
     return wavelength, np.asarray(spectra), b, q
 
