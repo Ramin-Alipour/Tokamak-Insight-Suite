@@ -2240,9 +2240,7 @@ def fit_full_em_gyrotropic_population_shape(
         "regularized_candidate_distribution_kg_m_s_inverse3": result["regularized_candidate_distribution"].reshape(pp.size, pa.size),
         "bulk_plasma_and_geometry_fixed": True,
         "population_density_fixed": True,
-        "electron_flow_projection_m_s_fixed": (
-            float(electron_flow_projection_m_s) if population_kind == "electron" else None
-        ),
+        "electron_flow_projection_m_s_fixed": float(electron_flow_projection_m_s),
         "electron_parallel_mean_velocity_m_s": inferred_parallel_velocity_m_s,
         "electron_parallel_mean_velocity_candidate_m_s": candidate_parallel_velocity_m_s,
         "electron_parallel_mean_velocity_status": (
