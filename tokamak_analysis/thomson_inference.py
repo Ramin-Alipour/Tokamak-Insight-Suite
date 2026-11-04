@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import brentq, curve_fit, least_squares
-from scipy.special import gammaln, stdtr
+from scipy.special import gammaln, ndtr, stdtr
 
 from .thomson_scattering import density_from_thomson_scattered_power, _covariance_is_positive_semidefinite
 from .formula_library import (
@@ -125,6 +125,54 @@ def _apply_response(response, spectrum, wavelength):
     if np.any(widths <= 0) or values.shape != x.shape:
         raise ValueError("Wavelength-bin widths and spectrum shape must be valid")
     return (response @ (values * widths)) / widths
+
+def _wavelength_bin_edges(wavelength):
+    """Midpoint finite-volume edges for strictly increasing wavelength centres."""
+    x = _finite_array(wavelength, "wavelength_nm", 1)
+    if x.size < 2 or np.any(np.diff(x) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least two strictly increasing bin centres")
+    edges = np.empty(x.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (x[:-1] + x[1:])
+    edges[0] = x[0] - 0.5 * (x[1] - x[0])
+    edges[-1] = x[-1] + 0.5 * (x[-1] - x[-2])
+    return edges
+
+
+def _gaussian_bin_averaged_shape(wavelength, amplitude, center, sigma):
+    """Exact bin-average of amplitude*exp[-(lambda-center)^2/(2 sigma^2)]."""
+    edges = _wavelength_bin_edges(wavelength)
+    sigma = _finite_scalar(sigma, "sigma", minimum=np.finfo(float).tiny)
+    amplitude = _finite_scalar(amplitude, "amplitude", minimum=0.0)
+    center = _finite_scalar(center, "center")
+    z = (edges - center) / sigma
+    probability = ndtr(z[1:]) - ndtr(z[:-1])
+    positive_tail = z[:-1] > 0.0
+    probability[positive_tail] = ndtr(-z[:-1][positive_tail]) - ndtr(-z[1:][positive_tail])
+    return amplitude * np.sqrt(2.0*np.pi) * sigma * probability / np.diff(edges), probability
+
+
+def _kappa_bin_averaged_shape(wavelength, amplitude, center, sigma, kappa):
+    """Exact bin-average of the peak-amplitude Student-t/Kappa spectral shape."""
+    edges = _wavelength_bin_edges(wavelength)
+    amplitude = _finite_scalar(amplitude, "amplitude", minimum=0.0)
+    center = _finite_scalar(center, "center")
+    sigma = _finite_scalar(sigma, "sigma", minimum=np.finfo(float).tiny)
+    kappa = _finite_scalar(kappa, "kappa", minimum=1.500000000001)
+    degrees = 2.0*kappa - 1.0
+    scale = sigma*np.sqrt((degrees-2.0)/degrees)
+    z = (edges-center)/scale
+    probability = stdtr(degrees, z[1:]) - stdtr(degrees, z[:-1])
+    positive_tail = z[:-1] > 0.0
+    probability[positive_tail] = (
+        stdtr(degrees, -z[:-1][positive_tail])
+        - stdtr(degrees, -z[1:][positive_tail])
+    )
+    # Integral of (1 + z²/nu)^(-kappa) over wavelength.
+    shape_integral = (
+        scale*np.sqrt(degrees*np.pi)
+        * np.exp(gammaln(kappa-0.5)-gammaln(kappa))
+    )
+    return amplitude*shape_integral*probability/np.diff(edges), probability
 
 
 
@@ -363,7 +411,7 @@ def _fit_noncollective(
     def predict(parameters):
         amp, center, width = parameters[:3]
         coefficients = parameters[3:]
-        intrinsic = amp*np.exp(-0.5*((wavelength-center)/width)**2)
+        intrinsic, _ = _gaussian_bin_averaged_shape(wavelength, amp, center, width)
         return _apply_response(response, intrinsic, wavelength) + basis@coefficients
 
     def residual(parameters):
@@ -386,6 +434,10 @@ def _fit_noncollective(
         raise ValueError("Wavelength coverage must include at least ±3 fitted intrinsic widths")
     te = thomson_electron_temperature_from_spectral_width(width, laser_nm, angle)["electron_temperature_eV"]
     velocity = thomson_velocity_projection(center, laser_nm, angle)["electron_velocity_projection_m_s"]
+    bin_edges = _wavelength_bin_edges(wavelength)
+    captured_spectral_probability = float(
+        ndtr((bin_edges[-1]-center)/width)-ndtr((bin_edges[0]-center)/width)
+    )
     q_projection = 2.0*np.sin(angle/2.0)
     if te/ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
         raise ValueError("Non-relativistic Maxwellian model rejected: fitted electron temperature is outside its declared validity range.")
@@ -458,6 +510,8 @@ def _fit_noncollective(
         "reduced_chi_square": float(fit.fun@fit.fun/dof) if (uncertainty is not None or covariance_cholesky is not None) else None,
         "likelihood": "Gaussian_or_GLS",
         "fitted_spectrum": fitted,
+        "captured_spectral_probability": captured_spectral_probability,
+        "spectral_bin_integration": "exact_Gaussian_CDF_finite_volume_bin_averages",
         "fit_parameters": fit_parameters,
         "fit_parameter_names": fit_parameter_names,
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),
@@ -631,9 +685,7 @@ def _fit_kappa(
                   np.full(n_background, np.inf)]
 
     def intrinsic(x, amp, center, sigma, kappa):
-        df = 2.0*kappa - 1.0
-        scale = sigma * np.sqrt((df - 2.0) / df)
-        return amp * (1.0 + ((x-center)/scale)**2/df)**(-kappa)
+        return _kappa_bin_averaged_shape(x, amp, center, sigma, kappa)[0]
 
     def background_at(x, coefficients):
         # Evaluate the selected basis on the measured grid and interpolate only
@@ -704,9 +756,10 @@ def _fit_kappa(
 
     kappa_df = 2.0*kappa - 1.0
     kappa_scale = sigma * np.sqrt((kappa_df - 2.0) / kappa_df)
+    wavelength_edges = _wavelength_bin_edges(wavelength)
     captured_probability = float(
-        stdtr(kappa_df, (wavelength[-1]-center)/kappa_scale)
-        - stdtr(kappa_df, (wavelength[0]-center)/kappa_scale)
+        stdtr(kappa_df, (wavelength_edges[-1]-center)/kappa_scale)
+        - stdtr(kappa_df, (wavelength_edges[0]-center)/kappa_scale)
     )
     te = thomson_electron_temperature_from_spectral_width(
         sigma, laser_nm, angle
@@ -804,7 +857,7 @@ def _fit_kappa(
         df_local = 2.0*kap - 1.0
         scale_local = sig*np.sqrt((df_local-2.0)/df_local)
         return float(a*scale_local*np.sqrt(df_local*np.pi)
-                     * np.exp(gammaln(kap-0.5)))
+                     * np.exp(gammaln(kap-0.5)-gammaln(kap)))
     area = area_from_params(p)
     area_gradient = np.zeros(len(p))
     for j in range(4):
@@ -836,6 +889,7 @@ def _fit_kappa(
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_unc,
         "captured_spectral_probability": captured_probability,
+        "spectral_bin_integration": "exact_Student_t_CDF_finite_volume_bin_averages",
         "spectral_window_truncation_warning": (
             "The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window."
             if captured_probability < 0.999 else None
