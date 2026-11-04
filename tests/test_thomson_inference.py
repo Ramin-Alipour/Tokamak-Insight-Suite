@@ -471,6 +471,16 @@ def test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_ful
     assert second["integrated_spectral_signal_input_units_nm"] == pytest.approx(
         first["integrated_spectral_signal_input_units_nm"] * 1e6, rel=1e-6
     )
+    from scipy.special import gammaln
+    fitted_kappa = first["kappa_index"]
+    fitted_df = 2.0*fitted_kappa - 1.0
+    fitted_scale = first["intrinsic_sigma_nm"]*np.sqrt((fitted_df-2.0)/fitted_df)
+    expected_full_area = (
+        first["amplitude"]*fitted_scale*np.sqrt(fitted_df*np.pi)
+        * np.exp(gammaln(fitted_kappa-0.5)-gammaln(fitted_kappa))
+    )
+    assert first["integrated_scattered_power_W"] == pytest.approx(expected_full_area, rel=1e-10)
+    assert first["spectral_bin_integration"] == "exact_Student_t_CDF_finite_volume_bin_averages"
     assert first["absolute_scattered_power_available"] is False
     assert first["integrated_spectral_signal_unit"] == "input spectral-intensity unit × nm"
 
@@ -1631,3 +1641,40 @@ def test_primary_optical_fit_propagates_additive_systematic_covariance():
         "local_parameter_covariance_from_measurement_and_systematic_covariance"
     )
     assert np.all(np.isfinite(channel["fit_covariance"]))
+
+
+def test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs():
+    from scipy.special import ndtr, stdtr
+
+    wavelength = np.array([500.0, 500.15, 500.42, 500.9, 501.1])
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5*(wavelength[:-1]+wavelength[1:])
+    edges[0] = wavelength[0]-0.5*(wavelength[1]-wavelength[0])
+    edges[-1] = wavelength[-1]+0.5*(wavelength[-1]-wavelength[-2])
+    widths = np.diff(edges)
+
+    gaussian, gaussian_probability = _gaussian_bin_averaged_shape(
+        wavelength, 2.5, 500.55, 0.31
+    )
+    expected_gaussian = 2.5*np.sqrt(2.0*np.pi)*0.31*np.diff(
+        ndtr((edges-500.55)/0.31)
+    )
+    np.testing.assert_allclose(gaussian*widths, expected_gaussian, rtol=1e-13, atol=1e-15)
+    np.testing.assert_allclose(gaussian_probability, np.diff(ndtr((edges-500.55)/0.31)))
+
+    amplitude, centre, sigma, kappa = 3.0, 500.55, 0.31, 4.2
+    degrees = 2.0*kappa-1.0
+    scale = sigma*np.sqrt((degrees-2.0)/degrees)
+    kappa_shape, kappa_probability = _kappa_bin_averaged_shape(
+        wavelength, amplitude, centre, sigma, kappa
+    )
+    expected_probability = np.diff(stdtr(degrees, (edges-centre)/scale))
+    shape_integral = scale*np.sqrt(degrees*np.pi)*np.exp(
+        __import__("scipy").special.gammaln(kappa-0.5)
+        - __import__("scipy").special.gammaln(kappa)
+    )
+    np.testing.assert_allclose(kappa_probability, expected_probability, rtol=1e-12, atol=1e-14)
+    np.testing.assert_allclose(
+        kappa_shape*widths, amplitude*shape_integral*expected_probability,
+        rtol=1e-12, atol=1e-14,
+    )
