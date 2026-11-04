@@ -48,6 +48,7 @@ def fit_noncollective_kinetic_thomson_with_background(
     physical_initial, background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     measurement_uncertainty=None, measurement_covariance=None,
+    model_discrepancy_covariance=None, systematic_covariance=None,
     incident_polarization=None, radial_order=36, angular_order=18,
     maximum_recoil_correction_fraction=0.01, include_compton_recoil=False,
     physical_bounds=None, max_nfev=5000,
@@ -111,19 +112,59 @@ def fit_noncollective_kinetic_thomson_with_background(
         sigma = _real_vector(measurement_uncertainty, "measurement_uncertainty")
         if sigma.shape != y.shape or np.any(sigma <= 0):
             raise ValueError("measurement_uncertainty must be positive and match measured_spectrum")
-        whiten = lambda a: np.asarray(a) / sigma
-        noise_model = "supplied_pointwise_measurement_uncertainty"
+        total_covariance = np.diag(sigma**2)
+        measurement_supplied = True
     elif measurement_covariance is not None:
-        cov = np.asarray(measurement_covariance, dtype=float)
-        if cov.shape != (x.size, x.size) or np.any(~np.isfinite(cov)) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-13):
+        total_covariance = np.asarray(measurement_covariance, dtype=float)
+        if (total_covariance.shape != (x.size, x.size)
+                or np.any(~np.isfinite(total_covariance))
+                or not np.allclose(total_covariance, total_covariance.T, rtol=1e-10, atol=1e-13)):
             raise ValueError("measurement_covariance must be finite, symmetric and wavelength-sized")
-        try:
-            chol = np.linalg.cholesky(cov)
-        except np.linalg.LinAlgError as exc:
-            raise ValueError("measurement_covariance must be positive definite") from exc
-        whiten = lambda a: np.linalg.solve(chol, np.asarray(a))
-        noise_model = "supplied_full_spectral_covariance"
+        total_covariance = 0.5 * (total_covariance + total_covariance.T)
+        measurement_supplied = True
     else:
+        total_covariance = np.zeros((x.size, x.size), dtype=float)
+        measurement_supplied = False
+
+    discrepancy_supplied = model_discrepancy_covariance is not None
+    systematic_supplied = systematic_covariance is not None
+    for name, component in (
+        ("model_discrepancy_covariance", model_discrepancy_covariance),
+        ("systematic_covariance", systematic_covariance),
+    ):
+        if component is None:
+            continue
+        component = np.asarray(component, dtype=float)
+        if (component.shape != (x.size, x.size) or np.any(~np.isfinite(component))
+                or not np.allclose(component, component.T, rtol=1e-10, atol=1e-13)):
+            raise ValueError(f"{name} must be finite, symmetric and wavelength-sized")
+        component = 0.5 * (component + component.T)
+        eigenvalues = np.linalg.eigvalsh(component)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if eigenvalues.min() < -1e-10 * scale:
+            raise ValueError(f"{name} must be positive semidefinite")
+        total_covariance += component
+
+    covariance_supplied = measurement_supplied or discrepancy_supplied or systematic_supplied
+    if covariance_supplied:
+        try:
+            chol = np.linalg.cholesky(total_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "the sum of supplied measurement, model-discrepancy and systematic "
+                "covariances must be positive definite"
+            ) from exc
+        whiten = lambda a: np.linalg.solve(chol, np.asarray(a))
+        if discrepancy_supplied and systematic_supplied:
+            noise_model = "measurement_plus_model_discrepancy_plus_systematic_covariance" if measurement_supplied else "model_discrepancy_plus_systematic_covariance_only"
+        elif discrepancy_supplied:
+            noise_model = "measurement_plus_model_discrepancy_covariance" if measurement_supplied else "model_discrepancy_covariance_only"
+        elif systematic_supplied:
+            noise_model = "measurement_plus_systematic_covariance" if measurement_supplied else "systematic_covariance_only"
+        else:
+            noise_model = "supplied_measurement_covariance"
+    else:
+        chol = None
         whiten = lambda a: np.asarray(a)
         noise_model = "unweighted_no_measurement_uncertainty_supplied"
 
@@ -167,26 +208,79 @@ def fit_noncollective_kinetic_thomson_with_background(
     fit = least_squares(residual, p0, bounds=(lower, upper), method="trf", x_scale="jac", max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise ValueError(f"kinetic Thomson/background fit failed: {fit.message}")
-    jac = np.asarray(fit.jac, dtype=float)
-    singular = np.linalg.svd(jac, compute_uv=False)
-    tolerance = np.finfo(float).eps * max(jac.shape) * (singular[0] if singular.size else 0.0)
-    rank = int(np.count_nonzero(singular > tolerance))
-    condition = float(singular[0] / singular[-1]) if singular.size and singular[-1] > 0 else float("inf")
-    if rank < p0.size or not np.isfinite(condition) or condition > 1e12:
-        raise ValueError(f"{physical_model} physical parameters are not jointly identifiable after profiling background (rank {rank}/{p0.size}, condition={condition:.6g})")
+    profiled_jacobian = np.asarray(fit.jac, dtype=float)
+    profiled_singular = np.linalg.svd(profiled_jacobian, compute_uv=False)
+    profiled_tolerance = np.finfo(float).eps * max(profiled_jacobian.shape) * (
+        profiled_singular[0] if profiled_singular.size else 0.0
+    )
+    profiled_rank = int(np.count_nonzero(profiled_singular > profiled_tolerance))
+    profiled_condition = (
+        float(profiled_singular[0] / profiled_singular[-1])
+        if profiled_singular.size and profiled_singular[-1] > 0 else float("inf")
+    )
+    if profiled_rank < p0.size or not np.isfinite(profiled_condition) or profiled_condition > 1e12:
+        raise ValueError(
+            f"{physical_model} physical parameters are not jointly identifiable "
+            f"after profiling background (rank {profiled_rank}/{p0.size}, "
+            f"condition={profiled_condition:.6g})"
+        )
     coefficients, fitted, shape = profiled(fit.x)
-    # The variable-projection Jacobian is the profiled physical Jacobian.
-    physical_covariance = np.linalg.pinv(jac.T @ jac, rcond=1e-12)
-    dof = max(1, x.size - p0.size - basis.shape[1] - 1)
-    if noise_model == "unweighted_no_measurement_uncertainty_supplied":
-        physical_covariance *= float(fit.fun @ fit.fun / dof)
-        covariance_status = "residual_scaled_unweighted_conditional_covariance_not_measurement_uncertainty"
-    else:
-        covariance_status = "local_profiled_GLS_covariance_conditional_on_supplied_measurement_covariance"
     amplitude = float(coefficients[0])
     background_coefficients = np.asarray(coefficients[1:], dtype=float)
     background = basis @ background_coefficients
     fitted_signal = amplitude * shape
+
+    # Build the full local Jacobian for [physical parameters, amplitude,
+    # background coefficients]. This restores the nuisance cross-covariance
+    # that a profile-only covariance cannot provide.
+    n_physical = p0.size
+    n_nuisance = coefficients.size
+    joint_jacobian = np.empty((x.size, n_physical + n_nuisance), dtype=float)
+    step_scale = np.cbrt(np.finfo(float).eps)
+    for index in range(n_physical):
+        step = step_scale * max(1.0, abs(float(fit.x[index])))
+        plus, minus = fit.x.copy(), fit.x.copy()
+        plus[index] += step
+        minus[index] -= step
+        plus_shape = _apply_response(response, intrinsic(plus), x)
+        minus_shape = _apply_response(response, intrinsic(minus), x)
+        derivative = amplitude * (plus_shape - minus_shape) / (2.0 * step)
+        joint_jacobian[:, index] = whiten(derivative)
+    design_at_solution = np.column_stack((shape, basis))
+    joint_jacobian[:, n_physical:] = whiten(design_at_solution)
+    joint_singular = np.linalg.svd(joint_jacobian, compute_uv=False)
+    joint_tolerance = np.finfo(float).eps * max(joint_jacobian.shape) * (
+        joint_singular[0] if joint_singular.size else 0.0
+    )
+    rank = int(np.count_nonzero(joint_singular > joint_tolerance))
+    condition = (
+        float(joint_singular[0] / joint_singular[-1])
+        if joint_singular.size and joint_singular[-1] > 0 else float("inf")
+    )
+    parameter_count = n_physical + n_nuisance
+    if rank < parameter_count or not np.isfinite(condition) or condition > 1e12:
+        raise ValueError(
+            f"{physical_model} plus selected structured background is not jointly "
+            f"identifiable (rank {rank}/{parameter_count}, condition={condition:.6g}); "
+            "change the measured background basis or acquire additional spectral information"
+        )
+    joint_covariance = np.linalg.pinv(joint_jacobian.T @ joint_jacobian, rcond=1e-12)
+    dof = max(1, x.size - parameter_count)
+    if not covariance_supplied:
+        joint_covariance *= float(fit.fun @ fit.fun / dof)
+        covariance_status = (
+            "residual_scaled_unweighted_joint_covariance_not_measurement_uncertainty"
+        )
+    else:
+        covariance_status = (
+            "local_joint_GLS_covariance_conditional_on_supplied_measurement_"
+            "model_discrepancy_and_systematic_covariance_components"
+        )
+    physical_covariance = joint_covariance[:n_physical, :n_physical]
+    nuisance_covariance = joint_covariance[n_physical:, n_physical:]
+    physical_background_cross_covariance = joint_covariance[
+        :n_physical, n_physical + 1:
+    ]
     return {
         "model": f"non_collective_{physical_model}_with_structured_detector_background",
         "physical_model": physical_model,
@@ -204,13 +298,43 @@ def fit_noncollective_kinetic_thomson_with_background(
         "residual": y - fitted,
         "physical_parameter_covariance": physical_covariance,
         "physical_parameter_standard_uncertainty": np.sqrt(np.maximum(np.diag(physical_covariance), 0.0)),
+        "joint_parameter_names": (
+            ["electron_temperature_eV", "electron_velocity_projection_m_s"]
+            + (["kappa_index"] if physical_model == "kappa" else [])
+            + ["spectral_amplitude"]
+            + [f"background_coefficient_{i}" for i in range(background_coefficients.size)]
+        ),
+        "joint_parameter_covariance": joint_covariance,
+        "background_parameter_covariance": nuisance_covariance[1:, 1:],
+        "physical_background_cross_covariance": physical_background_cross_covariance,
+        "spectral_amplitude_standard_uncertainty": float(np.sqrt(max(nuisance_covariance[0, 0], 0.0))),
         "jacobian_rank": rank,
+        "jacobian_parameter_count": parameter_count,
         "jacobian_condition_number": condition,
+        "profiled_physical_jacobian_rank": profiled_rank,
+        "profiled_physical_jacobian_condition_number": profiled_condition,
+        "parameter_identifiability": {
+            "status": "locally_identifiable_after_joint_structured_background_fit",
+            "physical_parameter_count": n_physical,
+            "joint_parameter_count": parameter_count,
+            "joint_jacobian_rank": rank,
+            "joint_jacobian_condition_number": condition,
+            "background_basis": background_model,
+            "regularization_used": False,
+        },
+        "model_discrepancy_covariance_included": discrepancy_supplied,
+        "systematic_covariance_included": systematic_supplied,
+        "covariance_components": {
+            "measurement_covariance_supplied": measurement_supplied,
+            "model_discrepancy_covariance_supplied": discrepancy_supplied,
+            "systematic_covariance_supplied": systematic_supplied,
+            "combined_covariance_used_for_whitening": covariance_supplied,
+        },
         "optimizer_success": bool(fit.success),
         "optimizer_message": str(fit.message),
         "noise_model": noise_model,
         "covariance_status": covariance_status,
-        "uncertainty_semantics": "Profiled physical-parameter covariance conditional on the selected background basis and fixed instrument response; background/physical cross-covariance is not separately returned by this variable-projection API.",
+        "uncertainty_semantics": "Joint local covariance for physical parameters, spectral amplitude and detector-background coefficients; physical/background cross-covariance is returned. Conditional on the selected background basis, fixed instrument response and explicitly supplied covariance components. This is a local covariance, not a posterior distribution.",
         "absolute_density_inferred": False,
         "recoil_included": bool(include_compton_recoil) if physical_model == "relativistic_maxwell_juttner" else False,
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if include_compton_recoil else "polarized_elastic_Thomson") if physical_model == "relativistic_maxwell_juttner" else "not_applicable_nonrelativistic_kappa_projection",
