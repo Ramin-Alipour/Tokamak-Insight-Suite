@@ -145,6 +145,55 @@ def cold_plasma_dielectric_tensor(
     }
 
 
+
+def cold_plasma_absorbed_power_density(
+    frequency_Hz, magnetic_field_T, species, electric_field_V_m,
+) -> dict:
+    """Compute local time-averaged collisional absorption from the cold-fluid dielectric.
+
+    For the exp(-i*omega*t) convention, define the Hermitian dissipative
+    dielectric H=(epsilon-epsilon^dagger)/(2i). The cycle-averaged work
+    transferred from the wave to the plasma is
+        <P> = (epsilon_0*omega/2) E^dagger H E.
+    This is collisional cold-fluid absorption only; collisionless Landau,
+    cyclotron-resonant kinetic and nonlinear absorption are not represented.
+    """
+    dielectric = cold_plasma_dielectric_tensor(
+        frequency_Hz, magnetic_field_T, species,
+    )
+    raw = np.asarray(electric_field_V_m)
+    if raw.shape != (3,) or raw.dtype.kind not in "iufc" or np.any(~np.isfinite(raw)):
+        raise ValueError("electric_field_V_m must be a finite real or complex 3-vector")
+    field = raw.astype(complex, copy=False)
+    omega = dielectric["angular_frequency_rad_s"]
+    epsilon = dielectric["dielectric_tensor_lab"]
+    dissipative = (epsilon - epsilon.conj().T) / (2j)
+    dissipative = 0.5 * (dissipative + dissipative.conj().T)
+    quadratic = np.vdot(field, dissipative @ field)
+    power = 0.5 * EPS0 * omega * float(np.real(quadratic))
+    scale = 0.5 * EPS0 * omega * max(
+        float(np.linalg.norm(field)**2 * np.linalg.norm(dissipative, ord=2)),
+        np.finfo(float).tiny,
+    )
+    if power < -1e-11 * scale:
+        raise ArithmeticError(
+            "cold-fluid dielectric produced negative dissipative power; check convention or dielectric implementation"
+        )
+    return {
+        **dielectric,
+        "electric_field_V_m": field.copy(),
+        "hermitian_dissipative_dielectric_tensor": dissipative,
+        "absorbed_power_density_W_m3": max(power, 0.0),
+        "power_balance_relation": "0.5*epsilon_0*omega*real(E^dagger*Im_H(epsilon_r)*E)",
+        "absorption_scope": "local_time_averaged_species_resolved_cold_fluid_collisional_absorption",
+        "limitations": [
+            "No collisionless Landau damping or finite-temperature cyclotron-resonant absorption.",
+            "No relativistic, finite-Larmor-radius, spatial transport or nonlinear absorption.",
+            "The collision frequencies are external momentum-transfer closures, not inferred from the spectrum.",
+        ],
+    }
+
+
 def cold_plasma_magnetoionic_modes(
     frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
     wave_normal_direction=(0.0, 0.0, 1.0),
