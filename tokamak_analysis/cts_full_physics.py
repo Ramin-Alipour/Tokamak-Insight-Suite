@@ -357,6 +357,9 @@ def run_advanced_thomson_physics(model, **kwargs):
     """Public, explicit dispatcher for the advanced Analysis-1 physics solvers.
 
     Supported models:
+      - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
+        for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
+        a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
       - landau_fdt_cts: multispecies electrostatic CTS with the discrete
         Landau operator, matching Langevin source and Poisson screening.
       - polarized_kinetic_ece: magnetized kinetic ECE opacity projected onto
@@ -395,7 +398,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = solve_stratified_mode_conversion
     else:
         raise ValueError(
-            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
+            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion; "
             "no automatic model substitution is performed"
         )
@@ -410,6 +413,7 @@ def run_advanced_thomson_physics(model, **kwargs):
 
 
 __all__ = [
+    "kappa_electron_susceptibility",
     "analyze_cts_microwave_background",
     "analyze_landau_fdt_cts",
     "analyze_landau_fdt_full_em_constitutive",
