@@ -7,6 +7,75 @@ def _case():
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 
+def test_cts_multi_ion_species_resolved_flow_matches_common_flow_limit():
+    f0, f, geometry, _, _, _ = _case()
+    ions = [
+        {"name": "D+", "charge_state": 1, "mass_amu": 2.014},
+        {"name": "C6+", "charge_state": 6, "mass_amu": 12.0},
+    ]
+    common = dict(
+        electron_density_m3=2.0e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=[800.0, 900.0], ion_species=ions,
+        ion_fractions=[0.7, 0.3], electron_velocity_projection_m_s=0.0,
+    )
+    scalar = cts_spectral_density(
+        f, f0, geometry, ion_velocity_projection_m_s=1.5e4, **common
+    )
+    vector = cts_spectral_density(
+        f, f0, geometry, ion_velocity_projection_m_s=[1.5e4, 1.5e4], **common
+    )
+    mapping = cts_spectral_density(
+        f, f0, geometry,
+        ion_velocity_projection_m_s={"D+": 1.5e4, "C6+": 1.5e4}, **common
+    )
+    np.testing.assert_allclose(vector, scalar, rtol=1e-12, atol=0.0)
+    np.testing.assert_allclose(mapping, scalar, rtol=1e-12, atol=0.0)
+
+
+def test_cts_differential_multi_ion_flow_changes_physical_spectrum():
+    f0, f, geometry, _, _, _ = _case()
+    ions = [
+        {"name": "D+", "charge_state": 1, "mass_amu": 2.014},
+        {"name": "C6+", "charge_state": 6, "mass_amu": 12.0},
+    ]
+    common = dict(
+        electron_density_m3=2.0e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=[800.0, 900.0], ion_species=ions,
+        ion_fractions=[0.7, 0.3], electron_velocity_projection_m_s=0.0,
+    )
+    common_flow = cts_spectral_density(
+        f, f0, geometry, ion_velocity_projection_m_s=0.0, **common
+    )
+    differential_flow = cts_spectral_density(
+        f, f0, geometry,
+        ion_velocity_projection_m_s={"D+": -8.0e4, "C6+": 1.2e5}, **common
+    )
+    assert np.all(np.isfinite(differential_flow))
+    assert np.all(differential_flow >= 0.0)
+    assert not np.allclose(differential_flow, common_flow, rtol=1e-8, atol=0.0)
+
+
+def test_cts_species_resolved_flow_requires_exact_species_keys_and_subluminal_values():
+    f0, f, geometry, _, _, _ = _case()
+    ions = [
+        {"name": "D+", "charge_state": 1, "mass_amu": 2.014},
+        {"name": "C6+", "charge_state": 6, "mass_amu": 12.0},
+    ]
+    common = dict(
+        electron_density_m3=2.0e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0, ion_species=ions, ion_fractions=[0.7, 0.3],
+        electron_velocity_projection_m_s=0.0,
+    )
+    with pytest.raises(ValueError, match="exactly the ion species names"):
+        cts_spectral_density(
+            f, f0, geometry, ion_velocity_projection_m_s={"D+": 0.0}, **common
+        )
+    with pytest.raises(ValueError, match="subluminal"):
+        cts_spectral_density(
+            f, f0, geometry, ion_velocity_projection_m_s=[0.0, 3.0e8], **common
+        )
+
+
 def test_cts_omitted_background_state_does_not_claim_a_physical_zero():
     from tokamak_analysis.cts_analysis import cts_spectral_density
 
