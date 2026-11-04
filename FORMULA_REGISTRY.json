@@ -6002,10 +6002,10 @@
   },
   {
     "name": "Gyrotropic bi-Maxwellian optical Thomson spectral inference",
-    "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; sigma_v,q²=e T_q/m_e; lambda_s/lambda_0 ≈ 1 - q_hat·v/c",
+    "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; sigma_v,q²=e T_q/m_e; lambda_s/lambda_0 ≈ 1 - q_hat·v/c; P_i=Φ((λ_i^+−λ_c)/σ_λ)−Φ((λ_i^−−λ_c)/σ_λ); S̄_i=P_i/Δλ_i",
     "inputs": "Calibrated multi-view optical Thomson spectra, measured spectral response, laser wavelength, scattering angle, magnetic-field and scattering-vector directions",
     "output": "T_parallel [eV], T_perpendicular [eV], per-view q-projected flow [m s^-1], fit and covariance diagnostics",
-    "assumptions": "Gyrotropic bi-Maxwellian electrons with zero heat flux; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles required to separate parallel and perpendicular temperatures",
+    "assumptions": "Gyrotropic bi-Maxwellian electrons with zero heat flux; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles required to separate parallel and perpendicular temperatures; Gaussian probability is integrated exactly between midpoint-defined wavelength-bin edges before response convolution; no midpoint-sampled PDF approximation is used.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -6063,6 +6063,12 @@
           "name": "model_discrepancy_covariance",
           "unit": "full channel-major additive PSD covariance",
           "required": false
+        },
+        {
+          "name": "maximum_projected_rms_beta",
+          "unit": "dimensionless; conservative non-relativistic projected thermal-speed validity threshold",
+          "required": false,
+          "default": 0.1
         }
       ],
       "output_specs": [
@@ -6093,19 +6099,34 @@
         {
           "name": "parameter_covariance",
           "unit": "parameter covariance; withheld when anisotropy is non-identifiable"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; exact Gaussian probability captured by measured wavelength bins per view"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "declared projected thermal and fitted-flow beta diagnostics"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact Gaussian CDF integration over finite wavelength bins"
         }
       ],
       "prerequisites": [
         "Measured calibrated spectra and measured response operator",
         "Magnetic-field and scattering-vector geometry for each view",
-        "At least two distinct squared magnetic pitch angles to identify both temperatures"
+        "At least two distinct squared magnetic pitch angles to identify both temperatures",
+        "The fitted projected thermal rms beta must remain below maximum_projected_rms_beta; fitted bulk-flow beta must remain below 0.1."
       ],
       "uncertainty_model": "Full channel-major measurement covariance or pointwise standard uncertainties; optional independent additive model-discrepancy covariance is added once. Geometry covariance is not inferred or propagated by this spectral fitter.",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
-        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
+        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
+        "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen"
       ],
-      "note": "This is a non-relativistic small-beta multi-view spectral inference model. It does not infer a general 3-D EVDF, magnetic geometry, or calibration, and it does not apply relativistic corrections. Synthetic regression tests are not experimental validation."
+      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen."
     },
     "references": [
       {
@@ -6535,10 +6556,10 @@
   },
   {
     "name": "Gyrotropic anisotropic Kappa projected Thomson marginal",
-    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](e T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; Var(v_q)=e T_q/m_e for T_q in eV; κ>3/2",
+    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](e T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; Var(v_q)=e T_q/m_e for T_q in eV; κ>3/2; ν=2κ−1, s²=κθ_q²/(2κ−1); P_i=F_t(v_i^−/s;ν)−F_t(v_i^+/s;ν); S̄_i=P_i/Δλ_i",
     "inputs": "Kappa index κ, magnetic pitch cosine b_hat·q_hat, second-moment directional temperature T_q [eV], electron mass m_e, Boltzmann constant k_B",
     "output": "Normalized one-dimensional electron-velocity marginal along q; mapped to wavelength using λ=λ0[1−2 sin(θ_s/2) v_q/c] in the non-relativistic elastic-Thomson limit",
-    "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.",
+    "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.; each finite wavelength bin is integrated exactly through the Student-t CDF of the projected Kappa marginal; wavelength-window tails are not renormalized.",
     "status": "D",
     "category": "Optical Thomson scattering",
     "execution_contract": {
@@ -6611,6 +6632,10 @@
         {
           "name": "projected_velocity_distribution_m_s_inverse",
           "unit": "s m^-1; normalized q-projected marginal evaluated on the measured-window velocity grid"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact Student-t CDF probability integrated over finite wavelength bins"
         }
       ],
       "prerequisites": [
@@ -6630,8 +6655,10 @@
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain"
-      ]
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain",
+        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities"
+      ],
+      "note": "The projected bi-Kappa marginal is a Student-t distribution with ν=2κ−1 and scale²=κθ_q²/(2κ−1). The forward model integrates exact probability between wavelength-bin edges, applies the measured response to bin-integrated power, and reports measured-window coverage without tail renormalization."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
