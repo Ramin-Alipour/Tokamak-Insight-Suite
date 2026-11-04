@@ -103,3 +103,21 @@ def test_polarized_kinetic_ece_wrapper_returns_full_wave_jones_conversion():
         result["stratified_full_wave_mode_conversion"][0]["transmitted_jones_matrix"],
         np.eye(2), atol=1e-6,
     )
+
+
+
+def test_public_dispatcher_exposes_multispecies_thermal_collision_matrix():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    species = [
+        {"name": "e", "density_m3": 1.0e19, "mass_kg": 9.1093837015e-31,
+         "charge_C": -1.602176634e-19, "temperature_eV": 1000.0},
+        {"name": "D", "density_m3": 1.0e19, "mass_kg": 3.3452439e-27,
+         "charge_C": 1.602176634e-19, "temperature_eV": 1000.0},
+    ]
+    result = run_advanced_thomson_physics(
+        "multispecies_thermal_collision_matrix", species=species
+    )
+    assert result["public_physics_entrypoint"] == "multispecies_thermal_collision_matrix"
+    assert result["collision_frequency_matrix_s_inverse"].shape == (2, 2)
+    assert result["automatic_model_substitution"] is False

@@ -21,6 +21,7 @@ from .ece_kinetic import (
 )
 from .cts_em_background import integrate_thermal_microwave_background
 from .cts_kappa import kappa_electron_susceptibility
+from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 
 
 def analyze_landau_fdt_cts(
@@ -388,6 +389,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = analyze_cts_microwave_background
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "multispecies_thermal_collision_matrix":
+        solver = multispecies_thermal_coulomb_collision_matrix
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
     elif model == "landau_fdt_full_em_response":
