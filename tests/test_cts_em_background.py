@@ -244,3 +244,39 @@ def test_multimode_total_optical_depth_is_exact_for_incoherent_receiver_mixture(
     np.testing.assert_allclose(
         result["spectral_radiance_W_m2_sr_Hz"], [weights @ np.exp(-np.array([0.2, 1.1]))]
     )
+
+
+def test_planck_and_free_free_opacity_remain_finite_in_wien_tail():
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+    frequency = np.array([1.0e22, 2.0e22])
+    temperature_eV = 1.0e3
+    temperature_K = temperature_eV * 1.602176634e-19 / 1.380649e-23
+    planck = planck_spectral_radiance(frequency, temperature_K)
+    emissivity = thermal_bremsstrahlung_emissivity_si(
+        frequency, 1.0e19, [1.0e19], [1.0], temperature_eV
+    )
+    opacity = thermal_bremsstrahlung_absorption_si(
+        frequency, 1.0e19, [1.0e19], [1.0], temperature_eV
+    )
+    assert np.all(np.isfinite(planck))
+    assert np.all(planck == 0.0)  # representational underflow, not a clipped Wien tail
+    assert np.all(emissivity == 0.0)
+    assert np.all(np.isfinite(opacity))
+    assert np.all(opacity > 0.0)
+
+
+def test_free_free_absorption_is_algebraically_consistent_with_kirchhoff_at_moderate_x():
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+    frequency = np.array([80e9, 140e9, 220e9])
+    temperature_eV = 1.5e3
+    temperature_K = temperature_eV * 1.602176634e-19 / 1.380649e-23
+    emissivity = thermal_bremsstrahlung_emissivity_si(
+        frequency, 2.0e19, [1.0e19, 2.0e18], [1.0, 2.0],
+        temperature_eV, gaunt_factor=[1.1, 1.2, 1.3],
+    )
+    planck = planck_spectral_radiance(frequency, temperature_K)
+    opacity = thermal_bremsstrahlung_absorption_si(
+        frequency, 2.0e19, [1.0e19, 2.0e18], [1.0, 2.0],
+        temperature_eV, gaunt_factor=[1.1, 1.2, 1.3],
+    )
+    np.testing.assert_allclose(opacity, emissivity / planck, rtol=3e-14, atol=0.0)
