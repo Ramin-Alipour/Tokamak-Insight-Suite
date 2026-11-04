@@ -86,6 +86,8 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
     assert result["relativistic_kinematics"] is True
     assert result["recoil_included"] is include_compton_recoil
     assert ("Klein-Nishina" in " ".join(result["assumptions"])) is include_compton_recoil
+    assert result["momentum_probability_coverage"] >= 0.999
+    assert result["momentum_tail_renormalization_performed"] is False
     assert result["fit_covariance"].shape == (5, 5)
 
 @pytest.mark.parametrize("use_bounds", [False, True])
