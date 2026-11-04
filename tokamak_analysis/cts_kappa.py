@@ -11,7 +11,6 @@ import numpy as np
 from scipy.special import gammaln, betainc
 from scipy.integrate import quad
 
-from .thomson_generalized_dispersion import generalized_landau_integral
 
 E = 1.602176634e-19
 EPS0 = 8.8541878128e-12
@@ -142,7 +141,7 @@ def kappa_electron_susceptibility(
         "integral": integral,
         "interior_derivative_integral": integral,
         "finite_support_boundary_integral": 0.0j,
-        "normalized_probability_density_s_m": pdf.copy(),
+        "normalized_probability_density_s_m": pdf.copy() / grid_coverage,
         "pole": zeta,
         "pole_imaginary_part_m_s": eta,
         "pole_order": 1,
