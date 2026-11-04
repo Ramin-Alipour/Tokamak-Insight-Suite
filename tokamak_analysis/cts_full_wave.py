@@ -384,6 +384,7 @@ def _periodic_derivative_matrix(size, spacing):
 def solve_3d_periodic_full_wave(
     omega_rad_s, x_m, y_m, z_m, epsilon_r, *,
     impressed_current_density_A_m2, solver_rtol=1e-9,
+    bloch_wavevector_rad_m=(0.0, 0.0, 0.0),
 ):
     """Solve the full vector Maxwell equation in a 3-D periodic plasma cell.
 
@@ -437,9 +438,13 @@ def solve_3d_periodic_full_wave(
     Dy1 = _periodic_derivative_matrix(ny, dy)
     Dz1 = _periodic_derivative_matrix(nz, dz)
     Ix, Iy, Iz = eye(nx, format="csr"), eye(ny, format="csr"), eye(nz, format="csr")
-    Dx = kron(kron(Iz, Iy), Dx1, format="csr")
-    Dy = kron(kron(Iz, Dy1), Ix, format="csr")
-    Dz = kron(kron(Dz1, Iy), Ix, format="csr")
+    bloch = np.asarray(bloch_wavevector_rad_m, dtype=float)
+    if bloch.shape != (3,) or np.any(~np.isfinite(bloch)):
+        raise ValueError("bloch_wavevector_rad_m must be a finite 3-vector")
+    identity = eye(nx*ny*nz, format="csr")
+    Dx = kron(kron(Iz, Iy), Dx1, format="csr") + 1j * bloch[0] * identity
+    Dy = kron(kron(Iz, Dy1), Ix, format="csr") + 1j * bloch[1] * identity
+    Dz = kron(kron(Dz1, Iy), Ix, format="csr") + 1j * bloch[2] * identity
     zero = Dx * 0.0
     curl = bmat([
         [zero, -Dz, Dy],
@@ -492,7 +497,8 @@ def solve_3d_periodic_full_wave(
         "integrated_absorbed_power_W": float(np.sum(absorption) * dx * dy * dz),
         "relative_linear_system_residual": relative_residual,
         "grid_shape_nz_ny_nx": shape,
-        "boundary_condition": "three_dimensional_periodic_zero_bloch_wavevector",
+        "boundary_condition": "three_dimensional_bloch_periodic",
+        "bloch_wavevector_rad_m": bloch.copy(),
         "solver": "sparse_second_order_vector_finite_difference_frequency_domain",
         "maxwell_operator": "curl_curl_minus_k0_squared_full_tensor_epsilon",
         "mode_conversion": "full_coherent_3D_vector_coupling_through_spatially_varying_complex_tensor_epsilon",
