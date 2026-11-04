@@ -76,6 +76,44 @@ def test_cts_species_resolved_flow_requires_exact_species_keys_and_subluminal_va
         )
 
 
+
+def test_cts_multi_ion_flow_inference_recovers_species_resolved_projections():
+    from tokamak_analysis.cts_analysis import fit_cts_ion_species_flows
+
+    f0, frequency, geometry, _, _, _ = _case()
+    ions = [
+        {"name": "D+", "charge_state": 1, "mass_amu": 2.014},
+        {"name": "C6+", "charge_state": 6, "mass_amu": 12.0},
+    ]
+    fractions = [0.7, 0.3]
+    truth = {"D+": -4.0e4, "C6+": 8.0e4}
+    physical = cts_spectral_density(
+        frequency, f0, geometry,
+        electron_density_m3=2.0e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=[800.0, 900.0], ion_species=ions,
+        ion_fractions=fractions, electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=truth,
+    )
+    measured = 2.4e4 * physical + 3.0
+    result = fit_cts_ion_species_flows(
+        frequency, measured, probe_frequency_Hz=f0,
+        scattering_geometry=geometry, electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0, ion_temperature_eV=[800.0, 900.0],
+        ion_species=ions, ion_fractions=fractions,
+        electron_velocity_projection_m_s=0.0,
+        instrument_response=np.eye(frequency.size),
+        ion_velocity_initial_m_s={"D+": -3.5e4, "C6+": 7.5e4},
+        signal_uncertainty=np.full_like(measured, 0.01 * np.max(measured)),
+    )
+    assert result["optimizer_success"] is True
+    assert result["identifiability"] == "identifiable_conditional_on_fixed_plasma_inputs"
+    assert result["result_classification"] == "Conditional"
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["ion_velocity_projection_m_s"]["D+"] == pytest.approx(truth["D+"], rel=0.03, abs=1e3)
+    assert result["ion_velocity_projection_m_s"]["C6+"] == pytest.approx(truth["C6+"], rel=0.03, abs=1e3)
+    assert result["parameter_covariance"].shape == (4, 4)
+
+
 def test_cts_omitted_background_state_does_not_claim_a_physical_zero():
     from tokamak_analysis.cts_analysis import cts_spectral_density
 
