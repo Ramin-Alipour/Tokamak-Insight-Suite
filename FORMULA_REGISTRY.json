@@ -6492,5 +6492,124 @@
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle"
       ]
     }
+  },
+  {
+    "name": "Thomson PSF-aware profile inversion with GCV-selected curvature regularization",
+    "equation": "y = H p + ε; p̂λ = argmin ||W(Hp−y)||² + λ||D₂p||²; GCV(λ)=RSS(λ)/[n−tr(Sλ)]²",
+    "inputs": "Calibrated channel profile, supplied non-negative spatial PSF/mixing operator, optional measurement covariance; optional explicit regularization or GCV controls",
+    "output": "Conditional latent profile candidate, data-only identifiability, selected regularization strength and GCV diagnostics",
+    "assumptions": "Fixed supplied PSF/mixing matrix; second-difference curvature penalty; GCV uses whitened measured-channel residuals and active-set effective degrees of freedom for non-negative fits.",
+    "status": "D",
+    "category": "Optical Thomson spatial profile reconstruction",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile",
+      "formula_key": "thomson_psf_profile_gcv_regularization_selection",
+      "input_specs": [
+        {
+          "name": "measured_channel_values",
+          "unit": "calibrated measured channel values",
+          "required": true
+        },
+        {
+          "name": "spatial_mixing_matrix",
+          "unit": "non-negative channel-by-latent-node PSF/mixing operator",
+          "required": true
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "positive finite scalar; omitted selects GCV",
+          "required": false
+        },
+        {
+          "name": "measurement_uncertainty",
+          "unit": "positive pointwise 1-sigma per channel",
+          "required": false
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "positive-definite full channel covariance",
+          "required": false
+        },
+        {
+          "name": "gcv_candidate_count",
+          "unit": "integer 5–101",
+          "required": false,
+          "default": 31
+        },
+        {
+          "name": "gcv_log10_range",
+          "unit": "two increasing base-10 exponents",
+          "required": false,
+          "default": [
+            -8,
+            8
+          ]
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "regularized_candidate_profile",
+          "unit": "latent profile candidate; conditional unless data-only full rank"
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "selected positive curvature penalty"
+        },
+        {
+          "name": "regularization_selection",
+          "unit": "researcher_supplied or generalized_cross_validation_active_set"
+        },
+        {
+          "name": "gcv_candidate_strengths",
+          "unit": "candidate regularization values"
+        },
+        {
+          "name": "gcv_scores",
+          "unit": "GCV score per candidate"
+        },
+        {
+          "name": "gcv_effective_degrees_of_freedom",
+          "unit": "active-set smoother trace"
+        },
+        {
+          "name": "data_only_rank",
+          "unit": "rank of whitened measured PSF/mixing operator"
+        }
+      ],
+      "prerequisites": [
+        "Supplied spatial PSF/mixing operator on the latent profile grid",
+        "Calibrated channel measurements"
+      ],
+      "uncertainty_model": "Local covariance conditional on selected regularization and fixed PSF; excludes PSF uncertainty and is not a posterior interval.",
+      "limitations": [
+        "GCV selects regularization, not the spatial grid or PSF.",
+        "Data-only null-space modes remain non-identifiable regardless of regularization.",
+        "Non-negative active-set GCV is an approximate effective-degrees-of-freedom criterion.",
+        "PSF/mixing-operator uncertainty is not propagated by this function."
+      ],
+      "test_links": [
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_selects_regularization_by_gcv_when_omitted",
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "calibrated_measured_spatial_profile",
+    "execution_scope": "conditional_psf_aware_spatial_inverse",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile",
+      "function_links": [
+        "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile"
+      ],
+      "formula_key": "thomson_psf_profile_gcv_regularization_selection",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_selects_regularization_by_gcv_when_omitted",
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes"
+      ]
+    }
   }
 ]
