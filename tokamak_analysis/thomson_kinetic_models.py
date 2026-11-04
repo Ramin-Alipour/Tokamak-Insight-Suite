@@ -910,6 +910,9 @@ def fit_relativistic_maxwell_juttner(
         "thomson_recoil_correction_fraction_limit": physical["thomson_recoil_correction_fraction_limit"],
         "thomson_no_recoil_validity_status": physical["thomson_no_recoil_validity_status"],
         "quadrature_diagnostics": physical["quadrature"],
+        "momentum_probability_coverage": physical["momentum_probability_coverage"],
+        "quadrature_to_analytic_normalization_ratio": physical["quadrature_to_analytic_normalization_ratio"],
+        "momentum_tail_renormalization_performed": physical["momentum_tail_renormalization_performed"],
         "captured_spectral_probability": captured_probability,
         "assumptions": [
             "Single-scattering non-collective Thomson regime.",
