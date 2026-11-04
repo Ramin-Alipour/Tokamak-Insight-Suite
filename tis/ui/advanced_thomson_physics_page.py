@@ -26,6 +26,7 @@ MODEL_LABELS = {
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
 }
 
+EXAMPLES = {
     "thomson_relativistic_projected_evdf": {
         "wavelength_nm": np.linspace(499.8, 500.2, 81).tolist(),
         "signal": (2.0 + 100.0*np.exp(-0.5*((np.linspace(499.8, 500.2, 81)-500.0)/0.07)**2)).tolist(),
@@ -50,10 +51,9 @@ MODEL_LABELS = {
         "instrument_response_matrix": np.eye(41).tolist(),
         "background_signal": np.full(41, 2.0).tolist(),
         "regularization_strength": 0.001,
-        "velocity_limit_m_s": 1500000.0,
+        "velocity_limit_m_s": 8000.0,
         "velocity_points": 81
     },
-EXAMPLES = {
     "kappa_electrostatic_susceptibility": {
         "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
         "phase_velocity_m_s": 1.0e6,
