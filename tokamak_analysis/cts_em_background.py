@@ -1,10 +1,11 @@
 """Physical microwave background emission for CTS receiver modelling.
 
 Thermal free-free emission is calculated from the standard non-relativistic
-Maxwellian emissivity with an explicit Gaunt factor. Thermal ECE is handled
-through mode-resolved absorption supplied by a magnetized kinetic/radiative
-transfer calculation and Kirchhoff's law. The latter coefficient is not
-fabricated from a scalar magnetic-field magnitude.
+Maxwellian emissivity with an explicit Gaunt factor. Thermal ECE requires
+mode-resolved absorption plus either an independently supplied emissivity or
+an explicit LTE selection for the Planck source function. Absorption alone does
+not determine a non-LTE source function. No ECE coefficient is fabricated
+from a scalar magnetic-field magnitude.
 """
 from __future__ import annotations
 
