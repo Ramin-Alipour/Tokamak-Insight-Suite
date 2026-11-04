@@ -21,9 +21,14 @@ AMU = 1.66053906660e-27
 
 
 def _positive(x, name):
+    """Validate physical scalars without bool/string/complex coercion."""
+    if isinstance(x, (bool, np.bool_)) or not isinstance(
+        x, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a positive finite real scalar")
     x = float(x)
     if not np.isfinite(x) or x <= 0:
-        raise ValueError(f"{name} must be positive and finite")
+        raise ValueError(f"{name} must be a positive finite real scalar")
     return x
 
 
