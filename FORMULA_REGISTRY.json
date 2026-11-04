@@ -5287,7 +5287,8 @@
       "Weakly coupled, fully ionized, non-degenerate plasma.",
       "Coulomb logarithm is supplied by the researcher and is not inferred.",
       "Species-resolved Spitzer rates enter the magnetized kinetic resonance denominator as additive Krook widths.",
-      "The approximation is not a conserving linearized Landau collision operator; neutral collisions, strong coupling, relativistic corrections and velocity-space redistribution are omitted."
+      "The approximation is not a conserving linearized Landau collision operator; neutral collisions, strong coupling, relativistic corrections and velocity-space redistribution are omitted.",
+      "Ion-ion contribution currently includes self-collisions only; cross-species ion-ion collision terms are omitted."
     ],
     "status": "implemented_with_declared_approximation",
     "category": "Microwave collective Thomson scattering",
@@ -5347,7 +5348,8 @@
       ],
       "prerequisites": [
         "Weakly coupled, fully ionized plasma.",
-        "Externally supplied Coulomb logarithm."
+        "Externally supplied Coulomb logarithm.",
+        "Ion-ion self-collision approximation only; cross-species ion-ion terms are not included."
       ],
       "uncertainty_model": "No uncertainty in the Coulomb logarithm or collision model is inferred. Propagation of Coulomb-logarithm uncertainty is not yet implemented.",
       "test_links": [
