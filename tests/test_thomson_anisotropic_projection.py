@@ -4,6 +4,7 @@ import pytest
 from tokamak_analysis.thomson_kinetic_models import (
     project_bi_maxwellian_electron_vdf,
     infer_gyrotropic_bi_maxwellian_temperatures,
+    infer_three_dimensional_flow_from_thomson_projections,
 )
 
 
@@ -99,4 +100,37 @@ def test_multi_pitch_anisotropy_rejects_non_psd_pitch_covariance():
             [200.0, 150.0, 100.0], [1.0, 0.5, 0.0],
             projected_temperature_covariance_eV2=np.diag([4.0, 4.0, 4.0]),
             magnetic_pitch_cosine_covariance=np.diag([1.0e-4, -1.0e-4, 1.0e-4]),
+        )
+
+
+def test_three_dimensional_flow_inversion_propagates_tangent_plane_geometry_covariance():
+    velocity = np.array([1.0e5, 2.0e5, 3.0e5])
+    directions = np.eye(3)
+    common = dict(
+        velocity_projection_m_s=directions @ velocity,
+        scattering_vector_unit=directions,
+        projection_covariance_m2_s2=np.diag([1.0e4, 1.0e4, 1.0e4]),
+    )
+    measurement_only = infer_three_dimensional_flow_from_thomson_projections(**common)
+    with_geometry = infer_three_dimensional_flow_from_thomson_projections(
+        **common,
+        scattering_vector_covariance=np.eye(9)*1.0e-6,
+    )
+    assert with_geometry["reportable_as_inferred_parameter"] is True
+    assert with_geometry["electron_velocity_vector_m_s"] == pytest.approx(velocity)
+    assert with_geometry["geometry_uncertainty_included"] is True
+    assert with_geometry["geometry_covariance_method"] == "iterative_first_order_tangent_plane_errors_in_variables_GLS"
+    assert with_geometry["geometry_covariance_iterations"] > 0
+    assert np.trace(with_geometry["electron_velocity_covariance_m2_s2"]) > np.trace(
+        measurement_only["electron_velocity_covariance_m2_s2"]
+    )
+
+
+def test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance():
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        infer_three_dimensional_flow_from_thomson_projections(
+            velocity_projection_m_s=[1.0e5, 2.0e5, 3.0e5],
+            scattering_vector_unit=np.eye(3),
+            projection_covariance_m2_s2=np.diag([1.0e4, 1.0e4, 1.0e4]),
+            scattering_vector_covariance=np.diag([1.0e-6]*8+[-1.0e-6]),
         )
