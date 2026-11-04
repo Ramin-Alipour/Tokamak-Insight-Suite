@@ -317,6 +317,7 @@ def landau_cts_dynamic_structure_factor(
     from .cts_fdt import (
         classical_fdt_dynamic_structure_factor,
         quantum_fdt_dynamic_structure_factor,
+        quantum_unsymmetrized_dynamic_structure_factor,
     )
 
     temperature = _positive(common_temperature_J, "common_temperature_J")
@@ -424,6 +425,10 @@ def landau_cts_dynamic_structure_factor(
         omega, screened_response, temperature_J=temperature
     )
     quantum_fdt_spectrum = quantum_fdt["dynamic_structure_factor_m3_s"]
+    quantum_greater = quantum_unsymmetrized_dynamic_structure_factor(
+        omega, screened_response, temperature_J=temperature
+    )
+    quantum_greater_spectrum = quantum_greater["dynamic_structure_factor_m3_s"]
     scale = np.maximum(
         np.linalg.norm(fdt_spectrum, axis=(1, 2)),
         np.finfo(float).tiny,
@@ -439,6 +444,8 @@ def landau_cts_dynamic_structure_factor(
         "dynamic_structure_factor_m3_s": fdt_spectrum,
         "quantum_symmetrized_dynamic_structure_factor_m3_s": quantum_fdt_spectrum,
         "quantum_fdt_closure": quantum_fdt["closure"],
+        "quantum_unsymmetrized_dynamic_structure_factor_m3_s": quantum_greater_spectrum,
+        "quantum_detailed_balance_relation": quantum_greater["detailed_balance_relation"],
         "landau_langevin_spectral_matrix_m3_s": screened_noise,
         "landau_fdt_relative_consistency_residual": discrepancy,
         "angular_frequency_rad_s": omega.copy(),
