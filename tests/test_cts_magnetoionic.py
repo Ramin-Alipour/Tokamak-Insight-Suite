@@ -243,3 +243,87 @@ def test_magnetized_multispecies_collisional_dissipation_is_passive():
     )
     assert eigenvalues.min() >= -1e-11 * max(eigenvalues.max(), 1.0)
     assert result["absorbed_power_density_W_m3"] > 0.0
+
+
+def test_magnetized_mode_opacity_and_lte_emissivity_follow_energy_balance():
+    from tokamak_analysis.cts_magnetoionic import (
+        cold_plasma_mode_radiative_coefficients,
+    )
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+
+    species = [
+        {
+            "name": "e-", "mass_kg": ME, "charge_C": -E,
+            "density_m3": 3.0e19, "collision_frequency_rad_s": 4.0e7,
+        },
+        {
+            "name": "D+", "mass_kg": 2.0*ME*1836.15267343, "charge_C": E,
+            "density_m3": 1.5e19, "collision_frequency_rad_s": 8.0e6,
+        },
+    ]
+    frequency = 75.0e9
+    temperature = 1800.0
+    field = np.array([1.0+0.2j, -0.3+0.7j, 0.5-0.1j])
+    flux = 2.5e6
+    result = cold_plasma_mode_radiative_coefficients(
+        frequency, [0.3, -0.4, 2.0], species, field,
+        mode_poynting_flux_W_m2=flux,
+        electron_temperature_eV=temperature,
+        assume_lte=True,
+    )
+    expected_alpha = result["absorbed_power_density_W_m3"] / flux
+    expected_planck = planck_spectral_radiance(
+        np.array([frequency]), temperature * E / 1.380649e-23
+    )[0]
+    assert result["absorption_coefficient_m_inverse"] == pytest.approx(
+        expected_alpha, rel=2e-15
+    )
+    assert result["thermal_emissivity_W_m3_sr_Hz"] == pytest.approx(
+        expected_alpha * expected_planck, rel=2e-15
+    )
+    assert result["lte_assumed"] is True
+    assert result["absorption_coefficient_m_inverse"] > 0.0
+
+
+def test_magnetized_mode_emissivity_is_not_invented_without_explicit_lte():
+    from tokamak_analysis.cts_magnetoionic import (
+        cold_plasma_mode_radiative_coefficients,
+    )
+
+    species = [
+        {
+            "name": "e-", "mass_kg": ME, "charge_C": -E,
+            "density_m3": 3.0e19, "collision_frequency_rad_s": 4.0e7,
+        },
+    ]
+    result = cold_plasma_mode_radiative_coefficients(
+        75.0e9, [0.0, 0.0, 2.0], species,
+        np.array([1.0+0.0j, 0.2+0.1j, 0.0+0.0j]),
+        mode_poynting_flux_W_m2=1.0e6,
+        electron_temperature_eV=1000.0,
+        assume_lte=False,
+    )
+    assert result["thermal_emissivity_W_m3_sr_Hz"] is None
+    assert result["planck_source_radiance_W_m2_sr_Hz"] is None
+    assert result["emissivity_relation"].startswith("not_evaluated")
+
+
+def test_magnetized_mode_radiative_closure_is_publicly_dispatched():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "cold_plasma_mode_radiative_coefficients",
+        frequency_Hz=75.0e9,
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        species=[{
+            "name": "e-", "mass_kg": ME, "charge_C": -E,
+            "density_m3": 3.0e19, "collision_frequency_rad_s": 4.0e7,
+        }],
+        electric_field_V_m=np.array([1.0+0.0j, 0.2+0.1j, 0.0+0.0j]),
+        mode_poynting_flux_W_m2=1.0e6,
+        electron_temperature_eV=1000.0,
+        assume_lte=True,
+    )
+    assert result["public_physics_entrypoint"] == "cold_plasma_mode_radiative_coefficients"
+    assert result["thermal_emissivity_W_m3_sr_Hz"] > 0.0
+    assert result["automatic_model_substitution"] is False
