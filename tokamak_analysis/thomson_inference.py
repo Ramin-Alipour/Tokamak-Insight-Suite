@@ -2141,11 +2141,33 @@ def analyze_thomson_spectra(
             if systematic_covariance_supplied else None
         )
         if systematic_covariance_supplied:
-            fit["fit_covariance_interpretation"] = (
-                "local_parameter_covariance_from_measurement_model_discrepancy_"
-                "and_systematic_covariance_components"
-                if measurement_covariance_supplied or model_discrepancy_covariance_supplied
-                else "local_parameter_covariance_from_supplied_systematic_covariance_only"
+            if measurement_covariance_supplied and model_discrepancy_covariance_supplied:
+                fit["fit_covariance_interpretation"] = (
+                    "local_parameter_covariance_from_measurement_model_discrepancy_"
+                    "and_systematic_covariance_components"
+                )
+            elif measurement_covariance_supplied:
+                fit["fit_covariance_interpretation"] = (
+                    "local_parameter_covariance_from_measurement_and_systematic_covariance"
+                )
+            elif model_discrepancy_covariance_supplied:
+                fit["fit_covariance_interpretation"] = (
+                    "local_parameter_covariance_from_model_discrepancy_and_systematic_covariance"
+                )
+            else:
+                fit["fit_covariance_interpretation"] = (
+                    "local_parameter_covariance_from_supplied_systematic_covariance_only"
+                )
+            fit["spectral_weighting_status"] = (
+                "full_channel_major_generalized_least_squares_with_systematic_covariance"
+                if cross_channel_covariance_present else
+                "within_channel_gls_with_measurement_model_discrepancy_and_systematic_covariance"
+                if measurement_covariance_supplied and model_discrepancy_covariance_supplied else
+                "within_channel_gls_with_measurement_and_systematic_covariance"
+                if measurement_covariance_supplied else
+                "within_channel_gls_with_model_discrepancy_and_systematic_covariance"
+                if model_discrepancy_covariance_supplied else
+                "within_channel_gls_with_systematic_covariance_only"
             )
         fit["background_model_status"] = (
             f"{background_model}_detector_space_basis_jointly_fitted"
