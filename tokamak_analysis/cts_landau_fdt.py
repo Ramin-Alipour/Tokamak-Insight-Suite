@@ -1,6 +1,6 @@
 """Conservative multispecies linearized Coulomb Landau operator and classical FDT.
 
-Finite-box, 3-D Cartesian velocity-space reference discretization about a
+Finite-box, 3-D Cartesian normalized-velocity reference discretization about a
 common-temperature, common-flow Maxwellian mixture. The symmetric weak form
 retains test-particle and field-particle terms and enforces particle number,
 total momentum and total energy invariants. The matching Langevin covariance
@@ -66,11 +66,15 @@ class LandauFDTSystem:
 
 
 def build_linearized_landau_fdt(
-    velocity_x_m_s, velocity_y_m_s, velocity_z_m_s, species: Sequence[Mapping],
+    normalized_velocity_x, normalized_velocity_y, normalized_velocity_z, species: Sequence[Mapping],
     *, common_temperature_J, common_bulk_flow_m_s=(0.0, 0.0, 0.0),
     coulomb_logarithm=15.0,
 ) -> LandauFDTSystem:
     """Assemble the multispecies linearized Landau operator for h=delta_f/F.
+
+    The three input axes are dimensionless velocity coordinates in units of each
+    species thermal speed sqrt(T/m); each species is mapped to its own physical
+    velocity grid, avoiding the unresolved electron/ion thermal-speed mismatch.
 
     The discrete weak form is
       <g,Lh>_W = -sum_ab Gamma_ab int F_a F_b'
@@ -86,8 +90,8 @@ def build_linearized_landau_fdt(
     relativistic and assumes isotropic Maxwellians with common T and flow.
     """
     temp = _positive(common_temperature_J, "common_temperature_J")
-    axes = [_axis(x)[0] for x in (velocity_x_m_s, velocity_y_m_s, velocity_z_m_s)]
-    vel, dv, deriv = _grid(axes)
+    axes = [_axis(x)[0] for x in (normalized_velocity_x, normalized_velocity_y, normalized_velocity_z)]
+    xi, dv_normalized, deriv_normalized = _grid(axes)
     nv = vel.shape[0]
     if nv > 512:
         raise ValueError("velocity grid exceeds 512 nodes; use a matrix-free implementation")
@@ -117,12 +121,14 @@ def build_linearized_landau_fdt(
     if not np.allclose(ln, ln.T, rtol=1e-12, atol=1e-12):
         raise ValueError("coulomb_logarithm matrix must be symmetric")
 
-    f0s, ws, slices = [], [], []
-    delta = vel - flow
+    f0s, ws, slices, velocity_grids, derivative_grids = [], [], [], [], []
     for s, (mass, density, charge, name) in enumerate(parsed):
-        vth2 = temp / mass
-        f0 = density / (2*np.pi*vth2)**1.5 * np.exp(-0.5*np.sum(delta**2, axis=1)/vth2)
-        w = f0 * dv
+        vth = np.sqrt(temp/mass)
+        velocities = flow + vth*xi
+        f0 = density / (2*np.pi*vth**2)**1.5 * np.exp(-0.5*np.sum(xi**2, axis=1))
+        w = f0 * (vth**3*dv_normalized)
+        velocity_grids.append(velocities)
+        derivative_grids.append([d/vth for d in deriv_normalized])
         if np.any(~np.isfinite(w)) or np.any(w <= 0):
             raise ValueError("Maxwellian underflow/overflow; enlarge or recenter the velocity domain")
         f0s.append(f0)
@@ -137,14 +143,14 @@ def build_linearized_landau_fdt(
             gamma = parsed[a][2]**2 * parsed[b][2]**2 * ln[a, b] / (8*np.pi*epsilon_0**2)
             oa, ob = a*nv, b*nv
             for i in range(nv):
-                ga = [deriv[d].getrow(i)/ma for d in range(3)]
+                ga = [derivative_grids[a][d].getrow(i)/ma for d in range(3)]
                 for j in range(nv):
-                    u = vel[i]-vel[j]
+                    u = velocity_grids[a][i]-velocity_grids[b][j]
                     u2 = float(u@u)
                     if u2 <= np.finfo(float).tiny:
                         continue
                     U = (np.eye(3)-np.outer(u,u)/u2)/np.sqrt(u2)
-                    gb = [deriv[d].getrow(j)/mb for d in range(3)]
+                    gb = [derivative_grids[b][d].getrow(j)/mb for d in range(3)]
                     D = lil_matrix((3, ndof), dtype=float)
                     for d in range(3):
                         D[d, oa:oa+nv] = ga[d]
@@ -163,8 +169,8 @@ def build_linearized_landau_fdt(
     for s, (mass, density, charge, name) in enumerate(parsed):
         sl = slices[s]
         moments[sl, s] = 1.0
-        moments[sl, ns:ns+3] = mass*vel
-        moments[sl, ns+3] = 0.5*mass*np.sum(vel**2, axis=1)
+        moments[sl, ns:ns+3] = mass*velocity_grids[s]
+        moments[sl, ns+3] = 0.5*mass*np.sum(velocity_grids[s]**2, axis=1)
     inv_resid = float(sparse_norm(K@moments) /
         max(sparse_norm(K)*np.linalg.norm(moments), np.finfo(float).tiny))
     # K is a Gram sum, hence PSD; verify the FDT covariance numerically.
@@ -173,7 +179,7 @@ def build_linearized_landau_fdt(
     metadata = {
         "operator": "multispecies_linearized_Coulomb_Landau_test_and_field_particle",
         "equilibrium": "common_temperature_common_flow_isotropic_Maxwellian",
-        "velocity_grid": "user_supplied_3D_Cartesian_tensor_product",
+        "velocity_grid": "species_scaled_3D_Cartesian_normalized_thermal_coordinates",
         "velocity_nodes_per_species": int(nv),
         "species_count": int(ns),
         "conservation": {"species_particle_number": True, "total_momentum": True, "total_energy": True},
@@ -188,7 +194,7 @@ def build_linearized_landau_fdt(
             "No quantum detailed balance or arbitrary non-Maxwellian equilibrium.",
         ],
     }
-    return LandauFDTSystem(L, W, Q, metric_diag, moments, tuple(slices), vel.copy(), metadata)
+    return LandauFDTSystem(L, W, Q, metric_diag, moments, tuple(slices), np.stack(velocity_grids), metadata)
 
 
 def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
@@ -217,8 +223,7 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
     if direction.shape != (3,) or np.any(~np.isfinite(direction)) or np.linalg.norm(direction) == 0:
         raise ValueError("propagation_direction must be a finite non-zero 3-vector")
     direction = direction/np.linalg.norm(direction)
-    streaming = system.velocity_grid_m_s @ direction
-    streaming = np.tile(streaming, len(system.species_slices))
+    streaming = (system.velocity_grid_m_s @ direction).ravel()
     L = system.operator_s_inverse.toarray() - 1j*wave_number*np.diag(streaming)
     Q = system.fdt_source_covariance_s_inverse.toarray()
     result = np.empty((omega.size, obs.shape[0], drive.shape[1]), complex)
