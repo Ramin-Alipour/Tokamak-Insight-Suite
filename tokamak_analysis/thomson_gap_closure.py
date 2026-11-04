@@ -128,6 +128,7 @@ def relativistic_projected_compton_kinematics(
     recoil_fraction = 1.0 - energy_ratio_rest
 
     kn_weight = None
+    thomson_weight = None
     if incident_polarization is not None:
         raw_polarization = np.asarray(incident_polarization)
         if raw_polarization.dtype.kind not in "iuf":
@@ -187,6 +188,11 @@ def relativistic_projected_compton_kinematics(
             denominator_i * np.maximum(differential_rest, 0.0)
             / (gamma**2 * denominator_s**2)
         )
+        thomson_differential_rest = 1.0 - polarization_projection_squared
+        thomson_weight = (
+            denominator_i * np.maximum(thomson_differential_rest, 0.0)
+            / (gamma**2 * denominator_s**2)
+        )
 
     return {
         "thomson_scattered_wavelength_nm": thomson_wavelength,
@@ -195,6 +201,7 @@ def relativistic_projected_compton_kinematics(
         "rest_frame_scattering_angle_cosine": cosine_rest,
         "maximum_recoil_correction_fraction": float(np.max(recoil_fraction)),
         "relative_lab_differential_scattering_weight": kn_weight,
+        "relative_lab_thomson_differential_scattering_weight": thomson_weight,
         "cross_section_weight_reference": "classical_electron_radius_squared",
         "kinematics": "exact_single_electron_Compton_four_momentum_conservation",
     }
@@ -215,7 +222,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
     incident polarization. Electrons remain restricted to velocities parallel
     to q in symmetric scattering geometry; this is not a general 3-D EVDF.
     In the default Thomson route, the maximum recoil correction is screened
-    against maximum_recoil_correction_fraction and no recoil weighting is used.
+    against maximum_recoil_correction_fraction. If polarization is supplied,
+    the elastic Thomson differential weight is also applied.
     """
     x = _real_vector(wavelength_nm, "wavelength_nm", minimum=9)
     y = _real_vector(signal, "signal", minimum=9)
@@ -281,10 +289,12 @@ def reconstruct_relativistic_projected_thomson_evdf(
         kinematics["compton_scattered_wavelength_nm"] if include_compton_recoil
         else kinematics["thomson_scattered_wavelength_nm"]
     )
-    scattering_weights = (
-        kinematics["relative_lab_differential_scattering_weight"]
-        if include_compton_recoil else np.ones(v.size, dtype=float)
-    )
+    if include_compton_recoil:
+        scattering_weights = kinematics["relative_lab_differential_scattering_weight"]
+    elif incident_polarization is not None:
+        scattering_weights = kinematics["relative_lab_thomson_differential_scattering_weight"]
+    else:
+        scattering_weights = np.ones(v.size, dtype=float)
     if np.any(~np.isfinite(scattering_weights)) or np.any(scattering_weights < 0.0):
         raise ValueError("Compton differential-scattering weights must be finite and non-negative")
     if np.any(wavelength_centres < x[0]) or np.any(wavelength_centres > x[-1]):
@@ -385,7 +395,10 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "maximum_recoil_correction_fraction_limit": float(recoil_limit),
         "scattering_cross_section_model": (
             "polarized_single_scattering_Klein_Nishina_in_electron_rest_frame"
-            if include_compton_recoil else "kinematic_delta_kernel_without_cross_section_weighting"
+            if include_compton_recoil else
+            "polarized_single_scattering_Thomson_in_electron_rest_frame"
+            if incident_polarization is not None else
+            "kinematic_delta_kernel_without_cross_section_weighting"
         ),
         "projected_evdf_s_m": evdf if data_identifiable else None,
         "regularized_candidate_evdf_s_m": evdf,
