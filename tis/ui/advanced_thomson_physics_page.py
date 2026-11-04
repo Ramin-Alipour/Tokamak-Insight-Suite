@@ -19,7 +19,7 @@ MODEL_LABELS = {
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
     "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
-    "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
+    "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware inversion with optional GCV regularization",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
@@ -74,7 +74,8 @@ EXAMPLES = {
     "thomson_psf_profile_inverse": {
         "measured_channel_values": [2.0, 3.0, 4.0, 3.0, 2.0],
         "spatial_mixing_matrix": [[0.85,0.10,0.00,0.00,0.00],[0.10,0.80,0.10,0.00,0.00],[0.00,0.10,0.80,0.10,0.00],[0.00,0.00,0.10,0.80,0.10],[0.00,0.00,0.00,0.10,0.85]],
-        "regularization_strength": 0.01,
+        "regularization_strength": None,
+        "gcv_candidate_count": 31,
         "measurement_uncertainty": [0.1,0.1,0.1,0.1,0.1]
     },
     "thomson_projected_evdf": {
