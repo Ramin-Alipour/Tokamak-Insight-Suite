@@ -375,3 +375,42 @@ def test_free_free_only_uniform_slab_obeys_planck_kirchhoff_solution():
         result["spectral_radiance_W_m2_sr_Hz"], expected,
         rtol=2e-12, atol=1e-30,
     )
+
+
+
+def test_effective_mode_optical_depth_ignores_zero_weight_modes_without_underflow():
+    # The zero-weight mode has the smallest optical depth. It must not become
+    # the log-sum-exp reference: doing so underflows the only active mode.
+    result = integrate_thermal_microwave_background(
+        frequency_Hz=np.array([100e9]),
+        path_length_m=np.array([1.0]),
+        electron_temperature_eV=np.array([1000.0]),
+        electron_density_m3=np.array([1.0e-20]),
+        ion_densities_m3=np.array([[1.0e-20]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=np.array([[[0.0, 1000.0]]]),
+        ece_mode_weights=np.array([0.0, 1.0]),
+        ece_emissivity_W_m3_sr_Hz=np.zeros((1, 1, 2)),
+        incident_radiance_W_m2_sr_Hz=np.array([1.0]),
+    )
+    assert np.isfinite(result["total_optical_depth"][0])
+    assert result["total_optical_depth"][0] == pytest.approx(1000.0)
+    assert result["total_optical_depth_by_mode"][0, 0] == pytest.approx(0.0)
+    assert result["total_optical_depth_by_mode"][0, 1] == pytest.approx(1000.0)
+
+
+def test_mode_weights_reject_boolean_and_non_numeric_values():
+    base = dict(
+        frequency_Hz=np.array([100e9]),
+        path_length_m=np.array([1.0]),
+        electron_temperature_eV=np.array([1000.0]),
+        electron_density_m3=np.array([1.0e-20]),
+        ion_densities_m3=np.array([[1.0e-20]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=np.array([[[0.2, 0.8]]]),
+        ece_emissivity_W_m3_sr_Hz=np.zeros((1, 1, 2)),
+    )
+    with pytest.raises(ValueError, match="ece_mode_weights must contain real numeric values"):
+        integrate_thermal_microwave_background(
+            **base, ece_mode_weights=np.array([True, False])
+        )
