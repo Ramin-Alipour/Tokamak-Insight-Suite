@@ -22,7 +22,10 @@ from .ece_kinetic import (
 from .cts_em_background import integrate_thermal_microwave_background
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
-from .cts_stokes_transfer import propagate_polarized_lte_stokes
+from .cts_stokes_transfer import (
+    propagate_polarized_lte_stokes,
+    propagate_stratified_polarized_lte_stokes,
+)
 
 
 def analyze_landau_fdt_cts(
@@ -377,6 +380,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         matrices for a supplied stratified dielectric.
       - polarized_lte_stokes: exact constant-coefficient Stokes transfer with
         dichroic Kirchhoff emissivity and Faraday rotation/conversion.
+      - stratified_polarized_lte_stokes: ordered segment-by-segment polarized
+        LTE ray transfer; non-commuting layer operators are not averaged.
 
     No physical model is substituted automatically. Equilibrium, geometry,
     dielectric, mode-basis and calibration inputs remain explicit caller data.
@@ -406,6 +411,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = propagate_stratified_nonparaxial_vector_field
     elif model == "polarized_lte_stokes":
         solver = propagate_polarized_lte_stokes
+    elif model == "stratified_polarized_lte_stokes":
+        solver = propagate_stratified_polarized_lte_stokes
     elif model == "stratified_mode_conversion":
         solver = solve_stratified_mode_conversion
     else:
@@ -432,5 +439,6 @@ __all__ = [
     "propagate_stratified_nonparaxial_vector_field",
     "solve_polarized_kinetic_ece_with_mode_conversion",
     "propagate_polarized_lte_stokes",
+    "propagate_stratified_polarized_lte_stokes",
     "run_advanced_thomson_physics",
 ]
