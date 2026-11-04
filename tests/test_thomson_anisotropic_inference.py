@@ -120,7 +120,7 @@ def _synthetic_bi_kappa_spectra():
     directional = tperp + (tpar-tperp)*pitch
     spectra = []
     for i, (temp, flow) in enumerate(zip(directional, [1.2e5, -0.7e5, 0.4e5])):
-        theta2 = ((2.0*kappa-3.0)/kappa)*(2.0*e*temp/me)
+        theta2 = ((2.0*kappa-3.0)/kappa)*(e*temp/me)
         theta = np.sqrt(theta2)
         velocity = (c/qmag)*(1.0-wavelength/laser)-flow
         log_pdf = (gammaln(kappa)-0.5*np.log(np.pi*kappa)
