@@ -174,8 +174,18 @@ def build_linearized_landau_fdt(
     inv_resid = float(sparse_norm(K@moments) /
         max(sparse_norm(K)*np.linalg.norm(moments), np.finfo(float).tiny))
     # K is a Gram sum, hence PSD; verify the FDT covariance numerically.
-    if inv_resid > 5e-2:
-        raise ArithmeticError("velocity grid does not resolve discrete Landau invariants; refine/expand it")
+    # The metadata below advertises exact discrete conservation.  A loose
+    # percent-level tolerance would let a poorly resolved grid pass while
+    # still labelling number, momentum and energy as conserved.  The chosen
+    # finite-difference stencil differentiates the invariant polynomials
+    # exactly on supported grids; only round-off-scale residual is accepted.
+    invariant_tolerance = 1.0e-8
+    if not np.isfinite(inv_resid) or inv_resid > invariant_tolerance:
+        raise ArithmeticError(
+            "velocity grid does not resolve discrete Landau invariants "
+            f"(relative residual={inv_resid:.3e}, tolerance={invariant_tolerance:.1e}); "
+            "refine/expand the grid"
+        )
     metadata = {
         "common_temperature_J": float(temp),
         "common_bulk_flow_m_s": flow.copy(),
@@ -189,6 +199,8 @@ def build_linearized_landau_fdt(
         "entropy_production": "non_positive",
         "fdt": "classical_Langevin_covariance_from_same_discrete_Landau_operator",
         "invariant_relative_residual": inv_resid,
+        "invariant_relative_tolerance": invariant_tolerance,
+        "invariants_numerically_verified": True,
         "coulomb_logarithm": ln.copy(),
         "limitations": [
             "Non-relativistic isotropic Maxwellian equilibrium only.",
