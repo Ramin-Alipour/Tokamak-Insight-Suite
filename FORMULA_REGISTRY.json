@@ -5582,5 +5582,117 @@
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
       ]
     }
+  },
+  {
+    "name": "Collisionless isotropic-Kappa CTS Landau susceptibility",
+    "equation": "f'_κ(v) = -2κv f_κ(v)/(a_κ+v²), a_κ=(2κ-3)k_B T_e/m_e; χ_e=-(ω_pe²/k²)∫_{-∞}^{∞} f'_κ(v)/(v-ζ) dv, Im(ζ)>0",
+    "inputs": "v [m/s] coverage grid; phase_velocity [m/s]; n_e [m^-3]; T_e [eV]; κ>3/2; k [m^-1]; optional positive Landau-pole displacement [m/s]",
+    "output": "Complex longitudinal electron susceptibility; full-tail Landau integral; adaptive quadrature errors; finite-grid CDF coverage",
+    "assumptions": "Isotropic non-relativistic 3-D Kappa distribution; exact 1-D marginal; collisionless, unmagnetized, longitudinal response; positive retarded-pole displacement.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.kappa_electron_susceptibility",
+      "formula_key": "cts_isotropic_kappa_landau_susceptibility",
+      "input_specs": [
+        {
+          "name": "v",
+          "unit": "m s^-1",
+          "description": "Strictly increasing finite velocity grid used only to enforce analytic CDF probability coverage and return a sampled PDF.",
+          "required": true
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s^-1",
+          "description": "Real phase velocity ω/k defining the Landau pole real part.",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "description": "Positive electron density.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive second-moment electron temperature.",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless",
+          "description": "Kappa index, strictly greater than 3/2 for finite second moment.",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1",
+          "description": "Positive longitudinal wave number.",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg",
+          "description": "Electron mass by default; optional species mass override.",
+          "required": false
+        },
+        {
+          "name": "pole_imaginary_part_m_s",
+          "unit": "m s^-1",
+          "description": "Positive imaginary pole displacement selecting the retarded Landau response; numerical regularization input, not a fitted collision rate.",
+          "required": false
+        },
+        {
+          "name": "minimum_velocity_grid_probability_coverage",
+          "unit": "dimensionless",
+          "description": "Explicit minimum analytic Kappa CDF mass represented by the supplied diagnostic grid; default 0.999.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex",
+          "description": "Collisionless longitudinal electron susceptibility using the complete analytic Kappa tail."
+        },
+        {
+          "name": "integral",
+          "unit": "s m^-2",
+          "description": "Full-axis Landau integral of f'_κ(v)/(v-ζ)."
+        },
+        {
+          "name": "landau_integral_real_absolute_error",
+          "unit": "s m^-2",
+          "description": "Adaptive quadrature absolute error estimate for the real part."
+        },
+        {
+          "name": "landau_integral_imag_absolute_error",
+          "unit": "s m^-2",
+          "description": "Adaptive quadrature absolute error estimate for the imaginary part."
+        },
+        {
+          "name": "velocity_grid_probability_coverage",
+          "unit": "dimensionless",
+          "description": "Exact analytic CDF probability mass represented by the supplied velocity grid."
+        },
+        {
+          "name": "landau_integral_tail_complete",
+          "unit": "boolean",
+          "description": "True when the physical susceptibility integral includes the analytic distribution over the full real velocity axis."
+        }
+      ],
+      "prerequisites": [
+        "Calibrated/prepared physical inputs; isotropic Kappa model; κ>3/2; collisionless unmagnetized longitudinal regime."
+      ],
+      "uncertainty_model": "Adaptive quadrature absolute errors are returned. This kernel does not infer uncertainty in supplied plasma parameters or model discrepancy.",
+      "test_links": [
+        "tests/test_cts_kappa.py::test_kappa_landau_susceptibility_integrates_the_analytic_tail_not_the_finite_grid",
+        "tests/test_cts_kappa.py::test_kappa_response_is_finite_and_normalized"
+      ],
+      "note": "Mapped to the public advanced-physics dispatcher and dashboard. This is not a conserving collisional Kappa operator, FDT noise closure, magnetized dielectric, relativistic Kappa response or Full-EM CTS vertex."
+    }
   }
 ]
