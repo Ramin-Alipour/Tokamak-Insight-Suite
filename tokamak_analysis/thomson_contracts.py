@@ -180,9 +180,11 @@ def validate_profile_inversion_contract(
         if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):
             raise ValueError(f"regularization strength for {name} must be an explicit positive real scalar")
         strength = float(value)
-        if not np.isfinite(strength) or strength <= 0:
-            raise ValueError(f"regularization strength for {name} must be finite and > 0")
+        if not np.isfinite(strength) or strength < 0:
+            raise ValueError(f"regularization strength for {name} must be finite and >= 0")
         parsed[name] = strength
+    if not any(value > 0 for value in parsed.values()):
+        raise ValueError("at least one active profile must have a positive regularization strength")
     return {
         "profile_bounds_relative": (float(bounds[0]), float(bounds[1])),
         "regularization_strength": parsed,
