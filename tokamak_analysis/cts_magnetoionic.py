@@ -33,11 +33,14 @@ def cold_plasma_dielectric_tensor(
     """Return the cold-plasma Stix dielectric tensor for exp(-i omega t).
 
     Each species mapping contains mass_kg, charge_C (signed), and density_m3.
-    The signed gyrofrequency is Omega_s=q_s |B|/m_s. With B along +z:
-      R=1-sum(omega_ps^2/[omega(omega+Omega_s)]),
-      L=1-sum(omega_ps^2/[omega(omega-Omega_s)]),
-      S=(R+L)/2, D=(R-L)/2, P=1-sum(omega_ps^2/omega^2).
-    The tensor in a right-handed field-aligned basis is
+    The signed gyrofrequency is Omega_s=q_s |B|/m_s. With B along +z
+    and species momentum-transfer rate nu_s:
+      R=1-sum(omega_ps^2/[omega(omega+i*nu_s+Omega_s)]),
+      L=1-sum(omega_ps^2/[omega(omega+i*nu_s-Omega_s)]),
+      P=1-sum(omega_ps^2/[omega(omega+i*nu_s)]),
+      S=(R+L)/2, D=(R-L)/2.
+    Setting every nu_s=0 recovers the collisionless Stix tensor. The tensor
+    in a right-handed field-aligned basis is
       [[S,-iD,0],[iD,S,0],[0,0,P]].
     Optional species collision_frequency_rad_s uses the cold-fluid
     momentum-drag closure for exp(-i omega t). It does not represent a
