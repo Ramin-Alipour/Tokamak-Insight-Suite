@@ -658,6 +658,12 @@ def full_em_cts_spectral_density(
     cold_mode_diagnostics = []
     local_magnetic_fields = []
     beam_overlap_weights = []
+    # Continue each cold-plasma eigenmode from the preceding measured
+    # frequency bin. Reusing the launch polarization as a fixed selector can
+    # jump to the other eigenmode when its polarization rotates across a
+    # frequency sweep.
+    previous_incident_mode_field = np.asarray(ei, dtype=complex).copy()
+    previous_scattered_mode_field = np.asarray(es, dtype=complex).copy()
     for index, shift in enumerate(shifts):
         fs = f0 + shift
         if frequency_geometry is None:
@@ -674,11 +680,15 @@ def full_em_cts_spectral_density(
             if not np.isfinite(overlap_weight) or overlap_weight < 0.0 or overlap_weight > 1.0 + 1e-10:
                 raise ValueError("beam_overlap_relative must be finite and lie in [0, 1]")
             incident_wavevector_bin, ei_bin, incident_diag_bin = _select_flux_normalized_cold_mode(
-                2.0*np.pi*f0, ki_hat_bin, b_bin, cold_wave_species, ei
+                2.0*np.pi*f0, ki_hat_bin, b_bin, cold_wave_species,
+                previous_incident_mode_field,
             )
+            previous_incident_mode_field = ei_bin.copy()
         scattered_wavevector, scattered_mode_field, scattered_mode_diagnostics = _select_flux_normalized_cold_mode(
-            2.0*np.pi*fs, ks_hat_bin, b_bin, cold_wave_species, es
+            2.0*np.pi*fs, ks_hat_bin, b_bin, cold_wave_species,
+            previous_scattered_mode_field,
         )
+        previous_scattered_mode_field = scattered_mode_field.copy()
         ki = incident_wavevector_bin
         ks = scattered_wavevector
         ei_local = ei_bin
@@ -929,6 +939,8 @@ def full_em_cts_spectral_density(
         "frequency_resolved_magnetic_field_T": np.asarray(local_magnetic_fields),
         "relative_gaussian_beam_overlap": np.asarray(beam_overlap_weights),
         "ray_tracing_geometry_used": frequency_geometry is not None,
+        "cold_plasma_mode_tracking": "adjacent_frequency_bin_eigenpolarization_overlap_continuation",
+        "mode_conversion_at_exact_degeneracies": "not_solved; branch continuation is not a coupled-mode conversion calculation",
         "scattering_volume_integration_used": False,
         "scattering_volume_weighting": "single local scattering point; no path-integrated scattering-volume quadrature",
         "scattering_locations_m": (np.asarray([item["scattering_location_m"] for item in frequency_geometry])
@@ -969,7 +981,8 @@ def full_em_cts_spectral_density(
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied electron distributions may use relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum distributions, and fast ions use bi-Gaussian or tabulated distributions.",
             "When electron_distribution is supplied, the Maxwellian electron response and Bindslev electron nonlinear source are replaced by a relativistic gyrotropic electron Vlasov response and second-order kinetic vertex; supplied fast-ion populations add their own relativistic vertices.",
-            "Classical FDT is applied only to bulk thermal Maxwellian species; explicitly supplied relativistic electron/fast-ion populations use the Klimontovich orbit spectrum."
+            "Classical FDT is applied only to bulk thermal Maxwellian species; explicitly supplied relativistic electron/fast-ion populations use the Klimontovich orbit spectrum.",
+            "Cold-plasma eigenmodes are continued by adjacent-bin polarization overlap; exact-degeneracy mode conversion and coupled-mode transport are not solved."
         ],
     }
 
