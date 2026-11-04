@@ -402,7 +402,7 @@ def test_evdf_allows_positive_definite_discrepancy_only_weighting():
         wavelength, signal, background,
         model_discrepancy_covariance=discrepancy,
     )
-    assert out["measurement_uncertainty_model"] == "model_discrepancy_and_systematic_covariance_only"
+    assert out["measurement_uncertainty_model"] == "model_discrepancy_only_weighting"
     assert out["evdf_covariance_available"] is True
 
 
