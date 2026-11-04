@@ -1115,3 +1115,15 @@ The interior and endpoint contributions are returned separately. This prevents a
 The free-free absorption kernel now rejects non-finite Gaunt factors, including NaN and infinities, before evaluating the Kirchhoff opacity alpha_nu=j_nu/B_nu(T_e). The emissivity path already enforced this condition; the opacity path now has matching finite-domain behavior. Tests cover all three non-finite cases.
 
 **Verification boundary:** the code, focused tests, Analysis-1 Python output contract, root diagnostic registry, and this audit note were committed directly to main. These changes do not mark the full OPT/CTS/PROF/INT defect list complete. GitHub Actions must pass on the final resulting SHA before software-test success is claimed; no experimental validation is claimed.
+
+
+### Full analytic Kappa-tail Landau response (TS-10)
+
+The isotropic-Kappa CTS susceptibility now integrates the exact derivative of the 1-D Kappa marginal over the complete velocity axis rather than truncating the susceptibility integral at the numerical VDF grid. With `a_κ=(2κ-3)k_B T_e/m_e),
+
+```
+f'_κ(v) = -2 κ v f_κ(v)/(a_κ + v²)
+χ_e(k,ω) = -(ω_pe²/k²) ∫[-∞,+∞] f'_κ(v)/(v-ζ) dv, Im(ζ)>0
+```
+
+Adaptive real/imaginary quadrature errors are returned separately. The finite input grid is retained as a CDF coverage requirement and sampled-PDF diagnostic, but changing its extent within the accepted coverage domain must not change the physical susceptibility. A regression test checks this grid invariance. This upgrades the collisionless isotropic non-relativistic unmagnetized electrostatic Kappa response; it does not imply a closed-form generalized dispersion function, collisional Kappa operator, FDT noise closure, magnetized dielectric, relativistic Kappa response or Full-EM CTS vertex.
