@@ -19,7 +19,7 @@ def test_unmagnetized_limit_is_isotropic_and_matches_plasma_frequency_relation()
     frequency = 100e9
     density = 1.0e18
     result = cold_plasma_dielectric_tensor(
-        frequency, [0.0, 0.0, 1.0], _electron_only(density)
+        frequency, [0.0, 0.0, 0.0], _electron_only(density)
     )
     omega = 2*np.pi*frequency
     omega_p2 = density*E**2/(EPS0*ME)
@@ -57,7 +57,7 @@ def test_perpendicular_ordinary_mode_is_stix_P():
     "frequency,field,species,direction",
     [
         (0.0, [0, 0, 1], _electron_only(), [0, 0, 1]),
-        (100e9, [0, 0, 0], _electron_only(), [0, 0, 1]),
+        (100e9, [0, 0], _electron_only(), [0, 0, 1]),
         (100e9, [0, 0, 1], [], [0, 0, 1]),
         (100e9, [0, 0, 1], _electron_only(), [0, 0, 0]),
     ],
