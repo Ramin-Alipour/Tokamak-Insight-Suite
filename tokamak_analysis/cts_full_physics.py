@@ -127,23 +127,18 @@ def propagate_stratified_nonparaxial_vector_field(
         ev -= kv * (np.dot(kv, ev) / (k0*k0))
         if np.linalg.norm(ev[:2]) <= np.finfo(float).tiny:
             continue
-        result = solve_stratified_full_wave_oblique(
+        conversion_result = solve_stratified_mode_conversion(
             omega, z, eps, kx_rad_m=float(KX[iy, ix]),
-            ky_rad_m=float(KY[iy, ix]),
-            incident_amplitude_V_m=ev[:2], rtol=rtol, atol=atol,
+            ky_rad_m=float(KY[iy, ix]), rtol=rtol, atol=atol,
             max_step_m=max_step_m,
         )
-        et = result["transmitted_electric_amplitude_V_m"]
-        er = result["reflected_electric_amplitude_V_m"]
+        et = conversion_result["transmitted_jones_matrix"] @ ev[:2]
+        er = conversion_result["reflected_jones_matrix"] @ ev[:2]
         transmitted[iy, ix, :2] = et
         transmitted[iy, ix, 2] = -(KX[iy, ix]*et[0] + KY[iy, ix]*et[1]) / q
         reflected[iy, ix, :2] = er
         reflected[iy, ix, 2] = (KX[iy, ix]*er[0] + KY[iy, ix]*er[1]) / q
-        conversion[iy, ix] = solve_stratified_mode_conversion(
-            omega, z, eps, kx_rad_m=float(KX[iy, ix]),
-            ky_rad_m=float(KY[iy, ix]), rtol=rtol, atol=atol,
-            max_step_m=max_step_m,
-        )["transmitted_jones_matrix"]
+        conversion[iy, ix] = conversion_result["transmitted_jones_matrix"]
         solved += 1
     output = np.stack([ifft2(transmitted[..., j]) for j in range(3)], axis=-1)
     reflected_field = np.stack([ifft2(reflected[..., j]) for j in range(3)], axis=-1)
