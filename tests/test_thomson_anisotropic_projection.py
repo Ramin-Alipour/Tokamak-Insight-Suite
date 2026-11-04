@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
 
-from tokamak_analysis.thomson_kinetic_models import project_bi_maxwellian_electron_vdf
+from tokamak_analysis.thomson_kinetic_models import (
+    project_bi_maxwellian_electron_vdf,
+    infer_gyrotropic_bi_maxwellian_temperatures,
+)
 
 
 def test_bi_maxwellian_projected_temperature_has_correct_parallel_and_perpendicular_limits():
@@ -66,4 +69,34 @@ def test_bi_maxwellian_projection_rejects_nonunit_geometry():
             temperature_perpendicular_eV=100.0,
             magnetic_field_unit=[2.0, 0.0, 0.0],
             scattering_vector_unit=[0.0, 1.0, 0.0],
+        )
+
+
+def test_multi_pitch_anisotropy_inversion_propagates_pitch_geometry_covariance():
+    common = dict(
+        projected_temperature_eV=[200.0, 175.0, 100.0],
+        magnetic_pitch_cosine=[1.0, 0.5, 0.0],
+        projected_temperature_covariance_eV2=np.diag([4.0, 4.0, 4.0]),
+    )
+    measurement_only = infer_gyrotropic_bi_maxwellian_temperatures(**common)
+    with_geometry = infer_gyrotropic_bi_maxwellian_temperatures(
+        **common,
+        magnetic_pitch_cosine_covariance=np.diag([1.0e-4, 1.0e-4, 1.0e-4]),
+    )
+    assert with_geometry["reportable_as_inferred_parameter"] is True
+    assert with_geometry["geometry_uncertainty_included"] is True
+    assert with_geometry["geometry_covariance_method"] == "iterative_first_order_errors_in_variables_GLS"
+    assert with_geometry["electron_temperature_parallel_eV"] == pytest.approx(200.0, rel=2e-3)
+    assert with_geometry["electron_temperature_perpendicular_eV"] == pytest.approx(100.0, rel=2e-3)
+    assert np.trace(with_geometry["temperature_covariance_eV2"]) > np.trace(
+        measurement_only["temperature_covariance_eV2"]
+    )
+
+
+def test_multi_pitch_anisotropy_rejects_non_psd_pitch_covariance():
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        infer_gyrotropic_bi_maxwellian_temperatures(
+            [200.0, 150.0, 100.0], [1.0, 0.5, 0.0],
+            projected_temperature_covariance_eV2=np.diag([4.0, 4.0, 4.0]),
+            magnetic_pitch_cosine_covariance=np.diag([1.0e-4, -1.0e-4, 1.0e-4]),
         )
