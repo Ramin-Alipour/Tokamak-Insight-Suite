@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: ece-dashboard-${{ github.workflow }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   test:
