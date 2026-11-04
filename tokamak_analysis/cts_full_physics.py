@@ -505,6 +505,7 @@ __all__ = [
     "cold_plasma_mode_radiative_coefficients",
     "cold_plasma_mode_group_velocity",
     "plasma_charge_state_moments",
-    "infer_gyrotropic_bi_maxwellian_temperatures",\n    "infer_three_dimensional_flow_from_thomson_projections",
+    "infer_gyrotropic_bi_maxwellian_temperatures",
+    "infer_three_dimensional_flow_from_thomson_projections",
     "run_advanced_thomson_physics",
 ]
