@@ -27,7 +27,7 @@ def test_thomson_analysis_1_registry_input_and_output_names_are_unique():
 
 
 def test_parameter_identifiability_is_declared_across_all_thomson_subanalyses():
-    for analysis_id in (1, 46, 81):
+    for analysis_id in (1, 30, 46, 81):
         outputs = {
             item["name"]
             for item in get_analysis(analysis_id)["execution_contract"]["output_specs"]
