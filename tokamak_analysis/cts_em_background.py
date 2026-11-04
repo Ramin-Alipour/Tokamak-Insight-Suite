@@ -303,6 +303,15 @@ def integrate_thermal_microwave_background(
         alpha_ff_total += alpha_ff * length[index]
         tau_ece_modes += ece_alpha[index].T * length[index]
     intensity = mode_weights @ intensity_modes
+    # An incoherent receiver mixture attenuates as sum_m w_m exp(-tau_m),
+    # not exp(-sum_m w_m tau_m).  Report the exact effective optical depth
+    # for incident radiation as well as the mode-resolved depths.
+    total_tau_by_mode = alpha_ff_total[None, :] + tau_ece_modes
+    minimum_tau = np.min(total_tau_by_mode, axis=0)
+    scaled_transmission = mode_weights @ np.exp(
+        -(total_tau_by_mode - minimum_tau[None, :])
+    )
+    effective_total_tau = minimum_tau - np.log(scaled_transmission)
     has_free_free = bool(np.any(alpha_ff_total > 0.0))
     has_ece = bool(np.any(tau_ece_modes > 0.0) or (
         ece_emissivity is not None and np.any(ece_emissivity > 0.0)
@@ -341,7 +350,9 @@ def integrate_thermal_microwave_background(
         "thermal_bremsstrahlung_optical_depth": alpha_ff_total,
         "ece_optical_depth": tau_ece_modes.T @ mode_weights,
         "ece_optical_depth_by_mode": tau_ece_modes,
-        "total_optical_depth": alpha_ff_total + tau_ece_modes.T @ mode_weights,
+        "total_optical_depth": effective_total_tau,
+        "total_optical_depth_by_mode": total_tau_by_mode.T,
+        "mean_total_optical_depth": alpha_ff_total + tau_ece_modes.T @ mode_weights,
         "ece_model_status": ece_status,
         "ece_source_model": ece_source_model,
         "gaunt_factor_resolution": gaunt_status,
