@@ -175,10 +175,13 @@ def _spitzer_species_collision_frequencies(
     nu_ei = 2.91e-6 * (ne * 1e-6) * zeff * ln_lambda / te**1.5
     rates = {"e-": float(nu_ei)}
     me_over_amu = 5.48579909065e-4
-    for name, z, mass_amu, density, ti in records:
-        nu_ii = 4.80e-8 * (density * 1e-6) * z**4 * ln_lambda / (np.sqrt(mass_amu) * ti**1.5)
-        nu_ie = (ne * me_over_amu / (density * mass_amu)) * nu_ei
-        rates[name] = float(nu_ii + nu_ie)
+    for i, (name, z, mass_amu, density, ti) in enumerate(records):
+        # Allocate the electron-ion momentum-transfer rate by each ion's
+        # Z_i^2 n_i contribution before applying pairwise momentum balance.
+        species_nu_ei = 2.91e-6 * (ne * 1e-6) * fractions[i] * z * ln_lambda / te**1.5
+        nu_ii_self = 4.80e-8 * (density * 1e-6) * z**4 * ln_lambda / (np.sqrt(mass_amu) * ti**1.5)
+        nu_ie = (ne * me_over_amu / (density * mass_amu)) * species_nu_ei
+        rates[name] = float(nu_ii_self + nu_ie)
     return {
         "collision_frequencies_s_inverse": rates,
         "effective_charge_Zeff": float(zeff),
@@ -189,6 +192,7 @@ def _spitzer_species_collision_frequencies(
             "weakly coupled, fully ionized, non-degenerate plasma",
             "classical Coulomb logarithm is supplied externally",
             "species-resolved Krook resonance correction, not a conserving linearized Landau operator",
+            "ion-ion rates include self-collisions only; cross-species ion-ion collision terms are omitted",
             "neutral collisions, strong coupling, relativistic corrections and velocity-space redistribution are omitted",
         ],
     }
@@ -667,6 +671,11 @@ def full_em_cts_spectral_density(
     collision_rates = collisional_diagnostics["collision_frequencies_s_inverse"]
     electron_distribution_used = None
     if electron_distribution is not None:
+        if collisional_model is not None:
+            raise ValueError(
+                "collisional_model currently applies only to thermal Maxwellian species; "
+                "collisional evolution of an explicit relativistic electron distribution is not implemented."
+            )
         if electron_flow_projection_m_s is not None and abs(electron_flow_projection_m_s) > 0.0:
             raise ValueError(
                 "With an explicit electron distribution, encode any parallel drift in the distribution "
