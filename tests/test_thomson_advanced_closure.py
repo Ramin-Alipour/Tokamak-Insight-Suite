@@ -74,3 +74,45 @@ def test_profile_regularization_does_not_hide_forward_null_space():
     assert result["data_only_rank"] == 2
     assert not result["data_only_identifiable"]
     assert "null space" in result["null_space_warning"]
+
+
+
+def test_optical_model_validity_distinguishes_nonrelativistic_and_relativistic_domains():
+    from tokamak_analysis.thomson_identifiability import optical_model_validity
+
+    nonrel = optical_model_validity(
+        "non_collective_maxwellian",
+        electron_temperature_eV=20_000.0,
+        electron_velocity_projection_m_s=0.2 * 299_792_458.0,
+    )
+    assert nonrel["status"] == "asymptotic_screen_exceeded"
+    assert {item["name"] for item in nonrel["checks"]} == {
+        "thermal_relativistic_parameter", "bulk_flow_beta"
+    }
+    relativistic = optical_model_validity(
+        "non_collective_relativistic_maxwell_juttner",
+        electron_temperature_eV=20_000.0,
+        electron_velocity_projection_m_s=0.2 * 299_792_458.0,
+    )
+    assert relativistic["status"] == "within_declared_screen"
+    assert all(
+        item["status"] in {
+            "included_in_relativistic_maxwell_juttner_model",
+            "within_lorentz_boost_domain",
+        }
+        for item in relativistic["checks"]
+    )
+
+
+def test_kappa_model_validity_reports_finite_variance_domain():
+    from tokamak_analysis.thomson_identifiability import optical_model_validity
+
+    result = optical_model_validity(
+        "non_collective_kappa",
+        electron_temperature_eV=100.0,
+        electron_velocity_projection_m_s=0.0,
+        kappa_index=1.4,
+    )
+    assert result["status"] == "outside_declared_model_domain"
+    kappa_check = next(item for item in result["checks"] if item["name"] == "finite_variance_kappa_domain")
+    assert kappa_check["status"] == "outside_declared_domain"

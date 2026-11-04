@@ -341,3 +341,20 @@ def test_nonuniform_wavelength_moments_use_one_finite_volume_measure():
     assert result["positive_area"] == pytest.approx(expected_area, rel=1e-13)
     assert result["center"] == pytest.approx(expected_center, rel=1e-13)
     assert result["variance"] == pytest.approx(expected_variance, rel=1e-13)
+
+
+
+def test_spectral_distribution_marks_gaussian_width_as_nonphysical_temperature():
+    import numpy as np
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(1059.0, 1061.0, 41)
+    signal = 2.0 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.2) ** 2) + 0.05
+    response = np.eye(wavelength.size)
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal, instrument_response_matrix=response,
+        background_fraction=0.1,
+    )
+    assert result["gaussian_width_is_physical_temperature"] is False
+    assert "not a unique electron temperature" in result["gaussian_width_interpretation"]
+    assert "canonical Thomson physical forward-model fit" in result["physical_temperature_source"]
