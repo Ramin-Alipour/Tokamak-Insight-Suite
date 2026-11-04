@@ -2766,7 +2766,7 @@
     "equation": "T_e = (σ_λ/λ_0)^2 (m_e c²/4) / sin²(θ/2)",
     "inputs": "Intrinsic plasma Doppler-width parameter from the measured-response-convolved physical spectrum fit [nm], laser wavelength [nm], scattering angle [rad]",
     "output": "eV",
-    "assumptions": "Single scattering; isotropic non-relativistic Maxwellian electrons; intrinsic width inferred by the measured-response-convolved physical forward fit; known geometry",
+    "assumptions": "Intrinsic Gaussian width equals thermal Doppler width for a non-collective isotropic non-relativistic Maxwellian. This is a conditional Te estimator, not a generic conversion of any Gaussian width. Non-Maxwellian tails, flow broadening, unresolved populations and residual instrumental broadening require explicit forward modelling.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -2814,6 +2814,26 @@
         {
           "name": "uncertainty_electron_temperature_eV",
           "unit": "eV"
+        },
+        {
+          "name": "temperature_identifiability",
+          "unit": "text",
+          "description": "Explicit conditional identifiability under the stated non-collective isotropic non-relativistic Maxwellian model."
+        },
+        {
+          "name": "relativistic_temperature_parameter_theta_e",
+          "unit": "1",
+          "description": "Dimensionless thermal parameter Te/(m_e c^2)."
+        },
+        {
+          "name": "nonrelativistic_screen_status",
+          "unit": "text",
+          "description": "Conservative theta_e<=0.01 screen; values outside it should use a relativistic forward model."
+        },
+        {
+          "name": "screen_threshold_theta_e",
+          "unit": "1",
+          "description": "Conservative software screening threshold, not a universal physical validity boundary."
         }
       ],
       "prerequisites": [
@@ -2822,11 +2842,11 @@
         "intrinsic plasma Doppler-width parameter inferred by the measured-response-convolved physical forward fit",
         "known geometry"
       ],
-      "uncertainty_model": "Independent first-order propagation of width, laser-wavelength and angle uncertainties.",
+      "uncertainty_model": "Optional independent uncertainties in intrinsic width, laser wavelength and scattering angle are propagated by first-order linearization. This uncertainty is conditional on the Maxwellian non-relativistic width model.",
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
       ],
-      "note": "Standalone analytic relation for the intrinsic width parameter of the canonical measured-spectrum forward fit; it does not correct or deconvolve measured spectra. Numerical software tests only; not empirical validation.",
+      "note": "The helper does not deconvolve the instrument response. The supplied width must be intrinsic to a selected physical spectral fit; outside theta_e<=0.01 the result is screened as requiring a relativistic model.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
