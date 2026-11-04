@@ -7172,6 +7172,15 @@
         "article": "P07014",
         "year": 2025,
         "doi": "10.1088/1748-0221/20/07/P07014"
+      },
+      {
+        "title": "Non-Maxwellian electron velocity distributions and Thomson scattering diagnostics",
+        "authors": "Skolar, Longley & Goodwin",
+        "journal": "Physics of Plasmas",
+        "volume": "32",
+        "article": "043907",
+        "year": 2025,
+        "doi": "10.1063/5.0261966"
       }
     ],
     "raw_data_to_physics": false,
