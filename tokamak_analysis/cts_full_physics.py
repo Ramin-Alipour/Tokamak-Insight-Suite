@@ -429,6 +429,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_dielectric_tensor
     elif model == "cold_plasma_magnetoionic_modes":
         solver = cold_plasma_magnetoionic_modes
+    elif model == "plasma_charge_state_moments":
+        solver = plasma_charge_state_moments
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
