@@ -6291,5 +6291,182 @@
       ],
       "note": "Brightness temperature characterizes radiance and must not be reported as the local electron temperature."
     }
+  },
+  {
+    "name": "Frequency-dependent CTS scattering wave number",
+    "equation": "k = (2π/c)√[f₀² + (f₀+Δf)² − 2f₀(f₀+Δf)cosθ]",
+    "inputs": "Probe frequency f₀ [Hz], measured spectral frequency shift Δf [Hz], scattering angle θ [rad]",
+    "output": "Scattering wave-number magnitude k [m⁻¹]",
+    "assumptions": "Single-scattering vacuum photon kinematics; fixed scattering angle over the spectral channel. The electrostatic CTS flow parameter remains the projection along the central scattering direction.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+      "formula_key": "cts_frequency_dependent_scattering_wave_number",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz; finite vector; f₀+Δf > 0",
+          "required": true
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz; positive scalar",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; (0,π]",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "scattering_wave_number_m_inverse",
+          "unit": "m⁻¹; one value per frequency shift"
+        }
+      ],
+      "prerequisites": [
+        "Vacuum single-scattering geometry",
+        "Positive incident and scattered photon frequencies"
+      ],
+      "uncertainty_model": "Deterministic geometric relation; uncertainty propagation requires supplied frequency and angle covariance and is not inferred by this helper.",
+      "limitations": [
+        "The electrostatic CTS model retains the central scattering direction for scalar flow projections; frequency-dependent q-direction rotation is not included.",
+        "Vacuum photon kinematics; refractive-index and ray-bending effects belong to the Full-EM/ray model."
+      ],
+      "function_links": [
+        "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+        "tokamak_analysis.cts_analysis.cts_spectral_density"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_scattering_wave_number_includes_scattered_photon_frequency"
+      ]
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield et al.",
+        "year": 2011,
+        "publisher": "Academic Press"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+      "function_links": [
+        "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+        "tokamak_analysis.cts_analysis.cts_spectral_density"
+      ],
+      "formula_key": "cts_frequency_dependent_scattering_wave_number",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_scattering_wave_number_includes_scattered_photon_frequency"
+      ]
+    }
+  },
+  {
+    "name": "Gyrotropic anisotropic Kappa projected Thomson marginal",
+    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](2 k_B T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; κ>3/2",
+    "inputs": "Kappa index κ, magnetic pitch cosine b_hat·q_hat, second-moment directional temperature T_q [eV], electron mass m_e, Boltzmann constant k_B",
+    "output": "Normalized one-dimensional electron-velocity marginal along q; mapped to wavelength using λ=λ0[1−2 sin(θ_s/2) v_q/c] in the non-relativistic elastic-Thomson limit",
+    "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+      "formula_key": "optical_thomson_gyrotropic_bi_kappa_projected_marginal",
+      "input_specs": [
+        {
+          "name": "initial_temperature_parallel_eV",
+          "unit": "eV; positive second-moment temperature seed",
+          "required": false
+        },
+        {
+          "name": "initial_temperature_perpendicular_eV",
+          "unit": "eV; positive second-moment temperature seed",
+          "required": false
+        },
+        {
+          "name": "initial_kappa",
+          "unit": "dimensionless; > 3/2",
+          "required": false
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "unit vector",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "unit vector per view",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; identifiable second-moment temperature"
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; identifiable second-moment temperature"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; finite-variance Kappa index"
+        },
+        {
+          "name": "directional_temperature_eV",
+          "unit": "eV per view"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated multi-view optical Thomson spectra",
+        "Measured wavelength response matrix",
+        "Independent magnetic pitch-angle coverage"
+      ],
+      "uncertainty_model": "Full supplied channel-major measurement covariance plus optional positive-semidefinite model-discrepancy covariance; local covariance from the whitened spectral Jacobian, residual-scaled only when no measurement covariance is supplied.",
+      "limitations": [
+        "Non-relativistic elastic-Thomson Doppler approximation only",
+        "Gyrotropic bi-Kappa closure is not an unrestricted measured 3-D EVDF",
+        "Parallel/perpendicular temperatures require rank-two pitch-angle design and full-rank spectral Jacobian",
+        "Kappa finite-variance domain is strictly greater than 3/2"
+      ],
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum",
+    "execution_scope": "multi_view_physical_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+      "function_links": [
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
+      ],
+      "formula_key": "optical_thomson_gyrotropic_bi_kappa_projected_marginal",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle"
+      ]
+    }
   }
 ]
