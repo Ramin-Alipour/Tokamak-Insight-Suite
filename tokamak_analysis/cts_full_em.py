@@ -194,6 +194,23 @@ def _spitzer_species_collision_frequencies(
     }
 
 
+def spitzer_cts_collision_frequencies(
+    electron_density_m3, electron_temperature_eV, ion_species,
+    ion_fractions, ion_temperature_eV, *, coulomb_logarithm,
+):
+    """Compute species-resolved Spitzer collision frequencies for CTS.
+
+    Returns electron-ion and ion-ion/electron-ion ion momentum-transfer rates
+    in s^-1. The model assumes a weakly coupled, fully ionized plasma and
+    exposes the non-conserving Krook approximation used by the Full-EM
+    resonance kernel; it is not a full linearized Landau collision operator.
+    """
+    return _spitzer_species_collision_frequencies(
+        electron_density_m3, electron_temperature_eV, ion_species,
+        ion_fractions, ion_temperature_eV, coulomb_logarithm,
+    )
+
+
 def _validate_collisional_model(model, ne, te, ions, fractions, ti):
     if model is None:
         return {
