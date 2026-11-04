@@ -15,7 +15,9 @@ from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_stru
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
 from .ece_kinetic import (
-    relativistic_kinetic_ece_absorption_coefficient,\n    solve_relativistic_kinetic_ece_profile,\n)
+    relativistic_kinetic_ece_absorption_coefficient,
+    solve_relativistic_kinetic_ece_profile,
+)
 from .cts_em_background import integrate_thermal_microwave_background
 
 
