@@ -370,3 +370,45 @@ def test_relativistic_projected_evdf_and_psf_profile_are_dashboard_api_routes():
     assert spatial["spatial_mixing_matrix"].shape == (5, 5)
     assert spatial["regularization_strength"] == pytest.approx(0.01)
     assert spatial["experimental_validation"] == "not_performed"
+
+
+def test_evdf_adds_independent_model_discrepancy_and_systematic_covariance():
+    wavelength, signal, background = _case()
+    n = signal.size
+    measurement = np.diag(np.full(n, 1.0**2))
+    discrepancy = 0.2**2 * np.eye(n)
+    systematic = 0.3**2 * np.eye(n)
+    out = _run(
+        wavelength, signal, background,
+        signal_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+    )
+    np.testing.assert_allclose(out["model_discrepancy_covariance"], discrepancy)
+    np.testing.assert_allclose(out["systematic_covariance"], systematic)
+    assert out["model_discrepancy_covariance_included"] is True
+    assert out["systematic_covariance_included"] is True
+    assert out["evdf_covariance_available"] is True
+    assert "mutually independent" in out["additive_covariance_independence_assumption"]
+
+
+def test_evdf_allows_positive_definite_discrepancy_only_weighting():
+    wavelength, signal, background = _case()
+    n = signal.size
+    discrepancy = 0.5**2 * np.eye(n)
+    out = _run(
+        wavelength, signal, background,
+        model_discrepancy_covariance=discrepancy,
+    )
+    assert out["measurement_uncertainty_model"] == "model_discrepancy_and_systematic_covariance_only"
+    assert out["evdf_covariance_available"] is True
+
+
+def test_evdf_rejects_indefinite_systematic_or_discrepancy_covariance():
+    wavelength, signal, background = _case()
+    invalid = np.eye(signal.size)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        _run(wavelength, signal, background, systematic_covariance=invalid)
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        _run(wavelength, signal, background, model_discrepancy_covariance=invalid)
