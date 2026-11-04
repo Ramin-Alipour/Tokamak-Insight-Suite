@@ -10,7 +10,8 @@ from tokamak_analysis.thomson_anisotropic_inference import (
 
 
 def _synthetic_spectra():
-    wavelength = np.linspace(1062.0, 1066.0, 161)
+    coordinate = np.linspace(-1.0, 1.0, 161)
+    wavelength = 1064.0 + 2.0 * (coordinate + 0.12 * coordinate**3)
     laser = 1064.0
     angle = np.pi / 2.0
     b = np.array([0.0, 0.0, 1.0])
@@ -28,7 +29,7 @@ def _synthetic_spectra():
         sigma_v = np.sqrt(1.602176634e-19 * tq / 9.1093837015e-31)
         center = laser * (1.0 - 2.0*np.sin(angle/2.0)*flows[i]/299792458.0)
         sigma_lam = laser * 2.0*np.sin(angle/2.0)*sigma_v/299792458.0
-        profile = np.exp(-0.5*((wavelength-center)/sigma_lam)**2)/(np.sqrt(2*np.pi)*sigma_lam)
+        profile, _ = _gaussian_bin_average(wavelength, center, sigma_lam)
         spectra.append((0.03 + 0.8*profile + 1.0e-4*(wavelength-laser)))
     return wavelength, np.asarray(spectra), b, q
 
@@ -112,7 +113,8 @@ def test_nonuniform_response_operator_conserves_bin_integrated_spectral_power():
 def _synthetic_bi_kappa_spectra():
     from scipy.special import gammaln
     c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
-    wavelength = np.linspace(499.65, 500.35, 281)
+    coordinate = np.linspace(-1.0, 1.0, 281)
+    wavelength = 500.0 + 0.35 * (coordinate + 0.08 * coordinate**3)
     laser, angle, kappa = 500.0, np.pi/2, 4.2
     qmag = 2.0*np.sin(angle/2.0)
     b = np.array([0.0, 0.0, 1.0])
