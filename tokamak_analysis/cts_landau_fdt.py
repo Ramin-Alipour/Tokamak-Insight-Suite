@@ -61,6 +61,7 @@ class LandauFDTSystem:
     equilibrium_weights: np.ndarray
     velocity_moments: np.ndarray
     species_slices: tuple[slice, ...]
+    velocity_grid_m_s: np.ndarray
     metadata: Mapping
 
 
@@ -150,7 +151,7 @@ def build_linearized_landau_fdt(
                         D[d, ob:ob+nv] = D[d, ob:ob+nv] - gb[d]
                     D = D.tocsr()
                     factor = gamma*ws[a][i]*ws[b][j]*(0.5 if a == b else 1.0)
-                    K = K + factor*(D.T @ U @ D)
+                    K = K + factor*(D.T @ csr_matrix(U) @ D)
     K = ((K+K.T)*0.5).tocsr()
     metric_diag = np.concatenate(ws)
     W = diags(metric_diag, format="csr")
@@ -158,12 +159,12 @@ def build_linearized_landau_fdt(
     L = (-Winv @ K).tocsr()
     Q = (2.0*Winv @ K @ Winv).tocsr()
 
-    moments = np.zeros((ndof, 5))
+    moments = np.zeros((ndof, ns + 4))
     for s, (mass, density, charge, name) in enumerate(parsed):
         sl = slices[s]
-        moments[sl, 0] = 1.0
-        moments[sl, 1:4] = mass*vel
-        moments[sl, 4] = 0.5*mass*np.sum(vel**2, axis=1)
+        moments[sl, s] = 1.0
+        moments[sl, ns:ns+3] = mass*vel
+        moments[sl, ns+3] = 0.5*mass*np.sum(vel**2, axis=1)
     inv_resid = float(sparse_norm(K@moments) /
         max(sparse_norm(K)*np.linalg.norm(moments), np.finfo(float).tiny))
     # K is a Gram sum, hence PSD; verify the FDT covariance numerically.
@@ -187,11 +188,13 @@ def build_linearized_landau_fdt(
             "No quantum detailed balance or arbitrary non-Maxwellian equilibrium.",
         ],
     }
-    return LandauFDTSystem(L, W, Q, metric_diag, moments, tuple(slices), metadata)
+    return LandauFDTSystem(L, W, Q, metric_diag, moments, tuple(slices), vel.copy(), metadata)
 
 
 def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
-                            density_observation, *, forcing=None):
+                            density_observation, *, forcing=None,
+                            wave_number_m_inverse=0.0,
+                            propagation_direction=(1.0, 0.0, 0.0)):
     """Compute a linear resolvent and FDT spectrum for supplied velocity moments.
 
     Electrostatic screening, CTS geometry and optical normalization are not
@@ -207,7 +210,16 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
     drive = np.eye(n) if forcing is None else np.asarray(forcing, dtype=float)
     if drive.ndim != 2 or drive.shape[0] != n or np.any(~np.isfinite(drive)):
         raise ValueError("forcing must have shape (n_dof,n_input)")
-    L = system.operator_s_inverse.toarray()
+    wave_number = float(wave_number_m_inverse)
+    direction = np.asarray(propagation_direction, dtype=float)
+    if not np.isfinite(wave_number) or wave_number < 0:
+        raise ValueError("wave_number_m_inverse must be finite and non-negative")
+    if direction.shape != (3,) or np.any(~np.isfinite(direction)) or np.linalg.norm(direction) == 0:
+        raise ValueError("propagation_direction must be a finite non-zero 3-vector")
+    direction = direction/np.linalg.norm(direction)
+    streaming = system.velocity_grid_m_s @ direction
+    streaming = np.tile(streaming, len(system.species_slices))
+    L = system.operator_s_inverse.toarray() - 1j*wave_number*np.diag(streaming)
     Q = system.fdt_source_covariance_s_inverse.toarray()
     result = np.empty((omega.size, obs.shape[0], drive.shape[1]), complex)
     spectrum = np.empty((omega.size, obs.shape[0], obs.shape[0]), complex)
@@ -221,5 +233,6 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
             "collision_operator": system.metadata["operator"],
             "fdt": system.metadata["fdt"],
             "limitations": list(system.metadata["limitations"])+[
-                "Self-consistent electrostatic screening and CTS scattering normalization are not applied."
+                "Self-consistent electrostatic screening and CTS scattering normalization are not applied.",
+                "Streaming is represented by the supplied Fourier wave number and direction; the velocity grid remains finite."
             ]}
