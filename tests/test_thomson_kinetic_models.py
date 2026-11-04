@@ -381,3 +381,15 @@ def test_relativistic_maxwell_juttner_reports_analytic_momentum_tail_coverage():
         result["quadrature_momentum_normalization"]
         / result["analytic_momentum_normalization"], rel=1e-13
     )
+
+
+def test_maxwell_juttner_normalization_overshoot_reports_ratio_without_unbound_variable(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as models
+
+    monkeypatch.setattr(models, "kve", lambda order, argument: 1.0e-300)
+    with pytest.raises(ValueError, match="analytic normalization \(captured="):
+        models.relativistic_maxwell_juttner_spectrum(
+            np.linspace(800.0, 1328.0, 101), 1064.0, np.pi/2.0, 500.0,
+            incident_polarization=[0.0, 0.0, 1.0],
+            radial_order=16, angular_order=8,
+        )
