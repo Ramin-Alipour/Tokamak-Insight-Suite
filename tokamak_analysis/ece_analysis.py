@@ -992,3 +992,111 @@ def reconstruct_ece_temperature_profile(
             output["time_resolved_uncertainty_note"] = "Time-resolved uncertainty excludes channel_covariance_eV2 because that matrix describes covariance of the time-window mean; use per-sample brightness_temperature_uncertainty_eV for time-resolved measurement uncertainty."
     return output
 
+
+
+"""Kinetic electron-cyclotron emission and absorption helpers.
+
+The Maxwellian absorption calculation uses the magnetized Vlasov conductivity
+kernel shared with the Full-EM CTS implementation.  It is not a relativistic
+arbitrary-EVDF solver: finite harmonic/quadrature truncation and the supplied
+positive damping rate remain explicit numerical/model inputs.
+"""
+from __future__ import annotations
+
+import numpy as np
+from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E
+from scipy.constants import speed_of_light as C_LIGHT, Planck as H_PLANCK
+from scipy.constants import Boltzmann as K_B, mu_0 as MU0
+
+
+def kinetic_ece_absorption(
+    frequency_Hz,
+    wavevector_rad_m,
+    magnetic_field_T,
+    electron_density_m3,
+    electron_temperature_eV,
+    electric_polarization,
+    *,
+    electron_flow_velocity_m_s=(0.0, 0.0, 0.0),
+    harmonic_order=12,
+    quadrature_order=24,
+    damping_rate_rad_s,
+) -> dict:
+    """Calculate kinetic Maxwellian ECE absorption for one local EM mode.
+
+    The mode is specified by its full 3-D wavevector and complex electric field.
+    The conductivity is integrated over magnetized Maxwellian gyro-orbits and
+    harmonics; alpha = Re(E* . sigma . E)/(Re(E x H*) . khat), so it is the
+    intensity attenuation coefficient [m^-1].  This local coefficient can be
+    integrated along a ray by a caller.  No resonance radius or ray is inferred.
+    """
+    f = float(frequency_Hz)
+    k = np.asarray(wavevector_rad_m, dtype=float)
+    b = np.asarray(magnetic_field_T, dtype=float)
+    e = np.asarray(electric_polarization, dtype=complex)
+    flow = np.asarray(electron_flow_velocity_m_s, dtype=float)
+    ne, te, damping = float(electron_density_m3), float(electron_temperature_eV), float(damping_rate_rad_s)
+    if not np.isfinite(f) or f <= 0:
+        raise ValueError("frequency_Hz must be positive and finite")
+    if k.shape != (3,) or not np.all(np.isfinite(k)) or np.linalg.norm(k) <= 0:
+        raise ValueError("wavevector_rad_m must be a finite non-zero 3-vector")
+    if b.shape != (3,) or not np.all(np.isfinite(b)) or np.linalg.norm(b) <= 0:
+        raise ValueError("magnetic_field_T must be a finite non-zero 3-vector")
+    if e.shape != (3,) or not np.all(np.isfinite(e.real)) or not np.all(np.isfinite(e.imag)) or np.linalg.norm(e) <= 0:
+        raise ValueError("electric_polarization must be a finite non-zero complex 3-vector")
+    if flow.shape != (3,) or not np.all(np.isfinite(flow)):
+        raise ValueError("electron_flow_velocity_m_s must be a finite 3-vector")
+    if not np.isfinite(ne) or ne <= 0 or not np.isfinite(te) or te <= 0:
+        raise ValueError("electron density and temperature must be positive and finite")
+    if not np.isfinite(damping) or damping <= 0:
+        raise ValueError("damping_rate_rad_s must be positive and finite")
+    if isinstance(harmonic_order, bool) or int(harmonic_order) != harmonic_order or harmonic_order < 2:
+        raise ValueError("harmonic_order must be an integer >= 2")
+    if isinstance(quadrature_order, bool) or int(quadrature_order) != quadrature_order or quadrature_order < 8:
+        raise ValueError("quadrature_order must be an integer >= 8")
+    omega = 2.0 * np.pi * f
+    from .cts_full_em import _species_conductivity
+    species = {
+        "name": "e-", "density": ne, "temperature": te,
+        "mass": M_E, "charge": -E_CHARGE, "flow": flow,
+    }
+    sigma = _species_conductivity(
+        omega, k, b, species, harmonic_order=int(harmonic_order),
+        quadrature_order=int(quadrature_order), damping_rate_rad_s=damping,
+    )
+    h_field = np.cross(k, e) / (MU0 * omega)
+    direction = k / np.linalg.norm(k)
+    flux = 0.5 * float(np.real(np.dot(np.cross(e, h_field.conj()), direction)))
+    absorbed_power = 0.5 * float(np.real(np.vdot(e, sigma @ e)))
+    scale = max(abs(flux), np.finfo(float).tiny)
+    if flux <= 0:
+        raise ValueError("electric_polarization and wavevector must describe a forward positive-flux mode")
+    if absorbed_power < -1e-10 * max(abs(absorbed_power), 1.0):
+        raise ValueError("computed kinetic conductivity produces negative absorption; check convention and convergence")
+    alpha = absorbed_power / flux
+    if not np.isfinite(alpha) or alpha < -1e-10:
+        raise ValueError("kinetic absorption coefficient is non-physical")
+    alpha = max(float(alpha), 0.0)
+    x = H_PLANCK * f / (K_B * te * E_CHARGE)
+    planck_radiance = (2.0 * H_PLANCK * f**3 / C_LIGHT**2) / np.expm1(x) if x < 700 else 0.0
+    return {
+        "absorption_coefficient_m_inverse": alpha,
+        "emission_coefficient_W_m3_sr_Hz": alpha * planck_radiance,
+        "planck_source_radiance_W_m2_sr_Hz": planck_radiance,
+        "absorbed_power_density_W_m3_per_E2": absorbed_power,
+        "forward_poynting_flux_W_m2_per_E2": flux,
+        "conductivity_S_m": sigma,
+        "frequency_Hz": f,
+        "wavevector_rad_m": k.copy(),
+        "magnetic_field_T": b.copy(),
+        "kinetic_model": "magnetized_nonrelativistic_Maxwellian_Vlasov_harmonic_response",
+        "harmonic_order": int(harmonic_order),
+        "quadrature_order": int(quadrature_order),
+        "damping_rate_rad_s": damping,
+        "limitations": [
+            "Local homogeneous Maxwellian response; spatial transfer requires integration along a supplied ray.",
+            "Nonrelativistic electron distribution; relativistic and arbitrary anisotropic EVDF emissivity are not included.",
+            "Harmonic and velocity quadrature truncation must be converged; damping is an explicit supplied regularization parameter, not a Landau collision operator.",
+            "The Planck source uses LTE detailed balance and is not valid for a nonthermal electron distribution.",
+        ],
+    }
