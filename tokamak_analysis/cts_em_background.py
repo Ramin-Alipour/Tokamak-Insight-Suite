@@ -106,8 +106,9 @@ def thermal_bremsstrahlung_emissivity_si(
     Uses the angle-resolved (per steradian) SI form
     j_nu = 5.44e-40 n_e sum_i(Z_i^2 n_i) T_K^-1/2
     exp(-h nu/kT) g_ff, with densities in m^-3 and T in kelvin.
-    The coefficient is (6.8e-38 * 0.1)/(4*pi): the angle-integrated cgs
-    emissivity converted from erg cm^-3 to W m^-3 and divided by 4*pi.
+    The coefficient is (6.8e-38 * 1e-13)/(4*pi): the angle-integrated cgs
+    emissivity is converted to SI with 1e-7 J/erg, 1e6 cm^3/m^3,
+    and 1e-12 from the two densities expressed in cm^-3, then divided by 4*pi.
     Relativistic corrections and magnetized-mode anisotropy are not included.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
@@ -135,7 +136,7 @@ def thermal_bremsstrahlung_emissivity_si(
     temp_K = te * E_CHARGE / K_B
     charge_weighted_ions = float(np.sum(z**2 * ni))
     x = H * nu / (K_B * temp_K)
-    coefficient_si = 6.8e-38 * 0.1 / (4.0 * np.pi)
+    coefficient_si = 6.8e-38 * 1.0e-13 / (4.0 * np.pi)
     return coefficient_si * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-x) * g
 
 
@@ -174,7 +175,7 @@ def thermal_bremsstrahlung_absorption_si(
     temperature_K = te * E_CHARGE / K_B
     x = H * nu / (K_B * temperature_K)
     charge_weighted_ions = float(np.sum(z**2 * ni))
-    coefficient_si = 6.8e-38 * 0.1 / (4.0 * np.pi)
+    coefficient_si = 6.8e-38 * 1.0e-13 / (4.0 * np.pi)
     emissivity_prefactor = (
         coefficient_si * ne * charge_weighted_ions
         * temperature_K**-0.5 * g

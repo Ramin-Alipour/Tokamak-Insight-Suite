@@ -69,8 +69,10 @@ def test_zero_density_path_rejects_nonzero_ece_absorption():
 
 def test_free_free_emissivity_uses_per_steradian_si_normalization():
     # Rybicki-Lightman thermal free-free coefficient: 6.8e-38 in
-    # erg s^-1 cm^-3 Hz^-1, integrated over 4*pi sr.  Converting to
-    # W m^-3 and dividing by 4*pi gives 5.41e-40 per steradian.
+    # erg s^-1 cm^-3 Hz^-1, integrated over 4*pi sr, with densities in cm^-3.
+    # For SI densities and emissivity, conversion is
+    # 1e-7 (J/erg) * 1e6 (cm^3/m^3) * 1e-12 (two density conversions)
+    # = 1e-13; divide by 4*pi for per-steradian emissivity.
     frequency = np.array([80e9, 120e9])
     ne = 2.0e19
     ni = np.array([1.0e19, 2.0e18])
@@ -79,7 +81,7 @@ def test_free_free_emissivity_uses_per_steradian_si_normalization():
     gaunt = np.array([1.2, 1.4])
     temperature_K = temperature_eV * 1.602176634e-19 / 1.380649e-23
     expected = (
-        (6.8e-38 * 0.1 / (4.0 * np.pi)) * ne * np.sum(charge**2 * ni)
+        (6.8e-38 * 1.0e-13 / (4.0 * np.pi)) * ne * np.sum(charge**2 * ni)
         * temperature_K**-0.5
         * np.exp(-6.62607015e-34 * frequency / (1.380649e-23 * temperature_K))
         * gaunt
