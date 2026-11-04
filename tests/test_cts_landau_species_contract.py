@@ -66,3 +66,18 @@ def test_electrostatic_cts_rejects_missing_species_metadata_contract():
             common_temperature_J=1.0,
             wave_number_m_inverse=1.0,
         )
+
+
+def test_electrostatic_cts_rejects_temperature_different_from_landau_equilibrium():
+    species = [
+        {"name": "e-", "mass_kg": 1.0, "charge_C": -1.0, "density_m3": 2.0},
+        {"name": "D+", "mass_kg": 4.0, "charge_C": 1.0, "density_m3": 0.5},
+    ]
+    with pytest.raises(ValueError, match="must match the temperature used to assemble"):
+        landau_cts_dynamic_structure_factor(
+            _minimal_system(),
+            np.asarray([1.0]),
+            species,
+            common_temperature_J=1.01,
+            wave_number_m_inverse=1.0,
+        )

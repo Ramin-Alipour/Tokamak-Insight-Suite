@@ -317,6 +317,12 @@ def landau_cts_dynamic_structure_factor(
     from .cts_fdt import classical_fdt_dynamic_structure_factor
 
     temperature = _positive(common_temperature_J, "common_temperature_J")
+    assembled_temperature = system.metadata.get("common_temperature_J")
+    if (assembled_temperature is None or not np.isfinite(assembled_temperature)
+            or not np.isclose(temperature, assembled_temperature, rtol=1e-12, atol=0.0)):
+        raise ValueError(
+            "common_temperature_J must match the temperature used to assemble the Landau system"
+        )
     k = _positive(wave_number_m_inverse, "wave_number_m_inverse")
     omega = np.asarray(angular_frequency_rad_s, dtype=float)
     if omega.ndim != 1 or omega.size == 0 or np.any(~np.isfinite(omega)):
