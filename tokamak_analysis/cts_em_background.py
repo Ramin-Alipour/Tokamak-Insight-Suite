@@ -327,6 +327,11 @@ def integrate_thermal_microwave_background(
             )
         if np.any(~np.isfinite(supplied_j)) or np.any(supplied_j < 0.0):
             raise ValueError("ECE emissivity must be finite and non-negative")
+        vacuum_path = ne == 0.0
+        if np.any(vacuum_path) and np.any(supplied_j[vacuum_path] != 0.0):
+            raise ValueError(
+                "ECE emissivity must be zero on path elements with zero electron density"
+            )
         ece_emissivity = supplied_j
         ece_source_model = "explicit_mode_resolved_ECE_emissivity"
 
