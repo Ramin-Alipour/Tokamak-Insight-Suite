@@ -290,3 +290,79 @@ def solve_stratified_mode_conversion(
         "mode_conversion": "coherent_cross_polarized_amplitudes_included",
         "approximation_scope": "1-D z-stratified local dielectric, oblique plane waves; no transverse diffraction or arbitrary 3-D interfaces",
     }
+
+
+
+def propagate_vectorial_angular_spectrum(
+    omega_rad_s, electric_field_xy_V_m, *, dx_m, dy_m, propagation_distance_m,
+    relative_permittivity=1.0,
+):
+    """Exact non-paraxial vector angular-spectrum propagation in a homogeneous medium.
+
+    Input is a sampled transverse (Ey,Ex) plane field with shape (ny,nx,2).
+    Each transverse Fourier component is propagated with its exact complex kz;
+    Ez is reconstructed from k.E=0 and H from k x E/(mu0 omega). Evanescent
+    components are retained and decay for non-negative propagation distance.
+    This is a 3-D vector diffraction solver for a homogeneous isotropic segment,
+    not a solver for arbitrary 3-D inhomogeneous plasma interfaces. Use the
+    Berreman boundary solver for anisotropic z-stratified mode conversion.
+    """
+    from scipy.constants import mu_0, c as c_light
+
+    omega = float(omega_rad_s)
+    dx, dy = float(dx_m), float(dy_m)
+    distance = float(propagation_distance_m)
+    eps = complex(relative_permittivity)
+    field = np.asarray(electric_field_xy_V_m, dtype=complex)
+    if not np.isfinite(omega) or omega <= 0:
+        raise ValueError("omega_rad_s must be positive and finite")
+    if not np.isfinite(dx) or dx <= 0 or not np.isfinite(dy) or dy <= 0:
+        raise ValueError("dx_m and dy_m must be positive and finite")
+    if not np.isfinite(distance) or distance < 0:
+        raise ValueError("propagation_distance_m must be finite and non-negative")
+    if not np.isfinite(eps.real) or not np.isfinite(eps.imag) or eps.imag < 0:
+        raise ValueError("relative_permittivity must be finite and passive for exp(-i omega t)")
+    if field.ndim != 3 or field.shape[2] != 2 or min(field.shape[:2]) < 2 or np.any(~np.isfinite(field)):
+        raise ValueError("electric_field_xy_V_m must be a finite (ny,nx,2) complex array")
+    ny, nx, _ = field.shape
+    refractive_index = np.sqrt(eps + 0j)
+    if refractive_index.real < 0:
+        refractive_index = -refractive_index
+    if refractive_index.imag < 0:
+        refractive_index = -refractive_index
+    k = omega/c_light * refractive_index
+    kx = 2*np.pi*np.fft.fftfreq(nx, d=dx)
+    ky = 2*np.pi*np.fft.fftfreq(ny, d=dy)
+    KX, KY = np.meshgrid(kx, ky, indexing="xy")
+    kz = np.sqrt(k*k-KX*KX-KY*KY+0j)
+    # Select the forward/decaying square-root branch for the exp(-i omega t) convention.
+    flip = (kz.imag < -1e-14) | ((np.abs(kz.imag) <= 1e-14) & (kz.real < 0))
+    kz[flip] *= -1
+    if np.any(np.abs(kz) <= np.finfo(float).tiny):
+        raise ValueError("grazing spectral components with kz=0 are singular for longitudinal-field reconstruction")
+    spectrum = np.fft.fft2(field, axes=(0, 1))
+    ex, ey = spectrum[:, :, 0], spectrum[:, :, 1]
+    ez = -(KX*ex+KY*ey)/kz
+    phase = np.exp(1j*kz*distance)
+    ex, ey, ez = ex*phase, ey*phase, ez*phase
+    kvec = np.stack(np.broadcast_arrays(KX, KY, kz), axis=-1)
+    evec = np.stack((ex, ey, ez), axis=-1)
+    hvec = np.cross(kvec, evec)/(mu_0*omega)
+    e_out = np.stack((ex, ey, ez), axis=-1)
+    electric = np.fft.ifft2(e_out, axes=(0, 1))
+    magnetic = np.fft.ifft2(hvec, axes=(0, 1))
+    spectral_power = np.real(np.sum(np.conj(e_out)*e_out, axis=-1))
+    evanescent = np.abs(KX*KX+KY*KY) > abs(k)**2
+    return {
+        "electric_field_xyz_V_m": electric,
+        "magnetic_field_xyz_A_m": magnetic,
+        "kx_rad_m": KX,
+        "ky_rad_m": KY,
+        "kz_rad_m": kz,
+        "evanescent_component_count": int(np.count_nonzero(evanescent)),
+        "propagation_distance_m": distance,
+        "relative_permittivity": eps,
+        "solver": "exact_nonparaxial_vector_angular_spectrum",
+        "maxwell_constraint": "k_dot_E_zero_per_transverse_Fourier_component",
+        "approximation_scope": "homogeneous_isotropic_segment_only; anisotropic_stratified_mode_conversion_is_separate",
+    }
