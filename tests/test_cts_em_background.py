@@ -337,3 +337,41 @@ def test_microwave_background_carries_path_resolved_charge_state_moments():
     assert moments[0]["effective_charge_Zeff"] == pytest.approx(1.0)
     assert moments[1]["effective_charge_Zeff"] == pytest.approx(1.8e19 / 1.4e19)
     assert moments[1]["quasineutrality_relative_residual"] == pytest.approx(0.0, abs=1e-15)
+
+
+def test_free_free_si_coefficient_uses_cgs_density_and_volume_conversions():
+    # The tabulated cgs coefficient uses n in cm^-3 and emissivity per cm^3.
+    # For n in m^-3 and output per m^3: 1e-7 * 1e6 * (1e-6)^2 = 1e-13.
+    from tokamak_analysis.cts_em_background import _FREE_FREE_EMISSIVITY_COEFFICIENT_SI
+
+    assert _FREE_FREE_EMISSIVITY_COEFFICIENT_SI == pytest.approx(
+        6.8e-51 / (4.0 * np.pi), rel=0.0, abs=0.0
+    )
+
+
+def test_free_free_only_uniform_slab_obeys_planck_kirchhoff_solution():
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+
+    frequency = np.array([80e9, 100e9, 130e9])
+    temperature_eV = 1800.0
+    ne = 1.0e20
+    ni = np.array([1.0e20])
+    path = np.array([0.4])
+    incident = np.array([2e-18, 3e-18, 4e-18])
+    result = integrate_thermal_microwave_background(
+        frequency_Hz=frequency,
+        path_length_m=path,
+        electron_temperature_eV=np.array([temperature_eV]),
+        electron_density_m3=np.array([ne]),
+        ion_densities_m3=ni[None, :],
+        ion_charge_states=np.array([1.0]),
+        incident_radiance_W_m2_sr_Hz=incident,
+    )
+    temperature_K = temperature_eV * 1.602176634e-19 / 1.380649e-23
+    source = planck_spectral_radiance(frequency, temperature_K)
+    tau = result["thermal_bremsstrahlung_optical_depth"]
+    expected = incident * np.exp(-tau) + source * (-np.expm1(-tau))
+    np.testing.assert_allclose(
+        result["spectral_radiance_W_m2_sr_Hz"], expected,
+        rtol=2e-12, atol=1e-30,
+    )

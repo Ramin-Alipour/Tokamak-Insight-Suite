@@ -16,6 +16,10 @@ K_B = 1.380649e-23
 C = 299792458.0
 E_CHARGE = 1.602176634e-19
 
+# Rybicki-Lightman 6.8e-38 cgs emissivity converted for SI densities/output:
+# 1e-7 J/erg * 1e6 cm^3/m^3 * (1e-6)^2 for the two densities.
+_FREE_FREE_EMISSIVITY_COEFFICIENT_SI = 6.8e-38 * 1.0e-13 / (4.0 * np.pi)
+
 
 def _real_array(value, name):
     """Convert real numeric inputs without silently accepting booleans or strings."""
@@ -136,7 +140,7 @@ def thermal_bremsstrahlung_emissivity_si(
     temp_K = te * E_CHARGE / K_B
     charge_weighted_ions = float(np.sum(z**2 * ni))
     x = H * nu / (K_B * temp_K)
-    coefficient_si = 6.8e-38 * 1.0e-13 / (4.0 * np.pi)
+    coefficient_si = _FREE_FREE_EMISSIVITY_COEFFICIENT_SI
     return coefficient_si * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-x) * g
 
 
@@ -175,7 +179,7 @@ def thermal_bremsstrahlung_absorption_si(
     temperature_K = te * E_CHARGE / K_B
     x = H * nu / (K_B * temperature_K)
     charge_weighted_ions = float(np.sum(z**2 * ni))
-    coefficient_si = 6.8e-38 * 1.0e-13 / (4.0 * np.pi)
+    coefficient_si = _FREE_FREE_EMISSIVITY_COEFFICIENT_SI
     emissivity_prefactor = (
         coefficient_si * ne * charge_weighted_ions
         * temperature_K**-0.5 * g
