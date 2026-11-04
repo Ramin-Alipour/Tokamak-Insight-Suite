@@ -29,6 +29,7 @@ from .cts_em_background import (
     radiance_to_receiver_spectral_power,
     propagate_receiver_spectral_power_covariance,
     integrate_receiver_spectral_power,
+    brightness_temperature_from_radiance,
 )
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
@@ -398,6 +399,21 @@ def analyze_cts_microwave_background(
         raise ValueError(
             "receiver_input_covariance requires receiver etendue and end-to-end efficiency"
         )
+    result["rayleigh_jeans_brightness_temperature_K"] = (
+        brightness_temperature_from_radiance(
+            frequency_Hz, result["spectral_radiance_W_m2_sr_Hz"],
+            convention="rayleigh_jeans",
+        )
+    )
+    result["planck_brightness_temperature_K"] = (
+        brightness_temperature_from_radiance(
+            frequency_Hz, result["spectral_radiance_W_m2_sr_Hz"],
+            convention="planck",
+        )
+    )
+    result["brightness_temperature_interpretation"] = (
+        "Equivalent radiometric brightness temperature; not electron_temperature_eV"
+    )
     if has_etendue:
         if receiver_input_covariance is None:
             receiver_power = radiance_to_receiver_spectral_power(
