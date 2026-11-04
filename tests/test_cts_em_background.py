@@ -607,3 +607,32 @@ def test_microwave_background_api_reports_both_brightness_temperature_convention
     assert result["planck_brightness_temperature_K"].shape == (3,)
     assert result["rayleigh_jeans_brightness_temperature_K"].shape == (3,)
     assert "not electron_temperature_eV" in result["brightness_temperature_interpretation"]
+
+
+
+def test_microwave_background_api_propagates_joint_receiver_covariance_end_to_end():
+    from tokamak_analysis.cts_full_physics import analyze_cts_microwave_background
+
+    frequency = np.array([90.0e9, 100.0e9, 110.0e9])
+    # Three radiance bins followed by etendue and efficiency.
+    standard = np.array([1.0e-24, 1.0e-24, 1.0e-24, 1.0e-8, 0.01])
+    correlation = np.eye(5)
+    correlation[0, 1] = correlation[1, 0] = 0.2
+    correlation[2, 4] = correlation[4, 2] = 0.15
+    joint_covariance = np.outer(standard, standard) * correlation
+    result = analyze_cts_microwave_background(
+        frequency,
+        np.array([0.1]),
+        np.array([1000.0]),
+        electron_density_m3=np.array([1.0e19]),
+        ion_densities_m3=np.array([[1.0e19]]),
+        ion_charge_states=np.array([1]),
+        receiver_etendue_m2_sr=1.0e-6,
+        end_to_end_efficiency=0.5,
+        receiver_input_covariance=joint_covariance,
+    )
+    assert result["receiver_conversion_applied_once"] is True
+    assert result["receiver_spectral_power_covariance_W2_Hz2"].shape == (3, 3)
+    assert result["receiver_spectral_power_uncertainty_W_Hz"].shape == (3,)
+    assert result["integrated_receiver_power_uncertainty_W"] > 0.0
+    assert result["uncertainty_method"] == "first_order_full_joint_covariance_J_C_JT"
