@@ -39,7 +39,7 @@ def kappa_electron_susceptibility(
     wavenumber_m_inverse,
     mass_kg=ME,
     pole_imaginary_part_m_s=None,
-    minimum_velocity_grid_probability_coverage=0.99,
+    minimum_velocity_grid_probability_coverage=0.999,
 ):
     """Return chi_e for the normalized 1-D marginal of an isotropic 3-D Kappa.
 
@@ -112,6 +112,18 @@ def kappa_electron_susceptibility(
         phase_velocity,
         pole_imaginary_part_m_s=pole_imaginary_part_m_s,
     )
+    # generalized_landau_integral normalizes arbitrary tabulated inputs on
+    # their finite interval. Here pdf is already analytically normalized on
+    # the infinite axis, so restore the exact represented probability mass
+    # after that internal normalization. This keeps the omitted Kappa tail
+    # omitted (and bounded by the coverage gate) instead of amplifying the
+    # represented distribution to unit mass.
+    for key in ("integral", "interior_derivative_integral",
+                "finite_support_boundary_integral"):
+        if key in response:
+            response[key] = complex(response[key]) * grid_coverage
+    response["finite_support_probability_mass"] = grid_coverage
+    response["analytic_kappa_pdf_s_m"] = pdf.copy()
     plasma_frequency_squared = ne * E**2 / (EPS0 * mass)
     response.update({
         "electron_susceptibility": complex(
@@ -126,7 +138,7 @@ def kappa_electron_susceptibility(
         "velocity_grid_probability_coverage": grid_coverage,
         "minimum_velocity_grid_probability_coverage": minimum_coverage,
         "finite_velocity_grid_truncation": bool(grid_coverage < 1.0 - 1e-12),
-        "finite_grid_normalization_bias_prevented": True,
+        "finite_grid_renormalization_bias_prevented": True,
         "limitations": [
             "Collisionless unmagnetized longitudinal response only.",
             "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
