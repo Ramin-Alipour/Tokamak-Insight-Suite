@@ -653,6 +653,14 @@
         {
           "name": "validity_screening",
           "unit": "structured; projected thermal rms beta and fitted flow beta"
+        },
+        {
+          "name": "projected_velocity_grid_m_s",
+          "unit": "m s^-1; sorted one-dimensional scattering-vector velocity grid per view"
+        },
+        {
+          "name": "projected_velocity_distribution_m_s_inverse",
+          "unit": "s m^-1; normalized one-dimensional q-projected Kappa marginal per view"
         }
       ],
       "assumptions": [
@@ -697,7 +705,8 @@
         "Channel-wise non-collective Maxwellian and Kappa inference jointly fit the selected detector-space constant, linear, polynomial, cubic-spline or researcher-supplied template background with the physical Thomson forward spectrum. The Kappa profile-likelihood interval is computed only for the linear-background parameterization; structured bases use the joint fit covariance and Jacobian identifiability diagnostics. Relativistic Maxwell-Juttner channel-wise fitting retains its linear baseline contract.",
         "Gyrotropic bi-Kappa optical fitting uses non-relativistic elastic-Thomson Doppler mapping; it does not include relativistic cross-section/recoil corrections or unrestricted 3-D EVDF inversion.",
         "Kappa index and separate parallel/perpendicular temperatures are reported only when the spectral Jacobian and multi-view pitch-angle geometry identify them.",
-        "The anisotropic bi-Kappa fitter screens projected thermal rms beta and bulk-flow beta before reporting a non-relativistic fit; the configurable threshold is a conservative software error-budget screen, not a universal physical validity boundary."
+        "The anisotropic bi-Kappa fitter screens projected thermal rms beta and bulk-flow beta before reporting a non-relativistic fit; the configurable threshold is a conservative software error-budget screen, not a universal physical validity boundary.",
+        "The anisotropic Kappa fitter returns only the one-dimensional velocity marginal along each supplied scattering vector; it does not reconstruct the full 3-D EVDF."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
