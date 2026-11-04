@@ -289,6 +289,45 @@ def test_cts_tabulated_non_maxwellian_fast_ion_forward_model():
     assert np.all(spectrum>=0)
 
 
+def test_cts_tabulated_fast_ion_uses_species_resolved_doppler_flow():
+    f0, _, geometry, ions, fractions, _ = _case()
+    frequency = np.linspace(-0.5e9, 0.5e9, 51)
+    velocity = np.linspace(-2.0e6, 2.0e6, 161)
+    pdf = (
+        np.exp(-0.5 * (velocity / 3.0e5) ** 2)
+        + 0.35 * np.exp(-0.5 * ((velocity - 4.0e5) / 1.5e5) ** 2)
+    )
+    common = dict(
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=fractions,
+        electron_velocity_projection_m_s=0.0,
+        fast_ion={
+            "species_index": 0,
+            "fraction": 0.12,
+            "kind": "tabulated_1d",
+            "velocity_m_s": velocity,
+            "probability_density_m_s_inverse": pdf,
+        },
+    )
+    stationary = cts_spectral_density(
+        frequency, f0, geometry, ion_velocity_projection_m_s={"D+": 0.0}, **common
+    )
+    flowing = cts_spectral_density(
+        frequency, f0, geometry, ion_velocity_projection_m_s={"D+": 2.0e5}, **common
+    )
+
+    assert np.all(np.isfinite(stationary))
+    assert np.all(np.isfinite(flowing))
+    assert np.all(stationary >= 0.0)
+    assert np.all(flowing >= 0.0)
+    # A species flow shifts the tabulated fast-ion Landau resonance as well as
+    # the thermal-ion resonance; it must not be silently ignored.
+    assert not np.allclose(flowing, stationary, rtol=1e-8, atol=0.0)
+
+
 def test_cts_improved_genetic_search_is_deterministic_and_bounded():
     from tokamak_analysis.cts_analysis import _improved_genetic_search
 
