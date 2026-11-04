@@ -114,6 +114,13 @@ def test_thomson_family_maps_all_four_distinct_executable_subanalyses():
         )
     )
     names = {item["diagnostic"] for item in diagnostic_registry}
+    app_source = (Path(__file__).resolve().parents[1] / "app.py").read_text(
+        encoding="utf-8"
+    )
+    assert "analyze_cts_spectrum_model" in app_source
+    assert "cts_model=st.selectbox" in app_source
+    assert "spectral_distribution" in app_source
+    assert "observed_sigma_nm" in app_source
     assert {
         "Thomson scattering",
         "Collective Thomson / coherent scattering (CTS)",
