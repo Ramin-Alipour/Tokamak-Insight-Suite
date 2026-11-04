@@ -298,7 +298,7 @@ def fit_gyrotropic_bi_kappa_thomson(
     Its exact one-dimensional marginal along a view q is
       p(v_q) = Gamma(kappa)/(sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)
                [1 + v_q^2/(kappa*theta_q^2)]^(-kappa),
-    where theta_q^2 = (2*kappa-3)/kappa * 2*k_B*T_q/m_e.
+    where theta_q^2 = (2*kappa-3)/kappa * k_B*T_q/m_e.
     This parameterization makes T_q the actual second-moment temperature
     (m_e <(v_q-u_q)^2>/k_B), not the Kappa core/scale temperature.
     The finite-variance domain kappa>3/2 is enforced.
@@ -338,7 +338,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         response = np.broadcast_to(response, (n_view, n_bin, n_bin)).copy()
     if response.shape != (n_view, n_bin, n_bin) or np.any(response < 0.0):
         raise ValueError("instrument_response_matrix must be non-negative with shape (n_bin,n_bin) or (n_view,n_bin,n_bin)")
-    if not np.allclose(response.sum(axis=1), 1.0, rtol=1e-8, atol=1e-10):
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("measured response columns must sum to one; response is never silently renormalized")
     if measurement_covariance is not None and signal_uncertainty is not None:
         raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
@@ -409,7 +409,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         predictions = np.empty_like(spectra)
         for i in range(n_view):
             flow, log_amp, offset, slope = parameters[3 + 4*i:7 + 4*i]
-            theta2 = ((2.0*kappa - 3.0)/kappa) * (2.0*_E*directional[i]/_ME)
+            theta2 = ((2.0*kappa - 3.0)/kappa) * (_E*directional[i]/_ME)
             theta = np.sqrt(theta2)
             velocity = (_C/qmag) * (1.0 - wavelength/laser) - flow
             log_norm = (gammaln(kappa) - 0.5*np.log(np.pi*kappa)
@@ -449,7 +449,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         "model": "gyrotropic_bi_kappa_nonrelativistic_optical_thomson",
         "distribution_definition": "f3(v) proportional to [1 + v_parallel^2/(kappa*theta_parallel^2) + v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1))",
         "projected_marginal": "p(v_q)=Gamma(kappa)/(sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)*(1+v_q^2/(kappa*theta_q^2))^(-kappa)",
-        "temperature_definition": "T_q=m_e*Var(v_q)/k_B; theta_q^2=((2*kappa-3)/kappa)*(2*k_B*T_q/m_e)",
+        "temperature_definition": "T_q=m_e*Var(v_q)/k_B; theta_q^2=((2*kappa-3)/kappa)*(k_B*T_q/m_e)",
         "electron_temperature_parallel_eV": float(np.exp(fit.x[0])) if reportable else None,
         "electron_temperature_perpendicular_eV": float(np.exp(fit.x[1])) if reportable else None,
         "kappa_index": float(kappa) if full_rank else None,
