@@ -46,9 +46,13 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
     dof = 2.0 * kappa - 1.0
     scale = theta * np.sqrt(kappa / dof)
     velocity_edges = (light_speed / q_factor) * (1.0 - edges / laser_nm) - flow_m_s
-    probability = (
-        stdtr(dof, velocity_edges[:-1] / scale)
-        - stdtr(dof, velocity_edges[1:] / scale)
+    upper_standardized = velocity_edges[:-1] / scale
+    lower_standardized = velocity_edges[1:] / scale
+    probability = stdtr(dof, upper_standardized) - stdtr(dof, lower_standardized)
+    positive_tail = lower_standardized > 0.0
+    probability[positive_tail] = (
+        stdtr(dof, -lower_standardized[positive_tail])
+        - stdtr(dof, -upper_standardized[positive_tail])
     )
     return np.maximum(probability, 0.0) / np.diff(edges)
 
