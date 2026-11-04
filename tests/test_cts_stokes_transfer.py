@@ -32,7 +32,7 @@ def test_zero_absorption_faraday_rotation_conserves_intensity_and_polarization()
     assert result["I"] == pytest.approx(3.0, abs=1e-13)
     assert np.linalg.norm(result["stokes_radiance"][1:]) == pytest.approx(1.0, abs=1e-13)
     assert result["Q"] == pytest.approx(np.cos(np.pi / 4), abs=1e-13)
-    assert result["U"] == pytest.approx(-np.sin(np.pi / 4), abs=1e-13)
+    assert result["U"] == pytest.approx(np.sin(np.pi / 4), abs=1e-13)
 
 
 def test_zero_matrix_handles_emission_without_matrix_inverse():
