@@ -1102,7 +1102,29 @@
         "experimental_validation": "not_performed"
       }
     ],
-    "uncertainty_model": "Non-collective Maxwellian and Kappa fits support full channel-major GLS, including cross-channel covariance. Relativistic Maxwell-Juttner fits support full within-channel spectral covariance through GLS when the channel-major covariance is block diagonal; cross-channel covariance is explicitly rejected pending a joint relativistic multi-channel forward inversion. Relativistic fits also support measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines supplied optical-factor covariance with supported spectral/response propagation under the zero-scattered-power covariance rule."
+    "uncertainty_model": "Non-collective Maxwellian and Kappa fits support full channel-major GLS, including cross-channel covariance. Relativistic Maxwell-Juttner fits support full within-channel spectral covariance through GLS when the channel-major covariance is block diagonal; cross-channel covariance is explicitly rejected pending a joint relativistic multi-channel forward inversion. Relativistic fits also support measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines supplied optical-factor covariance with supported spectral/response propagation under the zero-scattered-power covariance rule.",
+    "secondary_physics_models": [
+      {
+        "model": "gyrotropic_bi_maxwellian_anisotropy",
+        "function_link": "tokamak_analysis.thomson_kinetic_models.infer_gyrotropic_bi_maxwellian_temperatures",
+        "formula_key": "thomson_gyrotropic_bimaxwellian_anisotropy",
+        "dashboard": "tis.ui.advanced_thomson_physics_page",
+        "equation": "T_q = T_perp*(1-mu^2) + T_parallel*mu^2",
+        "input_contract": "Directional temperatures extracted from calibrated Thomson spectra at independent magnetic pitch angles, with their full covariance.",
+        "identifiability": "Requires rank-2 pitch-angle design; otherwise parallel and perpendicular temperatures are withheld.",
+        "scope": "Gyrotropic bi-Maxwellian two-temperature closure; not a general anisotropic EVDF."
+      },
+      {
+        "model": "thomson_three_dimensional_flow",
+        "function_link": "tokamak_analysis.thomson_kinetic_models.infer_three_dimensional_flow_from_thomson_projections",
+        "formula_key": "thomson_three_dimensional_flow_from_projections",
+        "dashboard": "tis.ui.advanced_thomson_physics_page",
+        "equation": "v_q,i = q_hat_i dot v_e",
+        "input_contract": "Flow projections extracted from calibrated Thomson spectra across views, unit scattering vectors and full projection covariance.",
+        "identifiability": "Requires rank-3 scattering-vector geometry; otherwise the 3-D vector is withheld.",
+        "scope": "Common subluminal bulk-flow vector across views; geometry covariance is not included."
+      }
+    ]
   },
   {
     "family": "Plasma parameters",
