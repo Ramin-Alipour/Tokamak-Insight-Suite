@@ -176,3 +176,95 @@ def quantum_fdt_dynamic_structure_factor(
             "Zero frequency requires a separately converged static-limit extrapolation.",
         ],
     }
+
+
+def quantum_unsymmetrized_dynamic_structure_factor(
+    angular_frequency_rad_s,
+    retarded_density_response_m3_per_J,
+    *,
+    temperature_J: float,
+    psd_relative_tolerance: float = 1e-8,
+) -> dict:
+    r"""Return the unsymmetrized quantum S-greater matrix with detailed balance.
+
+    With x=hbar*omega/(k_B*T) and the exp(-i omega t) retarded-response
+    convention, S^>(omega) = -2*hbar/(1-exp(-x))*Im_H[chi].
+    The returned spectrum obeys S^>(-omega)=exp(-x)*S^>(omega).
+    temperature_J denotes k_B*T. This relation assumes a thermal equilibrium
+    KMS state; it does not make a classical susceptibility quantum-mechanical.
+    """
+    from scipy.constants import hbar
+
+    omega = np.asarray(angular_frequency_rad_s, dtype=float)
+    chi = np.asarray(retarded_density_response_m3_per_J, dtype=complex)
+    if omega.ndim != 1 or omega.size == 0 or np.any(~np.isfinite(omega)):
+        raise ValueError("angular_frequency_rad_s must be a finite non-empty vector")
+    if np.any(omega == 0.0):
+        raise ValueError("zero frequency requires a separately converged static-limit extrapolation")
+    if (chi.ndim != 3 or chi.shape[0] != omega.size
+            or chi.shape[1] != chi.shape[2] or chi.shape[1] == 0
+            or np.any(~np.isfinite(chi.real)) or np.any(~np.isfinite(chi.imag))):
+        raise ValueError("retarded response must be finite with shape (n_frequency,n_species,n_species)")
+    if isinstance(temperature_J, (bool, np.bool_)):
+        raise ValueError("temperature_J must be positive and finite")
+    temperature = float(temperature_J)
+    if not np.isfinite(temperature) or temperature <= 0.0:
+        raise ValueError("temperature_J must be positive and finite")
+    if isinstance(psd_relative_tolerance, (bool, np.bool_)):
+        raise ValueError("psd_relative_tolerance must be positive and finite")
+    tolerance = float(psd_relative_tolerance)
+    if not np.isfinite(tolerance) or tolerance <= 0.0:
+        raise ValueError("psd_relative_tolerance must be positive and finite")
+
+    x = hbar * omega / temperature
+    abs_x = np.abs(x)
+    factor = np.empty_like(x)
+    small = abs_x < 1.0e-4
+    xs = x[small]
+    factor[small] = (2.0 * temperature / omega[small]) * (
+        1.0 + xs / 2.0 + xs**2 / 12.0 - xs**4 / 720.0
+    )
+    high_positive = x > 50.0
+    factor[high_positive] = 2.0 * hbar
+    high_negative = x < -50.0
+    ex = np.exp(x[high_negative])
+    factor[high_negative] = 2.0 * hbar * ex / (1.0 - ex)
+    middle = ~(small | high_positive | high_negative)
+    factor[middle] = 2.0 * hbar / (-np.expm1(-x[middle]))
+
+    imaginary = (chi - np.swapaxes(chi.conj(), 1, 2)) / (2j)
+    spectrum = -factor[:, None, None] * imaginary
+    spectrum = 0.5 * (spectrum + np.swapaxes(spectrum.conj(), 1, 2))
+    minimum_eigenvalues = np.empty(omega.size)
+    for index, matrix in enumerate(spectrum):
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        minimum_eigenvalues[index] = float(eigenvalues[0])
+        if eigenvalues[0] < -tolerance * scale:
+            raise ValueError(
+                "unsymmetrized quantum FDT spectrum is not positive semidefinite; "
+                "check response causality, Fourier/sign convention and convergence"
+            )
+        if eigenvalues[0] < 0.0:
+            values, vectors = np.linalg.eigh(matrix)
+            spectrum[index] = (vectors * np.maximum(values, 0.0)) @ vectors.conj().T
+
+    return {
+        "dynamic_structure_factor_m3_s": spectrum,
+        "angular_frequency_rad_s": omega.copy(),
+        "temperature_J": temperature,
+        "closure": "unsymmetrized_quantum_matrix_fluctuation_dissipation_theorem",
+        "response_fourier_convention": "exp(-i*omega*t)",
+        "response_units": "m^-3/J",
+        "spectrum_units": "m^-3*s",
+        "detailed_balance_relation": "S_greater(-omega)=exp(-hbar*omega/temperature_J)*S_greater(omega)",
+        "quantum_argument_hbar_omega_over_temperature": x,
+        "minimum_eigenvalue_before_roundoff_projection": minimum_eigenvalues,
+        "positive_semidefinite": True,
+        "limitations": [
+            "Requires a thermal-equilibrium KMS state and a causal retarded susceptibility.",
+            "The susceptibility itself must contain the appropriate quantum response; the FDT factor does not quantum-correct a classical dielectric.",
+            "This is S-greater, not the symmetrized spectrum or S-less.",
+            "Zero frequency requires a separately converged static-limit extrapolation.",
+        ],
+    }
