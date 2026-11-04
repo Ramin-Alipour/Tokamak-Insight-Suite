@@ -36,4 +36,6 @@
 5. A successful optimizer is not sufficient for a reportable physical measurement. Data-only identifiability, covariance provenance, model discrepancy and external inputs must be reported.
 6. CI establishes software checks only. It is not experimental validation.
 
-TS-02 incremental implementation note (2026-11-04): the relativistic ECE absorption entry point is conditional on an explicitly supplied normalized gyrotropic EVDF, density, local wavevector, magnetic field and polarization. It does not infer the EVDF, implement a collisional operator, or close polarized transfer. Resonance-width and quadrature convergence remain numerical release gates.\n\nAnalysis 1 must not be advertised as having all TS-01–TS-20 closed until every remaining PARTIAL/OPEN item has code-level implementation, tests, public API/dashboard integration, synchronized documentation, and successful CI on the exact release commit.
+TS-02 incremental implementation note (2026-11-04): the relativistic ECE absorption entry point is conditional on an explicitly supplied normalized gyrotropic EVDF, density, local wavevector, magnetic field and polarization. It does not infer the EVDF, implement a collisional operator, or close polarized transfer. Resonance-width and quadrature convergence remain numerical release gates.
+
+Analysis 1 must not be advertised as having all TS-01–TS-20 closed until every remaining PARTIAL/OPEN item has code-level implementation, tests, public API/dashboard integration, synchronized documentation, and successful CI on the exact release commit.
