@@ -248,8 +248,53 @@ def solve_polarized_kinetic_ece_with_mode_conversion(
     }
 
 
+def run_advanced_thomson_physics(model, **kwargs):
+    """Public, explicit dispatcher for the four advanced Analysis-1 physics solvers.
+
+    Supported models:
+      - landau_fdt_cts: multispecies electrostatic CTS with the discrete
+        Landau operator, matching Langevin source and Poisson screening.
+      - polarized_kinetic_ece: magnetized kinetic ECE opacity projected onto
+        two unit-flux modes, polarized LTE transfer and Berreman conversion.
+      - stratified_nonparaxial_vector: 2-D vector-beam propagation through a
+        z-stratified anisotropic dielectric using angular-spectrum and
+        oblique Berreman solutions.
+      - stratified_mode_conversion: coherent Jones reflection/transmission
+        matrices for a supplied stratified dielectric.
+
+    No physical model is substituted automatically. Equilibrium, geometry,
+    dielectric, mode-basis and calibration inputs remain explicit caller data.
+    The returned limitations and convergence gates are preserved.
+    """
+    if not isinstance(model, str):
+        raise ValueError("model must be an explicit supported model name")
+    if model == "landau_fdt_cts":
+        solver = analyze_landau_fdt_cts
+    elif model == "polarized_kinetic_ece":
+        solver = solve_polarized_kinetic_ece_with_mode_conversion
+    elif model == "stratified_nonparaxial_vector":
+        solver = propagate_stratified_nonparaxial_vector_field
+    elif model == "stratified_mode_conversion":
+        solver = solve_stratified_mode_conversion
+    else:
+        raise ValueError(
+            "model must be one of: landau_fdt_cts, polarized_kinetic_ece, "
+            "stratified_nonparaxial_vector, stratified_mode_conversion; "
+            "no automatic model substitution is performed"
+        )
+    result = solver(**kwargs)
+    if not isinstance(result, Mapping):
+        raise TypeError("advanced physics solver must return a mapping")
+    return {
+        **dict(result),
+        "public_physics_entrypoint": model,
+        "automatic_model_substitution": False,
+    }
+
+
 __all__ = [
     "analyze_landau_fdt_cts",
     "propagate_stratified_nonparaxial_vector_field",
     "solve_polarized_kinetic_ece_with_mode_conversion",
+    "run_advanced_thomson_physics",
 ]

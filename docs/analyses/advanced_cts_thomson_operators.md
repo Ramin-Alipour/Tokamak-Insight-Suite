@@ -233,3 +233,23 @@ double count it. The drift must be strictly subluminal. Quadrature convergence
 must be checked for the selected temperature and drift; this is a numerical
 forward-model capability, not an assertion that a drifted VDF has been
 identified from a single CTS spectrum.
+
+
+## Unified public Analysis-1 solver entry point
+
+The four advanced solver paths are available through
+tokamak_analysis.cts_full_physics.run_advanced_thomson_physics(model, **kwargs).
+The explicit model keys are:
+
+- landau_fdt_cts
+- polarized_kinetic_ece
+- stratified_nonparaxial_vector
+- stratified_mode_conversion
+
+The dispatcher forwards the caller's inputs to exactly one solver, preserves
+the solver's limitations and convergence metadata, and never substitutes a
+simpler model. This is an API/integration improvement; it does not expand the
+physical validity domains documented above. The Landau-FDT branch remains a
+finite-box, non-relativistic, isotropic Maxwellian electrostatic CTS reference
+solver; kinetic ECE remains non-relativistic Maxwellian; vector propagation
+and mode conversion remain restricted to the documented stratified geometry.
