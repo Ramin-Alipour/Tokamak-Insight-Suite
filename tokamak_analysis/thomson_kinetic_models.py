@@ -507,7 +507,7 @@ def relativistic_maxwell_juttner_spectrum(
             or momentum_quadrature_to_analytic_ratio > 1.0 + 1e-4):
         raise ValueError(
             "Maxwell-Juttner momentum quadrature is inconsistent with the "
-            f"analytic normalization (captured={momentum_probability_coverage:.8g}); "
+            f"analytic normalization (captured={momentum_quadrature_to_analytic_ratio:.8g}); "
             "increase radial_order or revise the momentum quadrature."
         )
     momentum_probability_coverage = min(1.0, momentum_quadrature_to_analytic_ratio)
