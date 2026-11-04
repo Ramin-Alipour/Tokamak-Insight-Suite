@@ -1512,3 +1512,144 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
             kwargs["measured_spectrum"] = kwargs.pop("spectrum")
         return analyze_full_em_cts_spectrum(**kwargs)
     raise ValueError("model must be 'electrostatic', 'full_electromagnetic', 'full_em_spatial_profiles' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
+
+
+def fit_cts_ion_species_flows(
+    frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
+    scattering_geometry, electron_density_m3, electron_temperature_eV,
+    ion_temperature_eV, ion_species, ion_fractions,
+    electron_velocity_projection_m_s, instrument_response,
+    ion_velocity_initial_m_s, signal_uncertainty,
+    ion_velocity_bounds_m_s=(-5.0e5, 5.0e5),
+):
+    """Conditionally infer independent ion-species flow projections from CTS.
+
+    Density, temperatures, composition, electron flow, geometry and calibrated
+    instrument response are fixed supplied inputs. The fitted parameters are
+    one projected flow per ion species plus a positive spectral scale and a
+    constant residual offset. A scalar flow is never silently substituted for
+    missing species flows. The result is withheld if the spectral Jacobian
+    cannot distinguish all requested flow parameters.
+    """
+    from scipy.optimize import least_squares
+
+    frequency = _array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    observed = _array(measured_spectrum, "measured_spectrum", 1)
+    uncertainty = _array(signal_uncertainty, "signal_uncertainty", 1)
+    if frequency.size != observed.size or uncertainty.shape != observed.shape or frequency.size < 12:
+        raise ValueError("frequency, measured spectrum and signal uncertainty must match and contain at least 12 bins")
+    if np.any(np.diff(frequency) <= 0.0) or np.any(observed < 0.0) or np.any(uncertainty <= 0.0):
+        raise ValueError("frequency must increase; measured spectrum must be non-negative; uncertainty must be positive")
+    if not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes)) or not ion_species:
+        raise ValueError("ion_species must be a non-empty sequence")
+    names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
+    if len(set(names)) != len(names):
+        raise ValueError("ion species names must be unique")
+    if not isinstance(ion_velocity_initial_m_s, Mapping) or set(ion_velocity_initial_m_s) != set(names):
+        raise ValueError("ion_velocity_initial_m_s must map exactly every ion species name to an initial projected flow")
+    initial_flows = np.asarray([
+        float(_array([ion_velocity_initial_m_s[name]], f"ion_velocity_initial_m_s[{name}]")[0])
+        for name in names
+    ])
+    bounds = _array(ion_velocity_bounds_m_s, "ion_velocity_bounds_m_s", 1)
+    if bounds.shape != (2,) or bounds[0] >= bounds[1] or np.any(np.abs(bounds) >= C):
+        raise ValueError("ion_velocity_bounds_m_s must be one finite increasing subluminal [lower, upper] pair")
+    if np.any(initial_flows < bounds[0]) or np.any(initial_flows > bounds[1]):
+        raise ValueError("each initial ion flow must lie inside ion_velocity_bounds_m_s")
+    response = _array(instrument_response, "instrument_response", 2)
+    if response.shape != (frequency.size, frequency.size):
+        raise ValueError("instrument_response must be square on the measured frequency grid")
+    y_scale = max(float(np.max(observed)), float(np.max(uncertainty)), np.finfo(float).tiny)
+    v_scale = max(abs(float(bounds[0])), abs(float(bounds[1])), 1.0)
+    normalized_uncertainty = uncertainty / y_scale
+    initial_physical = cts_spectral_density(
+        frequency, probe_frequency_Hz, scattering_geometry,
+        electron_density_m3=electron_density_m3,
+        electron_temperature_eV=electron_temperature_eV,
+        ion_temperature_eV=ion_temperature_eV,
+        ion_species=ion_species, ion_fractions=ion_fractions,
+        electron_velocity_projection_m_s=electron_velocity_projection_m_s,
+        ion_velocity_projection_m_s=initial_flows,
+    )
+    initial_convolved = _convolve(response, initial_physical, frequency)
+    amplitude_seed = max(
+        float(np.dot(observed / y_scale, initial_convolved) / max(np.dot(initial_convolved, initial_convolved), np.finfo(float).tiny)),
+        1e-10,
+    )
+    offset_seed = float(np.median(observed / y_scale - amplitude_seed * initial_convolved))
+    x0 = np.r_[initial_flows / v_scale, np.log(amplitude_seed), offset_seed]
+    lower = np.r_[np.full(len(names), bounds[0] / v_scale), np.log(1e-12), -np.inf]
+    upper = np.r_[np.full(len(names), bounds[1] / v_scale), np.log(1e12), np.inf]
+
+    def predict(parameters):
+        flows = parameters[:len(names)] * v_scale
+        flow_map = dict(zip(names, map(float, flows)))
+        physical = cts_spectral_density(
+            frequency, probe_frequency_Hz, scattering_geometry,
+            electron_density_m3=electron_density_m3,
+            electron_temperature_eV=electron_temperature_eV,
+            ion_temperature_eV=ion_temperature_eV,
+            ion_species=ion_species, ion_fractions=ion_fractions,
+            electron_velocity_projection_m_s=electron_velocity_projection_m_s,
+            ion_velocity_projection_m_s=flow_map,
+        )
+        return np.exp(parameters[-2]) * _convolve(response, physical, frequency) + parameters[-1]
+
+    def residual(parameters):
+        return (predict(parameters) - observed / y_scale) / normalized_uncertainty
+
+    fit = least_squares(residual, x0, bounds=(lower, upper), method="trf", x_scale="jac")
+    jacobian = np.asarray(fit.jac, dtype=float)
+    singular_values = np.linalg.svd(jacobian, compute_uv=False)
+    tolerance = np.finfo(float).eps * max(jacobian.shape) * (singular_values[0] if singular_values.size else 0.0)
+    rank = int(np.count_nonzero(singular_values > tolerance))
+    parameter_count = len(names) + 2
+    identifiable = rank == parameter_count
+    covariance = None
+    flow_uncertainties = None
+    if identifiable:
+        covariance_normalized = np.linalg.inv(jacobian.T @ jacobian)
+        covariance = covariance_normalized.copy()
+        covariance[:len(names), :len(names)] *= v_scale**2
+        covariance[:len(names), len(names):] *= v_scale
+        covariance[len(names):, :len(names)] *= v_scale
+        flow_uncertainties = {
+            name: float(v_scale * np.sqrt(max(covariance_normalized[i, i], 0.0)))
+            for i, name in enumerate(names)
+        }
+    fitted_flows = dict(zip(names, map(float, fit.x[:len(names)] * v_scale)))
+    fitted_spectrum = predict(fit.x) * y_scale
+    return {
+        "model": "unmagnetized_electrostatic_multi_ion_maxwellian_cts",
+        "ion_velocity_projection_m_s": fitted_flows if identifiable else None,
+        "candidate_ion_velocity_projection_m_s": fitted_flows,
+        "ion_velocity_uncertainty_m_s": flow_uncertainties,
+        "parameter_names": [f"u_{name}_parallel_m_s" for name in names] + ["log_spectral_scale", "normalized_offset"],
+        "parameter_covariance": covariance,
+        "spectral_scale": float(np.exp(fit.x[-2])),
+        "spectral_offset": float(fit.x[-1] * y_scale),
+        "fitted_spectrum": fitted_spectrum,
+        "residual": fitted_spectrum - observed,
+        "chi_square": float(np.sum(fit.fun**2)),
+        "degrees_of_freedom": int(frequency.size - parameter_count),
+        "jacobian_rank": rank,
+        "parameter_count": parameter_count,
+        "singular_values": singular_values,
+        "optimizer_success": bool(fit.success),
+        "optimizer_message": str(fit.message),
+        "identifiability": "identifiable_conditional_on_fixed_plasma_inputs" if identifiable else "non_identifiable_species_flow_combination",
+        "result_classification": "Conditional" if identifiable else "Non-identifiable",
+        "reportable_as_inferred_parameter": bool(fit.success and identifiable),
+        "conditional_inputs": [
+            "electron_density_m3", "electron_temperature_eV", "ion_temperature_eV",
+            "ion_species", "ion_fractions", "electron_velocity_projection_m_s",
+            "probe_frequency_Hz", "scattering_geometry", "instrument_response",
+        ],
+        "assumptions": [
+            "unmagnetized electrostatic longitudinal CTS",
+            "Maxwellian bulk electrons and ions",
+            "one constant projected flow per ion species over the scattering volume",
+            "supplied plasma parameters and composition are fixed, not inferred by this fit",
+            "independent Gaussian spectral errors described by signal_uncertainty",
+        ],
+    }
