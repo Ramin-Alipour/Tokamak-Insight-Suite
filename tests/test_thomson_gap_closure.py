@@ -368,3 +368,25 @@ def test_projected_evdf_rejects_non_psd_model_discrepancy_covariance():
             model_discrepancy_covariance=discrepancy,
             regularization_strength=1e-3,
         )
+
+
+def test_projected_evdf_normalizes_on_nonuniform_velocity_grid():
+    wavelength = np.linspace(520.0, 544.0, 121)
+    coordinate = np.linspace(-1.0, 1.0, 61)
+    velocity = 3.0e6 * (coordinate + 0.15 * coordinate**3)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(measured),
+        velocity_grid_m_s=velocity,
+        regularization_strength=1e-3,
+    )
+    weights = result["velocity_quadrature_weights_m_s"]
+    candidate = result["regularized_candidate_evdf_s_m"]
+    assert result["velocity_grid_spacing_uniform"] is False
+    assert result["regularization_operator"] == (
+        "nonuniform_three_point_second_derivative_on_interior_velocity_nodes"
+    )
+    np.testing.assert_allclose(np.dot(candidate, weights), 1.0, rtol=1e-10, atol=1e-10)
