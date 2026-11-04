@@ -164,6 +164,7 @@ def kappa_electron_susceptibility(
         "theta_m_s": float(np.sqrt(theta_squared)),
         "second_moment_m2_s2": float(E * te / mass),
         "velocity_grid_probability_coverage": grid_coverage,
+        "finite_support_probability_mass": grid_coverage,
         "minimum_velocity_grid_probability_coverage": minimum_coverage,
         "finite_velocity_grid_truncation": bool(grid_coverage < 1.0 - 1e-12),
         "finite_grid_renormalization_bias_prevented": True,
