@@ -383,6 +383,11 @@ def test_oblique_magnetoionic_group_velocity_reports_ray_walkoff():
     assert result["ray_direction"].shape == (3,)
     assert np.linalg.norm(result["ray_direction"]) == pytest.approx(1.0, rel=1e-12)
     assert 0.0 <= result["wave_normal_to_ray_walkoff_angle_rad"] <= np.pi
+    assert result["brillouin_energy_density_J_m3_per_V2_m2"] > 0.0
+    np.testing.assert_allclose(
+        result["energy_velocity_m_s"], result["group_velocity_m_s"],
+        rtol=5e-4, atol=1e-5,
+    )
 
 
 def test_group_velocity_rejects_collisional_and_degenerate_modes():
