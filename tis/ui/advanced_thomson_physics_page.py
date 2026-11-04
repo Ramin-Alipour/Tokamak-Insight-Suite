@@ -18,6 +18,7 @@ MODEL_LABELS = {
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
+    "thomson_relativistic_exact_flow_projection": "Optical Thomson — exact relativistic Doppler inversion of a single q-parallel flow projection",
     "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware inversion with optional GCV regularization",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
@@ -46,6 +47,14 @@ MODEL_LABELS = {
 }
 
 EXAMPLES = {
+    "thomson_relativistic_exact_flow_projection": {
+        "fitted_center_nm": 499.9998,
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "sigma_fitted_center_nm": 1.0e-5,
+        "sigma_laser_wavelength_nm": 2.0e-6,
+        "sigma_scattering_angle_rad": 1.0e-4
+    },
     "microwave_background": {
         "frequency_Hz": [90.0e9, 100.0e9, 110.0e9],
         "path_length_m": [0.05, 0.05],
