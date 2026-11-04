@@ -1,0 +1,43 @@
+name: Thomson and CTS physics contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tokamak_analysis/**"
+      - "tests/test_cts_*.py"
+      - "tests/test_thomson_contracts.py"
+      - ".github/workflows/cts-analysis.yml"
+  pull_request:
+    paths:
+      - "tokamak_analysis/**"
+      - "tests/test_cts_*.py"
+      - "tests/test_thomson_contracts.py"
+      - ".github/workflows/cts-analysis.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cts-physics-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install numerical test dependencies
+        run: python -m pip install --upgrade pip numpy scipy pytest
+      - name: Run Thomson and CTS contract regression tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: >-
+          python -m pytest -q
+          tests/test_cts_em_background.py
+          tests/test_cts_landau_fdt_operator.py
+          tests/test_cts_spatial_inference.py
+          tests/test_thomson_contracts.py
