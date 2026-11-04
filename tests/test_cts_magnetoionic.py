@@ -75,3 +75,20 @@ def test_cyclotron_pole_is_not_hidden_by_artificial_damping():
         cold_plasma_dielectric_tensor(
             gyrofrequency/(2*np.pi), [0.0, 0.0, 2.0], _electron_only()
         )
+
+
+
+def test_cold_plasma_modes_are_reachable_through_advanced_physics_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "cold_plasma_magnetoionic_modes",
+        frequency_Hz=100e9,
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        species=_electron_only(),
+        wave_normal_direction=[0.0, 0.0, 1.0],
+    )
+    assert result["public_physics_entrypoint"] == "cold_plasma_magnetoionic_modes"
+    assert result["automatic_model_substitution"] is False
+    assert len(result["modes"]) == 2
+    assert result["mode_conversion_performed"] is False
