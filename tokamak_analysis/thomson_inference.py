@@ -6,7 +6,7 @@ This module does not calibrate detectors or repair/prepare measurements.
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import curve_fit, least_squares
+from scipy.optimize import brentq, curve_fit, least_squares
 from scipy.special import gammaln, stdtr
 
 from .thomson_scattering import density_from_thomson_scattered_power, _covariance_is_positive_semidefinite
@@ -3373,11 +3373,26 @@ def analyze_thomson_spectra(
             background_reference_nm = float(
                 channel_result.get("fitted_center_nm", laser_wavelength_nm)
             )
-            fitted_background = (
-                float(channel_result["background_intercept"])
-                + float(channel_result["background_slope_per_nm"])
-                * (xs[channel_index] - background_reference_nm)
-            )
+            background_basis = channel_result.get("background_basis")
+            background_coefficients = channel_result.get("background_coefficients")
+            if background_basis is not None and background_coefficients is not None:
+                basis_array = np.asarray(background_basis, dtype=float)
+                coefficient_array = np.asarray(background_coefficients, dtype=float)
+            else:
+                basis_array = coefficient_array = None
+            if (basis_array is not None and basis_array.ndim == 2
+                    and basis_array.shape[0] == xs.shape[1]
+                    and coefficient_array.shape == (basis_array.shape[1],)):
+                fitted_background = basis_array @ coefficient_array
+            else:
+                fitted_background = (
+                    float(channel_result["background_intercept"])
+                    + float(channel_result["background_slope_per_nm"])
+                    * (xs[channel_index] - background_reference_nm)
+                )
+            channel_result["fitted_background_spectrum"] = np.asarray(
+                fitted_background, dtype=float
+            ).copy()
             try:
                 distribution = analyze_thomson_spectral_distribution(
                     xs[channel_index],
@@ -3427,28 +3442,117 @@ def analyze_thomson_spectra(
                 "reason": "EVDF reconstruction was explicitly disabled.",
             }
         elif model == "non_collective_relativistic_maxwell_juttner":
-            # The current inverse operator uses first-order non-relativistic
-            # Doppler kinematics. Never run it under a relativistic forward fit:
-            # a converged optimizer would not make the inferred velocity marginal
-            # physically consistent with the selected scattering model.
-            evdf = {
-                "analysis_status": "unavailable_for_selected_physical_model",
-                "reason": (
-                    "The available projected-EVDF inverse uses non-relativistic "
-                    "single-particle Doppler kinematics and is not applicable to "
-                    "the relativistic Maxwell-Juttner forward model. A relativistic "
-                    "EVDF inverse is not implemented."
-                ),
-                "identifiability": {
-                    "primary": [],
-                    "conditional": [
-                        "A relativistically consistent projected EVDF requires a relativistic inverse operator using the same photon-frequency and angular kinematics as the selected Maxwell-Juttner forward model."
-                    ],
-                    "non_identifiable": [
-                        "An unrestricted three-dimensional relativistic EVDF from one scattering geometry."
-                    ],
-                },
-            }
+            if laser_spectrum_wavelength_nm is not None:
+                evdf = {
+                    "analysis_status": "unavailable_for_this_channel",
+                    "reason": (
+                        "The relativistic projected inverse currently assumes a monochromatic "
+                        "incident laser; the supplied finite-bandwidth laser spectrum is not "
+                        "yet convolved in this inverse operator."
+                    ),
+                    "identifiability": {
+                        "primary": [],
+                        "conditional": ["A source-spectrum-aware relativistic projected inverse."],
+                        "non_identifiable": [
+                            "An unrestricted three-dimensional relativistic EVDF from one scattering geometry."
+                        ],
+                    },
+                }
+            else:
+                try:
+                    from .thomson_gap_closure import (
+                        reconstruct_relativistic_projected_thomson_evdf,
+                        relativistic_projected_compton_kinematics,
+                    )
+                    wavelength_axis = np.asarray(xs[channel_index], dtype=float)
+                    # Invert the same exact relativistic single-electron wavelength
+                    # map used by the selected forward model to set the velocity
+                    # support from the measured spectral-bin interior.
+                    low_wavelength = float(
+                        wavelength_axis[0] + 0.5*(wavelength_axis[1]-wavelength_axis[0])
+                    )
+                    high_wavelength = float(
+                        wavelength_axis[-1] - 0.5*(wavelength_axis[-1]-wavelength_axis[-2])
+                    )
+
+                    def mapped_wavelength_for_velocity(velocity_m_s):
+                        step = max(1.0, abs(float(velocity_m_s))*1e-10)
+                        probe = np.array([float(velocity_m_s), float(velocity_m_s)+step])
+                        mapped = relativistic_projected_compton_kinematics(
+                            probe, float(laser_wavelength_nm),
+                            float(scattering_angle_rad),
+                        )
+                        key = (
+                            "compton_scattered_wavelength_nm"
+                            if include_compton_recoil else
+                            "thomson_scattered_wavelength_nm"
+                        )
+                        return float(mapped[key][0])
+
+                    velocity_bracket = (-0.99*C_M_S, 0.99*C_M_S)
+                    velocity_low = brentq(
+                        lambda value: mapped_wavelength_for_velocity(value)-high_wavelength,
+                        *velocity_bracket, xtol=1e-3,
+                    )
+                    velocity_high = brentq(
+                        lambda value: mapped_wavelength_for_velocity(value)-low_wavelength,
+                        *velocity_bracket, xtol=1e-3,
+                    )
+                    if not velocity_high > velocity_low:
+                        raise ValueError(
+                            "Measured wavelength coverage does not map to an increasing projected-velocity interval."
+                        )
+                    velocity_grid = np.linspace(
+                        velocity_low, velocity_high, int(evdf_velocity_points)
+                    )
+                    evdf = reconstruct_relativistic_projected_thomson_evdf(
+                        wavelength_axis,
+                        y[channel_index],
+                        laser_wavelength_nm=float(laser_wavelength_nm),
+                        scattering_angle_rad=float(scattering_angle_rad),
+                        instrument_response_matrix=channel_responses[channel_index],
+                        background_signal=fitted_background,
+                        velocity_grid_m_s=velocity_grid,
+                        signal_uncertainty=channel_uncertainty,
+                        signal_covariance=channel_covariance,
+                        include_compton_recoil=include_compton_recoil,
+                        incident_polarization=incident_polarization,
+                        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                        regularization_strength=None,
+                    )
+                    evdf["laser_spectral_profile"] = {
+                        "assumption": "monochromatic_incident_laser",
+                    }
+                    evdf["analysis_status"] = (
+                        "completed"
+                        if evdf["primary_result_status"] == "identified_from_measurement"
+                        else "conditional_regularized_candidate"
+                    )
+                    evdf["forward_model_recoil_included"] = bool(include_compton_recoil)
+                    evdf["background_source"] = (
+                        "full detector-space nuisance basis fitted by the selected relativistic Thomson physical forward model"
+                    )
+                    evdf["interpretation"] = (
+                        "A relativistically mapped, normalized one-dimensional electron-velocity marginal along "
+                        "the scattering vector. The Compton route uses the same recoil switch and incident "
+                        "polarization as the selected forward fit. A regularized candidate is not promoted to "
+                        "a primary measurement when the data-only inverse is rank deficient. A single view "
+                        "does not identify transverse velocity structure or an unrestricted 3-D EVDF."
+                    )
+                except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
+                    evdf = {
+                        "analysis_status": "unavailable_for_this_channel",
+                        "reason": str(exc),
+                        "identifiability": {
+                            "primary": [],
+                            "conditional": [
+                                "A stable relativistic projected EVDF requires adequate wavelength coverage, measured response, polarization for the Compton route, and sufficient spectral information."
+                            ],
+                            "non_identifiable": [
+                                "An unrestricted three-dimensional relativistic EVDF from one scattering geometry."
+                            ],
+                        },
+                    }
         else:
             try:
                 q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
