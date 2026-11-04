@@ -371,7 +371,11 @@ def _fit_noncollective(
     background_interior_knots=3, background_templates=None,
     spectral_covariance=None,
 ):
-    """Fit the Maxwellian Thomson feature jointly with a detector-space background basis."""
+    """Fit Maxwellian Thomson spectra with exact finite-bin Gaussian probabilities.
+
+    The normal-CDF bin averages are response-convolved in bin-integrated
+    spectral-power space; the background remains a detector-space nuisance.
+    """
     from .thomson_background import _background_design
 
     signal_scale = float(np.max(np.abs(signal)))
@@ -538,7 +542,7 @@ def _fit_noncollective(
     }
 
 def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_covariance=None):
-    """Profile Kappa while re-optimizing amplitude, centroid, width and baseline."""
+    """Profile Kappa using exact Student-t bin probabilities and re-fit nuisances."""
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     p = np.asarray(p, dtype=float)
@@ -632,7 +636,12 @@ def _fit_kappa(
     background_degree=2, background_interior_knots=3,
     background_templates=None,
 ):
-    """Fit an isotropic finite-variance Kappa spectrum with a joint detector-space background."""
+    """Fit isotropic finite-variance Kappa spectra with exact Student-t bin integrals.
+
+    The response acts on bin-integrated spectral power. The returned full-model
+    area uses the normalized Student-t shape integral, including Gamma(kappa)
+    in the denominator, and measured-window coverage is not tail-renormalized.
+    """
     from .thomson_background import _background_design
 
     signal_scale = float(np.max(np.abs(signal)))
