@@ -323,6 +323,8 @@ def analyze_cts_microwave_background(
     ion_charge_states,
     ece_absorption_coefficient_m_inverse=None,
     ece_mode_weights=None,
+    ece_emissivity_W_m3_sr_Hz=None,
+    ece_lte=False,
     gaunt_factor=1.0,
     incident_radiance_W_m2_sr_Hz=0.0,
 ):
@@ -342,6 +344,8 @@ def analyze_cts_microwave_background(
         ion_charge_states=ion_charge_states,
         ece_absorption_coefficient_m_inverse=ece_absorption_coefficient_m_inverse,
         ece_mode_weights=ece_mode_weights,
+        ece_emissivity_W_m3_sr_Hz=ece_emissivity_W_m3_sr_Hz,
+        ece_lte=ece_lte,
         gaunt_factor=gaunt_factor,
         incident_radiance_W_m2_sr_Hz=incident_radiance_W_m2_sr_Hz,
     )
