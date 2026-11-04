@@ -18,7 +18,7 @@ def test_analysis_1_optical_profile_and_distribution_routes_are_executable():
 
 
 def test_thomson_analysis_1_registry_input_and_output_names_are_unique():
-    for analysis_id in (1, 46, 81):
+    for analysis_id in (1, 30, 46, 81):
         contract = get_analysis(analysis_id)["execution_contract"]
         input_names = [item["name"] for item in contract["input_specs"]]
         output_names = [item["name"] for item in contract["output_specs"]]
@@ -151,9 +151,19 @@ def test_analysis1_public_output_identifiability_contract_matches_runtime_produc
     from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
     from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 
-    assert "parameter_identifiability" in inspect.signature(analyze_thomson_spectra).return_annotation.__str__() or callable(analyze_thomson_spectra)
-    assert callable(reconstruct_thomson_profile_from_spectra)
-    assert callable(analyze_thomson_spectral_distribution)
+    from tokamak_analysis.cts_analysis import analyze_cts_spectrum
+    from tokamak_analysis.cts_full_em import analyze_full_em_cts_spectrum
+
+    producers = (
+        analyze_thomson_spectra,
+        analyze_cts_spectrum,
+        analyze_full_em_cts_spectrum,
+        reconstruct_thomson_profile_from_spectra,
+        analyze_thomson_spectral_distribution,
+    )
+    for producer in producers:
+        assert callable(producer)
+        assert '"parameter_identifiability"' in inspect.getsource(producer), producer.__name__
     for analysis_id in (1, 30, 46, 81):
         outputs = {
             item["name"]
