@@ -14,7 +14,10 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
 
 MODEL_LABELS = {
-    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",\n    "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",\n    "thomson_relativistic_projected_evdf": "Optical Thomson — exact relativistic Doppler kinematics (zero-recoil Thomson limit)",\n    "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
+    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
+    "thomson_relativistic_projected_evdf": "Optical Thomson — exact relativistic Doppler kinematics (zero-recoil Thomson limit)",
+    "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
@@ -23,6 +26,33 @@ MODEL_LABELS = {
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
 }
 
+    "thomson_relativistic_projected_evdf": {
+        "wavelength_nm": np.linspace(499.8, 500.2, 81).tolist(),
+        "signal": (2.0 + 100.0*np.exp(-0.5*((np.linspace(499.8, 500.2, 81)-500.0)/0.07)**2)).tolist(),
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response_matrix": np.eye(81).tolist(),
+        "background_signal": np.full(81, 2.0).tolist(),
+        "velocity_grid_m_s": np.linspace(-80000.0, 80000.0, 81).tolist(),
+        "regularization_strength": 0.001
+    },
+    "thomson_psf_profile_inverse": {
+        "measured_channel_values": [2.0, 3.0, 4.0, 3.0, 2.0],
+        "spatial_mixing_matrix": [[0.85,0.10,0.00,0.00,0.00],[0.10,0.80,0.10,0.00,0.00],[0.00,0.10,0.80,0.10,0.00],[0.00,0.00,0.10,0.80,0.10],[0.00,0.00,0.00,0.10,0.85]],
+        "regularization_strength": 0.01,
+        "measurement_uncertainty": [0.1,0.1,0.1,0.1,0.1]
+    },
+    "thomson_projected_evdf": {
+        "wavelength_nm": np.linspace(499.98, 500.02, 41).tolist(),
+        "signal": (2.0 + 100.0*np.exp(-0.5*((np.linspace(499.98, 500.02, 41)-500.001)/0.003)**2)).tolist(),
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response_matrix": np.eye(41).tolist(),
+        "background_signal": np.full(41, 2.0).tolist(),
+        "regularization_strength": 0.001,
+        "velocity_limit_m_s": 1500000.0,
+        "velocity_points": 81
+    },
 EXAMPLES = {
     "kappa_electrostatic_susceptibility": {
         "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
