@@ -213,3 +213,37 @@ def test_relativistic_compton_mode_rejects_non_boolean_selection():
             incident_polarization=[0.0, 0.0, 1.0],
             include_compton_recoil="yes",
         )
+
+
+def test_landau_susceptibility_matches_exact_maxwellian_plasma_dispersion_function():
+    from scipy.special import wofz
+    from tokamak_analysis.thomson_kinetic_models import _landau_susceptibility
+
+    sigma = 2.3e6
+    phase_velocity = 0.7*sigma
+    omega_p2 = 3.0e20
+    wave_number = 85.0
+    zeta = phase_velocity/(np.sqrt(2.0)*sigma)
+    plasma_dispersion = 1j*np.sqrt(np.pi)*wofz(zeta)
+    exact_landau_integral = -(1.0 + zeta*plasma_dispersion)/(sigma*sigma)
+    expected = -(omega_p2/(wave_number*wave_number))*exact_landau_integral
+    actual = _landau_susceptibility(
+        phase_velocity, omega_p2, wave_number, sigma, distribution="maxwellian"
+    )
+    np.testing.assert_allclose(actual, expected, rtol=2e-6, atol=1e-14)
+
+
+def test_kappa_landau_susceptibility_remains_finite_near_finite_variance_boundary():
+    from tokamak_analysis.thomson_kinetic_models import _landau_susceptibility
+
+    sigma = 1.7e6
+    values = [
+        _landau_susceptibility(
+            0.8*sigma, 2.0e20, 110.0, sigma,
+            distribution="kappa", kappa=kappa,
+        )
+        for kappa in (1.5001, 1.51, 1.7, 3.0)
+    ]
+    assert np.all(np.isfinite(np.asarray(values).real))
+    assert np.all(np.isfinite(np.asarray(values).imag))
+    assert len({round(float(value.real), 8) for value in values}) == len(values)
