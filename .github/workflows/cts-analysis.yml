@@ -6,6 +6,7 @@ on:
     paths:
       - "tokamak_analysis/**"
       - "tests/test_cts_*.py"
+      - "tests/test_ece_relativistic_absorption.py"
       - "tests/test_thomson_*.py"
       - ".github/workflows/cts-analysis.yml"
   pull_request:
@@ -44,4 +45,5 @@ jobs:
           tests/test_cts_full_physics_background_dispatch.py
           tests/test_cts_em_background_physics.py
           tests/test_cts_physical_background_integration.py
+          tests/test_ece_relativistic_absorption.py
           tests/test_thomson_contracts.py

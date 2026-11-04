@@ -42,7 +42,7 @@ jobs:
       - name: Install Chromium for real-browser tests
         run: python -m playwright install --with-deps chromium
       - name: Compile application and ECE module
-        run: python -m compileall -q app.py tokamak_analysis/ece_analysis.py tests
+        run: python -m compileall -q app.py tokamak_analysis/ece_analysis.py tokamak_analysis/ece_kinetic.py tests
       - name: Run complete automated test suite, including real-browser ECE workflow
         run: python -m pytest -q
       - name: Verify dashboard exposes the ECE workflow
