@@ -6,6 +6,7 @@ from scipy.constants import hbar
 from tokamak_analysis.cts_fdt import (
     classical_fdt_dynamic_structure_factor,
     quantum_fdt_dynamic_structure_factor,
+    quantum_unsymmetrized_dynamic_structure_factor,
 )
 
 def _passive_response(omega):
