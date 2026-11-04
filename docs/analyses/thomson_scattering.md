@@ -620,6 +620,22 @@ are returned. Cyclotron poles are rejected rather than assigned artificial
 damping. This local cold-plasma model is not a warm kinetic dielectric,
 Full-EM CTS three-wave vertex, ray tracer, or mode-conversion solver.
 
+The cold-plasma magnetoionic dielectric also accepts an optional
+species-resolved `collision_frequency_rad_s` (momentum-transfer rate
+`nu_s >= 0`). For the declared exp(-i omega t) convention, the cold-fluid
+momentum-drag closure replaces the transverse denominators by
+`omega [omega + i nu_s +/- Omega_s]` and the longitudinal denominator by
+`omega [omega + i nu_s]`. Thus
+`R=1-sum(omega_ps^2/{omega[omega+i nu_s+Omega_s]})`,
+`L=1-sum(omega_ps^2/{omega[omega+i nu_s-Omega_s]})`, and
+`P=1-sum(omega_ps^2/{omega[omega+i nu_s]})`.
+The returned Stix P is complex when collisions are nonzero. Omitting the
+parameter or setting it to zero recovers the collisionless tensor exactly.
+This is a cold-fluid Drude closure only: it does not replace the kinetic
+collision operator, warm-plasma dielectric, Landau damping, or relativistic
+collisional response. Rates are supplied per species in rad/s; no default
+rate is inferred from density or temperature.
+
 The electrostatic tabulated-fast-ion susceptibility interprets the finite
 velocity grid as zero outside its support. Its Landau integral includes the
 endpoint jump terms
