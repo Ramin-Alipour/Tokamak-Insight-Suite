@@ -4071,6 +4071,11 @@ elif page=='Advanced Analysis':
                 st.caption('Convergence is assessed at the fitted parameters and is a numerical discretization check, not a physical uncertainty or experimental validation. Custom harmonic and quadrature sequences must be paired and strictly increasing.')
                 cts_damping=st.text_input('Resonance damping rate (rad/s; blank uses the documented numerical default)',key='cts_full_damping')
                 st.caption('Blank damping uses max(2π × probe frequency × 10⁻⁷, 1 rad/s). This is numerical Landau-contour regularization, not a physical collision frequency; the selected value and its source are recorded in the result.')
+                cts_coulomb_log=st.text_input(
+                    'Optional Coulomb logarithm ln(Λ) for Spitzer collisional correction (blank = collisionless)',
+                    key='cts_full_coulomb_log',
+                )
+                st.caption('When supplied, weak-coupling Spitzer electron-ion and ion momentum-transfer rates are added as species-resolved Krook resonance widths. This is an explicitly approximate, non-conserving correction, not a full Landau collision operator; supply ln(Λ) from the plasma state.')
                 cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV:D+":[10,200]}',key='cts_full_parameter_bounds')
             st.markdown('**Ion composition (externally supplied)**')
             s1,s2,s3=st.columns(3)
@@ -4224,6 +4229,12 @@ elif page=='Advanced Analysis':
                         kwargs_cts['electron_flow_projection_initial_m_s']=float(cts_electron_flow)
                     if cts_damping.strip():
                         kwargs_cts['damping_rate_rad_s']=float(cts_damping)
+                    if cts_coulomb_log.strip():
+                        kwargs_cts['collisional_model']={
+                            'coulomb_logarithm':_parse_ts_scalar(
+                                cts_coulomb_log,'Coulomb logarithm ln(Λ)',minimum=1e-12,
+                            )
+                        }
                     if cts_bindslev_theta_limit.strip():
                         kwargs_cts['bindslev_validity_theta_e_limit']=_parse_ts_scalar(
                             cts_bindslev_theta_limit,'Bindslev theta_e validity limit',
