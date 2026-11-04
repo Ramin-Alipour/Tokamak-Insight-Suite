@@ -7267,6 +7267,26 @@
           "unit": "strictly increasing positive dimensionless regularization strengths",
           "required": false,
           "description": "Optional grid of at least two strictly increasing positive strengths. The full measured-spectrum spatial inverse is rerun at each value; profile spread is reported as regularization-choice sensitivity, never as measurement uncertainty."
+        },
+        {
+          "name": "spatial_mixing_covariance",
+          "unit": "(n_channels × n_nodes)²; row-major mixing-matrix element covariance",
+          "required": false,
+          "description": "Optional finite symmetric positive-semidefinite covariance of the supplied detector-channel-by-radial-node spatial mixing matrix, flattened in row-major order. Propagated through complete nonlinear spectral refits; does not estimate or calibrate the PSF."
+        },
+        {
+          "name": "spatial_mixing_mc_samples",
+          "unit": "integer >= 20",
+          "required": false,
+          "description": "Number of complete nonlinear refits used to propagate spatial-mixing operator covariance.",
+          "default": 100
+        },
+        {
+          "name": "spatial_mixing_mc_seed",
+          "unit": "integer",
+          "required": false,
+          "description": "Deterministic random seed for spatial-mixing covariance refits.",
+          "default": 84622
         }
       ],
       "output_specs": [
@@ -7385,6 +7405,11 @@
           "unit": "profile candidate spread across supplied regularization strengths",
           "required": false,
           "description": "Optional full-spectrum refit sensitivity output containing each numerical Te/flow/amplitude profile candidate, across-strength standard deviation/covariance and per-strength identifiability diagnostics. It is not measurement uncertainty and does not override data-only identifiability."
+        },
+        {
+          "name": "spatial_mixing_uncertainty",
+          "unit": "structured; supplied/propagated status, refit counts and parameter covariance contribution",
+          "description": "Reports whether the supplied spatial mixing matrix covariance was propagated through nonlinear wavelength-resolved physical refits, including rejected draws and the separately reported covariance contribution. Insufficient refits never produce a silent zero contribution."
         }
       ],
       "assumptions": [

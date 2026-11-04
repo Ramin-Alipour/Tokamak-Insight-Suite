@@ -312,3 +312,22 @@ def test_three_dimensional_thomson_flow_is_connected_to_dashboard_and_formula_re
     key = "thomson_three_dimensional_flow_from_projections"
     assert len([item for item in root_formula if item.get("execution_contract", {}).get("formula_key") == key]) == 1
     assert root_formula == packaged_formula
+
+
+
+def test_profile_registry_exposes_joint_spatial_operator_covariance_inputs_and_output():
+    entry = get_analysis(46)
+    inputs = {
+        item["name"]: item
+        for item in entry["execution_contract"]["input_specs"]
+    }
+    outputs = {
+        item["name"]
+        for item in entry["execution_contract"]["output_specs"]
+    }
+    assert {
+        "spatial_mixing_covariance",
+        "spatial_mixing_mc_samples",
+        "spatial_mixing_mc_seed",
+    } <= set(inputs)
+    assert "spatial_mixing_uncertainty" in outputs
