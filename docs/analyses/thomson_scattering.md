@@ -581,11 +581,16 @@ baseline.
 
 The CTS physical-background radiative-transfer API now accepts exactly zero
 electron and positive-ion density as an explicit vacuum/no-plasma state.
-Quasineutrality is enforced on every path element: a zero-electron-density
+The vacuum consistency rule is enforced: a zero-electron-density
 element must also have zero positive-ion density, and its supplied ECE
-absorption coefficient must be exactly zero. The free-free emissivity is
-exactly zero at zero electron density; no numerical floor is converted into a
-spurious physical background.
+absorption coefficient must be exactly zero. For non-vacuum path elements,
+quasineutrality is not silently imposed or repaired. The returned
+`plasma_charge_state_moments_by_path` reports
+`n_{e,quasi}=Σ_i Z_i n_i`, `Z_eff=Σ_i Z_i² n_i/n_e`,
+`ρ_q=e(Σ_i Z_i n_i-n_e)` and the relative charge-balance residual.
+`Z_eff` is unavailable when electron density is zero. The free-free
+emissivity is exactly zero at zero electron density; no numerical floor is
+converted into a spurious physical background.
 
 The returned `background_status` distinguishes
 `zero_background_exact_zero_radiance`,
@@ -595,3 +600,35 @@ The returned `background_status` distinguishes
 incident radiance are all zero. A nonzero incident radiance in vacuum is
 therefore preserved and is not mislabeled as a zero total signal. This
 contract does not infer ECE opacity, plasma density, or a detector noise floor.
+
+
+### Local cold-plasma magnetoionic modes and kinetic CTS boundaries
+
+The advanced physics dispatcher exposes `cold_plasma_dielectric` and
+`cold_plasma_magnetoionic_modes`. The local cold, collisionless,
+multispecies dielectric uses the Stix functions
+`R=1-Σ_s ω_{ps}²/[ω(ω+Ω_s)]`,
+`L=1-Σ_s ω_{ps}²/[ω(ω-Ω_s)]`,
+`S=(R+L)/2`, `D=(R-L)/2`, and
+`P=1-Σ_s ω_{ps}²/ω²`, where
+`Ω_s=q_s|B|/m_s` is signed. The magnetic-field vector sets both magnitude
+and field-aligned basis. The zero-field limit is isotropic. For a supplied
+wave-normal direction, the two local refractive-index branches are obtained
+from
+`det[ε_r-n²(I- k_hat k_hatᵀ)]=0`; complex roots and polarization eigenvectors
+are returned. Cyclotron poles are rejected rather than assigned artificial
+damping. This local cold-plasma model is not a warm kinetic dielectric,
+Full-EM CTS three-wave vertex, ray tracer, or mode-conversion solver.
+
+The electrostatic tabulated-fast-ion susceptibility interprets the finite
+velocity grid as zero outside its support. Its Landau integral includes the
+endpoint jump terms
+`f(v_min)/(v_min-ζ)-f(v_max)/(v_max-ζ)`, as well as the interior principal
+value and retarded Landau residue. The finite-support convention is therefore
+explicit rather than dropping boundary contributions.
+
+In Full-EM CTS, the measured real frequency shift is preserved in Maxwell's
+wave tensor. The numerical resonance-broadening parameter enters kinetic
+resonance denominators only; it does not floor or replace the real frequency.
+An exactly zero frequency shift is currently unavailable because a separately
+derived and converged static-Maxwell limit is not yet implemented.
