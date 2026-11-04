@@ -6967,7 +6967,7 @@
       "function_link": "tokamak_analysis.thomson_inference._fit_noncollective",
       "function_links": [
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        null
+        "tokamak_analysis.thomson_inference._fit_noncollective"
       ],
       "formula_key": "optical_thomson_noncollective_maxwellian_finite_bin",
       "implementation_link_status": "mapped",
@@ -7141,7 +7141,7 @@
       "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
       "function_links": [
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        null
+        "tokamak_analysis.thomson_inference._fit_kappa"
       ],
       "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
       "implementation_link_status": "mapped",
