@@ -20,6 +20,7 @@ from .ece_kinetic import (
     solve_relativistic_kinetic_ece_profile,
 )
 from .cts_em_background import integrate_thermal_microwave_background
+from .cts_kappa import kappa_electron_susceptibility
 
 
 def analyze_landau_fdt_cts(
@@ -378,6 +379,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = relativistic_kinetic_ece_absorption_coefficient
     elif model == "microwave_background":
         solver = analyze_cts_microwave_background
+    elif model == "kappa_electrostatic_susceptibility":
+        solver = kappa_electron_susceptibility
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
     elif model == "landau_fdt_full_em_response":
