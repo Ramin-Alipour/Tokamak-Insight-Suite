@@ -1143,3 +1143,15 @@ C_eff = C_T + diag(2 μ ΔT) C_μ diag(2 μ ΔT)
 ```
 
 until the inferred temperatures converge. The geometry covariance must be positive semidefinite; measurement covariance remains positive definite. The result exposes the effective covariance, whether geometry uncertainty was included, and the iteration count. Temperature/geometry cross-covariance is not inferred. The public advanced-physics dispatcher, dashboard example, root/package formula registries and regression tests are synchronized. This propagates uncertainty in the supplied pitch cosines; it does not infer magnetic equilibrium or recover arbitrary anisotropic EVDFs.
+
+
+### Optical 3-D flow geometry covariance (OPT-04 / OPT-11)
+
+The multi-view inversion `v_{q,i}=q̂_i·v_e` now accepts the full `3N×3N` covariance of Cartesian scattering-vector components, including cross-view correlations. Because each nominal direction is a unit vector, the covariance is projected onto the tangent plane with `P_i=I−q̂_iq̂_iᵀ`. The first-order projection covariance is updated iteratively as
+
+```
+C_eff = C_v + J_Q C_Q J_Qᵀ
+(J_Q)_i = v_eᵀ P_i
+```
+
+The 3-D GLS then uses `C_eff` to calculate the flow vector and its covariance. Non-identifiable view geometry still withholds the vector; geometry covariance does not create missing rank. The API returns supplied and tangent-projected geometry covariance separately, the effective projection covariance and iteration count. Dashboard example, dispatcher, formula registries and cross-contract tests are synchronized. This is a first-order uncertainty propagation for small direction errors; it does not infer the scattering geometry or equilibrium.
