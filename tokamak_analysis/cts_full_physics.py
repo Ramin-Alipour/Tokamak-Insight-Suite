@@ -33,7 +33,10 @@ from .cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
 )
-from .thomson_kinetic_models import (\n    infer_gyrotropic_bi_maxwellian_temperatures,\n    infer_three_dimensional_flow_from_thomson_projections,\n)
+from .thomson_kinetic_models import (
+    infer_gyrotropic_bi_maxwellian_temperatures,
+    infer_three_dimensional_flow_from_thomson_projections,
+)
 from .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
