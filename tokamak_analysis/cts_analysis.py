@@ -1622,7 +1622,14 @@ def fit_cts_ion_species_flows(
             for i, name in enumerate(names)
         }
     fitted_flows = dict(zip(names, map(float, fit.x[:len(names)] * v_scale)))
+    flow_lower_scaled, flow_upper_scaled = bounds / v_scale
+    flow_at_bound = bool(np.any(
+        (fit.x[:len(names)] - flow_lower_scaled) <= 1e-6 * max(abs(flow_lower_scaled), 1.0)
+    ) or np.any(
+        (flow_upper_scaled - fit.x[:len(names)]) <= 1e-6 * max(abs(flow_upper_scaled), 1.0)
+    ))
     fitted_spectrum = predict(fit.x) * y_scale
+    reportable = bool(fit.success and identifiable and not flow_at_bound)
     return {
         "model": "unmagnetized_electrostatic_multi_ion_maxwellian_cts",
         "ion_velocity_projection_m_s": fitted_flows if identifiable else None,
@@ -1643,7 +1650,14 @@ def fit_cts_ion_species_flows(
         "optimizer_message": str(fit.message),
         "identifiability": "identifiable_conditional_on_fixed_plasma_inputs" if identifiable else "non_identifiable_species_flow_combination",
         "result_classification": "Conditional" if identifiable else "Non-identifiable",
-        "reportable_as_inferred_parameter": bool(fit.success and identifiable),
+        "reportability_reason": (
+            "full_rank_conditional_fit_with_no_flow_bound_hit" if reportable else
+            "optimizer_failed" if not fit.success else
+            "non_identifiable_species_flow_combination" if not identifiable else
+            "one_or_more_species_flow_parameters_at_user_supplied_bounds"
+        ),
+        "flow_parameter_at_bound": flow_at_bound,
+        "reportable_as_inferred_parameter": reportable,
         "conditional_inputs": [
             "electron_density_m3", "electron_temperature_eV", "ion_temperature_eV",
             "ion_species", "ion_fractions", "electron_velocity_projection_m_s",
