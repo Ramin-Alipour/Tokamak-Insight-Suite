@@ -161,7 +161,10 @@ def relativistic_gyrotropic_three_wave_vertex(
     ki = rotation.T@ki_lab
     kf = rotation.T@kf_lab
     ei = rotation.T@ei_lab
-    ei = ei/np.linalg.norm(ei)
+    # Preserve the physical incident-field amplitude.  The second-order
+    # current is bilinear in the incident and fluctuation fields, so
+    # normalizing this vector to unit magnitude silently removes the
+    # incident-wave amplitude from the relativistic three-wave vertex.
     bi = np.cross(ki, ei)/wi
     pperp, ppar, f0, dfperp, dfpar, weights = _momentum_grid(
         distribution, mass, int(quadrature_order)
