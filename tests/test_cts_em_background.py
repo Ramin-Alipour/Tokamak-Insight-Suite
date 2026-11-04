@@ -414,3 +414,14 @@ def test_mode_weights_reject_boolean_and_non_numeric_values():
         integrate_thermal_microwave_background(
             **base, ece_mode_weights=np.array([True, False])
         )
+
+
+
+def test_zero_electron_density_rejects_nonzero_ece_emissivity():
+    with pytest.raises(ValueError, match="ECE emissivity must be zero"):
+        integrate_thermal_microwave_background(
+            **_vacuum_case(
+                ece_absorption_coefficient_m_inverse=np.zeros((2, 3)),
+                ece_emissivity_W_m3_sr_Hz=np.ones((2, 3)),
+            )
+        )
