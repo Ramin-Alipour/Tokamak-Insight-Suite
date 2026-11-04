@@ -242,8 +242,24 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         raise ValueError("electron_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare a stationary-electron-flow assumption")
     if ion_velocity_projection_m_s is None:
         raise ValueError("ion_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare stationary ion flow")
-    ui=float(_array([ion_velocity_projection_m_s],"ion_velocity_projection_m_s")[0]); ue=float(_array([electron_velocity_projection_m_s],"electron_velocity_projection_m_s")[0])
-    if abs(ui)>=C or abs(ue)>=C: raise ValueError("flow projections must be subluminal")
+    ue=float(_array([electron_velocity_projection_m_s],"electron_velocity_projection_m_s")[0])
+    if isinstance(ion_velocity_projection_m_s, Mapping):
+        expected_names = [item["name"] for item in ions]
+        missing = [name for name in expected_names if name not in ion_velocity_projection_m_s]
+        extra = [name for name in ion_velocity_projection_m_s if name not in expected_names]
+        if missing or extra:
+            raise ValueError(f"ion_velocity_projection_m_s mapping must contain exactly the ion species names; missing={missing}, extra={extra}")
+        ion_flows = np.asarray([float(_array([ion_velocity_projection_m_s[name]], f"ion_velocity_projection_m_s[{name}]")[0]) for name in expected_names])
+    else:
+        raw_ion_flow = _array(ion_velocity_projection_m_s, "ion_velocity_projection_m_s")
+        if raw_ion_flow.ndim == 0:
+            ion_flows = np.full(len(ions), float(raw_ion_flow))
+        elif raw_ion_flow.ndim == 1 and raw_ion_flow.shape == (len(ions),):
+            ion_flows = raw_ion_flow.astype(float, copy=False)
+        else:
+            raise ValueError("ion_velocity_projection_m_s must be a scalar, a species-name mapping, or one projected velocity per ion species")
+    if np.any(np.abs(ion_flows) >= C) or abs(ue) >= C:
+        raise ValueError("flow projections must be subluminal")
     if np.any(f0+f<=0): raise ValueError("scattered frequencies must remain positive")
     k,_,_=_geometry(scattering_geometry,f0); om=2*np.pi*f
     ce,fe=_component(om,k,ne,te,ME,1.,ue); total=ce.copy(); terms=[]
@@ -269,14 +285,15 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
             hot=(idx,hf,"maxwellian",ht)
     for i,s in enumerate(ions):
         ni=s["fraction"]*ne/s["Z"]; hf=hot[1] if hot and hot[0]==i else 0.
-        cb,fb=_component(om,k,ni*(1-hf),float(ti_values[i]),s["mass"],s["Z"],ui); total+=cb
+        ui_i=float(ion_flows[i])
+        cb,fb=_component(om,k,ni*(1-hf),float(ti_values[i]),s["mass"],s["Z"],ui_i); total+=cb
         if ni*(1-hf)>0: terms.append((s["Z"]**2*ni*(1-hf)/ne,cb,fb))
         if hf:
             if hot[2]=="tabulated":
                 ch,fh=_component_tabulated(om,k,ni*hf,s["mass"],s["Z"],ui,
                     hot[3]["velocity_m_s"],hot[3]["probability_density_m_s_inverse"])
             else:
-                ch,fh=_component(om,k,ni*hf,hot[3],s["mass"],s["Z"],ui)
+                ch,fh=_component(om,k,ni*hf,hot[3],s["mass"],s["Z"],ui_i)
             total+=ch
             terms.append((s["Z"]**2*ni*hf/ne,ch,fh))
     eps=1+total
