@@ -236,3 +236,28 @@ def test_multiview_evdf_regularization_sensitivity_reports_l_curve_without_auto_
     assert result["selection_policy"].startswith("no automatic lambda selection")
     assert all(level["data_only_jacobian_rank"] == 6 for level in result["levels"])
     assert all(level["null_space_dimension"] == 0 for level in result["levels"])
+
+
+def test_multiview_3d_evdf_is_available_through_public_thomson_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    kernels = np.zeros((3, 2, 6))
+    for view in range(3):
+        kernels[view, :, 2*view:2*view+2] = np.eye(2)
+    truth = np.array([1., 2., 3., 4., 5., 6.])
+    volume = np.full(6, 0.1)
+    data = (kernels.reshape(6, 6) @ (truth * volume)).reshape(3, 2)
+    result = run_advanced_thomson_physics(
+        "thomson_multiview_3d_evdf",
+        spectral_kernels=kernels,
+        measured_spectra=data,
+        velocity_grid_m_s=np.arange(18).reshape(6, 3),
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=np.zeros((1, 6)),
+        regularization_strength=1e-6,
+    )
+    assert result["public_physics_entrypoint"] == "thomson_multiview_3d_evdf"
+    assert result["automatic_model_substitution"] is False
+    assert result["status"] == "identified_from_multi_view_measurements"
+    assert result["evdf_m3_s3"] is not None
+    assert result["view_count"] == 3
