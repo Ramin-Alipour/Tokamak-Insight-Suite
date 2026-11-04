@@ -215,3 +215,32 @@ def test_uniform_lte_ece_slab_matches_formal_solution_of_radiative_transfer():
     np.testing.assert_allclose(
         result["spectral_radiance_W_m2_sr_Hz"], expected, rtol=2e-12, atol=1e-30
     )
+
+
+def test_multimode_total_optical_depth_is_exact_for_incoherent_receiver_mixture():
+    frequency = np.array([100e9])
+    weights = np.array([0.25, 0.75])
+    alpha = np.array([[[0.2, 1.1]]])
+    result = integrate_thermal_microwave_background(
+        frequency_Hz=frequency,
+        path_length_m=np.array([1.0]),
+        electron_temperature_eV=np.array([1000.0]),
+        electron_density_m3=np.array([0.0]),
+        ion_densities_m3=np.array([[0.0]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=alpha,
+        ece_mode_weights=weights,
+        ece_emissivity_W_m3_sr_Hz=np.zeros((1, 1, 2)),
+        incident_radiance_W_m2_sr_Hz=np.array([1.0]),
+    )
+    expected = -np.log(weights @ np.exp(-np.array([0.2, 1.1])))
+    assert result["total_optical_depth"][0] == pytest.approx(expected, rel=2e-14)
+    assert result["mean_total_optical_depth"][0] == pytest.approx(
+        weights @ np.array([0.2, 1.1]), rel=2e-14
+    )
+    assert result["total_optical_depth"][0] != pytest.approx(
+        result["mean_total_optical_depth"][0], rel=1e-3
+    )
+    np.testing.assert_allclose(
+        result["spectral_radiance_W_m2_sr_Hz"], [weights @ np.exp(-np.array([0.2, 1.1]))]
+    )
