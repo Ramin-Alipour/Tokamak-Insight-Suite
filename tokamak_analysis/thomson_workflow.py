@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline, PchipInterpolator, make_smoothing_spline
 
 from .thomson_scattering import _covariance_is_positive_semidefinite
+from .formula_library import thomson_velocity_projection_relativistic_exact
 
 def analyze_thomson_spectra(*args, **kwargs):
     """Infer physical plasma parameters directly from measured calibrated spectra.
