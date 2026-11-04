@@ -1127,3 +1127,8 @@ f'_κ(v) = -2 κ v f_κ(v)/(a_κ + v²)
 ```
 
 Adaptive real/imaginary quadrature errors are returned separately. The finite input grid is retained as a CDF coverage requirement and sampled-PDF diagnostic, but changing its extent within the accepted coverage domain must not change the physical susceptibility. A regression test checks this grid invariance. This upgrades the collisionless isotropic non-relativistic unmagnetized electrostatic Kappa response; it does not imply a closed-form generalized dispersion function, collisional Kappa operator, FDT noise closure, magnetized dielectric, relativistic Kappa response or Full-EM CTS vertex.
+
+
+### CTS Kappa full-tail solver dashboard and formula registration
+
+The full-axis collisionless isotropic-Kappa susceptibility is now selectable in the Advanced Analysis-1 Dashboard as `kappa_electrostatic_susceptibility`. The dashboard example supplies a finite velocity grid only for the exact CDF coverage gate; the physical Landau integral itself is evaluated over the full real axis. The public dispatcher remains the execution path. The root and packaged formula registries both declare the equation, units, required inputs, outputs, quadrature-error metadata, test link and model-domain limitations. A dashboard/dispatcher/registry contract test checks the executable path and parity of both formula registries.
