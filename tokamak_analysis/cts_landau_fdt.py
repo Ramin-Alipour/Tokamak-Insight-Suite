@@ -177,6 +177,9 @@ def build_linearized_landau_fdt(
     if inv_resid > 5e-2:
         raise ArithmeticError("velocity grid does not resolve discrete Landau invariants; refine/expand it")
     metadata = {
+        "common_temperature_J": float(temp),
+        "common_bulk_flow_m_s": flow.copy(),
+        "species": tuple({"name": name, "mass_kg": float(mass), "density_m3": float(density), "charge_C": float(charge)} for mass, density, charge, name in parsed),
         "operator": "multispecies_linearized_Coulomb_Landau_test_and_field_particle",
         "equilibrium": "common_temperature_common_flow_isotropic_Maxwellian",
         "velocity_grid": "species_scaled_3D_Cartesian_normalized_thermal_coordinates",
