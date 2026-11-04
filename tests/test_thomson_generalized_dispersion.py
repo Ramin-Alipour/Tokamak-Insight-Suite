@@ -76,3 +76,24 @@ def test_generalized_landau_integral_supports_higher_order_pole():
     assert result["pole_order"] == 2
     assert np.isfinite(result["integral"].real)
     assert np.isfinite(result["integral"].imag)
+
+
+def test_generalized_landau_integral_includes_distributional_finite_support_edges():
+    # A constant top-hat on [a,b], extended by zero outside, has no interior
+    # derivative. Its complete distributional derivative consists only of
+    # +f(a) delta(v-a) - f(b) delta(v-b).
+    velocity = np.linspace(-2.0, 3.0, 101)
+    distribution = np.ones_like(velocity)
+    phase_velocity = 0.4
+    eta = 0.07
+    result = generalized_landau_integral(
+        velocity, distribution, phase_velocity,
+        pole_imaginary_part_m_s=eta,
+    )
+    normalized = result["normalized_probability_density_s_m"]
+    zeta = complex(phase_velocity, eta)
+    expected = normalized[0] / (velocity[0] - zeta) - normalized[-1] / (velocity[-1] - zeta)
+    assert result["interior_derivative_integral"] == 0.0j
+    assert result["finite_support_boundary_integral"] == expected
+    assert result["integral"] == expected
+    assert result["finite_support_extension"] == "zero_outside_tabulated_velocity_interval"
