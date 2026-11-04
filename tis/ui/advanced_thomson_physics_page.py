@@ -91,6 +91,18 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_relativistic_projected_evdf": (
+        "Inverse model: exact relativistic Doppler kinematics in the Thomson limit, or "
+        "single-electron Compton four-momentum conservation with polarized Klein-Nishina "
+        "weighting when include_compton_recoil=true. The unknown is only the 1-D electron "
+        "velocity marginal parallel to the scattering vector q; a single view does not "
+        "identify the transverse velocity distribution or a general 3-D EVDF. The forward "
+        "operator integrates over the velocity grid, applies the measured spectral response, "
+        "and adds the supplied measured-space background. fitted_spectrum is the total "
+        "background-plus-scattered prediction; fitted_scattered_spectrum excludes background. "
+        "A regularized candidate is not promoted to a primary EVDF unless the data-only "
+        "Jacobian passes the rank and conditioning gates."
+    ),
     "gyrotropic_bi_maxwellian_spectral_fit": (
         "Physical forward model: exact Gaussian-CDF integration over each finite wavelength bin, "
         "followed by the measured response acting on bin-integrated spectral power. "
@@ -395,7 +407,20 @@ def render_advanced_thomson_physics_page(st) -> None:
             config = decode_complex_json(parsed)
             result = run_advanced_thomson_physics(model, **config)
             safe = json_safe(result)
-            st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
+            if isinstance(result, Mapping) and result.get("primary_result_status") == "identified_from_measurement":
+                st.success("Numerical solver completed; the primary physical result passed the solver data-identifiability gate.")
+            elif isinstance(result, Mapping) and (
+                result.get("primary_result_status") == "not_fully_identifiable_from_measured_spectrum"
+                or result.get("status") == "conditional_regularized_candidate"
+            ):
+                st.warning(
+                    "Numerical optimization completed, but the physical result is conditional: "
+                    "the measured data do not identify all requested degrees of freedom. "
+                    "Inspect the regularized candidate, rank, conditioning, and limitations; "
+                    "do not report it as a uniquely measured EVDF."
+                )
+            else:
+                st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
             if isinstance(result, Mapping) and "captured_spectral_probability" in result:
                 coverage = np.asarray(result["captured_spectral_probability"], dtype=float).ravel()
                 st.subheader("Measured wavelength-window coverage")
