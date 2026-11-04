@@ -287,3 +287,41 @@ def test_psf_aware_profile_rejects_invalid_gcv_controls():
         reconstruct_psf_aware_thomson_profile(np.ones(3), mixing, gcv_candidate_count=3)
     with pytest.raises(ValueError, match="regularization_strength"):
         reconstruct_psf_aware_thomson_profile(np.ones(3), mixing, regularization_strength=0.0)
+
+
+
+def test_psf_profile_propagates_supplied_mixing_operator_covariance():
+    mixing = np.array([
+        [0.90, 0.10, 0.00],
+        [0.10, 0.80, 0.10],
+        [0.00, 0.10, 0.90],
+    ])
+    truth = np.array([1.0, 2.0, 1.0])
+    measured = mixing @ truth
+    operator_covariance = np.eye(mixing.size) * 1.0e-6
+    result = reconstruct_psf_aware_thomson_profile(
+        measured, mixing, regularization_strength=1.0e-3,
+        measurement_uncertainty=np.full(3, 0.01),
+        spatial_mixing_covariance=operator_covariance,
+    )
+    assert result["psf_uncertainty_propagated"] is True
+    assert result["profile_covariance_with_psf_uncertainty"] is not None
+    contribution = result["psf_operator_covariance_contribution"]
+    assert contribution.shape == (3, 3)
+    np.testing.assert_allclose(contribution, contribution.T, atol=1e-12)
+    assert np.linalg.eigvalsh(contribution).min() >= -1e-12
+    assert np.trace(result["profile_covariance_with_psf_uncertainty"]) >= np.trace(
+        result["profile_covariance"]
+    )
+
+
+def test_psf_profile_rejects_non_psd_operator_covariance():
+    mixing = np.eye(3)
+    invalid = np.eye(9)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_psf_aware_thomson_profile(
+            np.array([1.0, 2.0, 1.0]), mixing,
+            regularization_strength=1.0e-3,
+            spatial_mixing_covariance=invalid,
+        )
