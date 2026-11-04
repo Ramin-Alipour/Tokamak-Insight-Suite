@@ -4,6 +4,8 @@ import pytest
 from tokamak_analysis.cts_em_background import (
     integrate_thermal_microwave_background,
     thermal_bremsstrahlung_emissivity_si,
+    thermal_bremsstrahlung_absorption_si,
+    ece_lte_emissivity_si,
 )
 
 
@@ -136,3 +138,47 @@ def test_background_transfer_rejects_boolean_physical_arrays():
     case = _vacuum_case(electron_density_m3=np.array([False, False]))
     with pytest.raises(ValueError, match="electron_density_m3 must contain real numeric values"):
         integrate_thermal_microwave_background(**case)
+
+
+
+def test_free_free_absorption_obeys_kirchhoff_with_exact_planck_source():
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+
+    frequency = np.array([20e9, 100e9, 400e9])
+    temperature_eV = 2500.0
+    emissivity = thermal_bremsstrahlung_emissivity_si(
+        frequency, 1.2e19, np.array([1.2e19]), np.array([1.0]),
+        temperature_eV, gaunt_factor=np.array([1.1, 1.2, 1.3]),
+    )
+    alpha = thermal_bremsstrahlung_absorption_si(
+        frequency, 1.2e19, np.array([1.2e19]), np.array([1.0]),
+        temperature_eV, gaunt_factor=np.array([1.1, 1.2, 1.3]),
+    )
+    source = planck_spectral_radiance(
+        frequency, temperature_eV * 1.602176634e-19 / 1.380649e-23
+    )
+    np.testing.assert_allclose(alpha * source, emissivity, rtol=2e-15, atol=0.0)
+    assert np.all(alpha > 0.0)
+
+
+def test_mode_resolved_lte_ece_emissivity_is_kirchhoff_consistent():
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+
+    frequency = np.array([80e9, 100e9, 120e9])
+    alpha = np.array([[1e-4, 2e-4], [3e-4, 4e-4], [5e-4, 6e-4]])
+    temperature_eV = 1800.0
+    emissivity = ece_lte_emissivity_si(frequency, alpha, temperature_eV)
+    source = planck_spectral_radiance(
+        frequency, temperature_eV * 1.602176634e-19 / 1.380649e-23
+    )
+    assert emissivity.shape == alpha.shape
+    np.testing.assert_allclose(emissivity, alpha * source[:, None], rtol=2e-15, atol=0.0)
+
+
+@pytest.mark.parametrize(
+    "alpha",
+    [np.array([-1e-4, 1e-4]), np.ones((2, 2, 2)), np.array([1e-4])],
+)
+def test_lte_ece_emissivity_rejects_unphysical_or_mismatched_absorption(alpha):
+    with pytest.raises(ValueError):
+        ece_lte_emissivity_si(np.array([90e9, 100e9]), alpha, 1000.0)
