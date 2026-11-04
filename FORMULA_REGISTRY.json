@@ -6605,7 +6605,9 @@
       ],
       "test_links": [
         "tests/test_thomson_gap_closure.py::test_psf_aware_profile_selects_regularization_by_gcv_when_omitted",
-        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes"
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes",
+        "tests/test_thomson_gap_closure.py::test_psf_profile_propagates_supplied_mixing_operator_covariance",
+        "tests/test_thomson_gap_closure.py::test_psf_profile_rejects_non_psd_operator_covariance"
       ]
     },
     "raw_data_to_physics": false,
