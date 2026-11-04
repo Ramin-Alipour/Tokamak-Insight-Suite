@@ -46,6 +46,10 @@ def test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius()
     np.testing.assert_allclose(out["electron_temperature_profile_eV"], [100.0,150.0], rtol=0.04)
     assert np.isnan(out["electron_density_profile_m3"]).all()
     assert out["channels"][0]["density_status"] == "not_identifiable_from_spectral_shape_alone"
+    assert out["channels"][0]["spectral_bin_integration"] == (
+        "exact_Gaussian_CDF_finite_volume_bin_averages"
+    )
+    assert 0.0 < out["channels"][0]["captured_spectral_probability"] <= 1.0
 
 
 def test_non_gaussian_instrument_response_matrix_is_used_in_forward_fit():
