@@ -25,6 +25,7 @@ def test_mode_resolved_ece_is_propagated_independently_and_receiver_weighted():
         **inputs,
         ece_absorption_coefficient_m_inverse=alpha,
         ece_mode_weights=np.array([0.25, 0.75]),
+        ece_lte=True,
         incident_radiance_W_m2_sr_Hz=0.0,
     )
     by_mode = result["spectral_radiance_by_mode_W_m2_sr_Hz"]
@@ -57,7 +58,7 @@ def test_legacy_single_effective_mode_ece_contract_is_preserved():
     inputs = _base_inputs()
     alpha = np.full((2, 3), 0.2)
     result = integrate_thermal_microwave_background(
-        **inputs, ece_absorption_coefficient_m_inverse=alpha
+        **inputs, ece_absorption_coefficient_m_inverse=alpha, ece_lte=True
     )
     assert result["spectral_radiance_by_mode_W_m2_sr_Hz"].shape == (1, 3)
     assert "single-effective-mode" in result["ece_model_status"]
