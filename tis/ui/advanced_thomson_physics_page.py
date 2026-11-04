@@ -37,7 +37,8 @@ EXAMPLES = {
     "thomson_three_dimensional_flow": {
         "velocity_projection_m_s": [100000.0, 200000.0, 300000.0],
         "scattering_vector_unit": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-        "projection_covariance_m2_s2": [[1000000.0, 0.0, 0.0], [0.0, 1000000.0, 0.0], [0.0, 0.0, 1000000.0]]
+        "projection_covariance_m2_s2": [[1000000.0, 0.0, 0.0], [0.0, 1000000.0, 0.0], [0.0, 0.0, 1000000.0]],
+        "scattering_vector_covariance": (1.0e-6*np.eye(9)).tolist()
     },
     "gyrotropic_bi_maxwellian_anisotropy": {
         "projected_temperature_eV": [180.0, 105.0, 80.0],
