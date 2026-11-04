@@ -1,41 +1,39 @@
 # CTS TS-01–TS-20 remediation ledger
 
-**Branch:** `main`  
-**Purpose:** implementation gate for the 20 CTS findings. This ledger distinguishes code that exists from physics that is not implemented; documentation or a passing unit test is not evidence that a missing physical model exists.
+**Target:** `main`  
+**Audit basis:** source and public entry points currently present on `main`.  
+**Rule:** a kernel, a passing unit test, a dashboard control, and a complete physical inference path are different deliverables. Status below is deliberately scoped; no item is called complete outside its stated validity domain.
 
-## Verified status from the current main-branch source
-
-| ID | Required capability / contract | Current evidence | Status |
+| ID | Required capability / contract | Verified implementation on main | Status |
 |---|---|---|---|
-| TS-01 | Collision operator and fluctuation-dissipation-consistent CTS response | New cts_landau_fdt.py assembles a finite-box 3-D Maxwellian multispecies linearized Landau weak-form operator with test/field-particle terms, discrete invariants and matching classical FDT source; Fourier streaming is supported in its density resolvent. CTS dielectric screening, dispatcher coupling, channel projection and convergence validation remain outstanding. | PARTIAL |
-| TS-02 | Independent ECE absorption solver | ece_kinetic.py provides independent magnetized Maxwellian kinetic absorption; new ece_kinetic_modes.py projects conductivity into a two-mode opacity matrix and integrates polarized LTE transfer. Relativistic/collisional response and automatic ray/mode coupling remain outstanding. | PARTIAL |
-| TS-03 | Relativistic, magnetized thermal bremsstrahlung | Existing background treatment is not a general relativistic magnetized free-free emissivity/opacity solver. | OPEN |
-| TS-04 | Full-vector, non-paraxial electromagnetic propagation | New propagate_vectorial_angular_spectrum provides exact non-paraxial vector propagation including longitudinal fields and evanescent components in homogeneous isotropic segments; Berreman handles 1-D stratified anisotropic media. General 3-D inhomogeneous anisotropic propagation remains open. | PARTIAL |
-| TS-05 | Mode conversion and branch tracking | Existing oblique Berreman solver returns coherent 2x2 Jones reflection/transmission matrices; ece_kinetic_modes propagates coupled modal coherency through supplied Hermitian coupling. Robust branch tracking through degeneracies and arbitrary 3-D interface conversion remain open. | PARTIAL |
-| TS-06 | General relativistic anisotropic EVDF | Several explicit gyrotropic distributions and constrained shape fitting exist; arbitrary/general EVDF reconstruction and unrestricted joint inference do not. | PARTIAL |
-| TS-07 | Consistent physical-background model in every optical path | Background integration is not a universal shared model across all optical analysis routes. | PARTIAL |
-| TS-08 | Full CTS geometry/profile covariance | Selected geometry ensembles and spatial covariance paths exist, but do not constitute a complete joint covariance model for every profile, ray, beam and inversion input. | PARTIAL |
-| TS-09 | General multi-population plasma model | Multi-ion species and selected fast-ion populations exist; a general, consistently coupled arbitrary multi-population model is not established. | PARTIAL |
-| TS-10 | General kinetic response for Kappa distributions | Existing Kappa support is parameterized and restricted; it is not a general kinetic susceptibility/noise response for arbitrary Kappa index and anisotropy. | OPEN |
-| TS-11 | Explicit physical-background zero-state | Omitted state now reports `uncharacterized_constant_offset` and `physical_background_zero=null`; only an explicit `assumed_zero` declaration asserts zero. Reference-PCA remains distinct. Tests added; dashboard-wide declaration enforcement remains open. | PARTIAL |
-| TS-12 | Explicit CTS profile range / support | Defaults and automatic numerical seeds remain in parts of the CTS workflow; a universal explicit support contract is not established. | OPEN |
-| TS-13 | Explicit regularization strength and scope | Regularized inversion requires positive `regularization_strength`; inferred tabulated VDF requires explicit `fast_ion.smoothness`; scope is returned in result metadata. | IMPLEMENTED FOR DECLARED CTS REGULARIZERS |
-| TS-14 | One spectral-response contract | Electrostatic and Full-EM paths validate the measured response operator and keep response uncertainty model-specific; cross-path parity still requires regression coverage. | PARTIAL |
-| TS-15 | External uncertainty in dashboard | Several external-uncertainty paths and covariance components exist; dashboard coverage is not yet demonstrated for every supported input/model. | PARTIAL |
-| TS-16 | Descriptive spectrum analysis separated from physical inference | Descriptive spectral analysis and physical inference are distinct callables, but dashboard/registry separation needs end-to-end verification. | PARTIAL |
-| TS-17 | Model-discrepancy uncertainty in all subanalyses | Model-discrepancy covariance is supported in selected CTS paths; universal propagation to every subanalysis is not established. | PARTIAL |
-| TS-18 | Multi-parameter identifiability | Jacobian rank and condition diagnostics exist in CTS inversion; complete profile-likelihood/posterior and practical-identifiability coverage is not established. | PARTIAL |
-| TS-19 | Consistent documentation and removal of stale claims | CTS documentation contains explicit limitations, but cross-checking every registry, dashboard and legacy document remains necessary. | PARTIAL |
-| TS-20 | CI on final commit | Must be verified from GitHub Actions checks for the exact resulting commit; no success is inferred from local reasoning. | NOT VERIFIED |
+| TS-01 | Collisional CTS with fluctuation-dissipation consistency | `cts_landau_fdt.py` assembles a finite-box 3-D multispecies linearized Landau weak-form operator with test/field-particle terms, discrete number/momentum/energy invariants and matching classical FDT noise. `analyze_landau_fdt_cts` adds self-consistent electrostatic Poisson screening and CTS dynamic-structure-factor output. Common-temperature/common-flow isotropic Maxwellians; non-relativistic finite-box reference discretization. | IMPLEMENTED WITH DECLARED DOMAIN; Full-EM coupling and convergence gate remain |
+| TS-02 | Independent ECE absorption solver | `ece_kinetic.py` computes magnetized non-relativistic Maxwellian Vlasov conductivity and absorption normalized to supplied modal Poynting flux. `ece_kinetic_modes.py` supplies a two-mode opacity and ordered LTE transfer path. | PARTIAL: relativistic/collisional response and self-consistent ray/eigenmode coupling remain |
+| TS-03 | Relativistic and magnetized bremsstrahlung | `cts_em_background.py` supplies non-relativistic unmagnetized Maxwellian free-free emissivity with explicit Gaunt factor. | OPEN for relativistic and magnetized-mode emissivity/opacity |
+| TS-04 | Full-vector non-paraxial Full-EM propagation | Exact vector angular-spectrum propagation exists for homogeneous isotropic segments; oblique Berreman and the stratified beam wrapper retain anisotropy, diffraction, longitudinal fields and coherent polarization. | PARTIAL: arbitrary 3-D inhomogeneous anisotropic media and dissipative interfaces remain |
+| TS-05 | Mode conversion | Coherent Jones reflection/transmission and two-mode opacity/coupling are available for declared stratified boundaries and supplied coupling generators. | PARTIAL: robust branch tracking through degeneracies and arbitrary 3-D conversion remain |
+| TS-06 | General relativistic anisotropic EVDF | Selected constrained gyrotropic/drifted distributions and parametric fits exist. | PARTIAL: unrestricted/general EVDF inversion and complete Full-EM coupling remain |
+| TS-07 | Shared physical background across all optical paths | Physical and detector-space background modules exist, with several optical workflow integrations. | PARTIAL: universal path parity and end-to-end dashboard verification remain |
+| TS-08 | Full CTS geometry/profile covariance | External geometry uncertainty, profile covariance and selected cross-covariance paths exist. | PARTIAL: one joint covariance contract across all ray, beam, profile and inversion inputs remains |
+| TS-09 | General multi-population plasma model | N-population relativistic Maxwell-Jüttner optical forward model and selected CTS multi-ion/fast-ion paths exist. | PARTIAL: a general coupled population model across all CTS/Full-EM paths remains |
+| TS-10 | General kinetic Kappa response | Parameterized Kappa optical models and restricted generalized-dispersion utilities exist. | OPEN for a general Kappa susceptibility, collision/noise and kinetic response with documented validity |
+| TS-11 | Explicit zero-background state | CTS spatial inversion requires explicit `background_mode='zero'` or `'spectrum'`; background integrator reports exact zero only when plasma and incident radiance are zero. Other paths retain legacy/optional background contracts. | PARTIAL |
+| TS-12 | Explicit CTS profile support | Full-EM spatial inversion requires an explicit positive `profile_bounds_relative`; no scientific range is silently selected. | IMPLEMENTED in spatial Full-EM inverse; audit remaining CTS profile paths |
+| TS-13 | Explicit regularization strength | Spatial Full-EM inverse requires explicit per-fit regularization strength and reports its scope separately from measurement covariance. Boolean/string coercion is rejected; zero is allowed only as an explicit per-profile choice, and at least one fitted profile must be regularized. | IMPLEMENTED in spatial Full-EM inverse; audit remaining CTS regularizers |
+| TS-14 | Common spectral-response contract | Measured response operators are validated in the principal electrostatic and Full-EM paths and are not silently renormalized. | PARTIAL: cross-path regression parity remains |
+| TS-15 | External uncertainty in dashboard | External covariance propagation exists in several APIs and selected dashboard modes. | PARTIAL: complete exposure for every supported input/model remains |
+| TS-16 | Descriptive spectrum separated from physical inference | Descriptive spectral moments and physical inference are separate numerical callables. | PARTIAL: registry/dashboard end-to-end separation remains |
+| TS-17 | Model-discrepancy uncertainty | Additive PSD model-discrepancy covariance is propagated in selected CTS and Thomson GLS inversions. | PARTIAL: universal propagation to all subanalyses remains |
+| TS-18 | Multi-parameter identifiability | Scaled-Jacobian SVD/rank diagnostics exist; profile covariance is withheld when data-only rank is deficient. | PARTIAL: profile likelihood/posterior and practical-identifiability coverage remain |
+| TS-19 | Documentation consistency | The scope note and this ledger are synchronized to distinguish implemented kernels from full end-to-end capabilities. | PARTIAL: legacy documentation and all dashboard/registry claims still require a repository-wide pass |
+| TS-20 | CI on exact final commit | GitHub Actions runs are triggered by pushes to `main`; success must be checked against the exact resulting SHA. | NOT VERIFIED until runs complete |
 
-## Implementation rules
+## Implementation and release rules
 
-1. Do not label an externally supplied coefficient as an internally solved physical model.
-2. Do not replace a missing collision operator, mode-conversion solver or relativistic emissivity with a fitted scale factor or phenomenological broadening and call it complete.
-3. Preserve the distinction between forward-model capability, inversion capability, dashboard exposure and experimental validation.
-4. Every physical extension must include unit tests for limiting cases, conservation/normalization, positivity or passivity where applicable, numerical convergence, and a documented validity domain.
-5. A CI pass establishes software checks only; it does not validate the physical model against an experiment.
+1. Never describe a supplied coefficient, damping rate, Gaunt factor, coupling generator, response matrix or background template as internally inferred physics.
+2. Never substitute phenomenological broadening for a missing collision operator, relativistic emissivity, arbitrary-3-D Maxwell solver or general EVDF response.
+3. Keep forward-model capability, inversion capability, dashboard exposure and experimental validation distinct.
+4. For physical extensions, require limiting-case tests, conservation/normalization, positivity or passivity where applicable, numerical convergence and a documented validity domain.
+5. A successful optimizer is not sufficient for a reportable physical measurement. Data-only identifiability, covariance provenance, model discrepancy and external inputs must be reported.
+6. CI establishes software checks only. It is not experimental validation.
 
-## Release gate
-
-Analysis 1 must not be described as having all TS-01–TS-20 closed until every OPEN/PARTIAL item has a code-level implementation, tests, public API/dashboard integration where applicable, synchronized documentation, and a successful CI run on the exact release commit.
+Analysis 1 must not be advertised as having all TS-01–TS-20 closed until every remaining PARTIAL/OPEN item has code-level implementation, tests, public API/dashboard integration, synchronized documentation, and successful CI on the exact release commit.

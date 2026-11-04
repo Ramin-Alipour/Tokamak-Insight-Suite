@@ -1,76 +1,24 @@
 # CTS collision/FDT and electromagnetic propagation implementation boundary
 
-This note records the verified implementation scope. It must not be read as
-claiming that the existing modules form a complete Landau-FDT solver.
+This document is the authoritative scope statement for the collision/FDT, ECE and electromagnetic propagation kernels. It distinguishes the numerical kernels now present on `main` from broader plasma-regime capabilities that remain open.
 
-## Implemented components on main
+## Implemented kernels
 
-- cts_collisional_bgk.py: isothermal multispecies BGK longitudinal response,
-  conserving each species particle number and total mixture momentum. It does
-  not conserve total energy and is not the Landau operator.
-- cts_fdt.py: classical matrix fluctuation-dissipation conversion for a
-  supplied retarded density susceptibility. It checks Hermitian positive
-  semidefiniteness and requires an explicit zero-frequency slope. It is an
-  FDT closure utility, not a velocity-space Landau stochastic source.
-- ece_kinetic.py: magnetized, non-relativistic Maxwellian Vlasov conductivity
-  absorption normalized by supplied mode normal Poynting flux, plus scalar
-  LTE Rayleigh-Jeans slab transfer.
-- cts_full_wave.py: full-vector oblique Berreman 4x4 propagation through a
-  one-dimensionally stratified local dielectric, and coherent 2x2 Jones
-  reflection/transmission matrices for polarization conversion.
+- **Conserving Landau--FDT CTS:** `cts_landau_fdt.py` builds a finite-box, 3-D Cartesian-velocity multispecies linearized Coulomb Landau operator in symmetric weak form. Test-particle and field-particle terms are retained. The discrete operator enforces species particle-number and total momentum/energy invariants; its matching classical Langevin covariance is derived from that same operator. The density resolvent includes Fourier streaming. `analyze_landau_fdt_cts` applies self-consistent multispecies electrostatic Poisson screening and returns the screened response, dynamic structure factor and consistency diagnostics.
+- **ECE absorption:** `ece_kinetic.py` computes the magnetized, non-relativistic Maxwellian Vlasov conductivity and modal absorption normalized by the supplied mode's normal Poynting flux. `ece_kinetic_modes.py` projects conductivity onto a two-mode unit-flux basis and provides ordered LTE transfer with an explicit coupling generator.
+- **Microwave backgrounds:** `cts_em_background.py` computes non-relativistic, unmagnetized Maxwellian free-free emissivity using an explicit Gaunt factor and integrates it with externally supplied mode-resolved ECE opacity. It reports exact zero radiance only when plasma emission/absorption and incident radiance are all zero.
+- **Vector propagation:** `cts_nonparaxial.py` implements exact vector angular-spectrum propagation in homogeneous isotropic segments, including evanescent components and longitudinal-field reconstruction. `cts_full_wave.py` implements oblique full-vector Berreman propagation and coherent Jones conversion for a 1-D stratified anisotropic dielectric. The integrated beam wrapper applies the stratified solver to transverse angular components without a paraxial expansion.
+- **Public orchestration:** `cts_full_physics.py` exposes explicit named routes for Landau--FDT CTS, polarized kinetic ECE, stratified non-paraxial vector propagation and stratified mode conversion. It performs no automatic model substitution.
 
-## Still not complete
+## Validity domains and remaining work
 
-1. A conserving, velocity-dependent multispecies linearized Landau operator
-   with test-particle and field-particle terms, energy conservation and
-   verified discrete entropy production.
-2. The matching velocity-space Langevin source covariance/FDT closure for
-   that Landau operator, and its coupling into the CTS dynamic structure
-   factor and Full-EM spectral dispatcher.
-3. Relativistic and collisional ECE emissivity/absorption, and self-consistent
-   ray/field-profile coupling of ECE transfer to the vector mode solver.
-4. General 3-D non-paraxial diffraction and mode conversion at arbitrary
-   interfaces. The Berreman solver is exact only for a 1-D stratified medium
-   with conserved transverse wavevector and propagating vacuum ports.
+1. **Landau--FDT CTS:** the implemented reference operator assumes non-relativistic, isotropic Maxwellian species with common temperature and common bulk flow on a finite velocity grid. Its velocity-domain, grid, frequency and species convergence must be demonstrated. The integrated response is electrostatic longitudinal CTS; a magnetized Full-EM current vertex, electromagnetic fluctuation source and coupling into the Full-EM measured-channel inverse remain open. Classical FDT is used; quantum detailed balance is not included.
+2. **ECE:** relativistic/Jüttner and fully collisional kinetic response are not implemented. The local solver requires a caller-supplied eigenmode wavevector and polarization. Self-consistent 3-D ray/eigenmode evolution and mode conversion along the ray are not inferred from scalar profiles.
+3. **Free-free background:** relativistic corrections and magnetized/polarized free-free emissivity/opacity are not implemented. A supplied Gaunt factor remains an external model input, not a solved correction.
+4. **Propagation and conversion:** exact non-paraxial vector propagation is available for homogeneous isotropic segments and a z-stratified anisotropic slab. Arbitrary 3-D inhomogeneous anisotropic interfaces, lateral structure, fully dissipative quasi-optical propagation and robust branch tracking through degeneracies remain open.
+5. **EVDF and populations:** selected constrained gyrotropic and N-population parameterizations do not constitute arbitrary relativistic anisotropic EVDF reconstruction. The general EVDF/current-vertex and Kappa kinetic-response problem remains open.
+6. **Background and covariance integration:** physical background, external uncertainty and model-discrepancy kernels exist, but complete parity across every optical/CTS subanalysis and dashboard remains an integration task.
 
-Unit tests establish software behavior, not experimental or device validation.
+## Quantitative release gate
 
-
-## New main-branch implementation
-
-- `cts_landau_fdt.py`: assembled finite-box 3-D Cartesian-velocity multispecies
-  linearized Coulomb Landau operator in symmetric weak form. Both test-particle
-  and field-particle contributions are retained. The weak form is a Gram sum,
-  with explicit species-number, total-momentum and total-energy invariants and
-  non-positive entropy production. The classical Langevin covariance is built
-  from the same discrete operator, not from an independently chosen collision
-  width. A Fourier streaming term can be included in the density resolvent.
-  This is a reference discretization about a common-temperature/common-flow
-  isotropic Maxwellian mixture; it is non-relativistic and requires velocity
-  grid/domain convergence. It is not yet a drop-in replacement for the
-  electrostatic/Full-EM CTS dispatcher, and it does not supply self-consistent
-  Poisson screening or optical Thomson normalization.
-- `cts_full_wave.py`: `propagate_vectorial_angular_spectrum` performs exact
-  non-paraxial vector angular-spectrum propagation through homogeneous
-  isotropic segments, retaining evanescent components and reconstructing the
-  longitudinal electric field from Maxwell transversality. Existing oblique
-  Berreman propagation and the 2x2 Jones solver retain coherent polarization
-  conversion for 1-D stratified anisotropic media.
-- `ece_kinetic.py`: the independent magnetized Maxwellian kinetic absorption
-  coefficient and ordered slab transfer are available. They remain
-  non-relativistic and use caller-supplied local mode wavevector/polarization;
-  the scalar profile transfer is not yet a fully coupled polarized 3-D
-  radiative-transfer solution.
-
-## Remaining integration boundary
-
-The new Landau-FDT operator is a real velocity-space collision/FDT kernel, but
-its CTS dielectric screening, measured-channel projection, Full-EM coupling,
-and dashboard exposure still require explicit integration and regression
-tests. The angular-spectrum propagator solves homogeneous segments only;
-general 3-D anisotropic plasma interfaces and diffraction remain outside its
-scope. Mode conversion is coherent for the existing 1-D stratified Berreman
-boundary problem, not arbitrary 3-D interfaces. ECE absorption remains
-non-relativistic Maxwellian; relativistic/collisional emissivity and
-mode-coupled 3-D transfer remain open. Do not mark these broader capabilities
-as complete from the existence of these kernels alone.
+Do not release a quantitative result until velocity-grid/domain, harmonic, quadrature, spatial-step, angular-spectrum and boundary convergence have been demonstrated for the requested regime. Report the exact model, assumptions, supplied external inputs, measurement and model-discrepancy covariance, data-only identifiability, and all limitations. Unit tests and CI establish software behavior, not experimental/device validation.
