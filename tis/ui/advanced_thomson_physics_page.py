@@ -86,6 +86,8 @@ EXAMPLES = {
         "scattering_angle_rad": 1.5707963267948966,
         "instrument_response_matrix": np.eye(41).tolist(),
         "background_signal": np.full(41, 2.0).tolist(),
+        "model_discrepancy_covariance": None,
+        "systematic_covariance": None,
         "regularization_strength": 0.001,
         "velocity_limit_m_s": 8000.0,
         "velocity_points": 81
