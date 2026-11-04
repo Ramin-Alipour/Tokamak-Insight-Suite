@@ -325,3 +325,46 @@ def test_psf_profile_rejects_non_psd_operator_covariance():
             regularization_strength=1.0e-3,
             spatial_mixing_covariance=invalid,
         )
+
+
+def test_projected_evdf_adds_independent_model_discrepancy_covariance_once():
+    wavelength = np.linspace(520.0, 544.0, 121)
+    velocity = np.linspace(-3.0e6, 3.0e6, 61)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    discrepancy = np.eye(wavelength.size) * 2.5e-4
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(measured),
+        velocity_grid_m_s=velocity,
+        model_discrepancy_covariance=discrepancy,
+        regularization_strength=1e-3,
+    )
+    assert result["model_discrepancy_included"] is True
+    assert result["measurement_covariance"] is None
+    np.testing.assert_allclose(
+        result["model_discrepancy_covariance"], discrepancy, rtol=0.0, atol=0.0
+    )
+    np.testing.assert_allclose(
+        result["effective_spectral_covariance"], discrepancy, rtol=0.0, atol=0.0
+    )
+    assert result["noise_model"] == "model_discrepancy_only_no_measurement_noise_covariance"
+
+
+def test_projected_evdf_rejects_non_psd_model_discrepancy_covariance():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    discrepancy = np.eye(wavelength.size)
+    discrepancy[0, 0] = -1.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_relativistic_projected_thomson_evdf(
+            wavelength, measured, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.zeros_like(measured),
+            velocity_grid_m_s=velocity,
+            model_discrepancy_covariance=discrepancy,
+            regularization_strength=1e-3,
+        )
