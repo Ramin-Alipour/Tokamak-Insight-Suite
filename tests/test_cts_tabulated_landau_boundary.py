@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from tokamak_analysis.cts_analysis import _component_tabulated
-from tokamak_analysis.cts_analysis import EPS0
+from tokamak_analysis.cts_analysis import E, EPS0
 
 
 def test_tabulated_vdf_landau_susceptibility_includes_zero_extension_endpoint_jumps():
@@ -17,6 +17,6 @@ def test_tabulated_vdf_landau_susceptibility_includes_zero_extension_endpoint_ju
     expected_landau_integral = (
         0.5 / (-1.0 - 2.0) - 0.5 / (1.0 - 2.0)
     )
-    expected = -(1.0 / EPS0) * expected_landau_integral
+    expected = -(E**2 / EPS0) * expected_landau_integral
     assert susceptibility[0] == pytest.approx(expected, rel=2e-12)
     assert resonant_density[0] == 0.0
