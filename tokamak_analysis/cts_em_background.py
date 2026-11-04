@@ -108,7 +108,7 @@ def thermal_bremsstrahlung_emissivity_si(
     """Unpolarized Maxwellian free-free emissivity j_nu in W m^-3 sr^-1 Hz^-1.
 
     Uses the angle-resolved (per steradian) SI form
-    j_nu = 5.44e-40 n_e sum_i(Z_i^2 n_i) T_K^-1/2
+    j_nu = 5.41e-52 n_e sum_i(Z_i^2 n_i) T_K^-1/2
     exp(-h nu/kT) g_ff, with densities in m^-3 and T in kelvin.
     The coefficient is (6.8e-38 * 1e-13)/(4*pi): the angle-integrated cgs
     emissivity is converted to SI with 1e-7 J/erg, 1e6 cm^3/m^3,
