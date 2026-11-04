@@ -142,9 +142,12 @@ def cold_plasma_magnetoionic_modes(
     dielectric = cold_plasma_dielectric_tensor(
         frequency_Hz, magnetic_field_T, species,
     )
-    nhat = np.asarray(wave_normal_direction, dtype=float)
-    if nhat.shape != (3,) or np.any(~np.isfinite(nhat)) or np.linalg.norm(nhat) <= 0.0:
-        raise ValueError("wave_normal_direction must be a finite non-zero 3-vector")
+    raw_nhat = np.asarray(wave_normal_direction)
+    if raw_nhat.dtype.kind not in "iuf" or raw_nhat.shape != (3,):
+        raise ValueError("wave_normal_direction must be a finite real non-zero 3-vector")
+    nhat = raw_nhat.astype(float, copy=True)
+    if np.any(~np.isfinite(nhat)) or np.linalg.norm(nhat) <= 0.0:
+        raise ValueError("wave_normal_direction must be a finite real non-zero 3-vector")
     nhat /= np.linalg.norm(nhat)
     epsilon = dielectric["dielectric_tensor_lab"]
     projector = np.eye(3) - np.outer(nhat, nhat)
