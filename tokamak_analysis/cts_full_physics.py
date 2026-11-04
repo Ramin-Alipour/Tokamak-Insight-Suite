@@ -28,6 +28,7 @@ from .cts_em_background import (
     plasma_charge_state_moments,
 )
 from .cts_kappa import kappa_electron_susceptibility
+from .cts_analysis import fit_cts_ion_species_flows
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from .cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
@@ -447,6 +448,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = analyze_cts_microwave_background
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "cts_multi_ion_flow_inference":
+        solver = fit_cts_ion_species_flows
     elif model == "multispecies_thermal_collision_matrix":
         solver = multispecies_thermal_coulomb_collision_matrix
     elif model == "landau_fdt_cts":
@@ -497,7 +500,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, thomson_three_dimensional_flow; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
@@ -516,6 +519,7 @@ __all__ = [
     "quantum_unsymmetrized_dynamic_structure_factor",
     "analyze_cts_microwave_background",
     "analyze_landau_fdt_cts",
+    "fit_cts_ion_species_flows",
     "analyze_landau_fdt_full_em_constitutive",
     "propagate_stratified_nonparaxial_vector_field",
     "solve_polarized_kinetic_ece_with_mode_conversion",
