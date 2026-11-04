@@ -14,6 +14,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
 
 MODEL_LABELS = {
+    "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
@@ -22,6 +23,11 @@ MODEL_LABELS = {
 }
 
 EXAMPLES = {
+    "thomson_three_dimensional_flow": {
+        "velocity_projection_m_s": [100000.0, 200000.0, 300000.0],
+        "scattering_vector_unit": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        "projection_covariance_m2_s2": [[1000000.0, 0.0, 0.0], [0.0, 1000000.0, 0.0], [0.0, 0.0, 1000000.0]]
+    },
     "gyrotropic_bi_maxwellian_anisotropy": {
         "projected_temperature_eV": [180.0, 105.0, 80.0],
         "magnetic_pitch_cosine": [1.0, 0.5, 0.0],
