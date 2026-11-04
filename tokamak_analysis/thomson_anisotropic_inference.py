@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import least_squares
+from scipy.special import gammaln
 
 
 _C = 299792458.0
@@ -272,6 +273,223 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "parameter_covariance_scale": covariance_scale_method,
             "model_discrepancy_supplied": model_discrepancy_covariance is not None,
             "combination": "C_effective = C_measurement + C_model_discrepancy; added once",
+        },
+        "experimental_validation": "not_performed",
+    }
+
+
+def fit_gyrotropic_bi_kappa_thomson(
+    wavelength_nm, measured_spectra, *, laser_wavelength_nm,
+    scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
+    instrument_response_matrix, measurement_covariance=None,
+    signal_uncertainty=None, model_discrepancy_covariance=None,
+    initial_temperature_parallel_eV=1000.0,
+    initial_temperature_perpendicular_eV=1000.0,
+    initial_kappa=4.0, kappa_bounds=(1.5001, 200.0),
+    temperature_bounds_eV=(1.0e-3, 1.0e7),
+    flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
+    max_nfev=6000,
+):
+    r"""Fit a gyrotropic anisotropic 3-D Kappa distribution to multi-view spectra.
+
+    The assumed normalized 3-D distribution is proportional to
+      [1 + v_parallel^2/(kappa theta_parallel^2)
+         + v_perp^2/(kappa theta_perp^2)]^(-(kappa+1)).
+    Its exact one-dimensional marginal along a view q is
+      p(v_q) = Gamma(kappa)/(sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)
+               [1 + v_q^2/(kappa*theta_q^2)]^(-kappa),
+    where theta_q^2 = (2*kappa-3)/kappa * 2*k_B*T_q/m_e.
+    This parameterization makes T_q the actual second-moment temperature
+    (m_e <(v_q-u_q)^2>/k_B), not the Kappa core/scale temperature.
+    The finite-variance domain kappa>3/2 is enforced.
+
+    Only the non-relativistic elastic-Thomson wavelength mapping is used.
+    T_parallel and T_perpendicular are reported only when the independent
+    pitch-angle design and complete whitened spectral Jacobian both identify
+    them. A single view cannot identify anisotropy.
+    """
+    wavelength = _real_array(wavelength_nm, "wavelength_nm", 1)
+    spectra = _real_array(measured_spectra, "measured_spectra", 2)
+    if wavelength.size < 16 or np.any(wavelength <= 0.0) or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must be positive, increasing, and contain >=16 bins")
+    n_view, n_bin = spectra.shape
+    if n_view < 1 or n_bin != wavelength.size:
+        raise ValueError("measured_spectra must have shape (n_view, n_wavelength)")
+    laser = float(laser_wavelength_nm)
+    angle = float(scattering_angle_rad)
+    if not np.isfinite(laser) or laser <= 0.0 or not np.isfinite(angle) or not 0.0 < angle < np.pi:
+        raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie in (0, pi)")
+    b = _real_array(magnetic_field_unit, "magnetic_field_unit")
+    q = _real_array(scattering_vector_unit, "scattering_vector_unit", 2)
+    if b.shape == (3,):
+        b = np.broadcast_to(b, (n_view, 3)).copy()
+    if b.shape != (n_view, 3) or q.shape != (n_view, 3):
+        raise ValueError("magnetic_field_unit and scattering_vector_unit must have shape (3,) or (n_view,3)")
+    if not np.allclose(np.linalg.norm(b, axis=1), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("each magnetic_field_unit row must have unit norm")
+    if not np.allclose(np.linalg.norm(q, axis=1), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("each scattering_vector_unit row must have unit norm")
+    mu = np.einsum("ij,ij->i", b, q)
+    mu2 = np.clip(mu * mu, 0.0, 1.0)
+    design = np.column_stack((1.0 - mu2, mu2))
+    geometry_rank = int(np.linalg.matrix_rank(design))
+    response = _real_array(instrument_response_matrix, "instrument_response_matrix")
+    if response.ndim == 2:
+        response = np.broadcast_to(response, (n_view, n_bin, n_bin)).copy()
+    if response.shape != (n_view, n_bin, n_bin) or np.any(response < 0.0):
+        raise ValueError("instrument_response_matrix must be non-negative with shape (n_bin,n_bin) or (n_view,n_bin,n_bin)")
+    if not np.allclose(response.sum(axis=1), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("measured response columns must sum to one; response is never silently renormalized")
+    if measurement_covariance is not None and signal_uncertainty is not None:
+        raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
+    size = n_view * n_bin
+    if measurement_covariance is not None:
+        cov = _real_array(measurement_covariance, "measurement_covariance", 2)
+        if cov.shape != (size, size) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-12 * max(np.max(np.abs(cov)), 1e-300)):
+            raise ValueError("measurement_covariance must be symmetric and channel-major")
+        cov = 0.5 * (cov + cov.T)
+    elif signal_uncertainty is not None:
+        sigma = _real_array(signal_uncertainty, "signal_uncertainty", 2)
+        if sigma.shape != spectra.shape or np.any(sigma <= 0.0):
+            raise ValueError("signal_uncertainty must be positive and match measured_spectra")
+        cov = np.diag(sigma.ravel() ** 2)
+    else:
+        cov = np.eye(size)
+    if model_discrepancy_covariance is not None:
+        discrepancy = _real_array(model_discrepancy_covariance, "model_discrepancy_covariance", 2)
+        if discrepancy.shape != (size, size) or not np.allclose(discrepancy, discrepancy.T, rtol=1e-10, atol=1e-12 * max(np.max(np.abs(discrepancy)), 1e-300)):
+            raise ValueError("model_discrepancy_covariance must be symmetric and channel-major")
+        discrepancy = 0.5 * (discrepancy + discrepancy.T)
+        eig = np.linalg.eigvalsh(discrepancy)
+        if eig[0] < -1e-10 * max(float(np.max(np.abs(eig))), 1e-300):
+            raise ValueError("model_discrepancy_covariance must be positive semidefinite")
+        cov = cov + discrepancy
+    try:
+        chol = np.linalg.cholesky(cov)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("effective spectral covariance must be positive definite") from exc
+    def whiten(value):
+        return np.linalg.solve(chol, np.asarray(value, dtype=float).ravel())
+
+    t0p, t0t = float(initial_temperature_parallel_eV), float(initial_temperature_perpendicular_eV)
+    tlo, thi = map(float, temperature_bounds_eV)
+    klo, khi = map(float, kappa_bounds)
+    k0 = float(initial_kappa)
+    if not (0.0 < tlo < thi and tlo <= t0p <= thi and tlo <= t0t <= thi):
+        raise ValueError("initial temperatures must lie inside positive temperature_bounds_eV")
+    if not (1.5 < klo < khi and klo <= k0 <= khi):
+        raise ValueError("kappa_bounds and initial_kappa must satisfy 1.5 < lower <= initial <= upper")
+    flow_lo, flow_hi = map(float, flow_bounds_m_s)
+    if not np.isfinite(flow_lo + flow_hi) or flow_lo >= flow_hi or flow_lo <= -_C or flow_hi >= _C:
+        raise ValueError("flow_bounds_m_s must be ordered and strictly subluminal")
+    if isinstance(max_nfev, (bool, np.bool_)) or int(max_nfev) < 1:
+        raise ValueError("max_nfev must be a positive integer")
+
+    qmag = 2.0 * np.sin(angle / 2.0)
+    widths = _bin_widths(wavelength)
+    edge = max(2, n_bin // 10)
+    p0 = [np.log(t0p), np.log(t0t), np.log(k0 - 1.5)]
+    lower = [np.log(tlo), np.log(tlo), np.log(klo - 1.5)]
+    upper = [np.log(thi), np.log(thi), np.log(khi - 1.5)]
+    for i in range(n_view):
+        y = spectra[i]
+        span = max(float(np.ptp(y)), np.finfo(float).tiny)
+        baseline = float(np.median(np.r_[y[:edge], y[-edge:]]))
+        p0.extend([0.0, np.log(max(float(np.max(y) - baseline), span * 1e-6)), baseline, 0.0])
+        lower.extend([flow_lo, -50.0, -np.inf, -np.inf])
+        upper.extend([flow_hi, 50.0, np.inf, np.inf])
+    p0, lower, upper = np.asarray(p0), np.asarray(lower), np.asarray(upper)
+
+    def predict(parameters):
+        tpar, tperp = np.exp(parameters[:2])
+        kappa = 1.5 + np.exp(parameters[2])
+        directional = tperp + (tpar - tperp) * mu2
+        if np.any(directional <= 0.0):
+            raise ValueError("directional bi-Kappa temperature became non-positive")
+        predictions = np.empty_like(spectra)
+        for i in range(n_view):
+            flow, log_amp, offset, slope = parameters[3 + 4*i:7 + 4*i]
+            theta2 = ((2.0*kappa - 3.0)/kappa) * (2.0*_E*directional[i]/_ME)
+            theta = np.sqrt(theta2)
+            velocity = (_C/qmag) * (1.0 - wavelength/laser) - flow
+            log_norm = (gammaln(kappa) - 0.5*np.log(np.pi*kappa)
+                        - gammaln(kappa - 0.5) - np.log(theta))
+            log_pdf = log_norm - kappa*np.log1p(velocity**2/(kappa*theta2))
+            pdf_velocity = np.exp(log_pdf)
+            intrinsic = pdf_velocity * (_C/(laser*qmag))
+            detector = _apply_response_in_bin_integrated_space(response[i], intrinsic, wavelength)
+            predictions[i] = np.exp(log_amp)*detector + offset + slope*(wavelength-laser)
+        return predictions, directional, kappa
+
+    def residual(parameters):
+        return whiten(predict(parameters)[0] - spectra)
+
+    fit = least_squares(residual, p0, bounds=(lower, upper), method="trf",
+                        x_scale="jac", max_nfev=int(max_nfev))
+    if not fit.success or not np.all(np.isfinite(fit.x)):
+        raise RuntimeError(f"gyrotropic bi-Kappa Thomson fit failed: {fit.message}")
+    fitted, directional, kappa = predict(fit.x)
+    singular = np.linalg.svd(fit.jac, compute_uv=False)
+    tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
+    full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
+    parameter_covariance = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if (full_rank and geometry_rank == 2) else None
+    covariance_scale_method = "supplied_absolute_covariance"
+    if parameter_covariance is not None and measurement_covariance is None and signal_uncertainty is None:
+        dof = max(1, size - fit.x.size)
+        parameter_covariance *= (2.0 * float(fit.cost) / dof)
+        covariance_scale_method = "unweighted_residual_scaled"
+    if parameter_covariance is not None:
+        transform = np.eye(fit.x.size)
+        transform[0, 0] = np.exp(fit.x[0])
+        transform[1, 1] = np.exp(fit.x[1])
+        transform[2, 2] = np.exp(fit.x[2])
+        parameter_covariance = transform @ parameter_covariance @ transform.T
+    reportable = geometry_rank == 2 and full_rank
+    return {
+        "model": "gyrotropic_bi_kappa_nonrelativistic_optical_thomson",
+        "distribution_definition": "f3(v) proportional to [1 + v_parallel^2/(kappa*theta_parallel^2) + v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1))",
+        "projected_marginal": "p(v_q)=Gamma(kappa)/(sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)*(1+v_q^2/(kappa*theta_q^2))^(-kappa)",
+        "temperature_definition": "T_q=m_e*Var(v_q)/k_B; theta_q^2=((2*kappa-3)/kappa)*(2*k_B*T_q/m_e)",
+        "electron_temperature_parallel_eV": float(np.exp(fit.x[0])) if reportable else None,
+        "electron_temperature_perpendicular_eV": float(np.exp(fit.x[1])) if reportable else None,
+        "kappa_index": float(kappa) if full_rank else None,
+        "kappa_finite_variance_domain": bool(kappa > 1.5),
+        "directional_temperature_eV": directional,
+        "magnetic_pitch_cosine": mu,
+        "magnetic_pitch_cosine_squared": mu2,
+        "geometry_design_rank": geometry_rank,
+        "anisotropy_identifiability": "identified" if reportable else "non_identifiable",
+        "kappa_identifiability": "identified" if full_rank else "non_identifiable",
+        "reportable_as_inferred_parameter": bool(reportable and full_rank),
+        "non_identifiability_reason": None if reportable else "Distinct squared magnetic pitch angles and a full-rank spectral Jacobian are required to identify both temperatures; kappa also requires a full-rank spectral Jacobian.",
+        "electron_velocity_projection_m_s": fit.x[3::4].copy(),
+        "fitted_spectra": fitted,
+        "residual_spectra": spectra - fitted,
+        "effective_covariance": cov,
+        "parameter_covariance": parameter_covariance,
+        "parameter_order": ["T_parallel_eV", "T_perpendicular_eV", "kappa_minus_1p5"] + [
+            item for i in range(n_view) for item in (
+                f"flow_projection_view_{i}_m_s", f"log_amplitude_view_{i}",
+                f"background_offset_view_{i}", f"background_slope_view_{i}_per_nm"
+            )
+        ],
+        "jacobian_singular_values": singular,
+        "optimizer": {"success": bool(fit.success), "message": str(fit.message),
+                      "nfev": int(fit.nfev), "cost": float(fit.cost)},
+        "covariance_provenance": {
+            "measurement": "supplied_full_channel_major" if measurement_covariance is not None else (
+                "supplied_pointwise_diagonal" if signal_uncertainty is not None else "unweighted_identity_for_fit"
+            ),
+            "parameter_covariance_scale": covariance_scale_method,
+            "model_discrepancy_supplied": model_discrepancy_covariance is not None,
+            "combination": "C_effective = C_measurement + C_model_discrepancy; added once",
+        },
+        "model_validity": {
+            "kinematics": "non-relativistic elastic Thomson mapping",
+            "distribution": "gyrotropic bi-Kappa with zero heat flux and finite second moments",
+            "kappa_domain": "kappa > 3/2",
+            "relativistic_corrections": False,
+            "limitations": ["No relativistic Doppler/cross-section correction", "No unrestricted 3-D EVDF reconstruction", "Kappa is a fitted parametric closure, not a general measured distribution"],
         },
         "experimental_validation": "not_performed",
     }
