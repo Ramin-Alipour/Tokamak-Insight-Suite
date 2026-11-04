@@ -5888,9 +5888,9 @@
   {
     "name": "Relativistic projected Compton kinematics and polarized Klein–Nishina weight",
     "equation": "r=ε′_s/ε′_i=[1+(hν′_i/m_ec²)(1−cosθ′)]⁻¹; λ_s=λ_i[(1−βμ_s)/(1−βμ_i)]/r; dσ′/dΩ′=(r_e²/2)r²[r+r⁻¹−2|e′·n′_s|²]",
-    "inputs": "Strictly increasing subluminal projected electron-velocity grid v_q [m s^-1], laser wavelength [nm], scattering angle [rad]; optional incident polarization unit vector transverse to the incident ray.",
+    "inputs": "Finite strictly increasing subluminal projected electron-velocity grid v_q [m s^-1] (uniform or non-uniform), laser wavelength [nm], scattering angle [rad]; optional incident polarization transverse to the incident ray; optional paired arbitrary 3-D incident and scattered unit directions matching the scattering angle.",
     "output": "Thomson-limit and Compton scattered wavelengths [nm], rest-frame photon-energy ratio, rest-frame scattering-angle cosine, maximum recoil correction fraction, and relative lab-frame polarized differential-scattering weight.",
-    "assumptions": "Single scattering; electron velocity restricted to the scattering-vector direction; incident/scattered geometry symmetric about the q bisector; exact Lorentz aberration and Compton four-momentum conservation; supplied polarization is transformed to the electron rest frame. No unrestricted 3-D EVDF or absolute density is inferred.",
+    "assumptions": "Single scattering; electron velocity restricted to the scattering-vector direction. If explicit ray directions are omitted, symmetric geometry is constructed from scattering_angle_rad; otherwise arbitrary non-collinear 3-D incident/scattered directions are used and validated against the supplied angle. Exact Lorentz aberration and Compton four-momentum conservation; supplied polarization is transformed to the electron rest frame. No unrestricted 3-D EVDF or absolute density is inferred.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5901,7 +5901,7 @@
       "input_specs": [
         {
           "name": "velocity_grid_m_s",
-          "unit": "m s^-1; finite, strictly increasing and subluminal",
+          "unit": "m s^-1; finite, strictly increasing, subluminal; uniform and non-uniform grids supported by quadrature-consistent inversion",
           "required": true
         },
         {
@@ -5911,12 +5911,22 @@
         },
         {
           "name": "scattering_angle_rad",
-          "unit": "rad; strictly between 0 and π",
+          "unit": "rad; strictly between 0 and π and consistent with optional ray directions",
           "required": true
         },
         {
           "name": "incident_polarization",
-          "unit": "dimensionless 3-vector; optional and transverse to the incident ray",
+          "unit": "dimensionless 3-vector; optional and transverse to the incident ray; required for polarized Klein–Nishina Compton inversion",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless unit 3-vector; optional; must be supplied together with scattered_direction",
+          "required": false
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless unit 3-vector; optional; must be supplied together with incident_direction",
           "required": false
         }
       ],
@@ -5960,14 +5970,16 @@
       ],
       "prerequisites": [
         "One-dimensional projected velocity support parallel to the scattering vector.",
-        "Symmetric incident/scattered geometry about the scattering-vector bisector.",
-        "A transverse incident polarization vector is required to calculate the polarized Klein–Nishina weight."
+        "Either provide paired non-collinear 3-D incident/scattered unit ray directions consistent with scattering_angle_rad, or use the symmetric geometry constructed from scattering_angle_rad.",
+        "A transverse incident polarization vector is required to calculate the polarized Klein–Nishina weight.",
+        "For projected EVDF inversion, non-uniform velocity grids use non-uniform trapezoidal quadrature for both the forward integral and EVDF normalization, with a non-uniform second-derivative regularizer."
       ],
       "uncertainty_model": "Deterministic kinematic transform. The helper does not infer uncertainties in velocity, wavelength, angle or polarization; uncertainty propagation must be performed by the enclosing inference using supplied covariance.",
       "test_links": [
-        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
+        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift",
+        "tests/test_thomson_gap_closure.py::test_projected_evdf_normalizes_on_nonuniform_velocity_grid"
       ],
-      "note": "This is a projected single-scattering Compton kernel. It does not recover transverse velocity structure or an unrestricted 3-D EVDF."
+      "note": "This is a projected single-scattering Compton kernel. It does not recover transverse velocity structure or an unrestricted 3-D EVDF. The enclosing inverse supports arbitrary strictly increasing velocity grids and preserves the same quadrature measure in its forward operator and normalization."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
@@ -5983,7 +5995,8 @@
       "formula_key": "thomson_projected_compton_kinematics",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
+        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift",
+        "tests/test_thomson_gap_closure.py::test_projected_evdf_normalizes_on_nonuniform_velocity_grid"
       ]
     }
   },
