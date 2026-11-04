@@ -5483,5 +5483,104 @@
       ],
       "calibrated_measurements_to_physics": false
     }
+  },
+  {
+    "name": "Three-dimensional electron flow from multi-view Thomson projections",
+    "equation": "v_q,i = q_hat_i · v_e;  v̂_e = (Qᵀ C_v⁻¹ Q)⁻¹ Qᵀ C_v⁻¹ v_q",
+    "inputs": "Measured directional flow projections [m s^-1], unit scattering-vector directions [1], full positive-definite projection covariance [m² s^-2]",
+    "output": "Three-component electron flow vector [m s^-1] and 3×3 covariance [m² s^-2]; non-identifiable unless Q has rank 3",
+    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known scattering-vector directions; geometry uncertainty excluded from supplied projection covariance.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.infer_three_dimensional_flow_from_thomson_projections",
+      "formula_key": "thomson_three_dimensional_flow_from_projections",
+      "input_specs": [
+        {
+          "name": "velocity_projection_m_s",
+          "unit": "m s^-1; measured-spectrum-derived projection per view",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "dimensionless; n_views × 3 unit vectors",
+          "required": true
+        },
+        {
+          "name": "projection_covariance_m2_s2",
+          "unit": "m² s⁻²; full positive-definite covariance",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_velocity_vector_m_s",
+          "unit": "m s^-1; 3-vector, withheld if rank deficient or superluminal"
+        },
+        {
+          "name": "electron_velocity_covariance_m2_s2",
+          "unit": "m² s⁻²; 3×3 GLS covariance"
+        },
+        {
+          "name": "identifiability",
+          "unit": "identifiable or non_identifiable"
+        },
+        {
+          "name": "chi_square",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "At least three linearly independent scattering-vector directions.",
+        "All views must sample a common flow vector or a physically justified shared-volume model.",
+        "Projection covariance and calibrated spectra are supplied; scattering geometry is known."
+      ],
+      "uncertainty_model": "Generalized least squares with the supplied full projection covariance. Scattering-vector/geometry uncertainty is not included.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
+      ],
+      "note": "A vector is reported only when the measured projection geometry spans three dimensions and the inferred speed is subluminal. A single scattering view identifies only one projection."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook",
+        "scope": "Thomson scattering kinematics and velocity projections."
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Optical Thomson diagnostic forward modelling; multi-view vector inversion is the explicit linear projection geometry implemented here."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "directional_flow_parameters_extracted_from_measured_calibrated_spectra",
+    "execution_scope": "conditional_multi_view_three_dimensional_flow_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — multi-view 3-D flow projection inversion",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_models.infer_three_dimensional_flow_from_thomson_projections",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_models.infer_three_dimensional_flow_from_thomson_projections"
+      ],
+      "formula_key": "thomson_three_dimensional_flow_from_projections",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
+      ]
+    }
   }
 ]
