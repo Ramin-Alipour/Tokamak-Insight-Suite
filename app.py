@@ -982,6 +982,8 @@ elif page=='Spectral Analysis':
                     )
                 st.caption('The selected nuisance basis is fitted simultaneously with each measured Thomson spectrum. It is not interpreted as plasma emission.')
             spatial_mixing_upload=None
+            spatial_mixing_covariance_upload=None
+            spatial_mixing_mc_samples=100
             spatial_regularization_text='0'
             spatial_regularization_sensitivity_text=''
             spatial_background_model='linear'
@@ -991,7 +993,16 @@ elif page=='Spectral Analysis':
             spatial_kappa_index_text=None
             spatial_fit_kappa_index=False
             if joint_spatial_spectral:
-                spatial_mixing_upload=st.file_uploader('Fixed measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
+                spatial_mixing_upload=st.file_uploader('Nominal measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
+                spatial_mixing_covariance_upload=st.file_uploader(
+                    'Optional spatial-mixing element covariance CSV (row-major matrix-element order)',
+                    type=['csv','txt'],key='ts_infer_spatial_mixing_covariance',
+                    help='Full covariance of the flattened nominal spatial-mixing matrix, in row-major order. It is propagated by complete nonlinear spectral refits; it is not used to estimate or calibrate the PSF.',
+                )
+                spatial_mixing_mc_samples=int(st.number_input(
+                    'Spatial-mixing uncertainty nonlinear refits',min_value=20,max_value=2000,
+                    value=100,step=20,key='ts_infer_spatial_mixing_mc_samples',
+                ))
                 spatial_regularization_text=st.text_input('Spatial curvature regularization strength (dimensionless numerical control; explicit)',value='0',key='ts_infer_spatial_regularization')
                 spatial_regularization_sensitivity_text=st.text_input(
                     'Optional regularization-sensitivity strengths (comma-separated, strictly increasing and positive)',
@@ -1254,11 +1265,16 @@ elif page=='Spectral Analysis':
                         kwargs.update({
                             'joint_spatial_spectral':True,
                             'spatial_mixing_matrix':spatial_mixing_matrix,
+                            'spatial_mixing_mc_samples':spatial_mixing_mc_samples,
                             'spatial_regularization_strength':_parse_ts_scalar(spatial_regularization_text,'Spatial regularization strength',minimum=0.0),
                             'spatial_background_model':spatial_background_model,
                             'spatial_background_degree':int(spatial_background_degree),
                             'spatial_background_interior_knots':int(spatial_background_interior_knots),
                         })
+                        if spatial_mixing_covariance_upload is not None:
+                            kwargs['spatial_mixing_covariance']=pd.read_csv(
+                                spatial_mixing_covariance_upload,header=None
+                            ).to_numpy(dtype=float)
                         if spatial_regularization_sensitivity_text.strip():
                             strengths = [
                                 _parse_ts_scalar(item.strip(),'Regularization-sensitivity strength',minimum=1e-300)

@@ -273,3 +273,13 @@ def test_thomson_dashboard_displays_model_domain_diagnostics():
     assert "domain_status" in source
     assert "theta_e_status" in source
     assert "beta_status" in source
+
+
+
+def test_thomson_dashboard_exposes_joint_spatial_mixing_covariance_refits():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "ts_infer_spatial_mixing_covariance" in source
+    assert "spatial_mixing_covariance" in source
+    assert "ts_infer_spatial_mixing_mc_samples" in source

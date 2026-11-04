@@ -458,3 +458,52 @@ def test_joint_inverse_rejects_nonfinite_regularization_sensitivity_strengths():
             scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
             regularization_sensitivity_strengths=[1.0e-3, np.inf],
         )
+
+
+
+def test_joint_profile_workflow_propagates_spatial_mixing_covariance_by_refits():
+    from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
+
+    x, y, r, h, *_ = _synthetic_case()
+    covariance = np.diag(np.where(h.reshape(-1) > 0.0, 1.0e-8, 0.0))
+    result = reconstruct_thomson_profile_from_spectra(
+        x, y, r,
+        model="non_collective_maxwellian",
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        joint_spatial_spectral=True,
+        spatial_mixing_matrix=h,
+        spatial_mixing_covariance=covariance,
+        spatial_mixing_mc_samples=20,
+        spatial_mixing_mc_seed=17,
+        spatial_regularization_strength=0.0,
+    )
+    uncertainty = result["spatial_mixing_uncertainty"]
+    assert uncertainty["supplied"] is True
+    assert uncertainty["method"] == "nonlinear_forward_refit_monte_carlo"
+    assert uncertainty["requested_samples"] == 20
+    assert uncertainty["successful_samples"] >= 20
+    assert uncertainty["propagated"] is True
+    assert result["parameter_covariance"].shape == (len(result["parameter_order"]),) * 2
+    assert result["profile_parameter_covariance"].shape == (3 * r.size, 3 * r.size)
+    assert result["covariance_decomposition"]["spatial_mixing_covariance"] == (
+        "nonlinear_refit_external_operator_contribution"
+    )
+
+
+def test_joint_profile_workflow_rejects_invalid_spatial_mixing_covariance():
+    from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
+
+    x, y, r, h, *_ = _synthetic_case()
+    invalid = np.eye(h.size)
+    invalid[0, 1] = 0.1
+    with pytest.raises(ValueError, match="must be symmetric"):
+        reconstruct_thomson_profile_from_spectra(
+            x, y, r, model="non_collective_maxwellian",
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+            instrument_response=np.eye(x.size), signal_uncertainty=np.full_like(y, 0.01),
+            joint_spatial_spectral=True, spatial_mixing_matrix=h,
+            spatial_mixing_covariance=invalid,
+        )

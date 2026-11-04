@@ -383,11 +383,6 @@ def reconstruct_thomson_profile_from_spectra(
             "profile_coordinate_covariance_m2 is supported by downstream profile "
             "reconstruction, not by the raw joint spatial-spectral optimizer"
         )
-    if joint_spatial_spectral and spatial_mixing_covariance is not None:
-        raise ValueError(
-            "spatial_mixing_covariance is currently propagated by the downstream "
-            "PSF-aware profile path, not by the raw joint spatial-spectral optimizer"
-        )
     if joint_spatial_spectral:
         if spatial_mixing_matrix is None:
             raise ValueError("spatial_mixing_matrix is required when joint_spatial_spectral=True")
@@ -413,34 +408,175 @@ def reconstruct_thomson_profile_from_spectra(
         if unsupported:
             raise ValueError(f"unsupported joint spatial-spectral inputs: {sorted(unsupported)}")
         from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
-        return reconstruct_joint_thomson_spatial_spectra(
-            args[0], args[1], args[2], spatial_mixing_matrix,
-            laser_wavelength_nm=kwargs["laser_wavelength_nm"],
-            scattering_angle_rad=kwargs["scattering_angle_rad"],
-            instrument_response=kwargs.get("instrument_response"),
-            laser_spectrum_wavelength_nm=kwargs.get("laser_spectrum_wavelength_nm"),
-            laser_spectrum_density_per_nm=kwargs.get("laser_spectrum_density_per_nm"),
-            signal_uncertainty=kwargs.get("signal_uncertainty"),
-            joint_spectral_covariance=kwargs.get("joint_spectral_covariance"),
-            model_discrepancy_covariance=kwargs.get("model_discrepancy_covariance"),
-            regularization_sensitivity_strengths=kwargs.get("regularization_sensitivity_strengths"),
-            regularization_strength=spatial_regularization_strength,
-            background_model=spatial_background_model,
-            background_degree=spatial_background_degree,
-            background_interior_knots=spatial_background_interior_knots,
-            background_templates=spatial_background_templates,
-            physical_model={
+        fit_kwargs = {
+            "laser_wavelength_nm": kwargs["laser_wavelength_nm"],
+            "scattering_angle_rad": kwargs["scattering_angle_rad"],
+            "instrument_response": kwargs.get("instrument_response"),
+            "laser_spectrum_wavelength_nm": kwargs.get("laser_spectrum_wavelength_nm"),
+            "laser_spectrum_density_per_nm": kwargs.get("laser_spectrum_density_per_nm"),
+            "signal_uncertainty": kwargs.get("signal_uncertainty"),
+            "joint_spectral_covariance": kwargs.get("joint_spectral_covariance"),
+            "model_discrepancy_covariance": kwargs.get("model_discrepancy_covariance"),
+            "regularization_sensitivity_strengths": kwargs.get("regularization_sensitivity_strengths"),
+            "regularization_strength": spatial_regularization_strength,
+            "background_model": spatial_background_model,
+            "background_degree": spatial_background_degree,
+            "background_interior_knots": spatial_background_interior_knots,
+            "background_templates": spatial_background_templates,
+            "physical_model": {
                 "non_collective_kappa": "kappa",
                 "non_collective_relativistic_maxwell_juttner": "relativistic_maxwell_juttner",
             }.get(selected_model, "maxwellian"),
-            kappa_index=kwargs.get("kappa_index"),
-            fit_kappa_index=kwargs.get("fit_kappa_index", False),
-            incident_polarization=kwargs.get("incident_polarization"),
-            radial_order=kwargs.get("radial_order", 24),
-            angular_order=kwargs.get("angular_order", 12),
-            maximum_recoil_correction_fraction=kwargs.get("maximum_recoil_correction_fraction", 0.01),
-            include_compton_recoil=kwargs.get("include_compton_recoil", False),
+            "kappa_index": kwargs.get("kappa_index"),
+            "fit_kappa_index": kwargs.get("fit_kappa_index", False),
+            "incident_polarization": kwargs.get("incident_polarization"),
+            "radial_order": kwargs.get("radial_order", 24),
+            "angular_order": kwargs.get("angular_order", 12),
+            "maximum_recoil_correction_fraction": kwargs.get("maximum_recoil_correction_fraction", 0.01),
+            "include_compton_recoil": kwargs.get("include_compton_recoil", False),
+        }
+        result = reconstruct_joint_thomson_spatial_spectra(
+            args[0], args[1], args[2], spatial_mixing_matrix, **fit_kwargs
         )
+        if spatial_mixing_covariance is None:
+            return result
+
+        # Propagate uncertainty in the supplied spatial forward operator by
+        # complete nonlinear refits. This is an external-operator contribution,
+        # not a calibration or an attempt to infer the PSF from the plasma data.
+        raw_h = np.asarray(spatial_mixing_matrix)
+        if raw_h.dtype.kind not in "iuf" or raw_h.ndim != 2:
+            raise ValueError("spatial_mixing_matrix must be a real two-dimensional array")
+        h = raw_h.astype(float, copy=False)
+        raw_cov = np.asarray(spatial_mixing_covariance)
+        if raw_cov.dtype.kind not in "iuf":
+            raise ValueError("spatial_mixing_covariance must contain real numeric values")
+        mixing_cov = raw_cov.astype(float, copy=False)
+        expected_shape = (h.size, h.size)
+        if mixing_cov.shape != expected_shape or not np.all(np.isfinite(mixing_cov)):
+            raise ValueError(f"spatial_mixing_covariance must be finite with shape {expected_shape}")
+        scale = max(float(np.max(np.abs(mixing_cov))), np.finfo(float).tiny)
+        if not np.allclose(mixing_cov, mixing_cov.T, rtol=1e-10, atol=1e-12 * scale):
+            raise ValueError("spatial_mixing_covariance must be symmetric")
+        mixing_cov = 0.5 * (mixing_cov + mixing_cov.T)
+        eigenvalues = np.linalg.eigvalsh(mixing_cov)
+        eig_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if eigenvalues[0] < -1e-10 * eig_scale:
+            raise ValueError("spatial_mixing_covariance must be positive semidefinite")
+        if (isinstance(spatial_mixing_mc_samples, (bool, np.bool_))
+                or not isinstance(spatial_mixing_mc_samples, (int, np.integer))
+                or spatial_mixing_mc_samples < 20):
+            raise ValueError("spatial_mixing_mc_samples must be an integer >= 20")
+        if (isinstance(spatial_mixing_mc_seed, (bool, np.bool_))
+                or not isinstance(spatial_mixing_mc_seed, (int, np.integer))):
+            raise ValueError("spatial_mixing_mc_seed must be an integer")
+        base_covariance = result.get("parameter_covariance")
+        if (not result.get("primary_outputs_reportable_as_identified")
+                or base_covariance is None):
+            result["spatial_mixing_uncertainty"] = {
+                "supplied": True, "propagated": False,
+                "status": "not_propagated_nominal_solution_not_data_identified",
+                "covariance_shape": list(mixing_cov.shape),
+                "requested_samples": int(spatial_mixing_mc_samples),
+                "successful_samples": 0,
+                "failed_samples": 0,
+                "warning": "Spatial-operator uncertainty is not added to a non-identifiable nominal physical result.",
+            }
+            return result
+
+        rng = np.random.default_rng(int(spatial_mixing_mc_seed))
+        parameter_draws = []
+        failures = {"negative_or_rank_deficient_operator": 0, "fit_or_identifiability_failure": 0}
+        for _ in range(int(spatial_mixing_mc_samples)):
+            try:
+                sampled_h = rng.multivariate_normal(
+                    h.reshape(-1), mixing_cov, check_valid="raise"
+                ).reshape(h.shape)
+                if np.any(sampled_h < 0) or np.linalg.matrix_rank(sampled_h) < min(sampled_h.shape):
+                    failures["negative_or_rank_deficient_operator"] += 1
+                    continue
+                sampled_result = reconstruct_joint_thomson_spatial_spectra(
+                    args[0], args[1], args[2], sampled_h,
+                    **{**fit_kwargs, "regularization_sensitivity_strengths": None},
+                )
+                if (not sampled_result.get("primary_outputs_reportable_as_identified")
+                        or sampled_result.get("parameter_covariance") is None
+                        or sampled_result.get("parameter_order") != result.get("parameter_order")):
+                    failures["fit_or_identifiability_failure"] += 1
+                    continue
+                candidate = sampled_result["optimizer_candidate"]
+                vector_parts = [
+                    np.asarray(candidate["relative_spectral_amplitude_profile"], dtype=float),
+                    np.asarray(candidate["electron_temperature_profile_eV"], dtype=float),
+                    np.asarray(candidate["electron_velocity_projection_profile_m_s"], dtype=float),
+                ]
+                if "kappa_index" in sampled_result["parameter_order"]:
+                    vector_parts.append(np.asarray([candidate["kappa_index"]], dtype=float))
+                vector_parts.append(
+                    np.asarray(sampled_result["detector_background_coefficients"], dtype=float).reshape(-1)
+                )
+                vector = np.concatenate(vector_parts)
+                if vector.size != len(result["parameter_order"]) or not np.all(np.isfinite(vector)):
+                    failures["fit_or_identifiability_failure"] += 1
+                    continue
+                parameter_draws.append(vector)
+            except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError):
+                failures["fit_or_identifiability_failure"] += 1
+
+        minimum_success = max(20, int(np.ceil(0.8 * int(spatial_mixing_mc_samples))))
+        metadata = {
+            "supplied": True,
+            "propagated": False,
+            "status": "insufficient_successful_refits",
+            "covariance_shape": list(mixing_cov.shape),
+            "covariance_parameter_order": [
+                f"spatial_mixing_matrix_row_major_element_{i}" for i in range(h.size)
+            ],
+            "requested_samples": int(spatial_mixing_mc_samples),
+            "successful_samples": len(parameter_draws),
+            "failed_samples": int(spatial_mixing_mc_samples) - len(parameter_draws),
+            "failure_reasons": failures,
+            "minimum_successful_samples": minimum_success,
+            "seed": int(spatial_mixing_mc_seed),
+            "method": "nonlinear_forward_refit_monte_carlo",
+            "covariance_semantics": "external_spatial_operator_parameter_covariance_added_to_data_only_GLS_covariance",
+        }
+        if len(parameter_draws) >= minimum_success:
+            operator_contribution = np.cov(np.asarray(parameter_draws), rowvar=False, ddof=1)
+            total_covariance = np.asarray(base_covariance, dtype=float) + operator_contribution
+            total_covariance = 0.5 * (total_covariance + total_covariance.T)
+            n_nodes = len(result["radius_m"])
+            diagonal = np.maximum(np.diag(total_covariance), 0.0)
+            result["parameter_covariance"] = total_covariance
+            result["profile_parameter_covariance"] = total_covariance[:3*n_nodes, :3*n_nodes].copy()
+            result["relative_spectral_amplitude_uncertainty"] = np.sqrt(diagonal[:n_nodes])
+            result["electron_temperature_uncertainty_profile_eV"] = np.sqrt(diagonal[n_nodes:2*n_nodes])
+            result["electron_temperature_uncertainty_eV"] = result["electron_temperature_uncertainty_profile_eV"]
+            result["electron_velocity_projection_uncertainty_profile_m_s"] = np.sqrt(diagonal[2*n_nodes:3*n_nodes])
+            result["electron_velocity_projection_uncertainty_m_s"] = result["electron_velocity_projection_uncertainty_profile_m_s"]
+            metadata.update({
+                "propagated": True,
+                "status": "propagated_by_nonlinear_refits",
+                "parameter_covariance_contribution": operator_contribution,
+                "total_parameter_covariance": total_covariance,
+            })
+            result["spatial_mixing_operator"] = "researcher_supplied_nominal_forward_operator_with_external_covariance_propagated"
+            result["covariance_decomposition"]["spatial_mixing_covariance"] = "nonlinear_refit_external_operator_contribution"
+            result["parameter_identifiability"]["uncertainty_contributions"] = [
+                "data_only_spectral_GLS",
+                "independently_sampled_spatial_mixing_operator_refits",
+            ]
+            result["uncertainty_semantics"] += (
+                " The reported covariance additionally includes the independently supplied "
+                "spatial-mixing covariance propagated by nonlinear forward refits."
+            )
+        else:
+            metadata["warning"] = (
+                "Too few valid, data-identifiable spatial-operator refits; no spatial-mixing "
+                "uncertainty contribution was added to the reported covariance."
+            )
+        result["spatial_mixing_uncertainty"] = metadata
+        return result
     if selected_model not in {
         "non_collective_maxwellian",
         "non_collective_kappa",

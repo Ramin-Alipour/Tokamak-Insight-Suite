@@ -234,3 +234,20 @@ PROF-07 update (2026-11-04): `thomson_psf_profile_inverse` now supports automati
 
 
 PROF-02 / PROF-03 incremental implementation (2026-11-04): the PSF-aware profile inverse accepts an optional full covariance for row-major elements of the supplied spatial mixing matrix. It propagates this operator uncertainty by first-order differentiation of the regularized normal equations and reports the PSF-only contribution separately from the measurement/regularization covariance. A combined covariance is exposed only for data-only identifiable profiles. The propagation assumes independent measurement and operator errors; their cross-covariance and higher-order PSF effects remain open. The spatial mixing matrix itself remains researcher-supplied and is not inferred from profile data.
+
+
+
+PROF-03 / INT-03 joint spatial-spectral operator uncertainty (2026-11-04): the public
+`reconstruct_thomson_profile_from_spectra(..., joint_spatial_spectral=True)`
+path now accepts a full covariance for row-major elements of the supplied
+detector-channel-by-radial-node mixing matrix. It samples the external operator
+and repeats the complete nonlinear, wavelength-resolved physical fit for each
+valid realization. A covariance contribution is added to the data-only GLS
+parameter covariance only when the nominal solution is data-identifiable and
+at least 80% of the requested refits (with a minimum of 20) remain valid and
+data-identifiable. Negative or rank-deficient sampled operators are rejected;
+insufficient refits are reported without silently substituting zero uncertainty.
+The Dashboard exposes the covariance upload and refit count. This does not
+estimate or calibrate the PSF, does not infer null-space spatial structure, and
+assumes the supplied operator covariance is independent of spectral measurement
+and model-discrepancy errors.
