@@ -157,7 +157,7 @@ def cold_plasma_magnetoionic_modes(
     p_minus = determinant(-1.0)
     c1 = 0.5 * (p_plus - p_minus)
     c2 = 0.5 * (p_plus + p_minus) - c0
-    scale = max(abs(c0), abs(c1), abs(c2), 1.0)
+    scale = max(abs(c0), abs(c1), abs(c2), np.finfo(float).tiny)
     if abs(c2) <= 1e-12 * scale:
         if abs(c1) <= 1e-12 * scale:
             raise ValueError("cold-plasma dispersion polynomial is degenerate at this frequency and direction")
