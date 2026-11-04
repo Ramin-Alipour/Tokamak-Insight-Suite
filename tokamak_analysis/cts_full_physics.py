@@ -37,6 +37,7 @@ from .thomson_evdf import reconstruct_thomson_evdf
 from .thomson_gap_closure import (
     reconstruct_relativistic_projected_thomson_evdf,
     reconstruct_psf_aware_thomson_profile,
+    relativistic_projected_compton_kinematics,
 )
 from .thomson_kinetic_models import (
     infer_gyrotropic_bi_maxwellian_temperatures,
@@ -422,8 +423,9 @@ def run_advanced_thomson_physics(model, **kwargs):
       - thomson_projected_evdf: response-aware non-negative inversion of the
         measured optical Thomson electron feature to its 1-D q-projected VDF;
         absolute density and the unobserved 3-D distribution are not inferred.
-      - thomson_relativistic_projected_evdf: exact relativistic Doppler-kinematic
-        inversion in the zero-photon-recoil Thomson limit.
+      - thomson_relativistic_projected_evdf: exact relativistic projected
+        inversion in the Thomson limit, or exact Compton four-momentum
+        kinematics with polarized Klein-Nishina weighting when recoil is enabled.
       - thomson_psf_profile_inverse: explicit PSF/mixing-aware regularized spatial inversion.
       - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.
       - thomson_three_dimensional_flow: GLS inversion of measured flow projections from three or more independent scattering-vector directions.
@@ -524,6 +526,7 @@ __all__ = [
     "plasma_charge_state_moments",
     "reconstruct_thomson_evdf",
     "reconstruct_relativistic_projected_thomson_evdf",
+    "relativistic_projected_compton_kinematics",
     "reconstruct_psf_aware_thomson_profile",
     "infer_gyrotropic_bi_maxwellian_temperatures",
     "infer_three_dimensional_flow_from_thomson_projections",
