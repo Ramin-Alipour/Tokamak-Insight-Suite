@@ -6445,6 +6445,14 @@
         {
           "name": "validity_screening",
           "unit": "dimensionless beta diagnostics and declared screen"
+        },
+        {
+          "name": "projected_velocity_grid_m_s",
+          "unit": "m s^-1; sorted measured-window velocity grid per view"
+        },
+        {
+          "name": "projected_velocity_distribution_m_s_inverse",
+          "unit": "s m^-1; normalized q-projected marginal evaluated on the measured-window velocity grid"
         }
       ],
       "prerequisites": [
@@ -6458,7 +6466,8 @@
         "Gyrotropic bi-Kappa closure is not an unrestricted measured 3-D EVDF",
         "Parallel/perpendicular temperatures require rank-two pitch-angle design and full-rank spectral Jacobian",
         "Kappa finite-variance domain is strictly greater than 3/2",
-        "The forward fit is withheld when projected thermal rms beta or fitted bulk-flow beta exceeds its declared non-relativistic screen."
+        "The forward fit is withheld when projected thermal rms beta or fitted bulk-flow beta exceeds its declared non-relativistic screen.",
+        "The returned projected distribution is the 1-D marginal along q over the wavelength window; transverse velocity dependence remains a parametric gyrotropic assumption."
       ],
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
