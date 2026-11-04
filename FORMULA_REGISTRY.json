@@ -6124,7 +6124,8 @@
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
-        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen"
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen",
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ],
       "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen."
     },
@@ -6156,7 +6157,8 @@
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
-        "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins"
+        "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ]
     }
   },
