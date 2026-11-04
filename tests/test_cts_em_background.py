@@ -6,6 +6,9 @@ from tokamak_analysis.cts_em_background import (
     thermal_bremsstrahlung_emissivity_si,
     thermal_bremsstrahlung_absorption_si,
     ece_lte_emissivity_si,
+    radiance_to_receiver_spectral_power,
+    propagate_receiver_spectral_power_covariance,
+    integrate_receiver_spectral_power,
 )
 
 
@@ -451,4 +454,106 @@ def test_free_free_absorption_rejects_nonfinite_gaunt_factor(bad_gaunt):
         thermal_bremsstrahlung_absorption_si(
             np.array([100e9]), 1.0e19, np.array([1.0e19]),
             np.array([1.0]), 1000.0, gaunt_factor=bad_gaunt,
+        )
+
+
+
+def test_receiver_spectral_power_uses_etendue_and_efficiency_once():
+    radiance = np.array([2.0e-18, 3.0e-18, 4.0e-18])
+    etendue = 2.5e-4
+    efficiency = 0.4
+    actual = radiance_to_receiver_spectral_power(
+        radiance,
+        receiver_etendue_m2_sr=etendue,
+        end_to_end_efficiency=efficiency,
+    )
+    np.testing.assert_allclose(actual, radiance * etendue * efficiency)
+    assert np.all(actual < radiance * etendue)
+
+
+def test_receiver_spectral_power_covariance_propagates_cross_correlations():
+    radiance = np.array([2.0e-18, 3.0e-18])
+    etendue, efficiency = 2.0e-4, 0.5
+    standard = np.array([1.0e-20, 1.5e-20, 1.0e-6, 0.01])
+    correlation = np.eye(4)
+    correlation[0, 1] = correlation[1, 0] = 0.25
+    correlation[0, 2] = correlation[2, 0] = 0.1
+    covariance = np.outer(standard, standard) * correlation
+    result = propagate_receiver_spectral_power_covariance(
+        radiance,
+        receiver_etendue_m2_sr=etendue,
+        end_to_end_efficiency=efficiency,
+        input_covariance=covariance,
+    )
+    jacobian = result["propagation_jacobian"]
+    expected = jacobian @ covariance @ jacobian.T
+    np.testing.assert_allclose(
+        result["receiver_spectral_power_covariance_W2_Hz2"], expected,
+        rtol=1e-12, atol=0.0,
+    )
+    assert result["receiver_spectral_power_uncertainty_W_Hz"].shape == (2,)
+    assert result["uncertainty_method"] == "first_order_full_joint_covariance_J_C_JT"
+
+
+def test_receiver_spectral_power_covariance_rejects_non_psd_joint_input():
+    radiance = np.array([2.0e-18, 3.0e-18])
+    covariance = np.eye(4)
+    covariance[0, 1] = covariance[1, 0] = 2.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        propagate_receiver_spectral_power_covariance(
+            radiance, receiver_etendue_m2_sr=1.0e-4,
+            end_to_end_efficiency=0.5, input_covariance=covariance,
+        )
+
+
+def test_integrated_receiver_power_uses_nonuniform_frequency_quadrature_and_covariance():
+    frequency = np.array([80.0e9, 100.0e9, 150.0e9])
+    spectral_power = np.array([1.0e-20, 2.0e-20, 1.0e-20])
+    covariance = np.diag(np.array([1.0e-42, 4.0e-42, 1.0e-42]))
+    result = integrate_receiver_spectral_power(
+        frequency, spectral_power,
+        spectral_power_covariance_W2_Hz2=covariance,
+    )
+    weights = np.array([10.0e9, 35.0e9, 25.0e9])
+    np.testing.assert_allclose(result["frequency_integration_weights_Hz"], weights)
+    np.testing.assert_allclose(
+        result["integrated_receiver_power_W"], weights @ spectral_power
+    )
+    np.testing.assert_allclose(
+        result["integrated_receiver_power_uncertainty_W"],
+        np.sqrt(weights @ covariance @ weights),
+    )
+
+
+def test_microwave_background_api_exposes_receiver_power_and_integrated_band_power():
+    from tokamak_analysis.cts_full_physics import analyze_cts_microwave_background
+
+    result = analyze_cts_microwave_background(
+        np.array([90.0e9, 100.0e9, 110.0e9]),
+        np.array([0.1]),
+        np.array([1000.0]),
+        electron_density_m3=np.array([1.0e19]),
+        ion_densities_m3=np.array([[1.0e19]]),
+        ion_charge_states=np.array([1]),
+        receiver_etendue_m2_sr=1.0e-6,
+        end_to_end_efficiency=0.5,
+    )
+    assert result["receiver_conversion_applied_once"] is True
+    assert result["receiver_spectral_power_W_Hz"].shape == (3,)
+    assert result["integrated_receiver_power_W"] > 0.0
+    assert result["receiver_power_uncertainty_status"].startswith("not_propagated")
+
+
+def test_microwave_background_api_requires_receiver_factors_as_a_pair():
+    from tokamak_analysis.cts_full_physics import analyze_cts_microwave_background
+
+    with pytest.raises(ValueError, match="must be supplied together"):
+        analyze_cts_microwave_background(
+            np.array([90.0e9, 100.0e9]),
+            np.array([0.1]),
+            np.array([1000.0]),
+            electron_density_m3=np.array([1.0e19]),
+            ion_densities_m3=np.array([[1.0e19]]),
+            ion_charge_states=np.array([1]),
+            receiver_etendue_m2_sr=1.0e-6,
         )
