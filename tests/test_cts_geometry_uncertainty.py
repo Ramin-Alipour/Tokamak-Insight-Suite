@@ -49,6 +49,7 @@ def test_geometry_uncertainty_refits_and_returns_full_covariance(monkeypatch):
             "conditional_fit_covariance": np.eye(5),
             "instrument_response_parameter_covariance": 0.5 * np.eye(5),
             "fit_covariance": 1.5 * np.eye(5),
+            "parameter_identifiability": {"conditional": []},
         }
 
     monkeypatch.setattr(full_em, "analyze_full_em_cts_spectrum", fake_analyze)
@@ -71,6 +72,12 @@ def test_geometry_uncertainty_refits_and_returns_full_covariance(monkeypatch):
     assert result["ray_geometry_parameter_covariance"].shape == (5, 5)
     assert np.all(np.isfinite(result["fit_covariance"]))
     assert np.all(np.diag(result["fit_covariance"]) >= 1.5)
+    geometry_status = next(
+        item for item in result["parameter_identifiability"]["conditional"]
+        if item["parameter"] == "ray_geometry_uncertainty_contribution"
+    )
+    assert geometry_status["propagated"] is True
+    assert geometry_status["successful_samples"] == 20
 
 
 def test_geometry_uncertainty_rejects_local_mean_only(monkeypatch):
