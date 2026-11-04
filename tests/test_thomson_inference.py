@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from tokamak_analysis.thomson_inference import analyze_thomson_spectra as _analyze_thomson_spectra
+from tokamak_analysis.thomson_inference import (
+    analyze_thomson_spectra as _analyze_thomson_spectra,
+    _gaussian_bin_averaged_shape,
+    _kappa_bin_averaged_shape,
+)
 
 
 def analyze_thomson_spectra(*args, **kwargs):
@@ -13,7 +17,8 @@ def analyze_thomson_spectra(*args, **kwargs):
 def _spectral_case(te_ev, center_nm=532.0, laser_nm=532.0, angle=np.pi/2, n=801):
     x = np.linspace(laser_nm-40.0, laser_nm+40.0, n)
     sigma = 2.0*laser_nm*np.sqrt(te_ev/510998.95069)*np.sin(angle/2.0)
-    y = 1200.0*np.exp(-0.5*((x-center_nm)/sigma)**2)+25.0+0.1*(x-center_nm)
+    feature, _ = _gaussian_bin_averaged_shape(x, 1200.0, center_nm, sigma)
+    y = feature+25.0+0.1*(x-center_nm)
     return x, y, sigma
 
 
@@ -61,7 +66,7 @@ def test_instrument_response_conserves_spectral_power_on_nonuniform_wavelength_g
     u = np.linspace(-40.0, 40.0, 801)
     x = 532.0 + u + 0.002 * u**2
     sigma = 2.0 * 532.0 * np.sqrt(100.0 / 510998.95069) * np.sin(np.pi / 4)
-    intrinsic = 1200.0 * np.exp(-0.5 * ((x - 532.0) / sigma) ** 2)
+    intrinsic, _ = _gaussian_bin_averaged_shape(x, 1200.0, 532.0, sigma)
     background = 25.0 + 0.1 * (x - 532.0)
     response = _asymmetric_lsf(x.size)
     measured = _apply_response(response, intrinsic, x) + background
@@ -205,7 +210,8 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     kappa = 4.0
     df = 2.0*kappa-1.0
     scale = sigma*np.sqrt((df-2.0)/df)
-    y = 900.0*(1.0+((x-532.0)/scale)**2/df)**(-kappa)+20.0
+    feature, _ = _kappa_bin_averaged_shape(x, 900.0, 532.0, sigma, kappa)
+    y = feature+20.0
     out = analyze_thomson_spectra(
         x,y[None,:],[0.15],laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi/2,instrument_response=np.eye(x.size),model="non_collective_kappa",
@@ -446,7 +452,8 @@ def test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_ful
     kappa = 4.0
     df = 2.0 * kappa - 1.0
     scale = sigma * np.sqrt((df - 2.0) / df)
-    signal = 900.0 * (1.0 + ((x - 532.0) / scale) ** 2 / df) ** (-kappa) + 20.0
+    feature, _ = _kappa_bin_averaged_shape(x, 900.0, 532.0, sigma, kappa)
+    signal = feature + 20.0
 
     first = analyze_thomson_spectra(
         x, signal[None, :], [0.1], laser_wavelength_nm=532.0,
@@ -683,7 +690,8 @@ def test_joint_multi_channel_gls_supports_kappa_projected_spectra():
         sigma=2.0*532.0*np.sqrt(te/510998.95069)*np.sin(np.pi/4)
         df=2.0*kappa-1.0
         scale=sigma*np.sqrt((df-2.0)/df)
-        return 900.0*(1.0+((x-532.0)/scale)**2/df)**(-kappa)+20.0
+        feature, _ = _kappa_bin_averaged_shape(x, 900.0, 532.0, sigma, kappa)
+        return feature+20.0
     y=np.vstack([spectrum(100.0),spectrum(150.0)])
     n=x.size
     covariance=np.eye(2*n)*0.4**2
@@ -1277,8 +1285,8 @@ def test_kappa_analysis_accepts_model_discrepancy_covariance():
     kappa = 3.5
     df = 2.0 * kappa - 1.0
     scale = sigma * np.sqrt((df - 2.0) / df)
-    signal = 900.0 * (1.0 + ((wavelength - center) / scale) ** 2 / df) ** (-kappa)
-    signal += 18.0 + 0.015 * (wavelength - center)
+    feature, _ = _kappa_bin_averaged_shape(wavelength, 900.0, center, sigma, kappa)
+    signal = feature + 18.0 + 0.015 * (wavelength - center)
     covariance = np.eye(wavelength.size) * 0.04
     covariance += np.eye(wavelength.size, k=1) * 0.008
     covariance += np.eye(wavelength.size, k=-1) * 0.008
@@ -1367,12 +1375,8 @@ def test_kappa_profile_likelihood_uses_full_spectral_covariance_gls():
     amplitude, center, width, kappa, offset, slope = parameters
     degrees = 2.0 * kappa - 1.0
     student_scale = width * np.sqrt((degrees - 2.0) / degrees)
-    signal = (
-        amplitude
-        * (1.0 + ((wavelength - center) / student_scale) ** 2 / degrees) ** (-kappa)
-        + offset
-        + slope * (wavelength - center)
-    )
+    feature, _ = _kappa_bin_averaged_shape(wavelength, amplitude, center, width, kappa)
+    signal = feature + offset + slope * (wavelength - center)
     correlation = 0.25 ** np.abs(
         np.subtract.outer(np.arange(wavelength.size), np.arange(wavelength.size))
     )
@@ -1405,7 +1409,7 @@ def test_kappa_channel_fit_supports_joint_polynomial_detector_background():
     df = 2.0 * kappa - 1.0
     scale = sigma * np.sqrt((df - 2.0) / df)
     z = 2.0 * (x - x.min()) / np.ptp(x) - 1.0
-    plasma = 900.0 * (1.0 + ((x - 532.0) / scale)**2 / df)**(-kappa)
+    plasma, _ = _kappa_bin_averaged_shape(x, 900.0, 532.0, sigma, kappa)
     measured_background = 20.0 + 2.5*z - 1.2*(0.5*(3.0*z*z - 1.0))
     y = plasma + measured_background
     out = analyze_thomson_spectra(
