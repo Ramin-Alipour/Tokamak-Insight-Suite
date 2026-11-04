@@ -30,7 +30,7 @@ MODEL_LABELS = {
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
     "relativistic_kinetic_ece_profile": "ECE — segment-resolved relativistic gyrotropic kinetic absorption (supplied ray and modes)",
     "relativistic_kinetic_ece": "ECE — local relativistic gyrotropic Vlasov absorption kernel",
-    "microwave_background": "CTS — thermal free-free and explicitly supplied ECE microwave background transfer",
+    "microwave_background": "CTS — thermal free-free/ECE radiative transfer with optional receiver-power and covariance closure",
     "multispecies_thermal_collision_matrix": "CTS — species-resolved thermal Coulomb collision matrix (not a kinetic fluctuation closure)",
     "quantum_fdt": "CTS — symmetrized quantum fluctuation-dissipation spectrum for a supplied causal response",
     "quantum_fdt_unsymmetrized": "CTS — unsymmetrized quantum S-greater spectrum with KMS detailed balance",
@@ -45,6 +45,18 @@ MODEL_LABELS = {
 }
 
 EXAMPLES = {
+    "microwave_background": {
+        "frequency_Hz": [90.0e9, 100.0e9, 110.0e9],
+        "path_length_m": [0.05, 0.05],
+        "electron_temperature_eV": [1500.0, 1500.0],
+        "electron_density_m3": [1.0e19, 1.0e19],
+        "ion_densities_m3": [[1.0e19], [1.0e19]],
+        "ion_charge_states": [1],
+        "gaunt_factor": [1.0, 1.0, 1.0],
+        "incident_radiance_W_m2_sr_Hz": 0.0,
+        "receiver_etendue_m2_sr": 1.0e-6,
+        "end_to_end_efficiency": 0.7
+    },
     "thomson_relativistic_projected_evdf": {
         "wavelength_nm": np.linspace(499.8, 500.2, 81).tolist(),
         "signal": (2.0 + 100.0*np.exp(-0.5*((np.linspace(499.8, 500.2, 81)-500.0)/0.07)**2)).tolist(),
