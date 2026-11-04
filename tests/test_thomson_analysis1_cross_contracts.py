@@ -92,6 +92,14 @@ def test_analysis_1_declares_channelwise_background_basis_and_mj_joint_gls():
     assert "model_discrepancy_covariance" in inspect.signature(analyze_thomson_spectra).parameters
     assert "systematic_covariance" in inspect.signature(analyze_thomson_spectra).parameters
     assert "non_collective_relativistic_maxwell_juttner" in inputs["model"]["unit"]
+    import json
+    diagnostic_records = json.loads(
+        (Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    optical = next(item for item in diagnostic_records if item["diagnostic"] == "Thomson scattering")
+    assert "systematic_covariance" in {
+        item["name"] for item in optical["execution_contract"]["input_specs"]
+    }
     assert "background_model" in inspect.signature(analyze_thomson_spectra).parameters
     parameters = inspect.signature(fit_relativistic_maxwell_juttner_channels).parameters
     assert {
