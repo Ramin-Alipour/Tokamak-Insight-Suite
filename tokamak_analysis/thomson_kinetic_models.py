@@ -318,6 +318,7 @@ def infer_three_dimensional_flow_from_thomson_projections(
     if eigenvalues[0] <= tolerance:
         raise ValueError("projection_covariance_m2_s2 must be positive definite")
     direction_covariance = None
+    supplied_direction_covariance = None
     tangent_projector = np.zeros((3*projections.size, 3*projections.size), dtype=float)
     for view, direction in enumerate(directions):
         tangent_projector[3*view:3*view+3, 3*view:3*view+3] = (
@@ -335,6 +336,7 @@ def infer_three_dimensional_flow_from_thomson_projections(
         if not np.allclose(direction_covariance, direction_covariance.T, rtol=1e-10, atol=1e-12*direction_scale):
             raise ValueError("scattering_vector_covariance must be symmetric")
         direction_covariance = 0.5*(direction_covariance+direction_covariance.T)
+        supplied_direction_covariance = direction_covariance.copy()
         direction_eigenvalues = np.linalg.eigvalsh(direction_covariance)
         direction_tolerance = np.finfo(float).eps*max(direction_covariance.shape)*max(float(direction_eigenvalues[-1]), np.finfo(float).tiny)
         if direction_eigenvalues[0] < -direction_tolerance:
@@ -349,7 +351,8 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "input_velocity_projection_m_s": projections.copy(),
         "input_projection_covariance_m2_s2": covariance.copy(),
         "geometry_uncertainty_included": direction_covariance is not None,
-        "input_scattering_vector_covariance": None if direction_covariance is None else direction_covariance.copy(),
+        "input_scattering_vector_covariance": supplied_direction_covariance,
+        "tangent_plane_scattering_vector_covariance": direction_covariance,
         "geometry_covariance_method": (
             "iterative_first_order_tangent_plane_errors_in_variables_GLS"
             if direction_covariance is not None else "not_supplied"
