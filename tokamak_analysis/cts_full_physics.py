@@ -19,7 +19,10 @@ from .ece_kinetic import (
     relativistic_kinetic_ece_absorption_coefficient,
     solve_relativistic_kinetic_ece_profile,
 )
-from .cts_em_background import (\n    integrate_thermal_microwave_background,\n    plasma_charge_state_moments,\n)
+from .cts_em_background import (
+    integrate_thermal_microwave_background,
+    plasma_charge_state_moments,
+)
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from .cts_stokes_transfer import (
