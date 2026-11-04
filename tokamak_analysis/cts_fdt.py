@@ -1,9 +1,10 @@
-"""Classical fluctuation--dissipation closure for CTS response matrices.
+"""Classical and quantum fluctuation--dissipation closures for CTS responses.
 
-This module implements the *closure*, not a collision operator.  In particular,
-it must only be applied to a causal susceptibility computed with the same
-collision model and equilibrium.  It does not turn BGK or an ad-hoc damping
-width into a Landau calculation.
+These functions implement fluctuation closures, not dielectric susceptibilities
+or collision operators. They must only be applied to causal retarded responses
+computed with the same equilibrium and collision model. A quantum FDT prefactor
+does not turn a classical susceptibility or an ad-hoc damping width into a
+quantum kinetic response.
 """
 from __future__ import annotations
 
