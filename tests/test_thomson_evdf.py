@@ -343,6 +343,8 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
     model = "thomson_projected_evdf"
     assert model in MODEL_LABELS
     configuration = EXAMPLES[model]
+    assert "model_discrepancy_covariance" in configuration
+    assert "systematic_covariance" in configuration
     result = run_advanced_thomson_physics(model, **configuration)
     assert result["public_physics_entrypoint"] == model
     assert result["automatic_model_substitution"] is False
