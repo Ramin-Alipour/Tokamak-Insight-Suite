@@ -75,3 +75,63 @@ def kinetic_ece_absorption_coefficient(
             "The plane-wave flux normalization assumes a homogeneous local mode and does not include beam-envelope energy transport.",
         ],
     }
+
+
+from scipy.constants import Boltzmann as K_B, elementary_charge as E_CHARGE
+
+
+def integrate_kinetic_ece_radiative_transfer(
+    frequency_Hz, segment_length_m, absorption_coefficient_m_inverse,
+    electron_temperature_eV, *, incident_brightness_temperature_K=0.0,
+):
+    """Integrate Rayleigh-Jeans ECE transfer through ordered slab segments.
+
+    The exact piecewise-constant update is Tb_out=Tb_in exp(-alpha L)
+    + Te(1-exp(-alpha L)). Absorption must be non-negative; gain is not
+    silently clipped. This scalar transfer step does not perform ray tracing.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    lengths = np.asarray(segment_length_m, dtype=float)
+    alpha = np.asarray(absorption_coefficient_m_inverse, dtype=float)
+    te = np.asarray(electron_temperature_eV, dtype=float)
+    tb0 = np.asarray(incident_brightness_temperature_K, dtype=float)
+    if f.ndim > 1 or f.size == 0 or np.any(~np.isfinite(f)) or np.any(f <= 0):
+        raise ValueError("frequency_Hz must be positive finite scalar or 1-D array")
+    f = f.reshape(-1)
+    if lengths.ndim != 1 or lengths.size == 0 or np.any(~np.isfinite(lengths)) or np.any(lengths <= 0):
+        raise ValueError("segment_length_m must be a non-empty positive finite vector")
+    if te.shape != lengths.shape or np.any(~np.isfinite(te)) or np.any(te <= 0):
+        raise ValueError("electron_temperature_eV must be positive with one value per segment")
+    if alpha.ndim == 1:
+        if alpha.shape != lengths.shape:
+            raise ValueError("1-D absorption coefficient must match segment_length_m")
+        alpha = np.broadcast_to(alpha[None, :], (f.size, lengths.size)).copy()
+    elif alpha.shape != (f.size, lengths.size):
+        raise ValueError("2-D absorption coefficient must have shape (n_frequency, n_segment)")
+    if np.any(~np.isfinite(alpha)) or np.any(alpha < 0):
+        raise ValueError("absorption coefficients must be finite and non-negative")
+    if (np.any(~np.isfinite(tb0)) or np.any(tb0 < 0) or tb0.ndim > 1
+            or (tb0.ndim == 1 and tb0.shape != f.shape)):
+        raise ValueError("incident brightness must be non-negative scalar or match frequency_Hz")
+    source_K = te * E_CHARGE / K_B
+    tau = alpha * lengths[None, :]
+    brightness = np.broadcast_to(tb0, f.shape).astype(float, copy=True)
+    for j in range(lengths.size):
+        attenuation = np.exp(-tau[:, j])
+        brightness = brightness * attenuation + source_K[j] * (-np.expm1(-tau[:, j]))
+    total_tau = np.sum(tau, axis=1)
+    return {
+        "frequency_Hz": f.copy(),
+        "brightness_temperature_out_K": brightness,
+        "segment_optical_depth": tau,
+        "total_optical_depth": total_tau,
+        "transmission": np.exp(-total_tau),
+        "source_function": "Rayleigh_Jeans_local_thermodynamic_equilibrium",
+        "transfer_solver": "ordered_piecewise_constant_exact_formal_solution",
+        "limitations": [
+            "Uses supplied local kinetic absorption coefficients and segment temperatures.",
+            "Assumes LTE and Rayleigh-Jeans source function.",
+            "No relativistic emissivity, collisional Landau dielectric, or self-consistent ray tracing.",
+            "No polarization conversion or transverse beam evolution in this scalar transfer step.",
+        ],
+    }

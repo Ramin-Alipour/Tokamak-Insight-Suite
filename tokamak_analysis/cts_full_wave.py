@@ -248,3 +248,45 @@ def solve_stratified_full_wave_oblique(
         "mode_conversion": "coherent vector coupling retained; reflected/transmitted Jones amplitudes returned",
         "approximation_scope": "1-D z-stratified local dielectric, oblique plane-wave incidence; no transverse diffraction or 3-D interfaces",
     }
+
+
+def solve_stratified_mode_conversion(
+    omega_rad_s, z_m, epsilon_r, *, kx_rad_m=0.0, ky_rad_m=0.0,
+    rtol=1e-8, atol=1e-10, max_step_m=None,
+):
+    """Construct coherent 2x2 reflected/transmitted Jones matrices.
+
+    Both independent tangential incident polarizations are propagated through
+    the oblique full-vector Berreman boundary-value problem. Matrix columns
+    correspond to incident basis states; off-diagonal terms are polarization
+    conversion amplitudes. The medium remains one-dimensionally stratified.
+    """
+    reflected = np.empty((2, 2), dtype=complex)
+    transmitted = np.empty((2, 2), dtype=complex)
+    diagnostics = []
+    for column in range(2):
+        incident = np.zeros(2, dtype=complex)
+        incident[column] = 1.0
+        result = solve_stratified_full_wave_oblique(
+            omega_rad_s, z_m, epsilon_r,
+            kx_rad_m=kx_rad_m, ky_rad_m=ky_rad_m,
+            incident_amplitude_V_m=incident,
+            rtol=rtol, atol=atol, max_step_m=max_step_m,
+        )
+        reflected[:, column] = result["reflected_electric_amplitude_V_m"]
+        transmitted[:, column] = result["transmitted_electric_amplitude_V_m"]
+        diagnostics.append({
+            "reflectance": result["reflectance"],
+            "transmittance": result["transmittance"],
+            "absorptance": result["absorptance"],
+        })
+    return {
+        "reflected_jones_matrix": reflected,
+        "transmitted_jones_matrix": transmitted,
+        "cross_polarized_reflection_amplitude": reflected[1, 0],
+        "cross_polarized_transmission_amplitude": transmitted[1, 0],
+        "basis_run_power_diagnostics": diagnostics,
+        "solver": "two_basis_oblique_full_vector_Berreman_4x4",
+        "mode_conversion": "coherent_cross_polarized_amplitudes_included",
+        "approximation_scope": "1-D z-stratified local dielectric, oblique plane waves; no transverse diffraction or arbitrary 3-D interfaces",
+    }
