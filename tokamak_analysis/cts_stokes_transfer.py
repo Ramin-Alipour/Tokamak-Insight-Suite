@@ -184,3 +184,91 @@ def propagate_polarized_lte_stokes(
         "coefficient_provenance": "explicit magnetoionic absorption and birefringence coefficients",
     })
     return result
+
+
+def propagate_stratified_polarized_lte_stokes(
+    frequency_Hz,
+    segment_temperature_K,
+    segment_length_m,
+    incident_stokes,
+    *,
+    alpha_I_m_inverse,
+    alpha_Q_m_inverse=0.0,
+    alpha_U_m_inverse=0.0,
+    alpha_V_m_inverse=0.0,
+    rho_Q_m_inverse=0.0,
+    rho_U_m_inverse=0.0,
+    rho_V_m_inverse=0.0,
+):
+    """Propagate through an ordered, piecewise-homogeneous polarized LTE ray.
+
+    Every segment has its own temperature, path length and magnetoionic
+    coefficients. Segment transfer operators are applied in physical ray
+    order; coefficients are never averaged before exponentiation. This
+    retains non-commuting dichroism/Faraday effects between layers.
+    """
+    temperatures = np.asarray(segment_temperature_K)
+    lengths = np.asarray(segment_length_m)
+    if (temperatures.dtype.kind not in "iuf" or lengths.dtype.kind not in "iuf"
+            or temperatures.ndim != 1 or lengths.shape != temperatures.shape
+            or temperatures.size == 0):
+        raise ValueError("segment temperatures and lengths must be matching non-empty real vectors")
+    temperatures = temperatures.astype(float, copy=False)
+    lengths = lengths.astype(float, copy=False)
+    if (np.any(~np.isfinite(temperatures)) or np.any(temperatures <= 0.0)
+            or np.any(~np.isfinite(lengths)) or np.any(lengths <= 0.0)):
+        raise ValueError("segment temperatures and lengths must be positive and finite")
+
+    n = temperatures.size
+    names = (
+        "alpha_I_m_inverse", "alpha_Q_m_inverse", "alpha_U_m_inverse",
+        "alpha_V_m_inverse", "rho_Q_m_inverse", "rho_U_m_inverse",
+        "rho_V_m_inverse",
+    )
+    supplied = {
+        "alpha_I_m_inverse": alpha_I_m_inverse,
+        "alpha_Q_m_inverse": alpha_Q_m_inverse,
+        "alpha_U_m_inverse": alpha_U_m_inverse,
+        "alpha_V_m_inverse": alpha_V_m_inverse,
+        "rho_Q_m_inverse": rho_Q_m_inverse,
+        "rho_U_m_inverse": rho_U_m_inverse,
+        "rho_V_m_inverse": rho_V_m_inverse,
+    }
+    coefficients = {}
+    for name in names:
+        raw = np.asarray(supplied[name])
+        if raw.dtype.kind not in "iuf":
+            raise ValueError(f"{name} must be real numeric scalar or path vector")
+        if raw.ndim == 0:
+            values = np.full(n, float(raw))
+        elif raw.shape == (n,):
+            values = raw.astype(float, copy=False)
+        else:
+            raise ValueError(f"{name} must be scalar or have one value per path segment")
+        if np.any(~np.isfinite(values)):
+            raise ValueError(f"{name} must contain only finite values")
+        coefficients[name] = values
+
+    current = _vector(incident_stokes, "incident_stokes").copy()
+    segment_results = []
+    for index in range(n):
+        local = {
+            name: float(values[index]) for name, values in coefficients.items()
+        }
+        step = propagate_polarized_lte_stokes(
+            frequency_Hz, float(temperatures[index]), current,
+            path_length_m=float(lengths[index]), **local,
+        )
+        current = step["stokes_radiance"]
+        segment_results.append(step)
+    return {
+        "stokes_radiance": current,
+        "I": float(current[0]), "Q": float(current[1]),
+        "U": float(current[2]), "V": float(current[3]),
+        "segment_count": int(n),
+        "segment_results": segment_results,
+        "path_order": "segment_0_to_segment_n_minus_1",
+        "transfer_model": "ordered_piecewise_constant_polarized_LTE_Stokes",
+        "coefficient_averaging": False,
+        "source_closure": "polarized_LTE_Planck_Kirchhoff_per_segment",
+    }
