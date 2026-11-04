@@ -24,7 +24,7 @@ def test_zero_frequency_requires_explicit_slope_and_uses_continuous_limit():
     with pytest.raises(ValueError, match="zero-frequency"):
         density_fluctuation_spectral_matrix(chi, [0.0], 2.0)
     out = density_fluctuation_spectral_matrix(
-        chi, [0.0], 2.0, zero_frequency_imaginary_slope=np.array([[-0.25j]])
+        chi, [0.0], 2.0, zero_frequency_imaginary_slope=np.array([[-0.25]])
     )
     assert out["density_fluctuation_spectral_matrix_m3_s"][0, 0, 0].real == pytest.approx(1.0)
 

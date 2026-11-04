@@ -17,12 +17,12 @@ def density_fluctuation_spectral_matrix(
     S_nn(omega) = -(2 T / omega) Im_H[chi(omega)],
     Im_H[chi] = (chi - chi^H)/(2 i).
 
-    At zero frequency the limit is -2 T d Im_H[chi]/d omega and its slope
-    must be supplied explicitly. No low-frequency floor is invented.
+    At zero frequency the limit is -2 T d Im_H[chi]/d omega. The supplied
+    slope is the Hermitian matrix derivative of Im_H[chi], not d chi/d omega.
     """
     raw = np.asarray(density_response_matrix_m3_per_J)
-    if raw.dtype.kind not in "fc":
-        raise ValueError("density response must be a finite complex-valued array")
+    if raw.dtype.kind not in "iufc":
+        raise ValueError("density response must be a finite numeric array")
     chi = np.asarray(raw, dtype=complex)
     omega = np.asarray(angular_frequency_rad_s, dtype=float)
     temperature = float(temperature_J)
