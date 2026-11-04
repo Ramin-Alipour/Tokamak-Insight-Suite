@@ -22,6 +22,7 @@ from .ece_kinetic import (
 from .cts_em_background import integrate_thermal_microwave_background
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
+from .cts_stokes_transfer import propagate_polarized_lte_stokes
 
 
 def analyze_landau_fdt_cts(
@@ -374,6 +375,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         oblique Berreman solutions.
       - stratified_mode_conversion: coherent Jones reflection/transmission
         matrices for a supplied stratified dielectric.
+      - polarized_lte_stokes: exact constant-coefficient Stokes transfer with
+        dichroic Kirchhoff emissivity and Faraday rotation/conversion.
 
     No physical model is substituted automatically. Equilibrium, geometry,
     dielectric, mode-basis and calibration inputs remain explicit caller data.
@@ -401,12 +404,14 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = solve_polarized_kinetic_ece_with_mode_conversion
     elif model == "stratified_nonparaxial_vector":
         solver = propagate_stratified_nonparaxial_vector_field
+    elif model == "polarized_lte_stokes":
+        solver = propagate_polarized_lte_stokes
     elif model == "stratified_mode_conversion":
         solver = solve_stratified_mode_conversion
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
-            "stratified_nonparaxial_vector, stratified_mode_conversion; "
+            "stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
@@ -426,5 +431,6 @@ __all__ = [
     "analyze_landau_fdt_full_em_constitutive",
     "propagate_stratified_nonparaxial_vector_field",
     "solve_polarized_kinetic_ece_with_mode_conversion",
+    "propagate_polarized_lte_stokes",
     "run_advanced_thomson_physics",
 ]
