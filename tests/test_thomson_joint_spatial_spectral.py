@@ -356,3 +356,63 @@ def test_joint_kappa_inverse_fits_index_and_propagates_its_uncertainty():
     assert out["detector_background_coefficients"].shape == (measured.shape[0], 1)
     assert np.all(np.isfinite(out["detector_background_coefficients"]))
     assert out["detector_background_offset"].shape == (measured.shape[0],)
+
+
+def test_joint_inverse_adds_model_discrepancy_covariance_once_to_measurement_covariance():
+    x, y, r, h, *_ = _synthetic_case()
+    measurement = np.eye(y.size) * 1.0e-4
+    discrepancy = np.eye(y.size) * 3.0e-4
+    base = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=measurement,
+    )
+    combined = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+    )
+    assert combined["noise_model"] == "measurement_plus_model_discrepancy_channel_major_covariance"
+    provenance = combined["spectral_covariance_provenance"]
+    assert provenance["measurement_covariance_supplied"] is True
+    assert provenance["model_discrepancy_covariance_supplied"] is True
+    assert provenance["combined_covariance"] == (
+        "measurement_covariance_plus_independent_model_discrepancy_covariance"
+    )
+    assert provenance["cross_covariance_assumed_zero"] is True
+    np.testing.assert_allclose(
+        combined["parameter_covariance"],
+        4.0 * base["parameter_covariance"],
+        rtol=2e-3, atol=1e-12,
+    )
+
+
+def test_joint_inverse_accepts_discrepancy_only_and_rejects_invalid_discrepancy_covariance():
+    x, y, r, h, *_ = _synthetic_case()
+    discrepancy = np.eye(y.size) * 2.0e-4
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        model_discrepancy_covariance=discrepancy,
+    )
+    assert out["noise_model"] == "model_discrepancy_only_channel_major_covariance"
+    assert out["spectral_covariance_provenance"]["measurement_covariance_supplied"] is False
+    assert out["spectral_covariance_provenance"]["model_discrepancy_covariance_supplied"] is True
+
+    invalid = np.eye(y.size)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+            model_discrepancy_covariance=invalid,
+        )
+
+    singular = np.zeros((y.size, y.size))
+    with pytest.raises(ValueError, match="combined spectral covariance must be positive definite"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+            model_discrepancy_covariance=singular,
+        )

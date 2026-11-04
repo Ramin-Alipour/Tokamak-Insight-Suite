@@ -404,6 +404,7 @@ def reconstruct_thomson_profile_from_spectra(
         allowed_joint = {"model", "laser_wavelength_nm", "scattering_angle_rad",
                          "instrument_response", "laser_spectrum_wavelength_nm",
                          "laser_spectrum_density_per_nm", "signal_uncertainty", "joint_spectral_covariance",
+                         "model_discrepancy_covariance",
                          "kappa_index", "fit_kappa_index", "incident_polarization",
                          "radial_order", "angular_order", "maximum_recoil_correction_fraction",
                          "include_compton_recoil"}
@@ -420,6 +421,7 @@ def reconstruct_thomson_profile_from_spectra(
             laser_spectrum_density_per_nm=kwargs.get("laser_spectrum_density_per_nm"),
             signal_uncertainty=kwargs.get("signal_uncertainty"),
             joint_spectral_covariance=kwargs.get("joint_spectral_covariance"),
+            model_discrepancy_covariance=kwargs.get("model_discrepancy_covariance"),
             regularization_strength=spatial_regularization_strength,
             background_model=spatial_background_model,
             background_degree=spatial_background_degree,

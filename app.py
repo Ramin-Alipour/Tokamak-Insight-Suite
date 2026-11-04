@@ -949,13 +949,11 @@ elif page=='Spectral Analysis':
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
-            model_discrepancy_covariance_upload=None
-            if not joint_spatial_spectral:
-                model_discrepancy_covariance_upload=st.file_uploader(
-                    'Optional full channel-major model-discrepancy covariance CSV (Nchannel × Nλ square matrix)',
-                    type=['csv','txt'],key='ts_infer_model_discrepancy_covariance',
-                    help='Supply the complete calibrated spectral model-discrepancy covariance, including cross-channel blocks. It is added to measurement covariance before GLS; do not include measurement noise again.',
-                )
+            model_discrepancy_covariance_upload=st.file_uploader(
+                'Optional full channel-major model-discrepancy covariance CSV (Nchannel × Nλ square matrix)',
+                type=['csv','txt'],key='ts_infer_model_discrepancy_covariance',
+                help='Supply the complete calibrated spectral model-discrepancy covariance, including cross-channel blocks. It is added once to measurement covariance before GLS; for joint spatial-spectral inference this matrix covers all measured channel-wavelength samples.',
+            )
             channel_background_model='linear'
             channel_background_degree=2
             channel_background_interior_knots=3

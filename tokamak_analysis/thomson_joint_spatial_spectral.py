@@ -144,6 +144,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
+    model_discrepancy_covariance=None,
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
@@ -217,22 +218,78 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("regularization_strength must be finite and non-negative")
     if signal_uncertainty is not None and joint_spectral_covariance is not None:
         raise ValueError("supply signal_uncertainty or joint_spectral_covariance, not both")
+
+    measurement_covariance = None
+    measurement_covariance_source = "not_supplied"
     if joint_spectral_covariance is not None:
-        cov = _real_array(joint_spectral_covariance, "joint_spectral_covariance")
-        if cov.shape != (m*nlam, m*nlam) or not np.all(np.isfinite(cov)) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-13):
-            raise ValueError("joint_spectral_covariance must be finite, symmetric, and channel-major")
+        measurement_covariance = _real_array(
+            joint_spectral_covariance, "joint_spectral_covariance"
+        )
+        if (measurement_covariance.shape != (m*nlam, m*nlam)
+                or not np.all(np.isfinite(measurement_covariance))
+                or not np.allclose(measurement_covariance, measurement_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "joint_spectral_covariance must be finite, symmetric, and channel-major"
+            )
+        measurement_covariance = 0.5 * (
+            measurement_covariance + measurement_covariance.T
+        )
         try:
-            chol = np.linalg.cholesky(cov)
+            np.linalg.cholesky(measurement_covariance)
         except np.linalg.LinAlgError as exc:
-            raise ValueError("joint_spectral_covariance must be positive definite") from exc
-        whiten = lambda v: np.linalg.solve(chol, np.asarray(v).reshape(-1))
-        noise_model = "full_channel_major_joint_spectral_covariance"
+            raise ValueError(
+                "joint_spectral_covariance must be positive definite"
+            ) from exc
+        measurement_covariance_source = "full_channel_major_joint_spectral_covariance"
     elif signal_uncertainty is not None:
         sigma = _real_array(signal_uncertainty, "signal_uncertainty")
         if sigma.shape != y.shape or not np.all(np.isfinite(sigma)) or np.any(sigma <= 0):
             raise ValueError("signal_uncertainty must be positive, finite, and match measured_spectra")
-        whiten = lambda v: (np.asarray(v) / sigma).reshape(-1)
-        noise_model = "independent_pointwise_spectral_uncertainty"
+        measurement_covariance = np.diag(np.square(sigma.reshape(-1)))
+        measurement_covariance_source = "independent_pointwise_spectral_uncertainty"
+
+    discrepancy = None
+    if model_discrepancy_covariance is not None:
+        discrepancy = _real_array(
+            model_discrepancy_covariance, "model_discrepancy_covariance"
+        )
+        if (discrepancy.shape != (m*nlam, m*nlam)
+                or not np.all(np.isfinite(discrepancy))
+                or not np.allclose(discrepancy, discrepancy.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "model_discrepancy_covariance must be finite, symmetric, and channel-major"
+            )
+        discrepancy = 0.5 * (discrepancy + discrepancy.T)
+        discrepancy_eigenvalues = np.linalg.eigvalsh(discrepancy)
+        discrepancy_scale = max(
+            float(np.max(np.abs(discrepancy_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if discrepancy_eigenvalues[0] < -1e-10 * discrepancy_scale:
+            raise ValueError(
+                "model_discrepancy_covariance must be positive semidefinite"
+            )
+
+    total_spectral_covariance = None
+    if measurement_covariance is not None or discrepancy is not None:
+        if measurement_covariance is None:
+            total_spectral_covariance = discrepancy.copy()
+            noise_model = "model_discrepancy_only_channel_major_covariance"
+        elif discrepancy is None:
+            total_spectral_covariance = measurement_covariance.copy()
+            noise_model = measurement_covariance_source
+        else:
+            total_spectral_covariance = measurement_covariance + discrepancy
+            noise_model = "measurement_plus_model_discrepancy_channel_major_covariance"
+        try:
+            chol = np.linalg.cholesky(total_spectral_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "combined spectral covariance must be positive definite; no silent jitter is applied"
+            ) from exc
+        whiten = lambda v: np.linalg.solve(chol, np.asarray(v).reshape(-1))
     else:
         scale = max(float(np.std(y)), float(np.max(np.abs(y))) * 1e-12, np.finfo(float).tiny)
         whiten = lambda v: np.asarray(v).reshape(-1) / scale
@@ -572,6 +629,30 @@ def reconstruct_joint_thomson_spatial_spectra(
         "regularization": {"kind": "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude",
                            "strength": lam_reg, "user_selected": True},
         "noise_model": noise_model,
+        "spectral_covariance_provenance": {
+            "measurement_covariance_source": measurement_covariance_source,
+            "measurement_covariance_supplied": measurement_covariance is not None,
+            "model_discrepancy_covariance_supplied": discrepancy is not None,
+            "model_discrepancy_covariance_shape": (
+                list(discrepancy.shape) if discrepancy is not None else None
+            ),
+            "model_discrepancy_covariance_trace": (
+                float(np.trace(discrepancy)) if discrepancy is not None else None
+            ),
+            "combined_covariance": (
+                "measurement_covariance_plus_independent_model_discrepancy_covariance"
+                if measurement_covariance is not None and discrepancy is not None
+                else "model_discrepancy_covariance_only"
+                if measurement_covariance is None and discrepancy is not None
+                else "measurement_covariance_only"
+                if measurement_covariance is not None
+                else "unweighted_residual_scaled"
+            ),
+            "cross_covariance_assumed_zero": bool(
+                measurement_covariance is not None and discrepancy is not None
+            ),
+            "silent_jitter_or_eigenvalue_clipping": False,
+        },
         "background_contract": {
             "model": background_model,
             "coefficient_count_per_channel": n_background,

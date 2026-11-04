@@ -196,3 +196,22 @@ TS-10 full-tail Kappa susceptibility upgrade (2026-11-04): `kappa_electron_susce
 
 
 TS-10 resonant quadrature stabilization (2026-11-04): the full-axis Kappa Landau integral is evaluated in thermal-speed coordinates, with the narrow resonant interval explicitly transformed by `t=(v-v_phi)/eta` and split from the two non-resonant tails. This prevents a direct infinite-interval adaptive quadrature from skipping a narrow Lorentzian when the supplied positive pole displacement is much smaller than the thermal speed. Real and imaginary quadrature error estimates are rescaled to SI units before reporting. The retarded imaginary contribution is covered by a sign/non-zero regression assertion.
+
+
+Optical joint spatial-spectral model-discrepancy propagation (2026-11-04): the
+measured-spectrum spatial inverse now accepts a full channel-major
+`model_discrepancy_covariance` alongside either pointwise measurement
+uncertainties or the full measurement covariance. The two independent
+covariance components are added exactly once before Cholesky whitening; a
+discrepancy-only weighting is allowed only when that covariance is positive
+definite. The discrepancy component must be finite, symmetric and positive
+semidefinite; the measurement covariance retains its positive-definite
+requirement. No eigenvalue clipping or numerical jitter is applied. The result
+reports covariance provenance, trace, combination rule and the zero
+measurement/discrepancy cross-covariance assumption. The workflow API, profile
+reconstruction registry contract, and Thomson Dashboard uploader are connected
+to the same input. Regression tests cover covariance addition, parameter-
+covariance scaling, discrepancy-only weighting and invalid/singular matrices.
+This closes one end-to-end covariance-propagation gap; it does not infer
+discrepancy from residuals or establish the remaining OPT/PROF/CTS
+requirements. CI on the resulting commit must still be checked.

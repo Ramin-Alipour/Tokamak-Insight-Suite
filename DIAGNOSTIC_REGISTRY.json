@@ -7098,6 +7098,12 @@
           "unit": "n_channels x n_channels; m^2",
           "required": false,
           "description": "Optional supplied covariance of the measured channel radial coordinates. Must be finite, symmetric and positive semidefinite; propagated jointly with profile-value uncertainty by Monte Carlo. It does not infer equilibrium mapping or flux coordinates."
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "full channel-major spectral-intensity covariance",
+          "required": false,
+          "description": "Optional finite symmetric positive-semidefinite covariance of optical forward-model discrepancy, shaped (Nchannel × Nλ, Nchannel × Nλ) in channel-major order. It is added once to the supplied measurement covariance; cross-covariance with measurement noise is assumed zero. It may be used alone only when positive definite."
         }
       ],
       "output_specs": [
