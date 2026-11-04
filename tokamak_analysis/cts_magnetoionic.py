@@ -30,8 +30,7 @@ def _real_scalar(value, name, *, positive=False, nonnegative=False):
 
 
 def cold_plasma_dielectric_tensor(
-    frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
-    magnetic_field_direction=(0.0, 0.0, 1.0),
+    frequency_Hz, magnetic_field_T, species: Sequence[Mapping],
 ) -> dict:
     """Return the cold-plasma Stix dielectric tensor for exp(-i omega t).
 
@@ -48,16 +47,13 @@ def cold_plasma_dielectric_tensor(
     """
     f = _real_scalar(frequency_Hz, "frequency_Hz", positive=True)
     b = np.asarray(magnetic_field_T)
-    direction = np.asarray(magnetic_field_direction, dtype=float)
     if b.dtype.kind not in "iuf" or b.shape != (3,) or np.any(~np.isfinite(b)):
         raise ValueError("magnetic_field_T must be a finite real 3-vector")
-    if direction.shape != (3,) or np.any(~np.isfinite(direction)):
-        raise ValueError("magnetic_field_direction must be a finite real 3-vector")
-    bnorm = float(np.linalg.norm(b.astype(float)))
-    dnorm = float(np.linalg.norm(direction))
-    if bnorm <= 0.0 or dnorm <= 0.0:
-        raise ValueError("magnetic field and its direction must be non-zero")
-    direction = direction / dnorm
+    b = b.astype(float, copy=False)
+    bnorm = float(np.linalg.norm(b))
+    if bnorm <= 0.0:
+        raise ValueError("magnetic_field_T must be non-zero")
+    direction = b / bnorm
     if not isinstance(species, Sequence) or isinstance(species, (str, bytes)) or not species:
         raise ValueError("species must be a non-empty sequence of species mappings")
     omega = 2.0 * np.pi * f
@@ -133,7 +129,6 @@ def cold_plasma_dielectric_tensor(
 def cold_plasma_magnetoionic_modes(
     frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
     wave_normal_direction=(0.0, 0.0, 1.0),
-    magnetic_field_direction=(0.0, 0.0, 1.0),
 ) -> dict:
     """Solve the two local cold-plasma refractive-index branches.
 
@@ -144,7 +139,6 @@ def cold_plasma_magnetoionic_modes(
     """
     dielectric = cold_plasma_dielectric_tensor(
         frequency_Hz, magnetic_field_T, species,
-        magnetic_field_direction=magnetic_field_direction,
     )
     nhat = np.asarray(wave_normal_direction, dtype=float)
     if nhat.shape != (3,) or np.any(~np.isfinite(nhat)) or np.linalg.norm(nhat) <= 0.0:
