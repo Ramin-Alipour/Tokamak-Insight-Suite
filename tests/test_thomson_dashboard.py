@@ -263,3 +263,13 @@ def test_n_population_thomson_dashboard_exposes_model_inputs():
     assert any(item.label.startswith("Initial population temperatures") for item in app.text_input)
     assert any(item.label.startswith("Initial population number fractions") for item in app.text_input)
     assert not app.exception, [str(error.value) for error in app.exception]
+
+
+def test_thomson_dashboard_displays_model_domain_diagnostics():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "Optical Thomson physical-model validity by channel" in source
+    assert "domain_status" in source
+    assert "theta_e_status" in source
+    assert "beta_status" in source

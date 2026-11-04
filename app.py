@@ -1435,6 +1435,27 @@ elif page=='Spectral Analysis':
                         })
                     st.markdown('**Thomson spectral-distribution diagnostics**')
                     st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
+                    validity_rows=[]
+                    for channel in result['channels']:
+                        validity=channel.get('model_validity',{})
+                        checks={item.get('name'):item for item in validity.get('checks',[])}
+                        theta=checks.get('thermal_relativistic_parameter',{})
+                        beta=checks.get('bulk_flow_beta',{})
+                        kappa=checks.get('finite_variance_kappa_domain',{})
+                        validity_rows.append({
+                            'channel_index':channel.get('channel_index'),
+                            'radius_m':channel.get('radius_m'),
+                            'model':validity.get('model'),
+                            'domain_status':validity.get('status'),
+                            'theta_e':theta.get('value'),
+                            'theta_e_status':theta.get('status'),
+                            'abs_beta_parallel':beta.get('value'),
+                            'beta_status':beta.get('status'),
+                            'kappa_domain_status':kappa.get('status'),
+                        })
+                    st.markdown('**Optical Thomson physical-model validity by channel**')
+                    st.dataframe(pd.DataFrame(validity_rows),width="stretch")
+                    st.caption('Non-relativistic theta_e and beta screens are conservative asymptotic diagnostics, not universal physical boundaries. Maxwell-Juttner thermal/flow effects are treated by its relativistic model; a screen warning never triggers automatic model substitution.')
     
                     # The parent physical fit also returns a model-conditional,
                     # one-dimensional electron-velocity marginal for each channel.
