@@ -67,3 +67,14 @@ def test_kappa_coverage_can_be_relaxed_only_by_explicit_user_choice():
     result = kappa_electron_susceptibility(**parameters)
     assert result["velocity_grid_probability_coverage"] < 0.99
     assert result["minimum_velocity_grid_probability_coverage"] == 0.5
+
+
+def test_kappa_susceptibility_is_reachable_through_public_advanced_physics_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "kappa_electrostatic_susceptibility", **args()
+    )
+    assert result["public_physics_entrypoint"] == "kappa_electrostatic_susceptibility"
+    assert result["automatic_model_substitution"] is False
+    assert result["velocity_grid_probability_coverage"] >= 0.999
