@@ -18,7 +18,7 @@ from .thomson_kinetic_models import (
 
 def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
                                 phase_velocity_m_s, *, pole_imaginary_part_m_s=None,
-                                pole_order=1):
+                                pole_order=1, include_finite_support_boundary_terms=True):
     """Evaluate integral f'(v)/(v-zeta) dv for a tabulated projected VDF.
 
     f is linearly interpolated on the supplied velocity grid, so f' is
@@ -42,6 +42,8 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
     if isinstance(pole_order, (bool, np.bool_)) or int(pole_order) != pole_order or int(pole_order) < 1:
         raise ValueError("pole_order must be a positive integer")
     pole_order = int(pole_order)
+    if not isinstance(include_finite_support_boundary_terms, (bool, np.bool_)):
+        raise ValueError("include_finite_support_boundary_terms must be boolean")
     eta = (1e-6 * float(np.median(np.diff(v))) if pole_imaginary_part_m_s is None
            else float(pole_imaginary_part_m_s))
     if not np.isfinite(eta) or eta <= 0:
@@ -69,7 +71,7 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
     boundary_integral = (
         float(f[0]) / (complex(v[0], 0.0) - zeta) ** pole_order
         - float(f[-1]) / (complex(v[-1], 0.0) - zeta) ** pole_order
-    )
+    ) if include_finite_support_boundary_terms else 0.0j
     integral += boundary_integral
     if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
         raise ValueError("generalized Landau integral is non-finite")
@@ -82,7 +84,12 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
         "pole_imaginary_part_m_s": eta,
         "quadrature": "analytic_piecewise_linear_derivative_integral_plus_distributional_finite_support_endpoint_jumps",
         "pole_order": pole_order,
-        "finite_support_extension": "zero_outside_tabulated_velocity_interval",
+        "finite_support_extension": (
+            "zero_outside_tabulated_velocity_interval_with_distributional_endpoint_jumps"
+            if include_finite_support_boundary_terms else
+            "finite_interval_truncation_of_an_analytic_nonzero_tail; endpoint_jumps_omitted"
+        ),
+        "finite_support_boundary_terms_included": bool(include_finite_support_boundary_terms),
         "limitation": "one complex pole per call; finite velocity support and positive pole displacement are explicit numerical inputs",
     }
 
