@@ -209,7 +209,10 @@ def reconstruct_thomson_evdf(
         matrix = matrix.astype(float, copy=False)
         if matrix.shape != (measured.size, measured.size) or not np.all(np.isfinite(matrix)):
             raise ValueError(f"{name} must be a finite square matrix matching signal")
-        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12 * max(float(np.max(np.abs(matrix))), 1.0)):
+        covariance_scale = max(float(np.max(np.abs(matrix))), np.finfo(float).tiny)
+        if not np.allclose(
+            matrix, matrix.T, rtol=1e-10, atol=1e-12 * covariance_scale
+        ):
             raise ValueError(f"{name} must be symmetric")
         matrix = 0.5 * (matrix + matrix.T)
         eigenvalues = np.linalg.eigvalsh(matrix)
