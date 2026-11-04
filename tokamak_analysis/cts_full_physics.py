@@ -26,6 +26,10 @@ from .cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
 )
+from .cts_magnetoionic import (
+    cold_plasma_dielectric_tensor,
+    cold_plasma_magnetoionic_modes,
+)
 
 
 def analyze_landau_fdt_cts(
@@ -382,6 +386,9 @@ def run_advanced_thomson_physics(model, **kwargs):
         dichroic Kirchhoff emissivity and Faraday rotation/conversion.
       - stratified_polarized_lte_stokes: ordered segment-by-segment polarized
         LTE ray transfer; non-commuting layer operators are not averaged.
+      - cold_plasma_dielectric: local multispecies Stix R/L/S/D/P tensor.
+      - cold_plasma_magnetoionic_modes: two local cold-plasma n^2 branches
+        and electric polarization eigenvectors for a supplied wave-normal.
 
     No physical model is substituted automatically. Equilibrium, geometry,
     dielectric, mode-basis and calibration inputs remain explicit caller data.
@@ -415,10 +422,15 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = propagate_stratified_polarized_lte_stokes
     elif model == "stratified_mode_conversion":
         solver = solve_stratified_mode_conversion
+    elif model == "cold_plasma_dielectric":
+        solver = cold_plasma_dielectric_tensor
+    elif model == "cold_plasma_magnetoionic_modes":
+        solver = cold_plasma_magnetoionic_modes
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
-            "stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes; "
+            "stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
@@ -440,5 +452,7 @@ __all__ = [
     "solve_polarized_kinetic_ece_with_mode_conversion",
     "propagate_polarized_lte_stokes",
     "propagate_stratified_polarized_lte_stokes",
+    "cold_plasma_dielectric_tensor",
+    "cold_plasma_magnetoionic_modes",
     "run_advanced_thomson_physics",
 ]
