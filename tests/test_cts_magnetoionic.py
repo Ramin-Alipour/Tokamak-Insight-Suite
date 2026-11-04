@@ -369,6 +369,12 @@ def test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_deriva
     assert result["group_velocity_m_s"][1] == pytest.approx(0.0, abs=1e-7)
     assert result["wave_normal_to_ray_walkoff_angle_rad"] == pytest.approx(0.0, abs=1e-7)
     assert 0.0 < result["group_speed_m_s"] < c
+    assert result["brillouin_energy_density_J_m3_per_V2_m2"] > 0.0
+    np.testing.assert_allclose(
+        result["energy_velocity_m_s"], result["group_velocity_m_s"],
+        rtol=3e-4, atol=1e-5,
+    )
+    assert result["relative_group_energy_velocity_difference"] < 3e-4
 
 
 def test_oblique_magnetoionic_group_velocity_reports_ray_walkoff():
