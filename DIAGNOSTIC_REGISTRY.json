@@ -4789,7 +4789,7 @@
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
     "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family. Electrostatic CTS optionally fits a fixed detector-space PCA nuisance background from explicitly supplied calibrated background-only reference spectra on the same frequency grid; the number of retained components is researcher-selected. The Full-EM branch does not accept this option. Scattering-volume samples may additionally carry externally prescribed electron_density_relative, electron_temperature_relative and ion_temperature_relative factors, plus sample-local species/flow/polarization overrides.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; full-wave diffraction-resolved mode conversion and absolute received-power normalization remain outside scope; the available ray/beam covariance propagation is paraxial and conditional on supplied Hessians or ABCD maps. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; the reference-ensemble basis covariance is bootstrapped and propagated to plasma-parameter covariance by repeated reference resampling/refits when enough fits succeed and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948). The ordinary bulk Full-EM inverse treats per-sample relative plasma factors as fixed inputs; a separate spatial-profile inverse fits node-wise relative density, electron-temperature and optional ion-temperature profiles with a full cross-node/profile covariance when the data-only Jacobian is identifiable. Covariance of externally prescribed per-sample factors remains outside that forward-input contract. Electrostatic and Full-EM measured-spectrum inversions accept an independent additive model-discrepancy covariance; the Full-EM branch combines it with measurement covariance before GLS and does not infer measurement/discrepancy cross-covariance. Other independent operators include correlated GP covariance construction for electrostatic CTS, bootstrap covariance of the reference-PCA mean/basis, propagated to plasma-parameter covariance by repeated reference resampling/refits when the success threshold is met, free-free plus LTE ECE radiative transfer with externally supplied mode-resolved ECE absorption, and Full-EM nonlinear gyrotropic electron/fast-ion shape inversion conditional on fixed bulk plasma and geometry. Paraxial beam covariance is propagated only through supplied symplectic ABCD maps; full dispersion-Hessian quasi-optics is not derived internally. A 6-D ray phase-space covariance can now be propagated from the local cold-plasma dispersion Hessian along a continuous non-degenerate eigenmode branch; the 4-D alternative uses supplied symplectic ABCD maps. This is paraxial Gaussian phase-space propagation, not a full vector quasi-optical mode-conversion solver. The optional collisional correction is a weak-coupling Spitzer/Krook resonance-width approximation with externally supplied Coulomb logarithm, not a conserving linearized Landau operator; fast nonthermal populations and velocity-space redistribution are not collisionally evolved. Ion-ion collision rates in the optional Spitzer/Krook branch currently include only each species' self-collision contribution; cross-species ion-ion collision terms are not yet included.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; full-wave diffraction-resolved mode conversion and absolute received-power normalization remain outside scope; the available ray/beam covariance propagation is paraxial and conditional on supplied Hessians or ABCD maps. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; the reference-ensemble basis covariance is bootstrapped and propagated to plasma-parameter covariance by repeated reference resampling/refits when enough fits succeed and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948). The ordinary bulk Full-EM inverse treats per-sample relative plasma factors as fixed inputs; a separate spatial-profile inverse fits node-wise relative density, electron-temperature and optional ion-temperature profiles with a full cross-node/profile covariance when the data-only Jacobian is identifiable. Covariance of externally prescribed per-sample factors remains outside that forward-input contract. Electrostatic and Full-EM measured-spectrum inversions accept an independent additive model-discrepancy covariance; the Full-EM branch combines it with measurement covariance before GLS and does not infer measurement/discrepancy cross-covariance. Other independent operators include correlated GP covariance construction for electrostatic CTS, bootstrap covariance of the reference-PCA mean/basis, propagated to plasma-parameter covariance by repeated reference resampling/refits when the success threshold is met, free-free plus LTE ECE radiative transfer with externally supplied mode-resolved ECE absorption, and Full-EM nonlinear gyrotropic electron/fast-ion shape inversion conditional on fixed bulk plasma and geometry. Paraxial beam covariance is propagated only through supplied symplectic ABCD maps; full dispersion-Hessian quasi-optics is not derived internally. A 6-D ray phase-space covariance can now be propagated from the local cold-plasma dispersion Hessian along a continuous non-degenerate eigenmode branch; the 4-D alternative uses supplied symplectic ABCD maps. This is paraxial Gaussian phase-space propagation, not a full vector quasi-optical mode-conversion solver. The optional collisional correction is a weak-coupling Spitzer/Krook resonance-width approximation with externally supplied Coulomb logarithm, not a conserving linearized Landau operator; fast nonthermal populations and velocity-space redistribution are not collisionally evolved. Ion-ion collision rates in the optional Spitzer/Krook branch currently include only each species' self-collision contribution; cross-species ion-ion collision terms are not yet included. The microwave-background API additionally reports Planck and Rayleigh-Jeans brightness temperatures from computed radiance (not electron temperature), converts radiance to receiver spectral power using measured etendue and efficiency when both are supplied, propagates the complete supplied radiance/etendue/efficiency covariance including cross terms, and integrates receiver spectral power over the nonuniform measured frequency grid with covariance propagation. The conversion is applied exactly once.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -4812,7 +4812,10 @@
       "tokamak_analysis.cts_em_geometry.gaussian_beam_overlap_transverse",
       "tokamak_analysis.cts_spatial_inference.analyze_full_em_cts_spatial_profiles",
       "tokamak_analysis.cts_kappa.kappa_electron_susceptibility",
-      "tokamak_analysis.cts_full_em.spitzer_cts_collision_frequencies"
+      "tokamak_analysis.cts_full_em.spitzer_cts_collision_frequencies",
+      "tokamak_analysis.cts_em_background.propagate_receiver_spectral_power_covariance",
+      "tokamak_analysis.cts_em_background.integrate_receiver_spectral_power",
+      "tokamak_analysis.cts_em_background.brightness_temperature_from_radiance"
     ],
     "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. The standard bulk-parameter optimizer does not infer an arbitrary relativistic electron VDF; a separate nonlinear tabulated gyrotropic VDF-shape inverse is available conditional on fixed bulk parameters, geometry, response and population density. Explicit stationary/drifted Maxwell-Juttner, bi-Gaussian and tabulated gyrotropic distributions are supported by the forward kinetic solver. Fast-ion distributions supplied to inversion remain fixed external inputs. Full-EM inversion additionally supports joint Monte Carlo propagation of explicitly supplied local magnetic-field, incident/scattered direction and complex polarization covariance for local (non-ray-resolved) geometry. Frequency-resolved ray/equilibrium/beam covariance and cross-covariance between distinct external covariance sources remain unsupported and are reported as such. Full-EM measured-spectrum inversion now accepts an independent additive model_discrepancy_covariance and combines it with supplied measurement covariance before GLS; discrepancy-only weighting is explicitly labelled, and singular total covariance is rejected without silent regularization. Spatially varying Full-EM profile inversion is available through the dedicated spatial-profile mode; it uses node-wise local Full-EM kinetic evaluations and reports identifiability-conditioned profile covariance. Full-EM relativistic electron propagation includes a Lorentz-boosted drifted Maxwell-Juttner equilibrium with chain-rule momentum derivatives; drift is encoded in the VDF, not as a second frequency shift. Optional Full-EM thermal-species collision corrections now compute species-resolved Spitzer electron-ion and ion-ion/electron-ion rates from an explicitly supplied Coulomb logarithm and add those rates to the magnetized Maxwellian resonance denominators using a declared non-conserving Krook approximation; it is not a full Landau collision operator.",
     "execution_contract": {
@@ -5186,6 +5189,24 @@
           "required": false,
           "description": "Full-EM only: optional species-resolved weak-coupling Spitzer collision rates. The externally supplied Coulomb logarithm is used to calculate electron-ion and ion-ion/electron-ion momentum-transfer frequencies, added to the thermal Maxwellian kinetic resonance denominators as a species-resolved Krook width. This is not a conserving linearized Landau collision operator; neutral collisions, strong coupling, relativistic collision corrections and velocity-space redistribution are omitted.",
           "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "receiver_etendue_m2_sr",
+          "unit": "m^2 sr",
+          "required": false,
+          "description": "Measured receiver A*Omega at the radiative-transfer reference plane; must be supplied with end_to_end_efficiency to request receiver-plane spectral power."
+        },
+        {
+          "name": "end_to_end_efficiency",
+          "unit": "dimensionless; (0,1]",
+          "required": false,
+          "description": "Measured total downstream power efficiency, applied once after radiance-to-etendue conversion."
+        },
+        {
+          "name": "receiver_input_covariance",
+          "unit": "(n_frequency+2) x (n_frequency+2)",
+          "required": false,
+          "description": "Optional full covariance ordered as [all spectral-radiance bins, receiver etendue, end-to-end efficiency], including supplied cross-covariances."
         }
       ],
       "output_specs": [
@@ -5876,6 +5897,36 @@
           "name": "collision_frequencies_s_inverse",
           "unit": "s^-1 by thermal species",
           "description": "Optional Spitzer/Krook resonance rates; present only when collisional_model is supplied."
+        },
+        {
+          "name": "planck_brightness_temperature_K",
+          "unit": "K",
+          "description": "Equivalent Planck brightness temperature calculated from returned spectral radiance; not the local electron temperature."
+        },
+        {
+          "name": "rayleigh_jeans_brightness_temperature_K",
+          "unit": "K",
+          "description": "Rayleigh-Jeans equivalent brightness temperature calculated from returned spectral radiance."
+        },
+        {
+          "name": "receiver_spectral_power_W_Hz",
+          "unit": "W Hz^-1; optional",
+          "description": "Receiver-plane spectral power P_nu=L_nu*A*Omega*eta, only when receiver etendue and efficiency are supplied."
+        },
+        {
+          "name": "receiver_spectral_power_covariance_W2_Hz2",
+          "unit": "(W Hz^-1)^2; optional",
+          "description": "Full first-order joint covariance J C J^T when receiver_input_covariance is supplied."
+        },
+        {
+          "name": "integrated_receiver_power_W",
+          "unit": "W; optional",
+          "description": "Frequency-integrated receiver power using trapezoidal quadrature on the supplied measured frequency grid."
+        },
+        {
+          "name": "integrated_receiver_power_uncertainty_W",
+          "unit": "W; optional",
+          "description": "Propagated band-power uncertainty retaining full spectral-bin covariance."
         }
       ],
       "assumptions": [
