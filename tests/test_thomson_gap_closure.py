@@ -390,3 +390,19 @@ def test_projected_evdf_normalizes_on_nonuniform_velocity_grid():
         "nonuniform_three_point_second_derivative_on_interior_velocity_nodes"
     )
     np.testing.assert_allclose(np.dot(candidate, weights), 1.0, rtol=1e-10, atol=1e-10)
+
+def test_nonuniform_velocity_grid_uses_composite_trapezoid_weights():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-1.0, 1.0, 41) ** 3 * 1.0e6
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, signal, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(signal),
+        velocity_grid_m_s=velocity, regularization_strength=1.0e-3,
+    )
+    steps = np.diff(velocity)
+    expected = np.r_[0.5 * steps[0], 0.5 * (steps[:-1] + steps[1:]), 0.5 * steps[-1]]
+    np.testing.assert_allclose(result["velocity_quadrature_weights_m_s"], expected)
+    assert result["regularization_discretization"] == "nonuniform_quadratic_second_derivative_with_dual_cell_quadrature"
