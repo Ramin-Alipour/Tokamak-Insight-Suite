@@ -557,3 +557,53 @@ def test_microwave_background_api_requires_receiver_factors_as_a_pair():
             ion_charge_states=np.array([1]),
             receiver_etendue_m2_sr=1.0e-6,
         )
+
+
+
+def test_planck_brightness_temperature_inverts_planck_radiance():
+    from tokamak_analysis.cts_em_background import (
+        brightness_temperature_from_radiance, planck_spectral_radiance,
+    )
+    frequency = np.array([30.0e9, 100.0e9, 400.0e9])
+    temperature_K = np.array([5.0, 50.0, 500.0])
+    radiance = planck_spectral_radiance(frequency, temperature_K)
+    recovered = brightness_temperature_from_radiance(
+        frequency, radiance, convention="planck"
+    )
+    np.testing.assert_allclose(recovered, temperature_K, rtol=2e-13, atol=0.0)
+
+
+def test_rayleigh_jeans_brightness_temperature_uses_radiance_relation():
+    from tokamak_analysis.cts_em_background import brightness_temperature_from_radiance
+    frequency = np.array([50.0e9, 100.0e9])
+    radiance = np.array([1.0e-18, 2.0e-18])
+    expected = 299792458.0**2 * radiance / (
+        2.0 * 1.380649e-23 * frequency**2
+    )
+    actual = brightness_temperature_from_radiance(
+        frequency, radiance, convention="rayleigh_jeans"
+    )
+    np.testing.assert_allclose(actual, expected, rtol=1e-14, atol=0.0)
+
+
+def test_brightness_temperature_rejects_negative_radiance_and_unknown_convention():
+    from tokamak_analysis.cts_em_background import brightness_temperature_from_radiance
+    with pytest.raises(ValueError, match="non-negative"):
+        brightness_temperature_from_radiance([100.0e9], [-1.0e-18])
+    with pytest.raises(ValueError, match="convention"):
+        brightness_temperature_from_radiance([100.0e9], [1.0e-18], convention="electron")
+
+
+def test_microwave_background_api_reports_both_brightness_temperature_conventions():
+    from tokamak_analysis.cts_full_physics import analyze_cts_microwave_background
+    result = analyze_cts_microwave_background(
+        np.array([90.0e9, 100.0e9, 110.0e9]),
+        np.array([0.1]),
+        np.array([1000.0]),
+        electron_density_m3=np.array([1.0e19]),
+        ion_densities_m3=np.array([[1.0e19]]),
+        ion_charge_states=np.array([1]),
+    )
+    assert result["planck_brightness_temperature_K"].shape == (3,)
+    assert result["rayleigh_jeans_brightness_temperature_K"].shape == (3,)
+    assert "not electron_temperature_eV" in result["brightness_temperature_interpretation"]
