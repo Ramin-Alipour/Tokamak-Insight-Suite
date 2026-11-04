@@ -7222,6 +7222,12 @@
           "name": "optimizer_candidate",
           "unit": "structured; non-primary diagnostic result",
           "description": "Numerical candidate profiles and regularized covariance retained only for troubleshooting when the data-only inverse is rank deficient or the optimizer fails; these values are explicitly not measured primary outputs."
+        },
+        {
+          "name": "regularization_sensitivity",
+          "unit": "profile candidate spread across supplied regularization strengths",
+          "required": false,
+          "description": "Optional full-spectrum refit sensitivity output containing each numerical Te/flow/amplitude profile candidate, across-strength standard deviation/covariance and per-strength identifiability diagnostics. It is not measurement uncertainty and does not override data-only identifiability."
         }
       ],
       "assumptions": [

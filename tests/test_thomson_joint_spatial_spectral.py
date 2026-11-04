@@ -438,7 +438,7 @@ def test_joint_inverse_reports_regularization_choice_sensitivity_separately():
 
 @pytest.mark.parametrize(
     "strengths",
-    [[1.0e-4], [1.0e-3, 1.0e-4], [0.0, 1.0e-3], [1.0e-3, np.inf]],
+    [[1.0e-4], [1.0e-3, 1.0e-4], [0.0, 1.0e-3]],
 )
 def test_joint_inverse_rejects_invalid_regularization_sensitivity_grid(strengths):
     x, y, r, h, *_ = _synthetic_case()
@@ -447,4 +447,14 @@ def test_joint_inverse_rejects_invalid_regularization_sensitivity_grid(strengths
             x, y, r, h, laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
             regularization_sensitivity_strengths=strengths,
+        )
+
+
+def test_joint_inverse_rejects_nonfinite_regularization_sensitivity_strengths():
+    x, y, r, h, *_ = _synthetic_case()
+    with pytest.raises(ValueError, match="regularization_sensitivity_strengths must contain only finite values"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+            regularization_sensitivity_strengths=[1.0e-3, np.inf],
         )
