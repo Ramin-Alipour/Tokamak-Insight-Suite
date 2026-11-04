@@ -111,6 +111,10 @@ def kappa_electron_susceptibility(
         pdf,
         phase_velocity,
         pole_imaginary_part_m_s=pole_imaginary_part_m_s,
+        # The analytic Kappa marginal is non-zero outside the numerical grid.
+        # Do not introduce artificial delta-function jumps at the truncation
+        # boundary; the omitted tail is controlled by the exact CDF coverage.
+        include_finite_support_boundary_terms=False,
     )
     # generalized_landau_integral normalizes arbitrary tabulated inputs on
     # their finite interval. Here pdf is already analytically normalized on
@@ -139,6 +143,9 @@ def kappa_electron_susceptibility(
         "minimum_velocity_grid_probability_coverage": minimum_coverage,
         "finite_velocity_grid_truncation": bool(grid_coverage < 1.0 - 1e-12),
         "finite_grid_renormalization_bias_prevented": True,
+        "finite_support_boundary_terms_included": False,
+        "tail_model": "analytic_isotropic_Kappa_marginal_truncated_only_for_numerical_quadrature; no artificial zero-extension edge jumps",
+
         "limitations": [
             "Collisionless unmagnetized longitudinal response only.",
             "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
