@@ -169,3 +169,18 @@ covariance; the detector background is excluded from the scattered-power
 integral. The result remains conditional on the fixed measured response and
 supplied measurement covariance, and does not infer absolute density without
 the independent calibrated optical-power and collection inputs.
+
+
+### Independent model-discrepancy covariance in the projected EVDF inverse
+
+`reconstruct_relativistic_projected_thomson_evdf` now accepts an optional
+wavelength-space `model_discrepancy_covariance`. The supplied matrix must be
+finite, symmetric and positive semidefinite. It is added exactly once to the
+independent signal and background measurement covariance components; the
+effective covariance must be positive definite for GLS whitening. A
+discrepancy-only weighting path is explicitly labelled as having no supplied
+measurement-noise covariance. The result returns the measurement covariance,
+discrepancy covariance and effective covariance separately, preserving their
+provenance. The covariance remains conditional on the selected 1-D projected
+EVDF, fixed response and fixed background; it is not a posterior uncertainty
+or a correction to the physical scattering kernel.
