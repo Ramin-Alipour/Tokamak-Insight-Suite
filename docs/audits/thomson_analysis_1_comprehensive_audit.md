@@ -985,3 +985,25 @@ Commits:
 **Verification:** the source, tests, documentation and registries are present on `main`. GitHub combined commit status returned no status entries for the resulting registry commit; this update therefore does not claim that the regression or full test suite has passed. No experimental validation is performed or claimed.
 
 **TS-20 traceability correction (2026-11-04):** the canonical `docs/audits/cts_ts01_ts20_implementation_status.md` ledger defines TS-20 as the cross-subanalysis contract and regression matrix. The earlier statement that its subject was unspecified was stale and is superseded. The Analysis-1 cross-contract tests cover the four public family routes (optical Thomson, CTS, spatial-profile reconstruction and descriptive spectral distribution), executable registry wiring, output-identifiability producers, CTS dispatcher outputs and dashboard exposure. The regression matrix has been extended to enforce byte-identical root/package JSON registries and exact equality between each Analysis-1 diagnostic execution contract and the runtime Python registry. TS-20 is therefore implemented at the contract/test level; it is not a substitute for closure of the physical model gaps TS-01–TS-18. Final status remains pending GitHub Actions on the exact commit.
+
+## O. Additional physical CTS kernel added on 2026-11-04
+
+A local 3-D magnetoionic group-velocity relation is now implemented in
+`tokamak_analysis/cts_magnetoionic.py` as
+`cold_plasma_mode_group_velocity`. Starting from
+`M(ω,k)=ε_r(ω)−(c²/ω²)(k²I−kkᵀ)`, the simple-mode Hellmann–Feynman
+derivative is
+`v_g,j=−(e†(∂M/∂k_j)e)/(e†(∂M/∂ω)e)`. The code computes the k derivative
+analytically and the ω derivative with a symmetric finite difference. It
+returns Cartesian group velocity and the ray/wave-normal walk-off angle,
+which are distinct in an anisotropic magnetized plasma. The public advanced
+physics dispatcher and both formula registries expose the relation.
+
+The validity gate is intentionally strict: collisionless, transparent,
+positive-real refractive-index root, isolated simple mode. Collisional,
+evanescent and degenerate branches are rejected rather than assigned a
+misleading real ray velocity. Regression tests compare parallel propagation
+with an independent numerical derivative of k(ω), check oblique walk-off,
+and verify rejection of collisions and degeneracies. This is a physical
+kernel addition, not completion of arbitrary-3-D inhomogeneous propagation,
+ray integration or mode conversion; TS-04/05 remain partial.
