@@ -2974,6 +2974,129 @@
     }
   },
   {
+    "name": "Exact relativistic Thomson electron-flow projection",
+    "equation": "β∥ = (1 − r)/(sin(θ/2)(1 + r)); v∥ = c β∥; r = λs/λ0",
+    "inputs": "Intrinsic fitted spectral centre λs [nm], laser wavelength λ0 [nm], scattering angle θ [rad]",
+    "output": "q-parallel projected velocity [m s^-1]; optional propagated 1σ uncertainty",
+    "assumptions": "Single bulk-velocity projection along q=(ns−ni); exact relativistic Doppler kinematics; spectral centre must be intrinsic and model-fitted. It does not infer a 3-D flow or the mean of a broad/non-Maxwellian EVDF.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection_relativistic_exact",
+      "formula_key": "thomson_velocity_projection_relativistic_exact",
+      "input_specs": [
+        {
+          "name": "fitted_center_nm",
+          "unit": "nm",
+          "description": "Positive intrinsic fitted scattered-spectrum centre.",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "description": "Positive calibrated incident laser wavelength.",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "description": "Scattering angle strictly between zero and pi.",
+          "required": true
+        },
+        {
+          "name": "sigma_fitted_center_nm",
+          "unit": "nm",
+          "description": "Optional independent 1-sigma fitted-centre uncertainty; all three uncertainty inputs must be supplied together.",
+          "required": false
+        },
+        {
+          "name": "sigma_laser_wavelength_nm",
+          "unit": "nm",
+          "description": "Optional independent 1-sigma laser wavelength uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_scattering_angle_rad",
+          "unit": "rad",
+          "description": "Optional independent 1-sigma scattering-angle uncertainty.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Exact relativistic q-parallel velocity projection."
+        },
+        {
+          "name": "beta_parallel",
+          "unit": "1",
+          "description": "Signed projected velocity divided by c."
+        },
+        {
+          "name": "uncertainty_electron_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "First-order uncertainty from the three supplied independent input uncertainties; returned when all are supplied."
+        },
+        {
+          "name": "identifiability",
+          "unit": "text",
+          "description": "Explicitly identifies the result as one projected velocity only."
+        }
+      ],
+      "prerequisites": [
+        "A physically fitted intrinsic spectral centre; calibrated laser wavelength and scattering angle."
+      ],
+      "uncertainty_model": "First-order independent-error propagation using analytic derivatives with respect to fitted centre, laser wavelength and scattering angle. Cross-covariances are not inferred.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty",
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs"
+      ],
+      "note": "Exact single-projection relativistic Doppler inversion; not a 3-D velocity reconstruction and not a distribution-mean estimator.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection",
+      "function_links": [],
+      "formula_key": "thomson_velocity_projection",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
+      ]
+    }
+  },
+  {
     "name": "Thomson electron density from calibrated scattered power",
     "equation": "n_e = P_s/[P_i L (dσ_eff/dΩ) ΔΩ η]",
     "inputs": "Scattered power [W], incident power [W], interaction length [m], scattering angle and polarization geometry, solid angle [sr], efficiency",
