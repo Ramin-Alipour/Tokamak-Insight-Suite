@@ -343,11 +343,6 @@ def test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_deriva
     )
     omega = 2.0 * np.pi * frequency
     omega_p2 = species[0]["density_m3"] * E**2 / (EPS0 * ME)
-    n2 = result["refractive_index"]**2
-    # For parallel propagation each circular branch obeys
-    # n^2 = 1 - omega_p^2/[omega*(omega +/- Omega_e)].
-    gyro = -E * np.linalg.norm(field) / ME
-    denominator = omega * (omega + gyro if result["mode_index"] == 0 else omega - gyro)
     # The branch order is the polynomial root order; independently verify
     # the returned derivative against a finite-difference derivative of its
     # own selected n(omega) branch rather than assuming R/L ordering.
@@ -363,7 +358,6 @@ def test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_deriva
         4.0 * np.pi * delta
     )
     expected = 1.0 / dk_domega
-    assert np.isfinite(denominator)
     assert result["group_velocity_m_s"][2] == pytest.approx(expected, rel=3e-4)
     assert result["group_velocity_m_s"][0] == pytest.approx(0.0, abs=1e-7)
     assert result["group_velocity_m_s"][1] == pytest.approx(0.0, abs=1e-7)
