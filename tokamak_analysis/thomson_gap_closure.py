@@ -457,7 +457,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
 def reconstruct_psf_aware_thomson_profile(
     measured_channel_values, spatial_mixing_matrix, *, regularization_strength=None,
     measurement_uncertainty=None, measurement_covariance=None,
-    positive=True, max_iter=3000, gcv_candidate_count=31,
+    spatial_mixing_covariance=None, positive=True, max_iter=3000, gcv_candidate_count=31,
     gcv_log10_range=(-8.0, 8.0),
 ):
     """PSF-aware profile inverse with optional GCV-selected curvature penalty.
@@ -548,17 +548,60 @@ def reconstruct_psf_aware_thomson_profile(
     identifiable = rank == h.shape[1] and np.isfinite(condition) and condition < 1e12
     active = np.ones(values.size, dtype=bool) if not positive else values > max(float(np.max(values)) * 1e-9, np.finfo(float).tiny)
     aa, pp = a[:, active], d2[:, active]
-    covariance_active = np.linalg.pinv(aa.T @ aa + lam * (pp.T @ pp), hermitian=True)
+    normal_inverse = np.linalg.pinv(aa.T @ aa + lam * (pp.T @ pp), hermitian=True)
+    covariance_active = normal_inverse.copy()
     residual = z - a @ values
     if noise_status == "unweighted_no_measurement_uncertainty_supplied":
         covariance_active *= float(residual @ residual / max(1, y.size - rank))
     covariance = np.zeros((values.size, values.size))
     covariance[np.ix_(np.flatnonzero(active), np.flatnonzero(active))] = covariance_active
+
+    operator_covariance_contribution = None
+    covariance_with_operator = None
+    if spatial_mixing_covariance is not None:
+        raw_operator_covariance = np.asarray(spatial_mixing_covariance)
+        if raw_operator_covariance.dtype.kind not in "iuf":
+            raise ValueError("spatial_mixing_covariance must contain real numeric values")
+        operator_covariance = raw_operator_covariance.astype(float, copy=False)
+        operator_size = h.size
+        if (operator_covariance.shape != (operator_size, operator_size)
+                or not np.all(np.isfinite(operator_covariance))
+                or not np.allclose(operator_covariance, operator_covariance.T, rtol=1e-10, atol=1e-13)):
+            raise ValueError("spatial_mixing_covariance must be finite, symmetric, and have shape (n_channels*n_nodes)^2 in row-major order")
+        operator_covariance = 0.5 * (operator_covariance + operator_covariance.T)
+        eigenvalues = np.linalg.eigvalsh(operator_covariance)
+        eigen_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if eigenvalues[0] < -1e-10 * eigen_scale:
+            raise ValueError("spatial_mixing_covariance must be positive semidefinite")
+        # W = whiten(I) is the linear map used on measured channel vectors.
+        # Differentiate the regularized normal equations with respect to each
+        # row-major element of H, holding the selected lambda fixed.
+        whitening_matrix = whiten(np.eye(y.size))
+        sensitivity = np.zeros((values.size, operator_size), dtype=float)
+        n_nodes = values.size
+        for channel in range(y.size):
+            w_column = whitening_matrix[:, channel]
+            projected_residual = float(w_column @ residual)
+            projected_design = a.T @ w_column
+            for node in range(n_nodes):
+                gradient = -projected_design * values[node]
+                gradient[node] += projected_residual
+                sensitivity[active, channel * n_nodes + node] = normal_inverse @ gradient[active]
+        operator_covariance_contribution = sensitivity @ operator_covariance @ sensitivity.T
+        operator_covariance_contribution = 0.5 * (
+            operator_covariance_contribution + operator_covariance_contribution.T
+        )
+        covariance_with_operator = covariance + operator_covariance_contribution
     return {
         "status": "identified_from_measurement" if identifiable else "conditional_regularized_candidate",
         "latent_profile": values if identifiable else None,
         "regularized_candidate_profile": values,
         "profile_covariance": covariance if identifiable else None,
+        "profile_covariance_with_psf_uncertainty": covariance_with_operator if identifiable else None,
+        "regularized_candidate_covariance_with_psf_uncertainty": covariance_with_operator,
+        "psf_operator_covariance_contribution": operator_covariance_contribution,
+        "psf_uncertainty_propagated": spatial_mixing_covariance is not None,
+        "psf_covariance_order": "row-major spatial_mixing_matrix elements" if spatial_mixing_covariance is not None else None,
         "fitted_channel_values": h @ values,
         "residual": y - h @ values,
         "spatial_mixing_matrix": h.copy(),
@@ -578,6 +621,6 @@ def reconstruct_psf_aware_thomson_profile(
             "conditional": ["regularized_candidate_profile; conditional on supplied PSF, regularization, and noise model"],
             "non_identifiable": ["spatial modes in the data-only null space", "sub-resolution modes not encoded by the supplied mixing operator"],
         },
-        "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval; excludes PSF/mixing-operator uncertainty",
+        "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval. When supplied, PSF covariance is propagated by first-order differentiation of the regularized normal equations, assuming independence from measurement noise; higher-order operator effects and measurement-operator cross-covariance are excluded.",
         "experimental_validation": "not_performed",
     }
