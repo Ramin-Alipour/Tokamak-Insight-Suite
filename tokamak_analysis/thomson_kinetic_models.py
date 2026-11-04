@@ -40,6 +40,84 @@ def _positive(value, name):
     return result
 
 
+def project_bi_maxwellian_electron_vdf(
+    velocity_grid_m_s, *, temperature_parallel_eV, temperature_perpendicular_eV,
+    magnetic_field_unit, scattering_vector_unit, flow_projection_m_s=0.0,
+):
+    """Return the gyrotropic bi-Maxwellian marginal along the scattering vector.
+
+    For a gyrotropic bi-Maxwellian with zero heat flux, the 1-D marginal along
+    q-hat is Gaussian with
+        T_q = T_perp + (T_parallel - T_perp) (b-hat . q-hat)**2.
+    This is a forward marginal, not an inverse fit. A single scattering
+    direction identifies T_q only; it cannot separate T_parallel from
+    T_perpendicular. Multiple independent pitch angles are required for that
+    separation. The returned distribution is normalized over velocity.
+    """
+    grid = np.asarray(velocity_grid_m_s)
+    if grid.dtype.kind not in "iuf" or grid.ndim != 1 or grid.size < 3:
+        raise ValueError("velocity_grid_m_s must be a real one-dimensional grid with at least three points")
+    grid = grid.astype(float, copy=False)
+    if not np.all(np.isfinite(grid)) or np.any(np.diff(grid) <= 0.0):
+        raise ValueError("velocity_grid_m_s must be finite and strictly increasing")
+    t_parallel = _positive(temperature_parallel_eV, "temperature_parallel_eV")
+    t_perpendicular = _positive(temperature_perpendicular_eV, "temperature_perpendicular_eV")
+    b = np.asarray(magnetic_field_unit)
+    q = np.asarray(scattering_vector_unit)
+    if b.dtype.kind not in "iuf" or q.dtype.kind not in "iuf" or b.shape != (3,) or q.shape != (3,):
+        raise ValueError("magnetic_field_unit and scattering_vector_unit must be real three-component vectors")
+    b = b.astype(float, copy=False)
+    q = q.astype(float, copy=False)
+    if not np.all(np.isfinite(b)) or not np.all(np.isfinite(q)):
+        raise ValueError("direction vectors must be finite")
+    if not np.isclose(np.linalg.norm(b), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("magnetic_field_unit must have unit norm")
+    if not np.isclose(np.linalg.norm(q), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("scattering_vector_unit must have unit norm")
+    if isinstance(flow_projection_m_s, (bool, np.bool_)) or not np.isscalar(flow_projection_m_s):
+        raise ValueError("flow_projection_m_s must be a finite scalar")
+    flow = float(flow_projection_m_s)
+    if not np.isfinite(flow):
+        raise ValueError("flow_projection_m_s must be a finite scalar")
+    pitch_cosine = float(np.clip(np.dot(b, q), -1.0, 1.0))
+    directional_temperature = (
+        t_perpendicular
+        + (t_parallel - t_perpendicular) * pitch_cosine**2
+    )
+    variance = E_CHARGE * directional_temperature / ME
+    sigma = float(np.sqrt(variance))
+    standardized = (grid - flow) / sigma
+    distribution = np.exp(-0.5 * standardized**2) / (np.sqrt(2.0 * np.pi) * sigma)
+    integral = _trapezoid(distribution, grid)
+    if not np.isfinite(integral) or integral <= 0.0:
+        raise ValueError("velocity_grid_m_s does not resolve a positive finite portion of the projected distribution")
+    distribution = distribution / integral
+    return {
+        "velocity_grid_m_s": grid.copy(),
+        "projected_vdf_s_m": distribution,
+        "projected_temperature_eV": float(directional_temperature),
+        "projected_velocity_mean_m_s": flow,
+        "projected_velocity_standard_deviation_m_s": sigma,
+        "magnetic_pitch_cosine": pitch_cosine,
+        "anisotropy_identifiability": (
+            "only_the_directional_temperature_combination_is_identified_from_one_scattering_direction"
+        ),
+        "separate_parallel_perpendicular_temperatures_identifiable": False,
+        "model": "gyrotropic_nonrelativistic_bi_maxwellian_projected_marginal",
+        "assumptions": [
+            "Gyrotropic bi-Maxwellian electron distribution",
+            "Zero heat flux and no non-Gaussian tails",
+            "Non-relativistic velocity-space Gaussian marginal",
+            "Magnetic-field and scattering-vector directions are supplied unit vectors",
+        ],
+        "limitations": [
+            "This callable is a forward projected-VDF kernel, not a measured-spectrum optimizer",
+            "A single scattering direction cannot independently identify parallel and perpendicular temperatures",
+            "The velocity grid truncates and numerically renormalizes the represented marginal",
+        ],
+    }
+
+
 def _apply_response(response, spectrum, wavelength_nm):
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(spectrum, dtype=float)
