@@ -412,6 +412,8 @@ def fit_gyrotropic_bi_kappa_thomson(
             raise ValueError("directional bi-Kappa temperature became non-positive")
         predictions = np.empty_like(spectra)
         captured_probability = np.empty(n_view, dtype=float)
+        projected_velocity_grid = np.empty_like(spectra)
+        projected_velocity_pdf = np.empty_like(spectra)
         for i in range(n_view):
             flow, log_amp, offset, slope = parameters[3 + 4*i:7 + 4*i]
             theta2 = ((2.0*kappa - 3.0)/kappa) * (_E*directional[i]/_ME)
@@ -421,11 +423,14 @@ def fit_gyrotropic_bi_kappa_thomson(
                         - gammaln(kappa - 0.5) - np.log(theta))
             log_pdf = log_norm - kappa*np.log1p(velocity**2/(kappa*theta2))
             pdf_velocity = np.exp(log_pdf)
+            velocity_order = np.argsort(velocity)
+            projected_velocity_grid[i] = velocity[velocity_order]
+            projected_velocity_pdf[i] = pdf_velocity[velocity_order]
             intrinsic = pdf_velocity * (_C/(laser*qmag))
             captured_probability[i] = float(np.sum(intrinsic * widths))
             detector = _apply_response_in_bin_integrated_space(response[i], intrinsic, wavelength)
             predictions[i] = np.exp(log_amp)*detector + offset + slope*(wavelength-laser)
-        return predictions, directional, kappa, captured_probability
+        return predictions, directional, kappa, captured_probability, projected_velocity_grid, projected_velocity_pdf
 
     def residual(parameters):
         return whiten(predict(parameters)[0] - spectra)
@@ -434,7 +439,7 @@ def fit_gyrotropic_bi_kappa_thomson(
                         x_scale="jac", max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"gyrotropic bi-Kappa Thomson fit failed: {fit.message}")
-    fitted, directional, kappa, captured_probability = predict(fit.x)
+    fitted, directional, kappa, captured_probability, projected_velocity_grid, projected_velocity_pdf = predict(fit.x)
     projected_rms_beta = np.sqrt(_E*directional/_ME)/_C
     fitted_flow_beta = np.abs(fit.x[3::4])/_C
     if np.max(projected_rms_beta) >= beta_limit or np.max(fitted_flow_beta) >= 0.1:
@@ -469,6 +474,8 @@ def fit_gyrotropic_bi_kappa_thomson(
         "kappa_finite_variance_domain": bool(kappa > 1.5),
         "directional_temperature_eV": directional,
         "captured_spectral_probability": captured_probability,
+        "projected_velocity_grid_m_s": projected_velocity_grid,
+        "projected_velocity_distribution_m_s_inverse": projected_velocity_pdf,
         "spectral_window_coverage_warning": (
             "The measured wavelength window truncates more than one percent of the fitted Kappa feature in at least one view."
             if np.any(captured_probability < 0.99) else None
