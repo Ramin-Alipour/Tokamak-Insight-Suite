@@ -5379,10 +5379,10 @@
   },
   {
     "name": "Gyrotropic bi-Maxwellian temperature anisotropy from multi-pitch Thomson projections",
-    "equation": "T_q(μ)=T_⊥(1−μ²)+T_∥μ²;  μ=b̂·q̂;  θ̂=(XᵀC_T⁻¹X)⁻¹XᵀC_T⁻¹T_q,  X=[1−μ², μ²]",
-    "inputs": "Directional projected electron temperatures T_q [eV], magnetic pitch cosines μ, full positive-definite covariance C_T [eV²]",
+    "equation": "T_q(μ)=T_⊥(1−μ²)+T_∥μ²; μ=b̂·q̂; C_eff=C_T+diag(2μΔT) C_μ diag(2μΔT); θ̂=(XᵀC_eff⁻¹X)⁻¹XᵀC_eff⁻¹T_q, iterated when C_μ is supplied",
+    "inputs": "Directional projected electron temperatures T_q [eV], magnetic pitch cosines μ, full positive-definite covariance C_T [eV²]; optional full pitch-cosine covariance C_μ [dimensionless²]",
     "output": "T_perpendicular [eV], T_parallel [eV], 2×2 covariance [eV²]; non-identifiable if the squared pitch cosines do not span rank 2",
-    "assumptions": "Gyrotropic bi-Maxwellian with zero heat flux and common magnetic-field axis; directional temperatures must already be inferred from calibrated Thomson spectra; pitch-angle uncertainty is not included in this GLS covariance.",
+    "assumptions": "Gyrotropic bi-Maxwellian with zero heat flux and common magnetic-field axis; directional temperatures must already be inferred from calibrated Thomson spectra; optional pitch-cosine covariance propagated by first-order iterative errors-in-variables GLS.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5405,6 +5405,12 @@
           "name": "projected_temperature_covariance_eV2",
           "unit": "eV²; full positive-definite covariance",
           "required": true
+        },
+        {
+          "name": "magnetic_pitch_cosine_covariance",
+          "unit": "dimensionless²; full positive-semidefinite covariance across views",
+          "description": "Optional covariance of the magnetic pitch cosines μ=b_hat·q_hat.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -5427,6 +5433,18 @@
         {
           "name": "chi_square",
           "unit": "dimensionless"
+        },
+        {
+          "name": "effective_projected_temperature_covariance_eV2",
+          "unit": "eV²; measurement plus first-order geometry covariance used in the GLS objective"
+        },
+        {
+          "name": "geometry_uncertainty_included",
+          "unit": "boolean; true only when pitch-cosine covariance is supplied"
+        },
+        {
+          "name": "geometry_covariance_iterations",
+          "unit": "count; iterative GLS updates when geometry covariance is supplied"
         }
       ],
       "prerequisites": [
@@ -5434,11 +5452,13 @@
         "Directional temperatures inferred from independent calibrated optical Thomson spectra.",
         "Gyrotropic bi-Maxwellian closure; not a general anisotropic EVDF."
       ],
-      "uncertainty_model": "Generalized least squares with the supplied full directional-temperature covariance. Magnetic pitch-angle/geometry covariance is not propagated by this callable.",
+      "uncertainty_model": "GLS with supplied full directional-temperature covariance; optional pitch-cosine covariance is propagated by first-order errors-in-variables iteration using dT_q/dμ=2μ(T_parallel−T_perpendicular). Temperature/geometry cross-covariance is not inferred.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_multi_pitch_gls_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_single_pitch_does_not_invent_anisotropy",
-        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance"
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance",
+        "tests/test_thomson_anisotropic_projection.py::test_multi_pitch_anisotropy_inversion_propagates_pitch_geometry_covariance",
+        "tests/test_thomson_anisotropic_projection.py::test_multi_pitch_anisotropy_rejects_non_psd_pitch_covariance"
       ],
       "note": "Physical GLS inversion of the gyrotropic pressure/temperature tensor projection. This is a constrained two-temperature model, not a general anisotropic distribution reconstruction.",
       "calibrated_measurements_to_physics": false
