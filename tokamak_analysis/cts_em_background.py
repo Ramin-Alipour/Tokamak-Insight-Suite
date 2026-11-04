@@ -142,7 +142,7 @@ def integrate_thermal_microwave_background(
             ece_alpha = supplied_alpha[:, :, None]
             n_modes = 1
             mode_weights = np.ones(1, dtype=float)
-            ece_status = "mode-resolved single-effective-mode ECE absorption supplied; Kirchhoff LTE source function used"
+            ece_status = "mode-resolved single-effective-mode ECE absorption supplied; source function selected separately"
         elif supplied_alpha.ndim == 3 and supplied_alpha.shape[:2] == (length.size, nu.size):
             n_modes = supplied_alpha.shape[2]
             if n_modes < 1:
@@ -154,7 +154,7 @@ def integrate_thermal_microwave_background(
                     or np.any(mode_weights < 0.0) or not np.isclose(mode_weights.sum(), 1.0, rtol=1e-8, atol=1e-10)):
                 raise ValueError("ece_mode_weights must be a non-negative length-n_modes vector summing to one")
             ece_alpha = supplied_alpha
-            ece_status = "independently propagated mode-resolved ECE absorption; Kirchhoff LTE source function used"
+            ece_status = "independently propagated mode-resolved ECE absorption; source function selected separately"
         else:
             raise ValueError("ece_absorption_coefficient_m_inverse must have shape (n_path,n_frequency) or (n_path,n_frequency,n_mode)")
         if np.any(~np.isfinite(ece_alpha)) or np.any(ece_alpha < 0.0):
