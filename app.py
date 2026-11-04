@@ -926,6 +926,10 @@ elif page=='Spectral Analysis':
                 'non_collective_relativistic_maxwell_juttner',
             ],index=None,placeholder='Select a physical model',key='ts_infer_model')
             st.caption('Optical Analysis 1 uses three explicitly selected non-collective forward models. Microwave collective Thomson scattering is a dedicated CTS subanalysis within primary Analysis 1; its electrostatic and full-electromagnetic models are not optical Thomson models.')
+            if model in {'non_collective_maxwellian','non_collective_kappa'}:
+                st.info(
+                    'Finite-bin physical forward model: the Maxwellian spectrum is integrated with the exact normal CDF and the Kappa spectrum with the exact Student-t CDF over each wavelength-bin edge. The measured response acts on bin-integrated spectral power; missing wavelength-window tails are reported, not renormalized.'
+                )
             g1,g2,g3=st.columns(3)
             with g1:
                 laser_nm_text=st.text_input('Laser wavelength (nm; required)',value='',key='ts_infer_laser')
@@ -1409,6 +1413,22 @@ elif page=='Spectral Analysis':
                     st.warning('The optimizer completed, but the requested physical profiles are not reportable as identified from the measured data.')
                 else:
                     st.success('Thomson spectral inference completed within the selected physical model.')
+                if result.get('spectral_bin_integration'):
+                    st.markdown('**Finite wavelength-bin physical integration**')
+                    st.caption(result['spectral_bin_integration'])
+                    coverage_rows=[
+                        {
+                            'channel_index':channel.get('channel_index'),
+                            'radius_m':channel.get('radius_m'),
+                            'captured_spectral_probability':channel.get('captured_spectral_probability'),
+                            'window_truncation_warning':channel.get('spectral_window_truncation_warning')
+                                or channel.get('spectral_window_coverage_warning'),
+                        }
+                        for channel in result.get('channels',[])
+                        if channel.get('captured_spectral_probability') is not None
+                    ]
+                    if coverage_rows:
+                        st.dataframe(pd.DataFrame(coverage_rows),width="stretch")
                 if result.get('validity_screening'):
                     st.markdown('**Selected-model validity screening**')
                     st.json(result['validity_screening'])
