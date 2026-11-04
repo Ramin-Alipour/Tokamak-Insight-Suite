@@ -575,6 +575,21 @@
           "name": "geometry_beam_propagated_covariance",
           "unit": "output units squared",
           "description": "Monte Carlo covariance propagated from the supplied correlated geometry/beam covariance."
+        },
+        {
+          "name": "momentum_probability_coverage",
+          "unit": "dimensionless",
+          "description": "Fraction of the analytic Maxwell-Juttner momentum probability represented by the finite quadrature; at least 0.999 is required for a reportable spectrum."
+        },
+        {
+          "name": "quadrature_to_analytic_normalization_ratio",
+          "unit": "dimensionless",
+          "description": "Finite-grid momentum quadrature normalization divided by the exact theta*Kve(2,1/theta) Maxwell-Juttner normalization; values above 1+1e-4 are rejected."
+        },
+        {
+          "name": "momentum_tail_renormalization_performed",
+          "unit": "boolean",
+          "description": "False; a missing Maxwell-Juttner momentum tail is never silently renormalized into the represented distribution."
         }
       ],
       "assumptions": [
