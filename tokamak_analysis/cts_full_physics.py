@@ -392,6 +392,8 @@ def run_advanced_thomson_physics(model, **kwargs):
       - cold_plasma_dielectric: local multispecies Stix R/L/S/D/P tensor.
       - cold_plasma_magnetoionic_modes: two local cold-plasma n^2 branches
         and electric polarization eigenvectors for a supplied wave-normal.
+      - plasma_charge_state_moments: Zeff, ion charge balance and net charge
+        density from explicit multispecies densities and charge states.
 
     No physical model is substituted automatically. Equilibrium, geometry,
     dielectric, mode-basis and calibration inputs remain explicit caller data.
