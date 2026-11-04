@@ -125,18 +125,23 @@ def quantum_fdt_dynamic_structure_factor(
 
     y = hbar * omega / (2.0 * temperature)
     abs_y = np.abs(y)
-    coth_y = np.empty_like(y)
+    quantum_factor = np.empty_like(y)
     small = abs_y < 1.0e-4
     ys = y[small]
-    coth_y[small] = 1.0 / ys + ys / 3.0 - ys**3 / 45.0
+    # Evaluate hbar*coth(y) as (2*T/omega)*(y*coth(y)); this
+    # remains finite even if the dimensionless y underflows to exactly zero.
+    quantum_factor[small] = (2.0 * temperature / omega[small]) * (
+        1.0 + ys**2 / 3.0 - ys**4 / 45.0
+    )
     large = ~small
     a = abs_y[large]
-    coth_y[large] = np.sign(y[large]) * (
+    coth_y = np.sign(y[large]) * (
         1.0 + 2.0 * np.exp(-2.0 * a) / (-np.expm1(-2.0 * a))
     )
+    quantum_factor[large] = hbar * coth_y
 
     imaginary = (chi - np.swapaxes(chi.conj(), 1, 2)) / (2j)
-    spectrum = -hbar * coth_y[:, None, None] * imaginary
+    spectrum = -quantum_factor[:, None, None] * imaginary
     spectrum = 0.5 * (spectrum + np.swapaxes(spectrum.conj(), 1, 2))
     minimum_eigenvalues = np.empty(omega.size)
     for index, matrix in enumerate(spectrum):
