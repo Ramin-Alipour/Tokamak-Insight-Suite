@@ -1,9 +1,9 @@
 """Cold-plasma magnetoionic dielectric and local wave branches.
 
-Stix R/L/S/D/P dielectric for a homogeneous, collisionless, cold,
-quasineutral or non-neutral multispecies plasma in a uniform magnetic field.
-This is a local dispersion kernel, not a warm kinetic CTS vertex or a
-ray-tracing/mode-conversion solution.
+Stix R/L/S/D/P dielectric for a homogeneous cold multispecies plasma in a
+uniform magnetic field, with optional species-resolved momentum-transfer
+collisions. This is a local cold-fluid dispersion kernel, not a warm kinetic
+CTS vertex or a ray-tracing/mode-conversion solution.
 """
 from __future__ import annotations
 
@@ -39,9 +39,11 @@ def cold_plasma_dielectric_tensor(
       S=(R+L)/2, D=(R-L)/2, P=1-sum(omega_ps^2/omega^2).
     The tensor in a right-handed field-aligned basis is
       [[S,-iD,0],[iD,S,0],[0,0,P]].
-    No collisions, finite-temperature corrections or relativistic effects
-    are included. Cyclotron/plasma resonant singularities are reported rather
-    than regularized by an invented damping rate.
+    Optional species collision_frequency_rad_s uses the cold-fluid
+    momentum-drag closure for exp(-i omega t). It does not represent a
+    velocity-dependent kinetic collision operator. Finite-temperature and
+    relativistic effects are not included. Collisionless cyclotron poles are
+    reported rather than regularized by an invented damping rate.
     """
     f = _real_scalar(frequency_Hz, "frequency_Hz", positive=True)
     b = np.asarray(magnetic_field_T)
