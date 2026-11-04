@@ -350,3 +350,23 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
     assert result["absolute_density_identified"] is False
     assert result["evdf_parallel_s_per_m"].shape == result["velocity_parallel_m_s"].shape
     assert np.trapz(result["evdf_parallel_s_per_m"], result["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
+
+
+def test_relativistic_projected_evdf_and_psf_profile_are_dashboard_api_routes():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    relativistic = "thomson_relativistic_projected_evdf"
+    assert relativistic in MODEL_LABELS
+    rel = run_advanced_thomson_physics(relativistic, **EXAMPLES[relativistic])
+    assert rel["public_physics_entrypoint"] == relativistic
+    assert rel["absolute_density_inferred"] is False
+    assert "no Compton recoil" in " ".join(rel["assumptions"])
+
+    profile = "thomson_psf_profile_inverse"
+    assert profile in MODEL_LABELS
+    spatial = run_advanced_thomson_physics(profile, **EXAMPLES[profile])
+    assert spatial["public_physics_entrypoint"] == profile
+    assert spatial["spatial_mixing_matrix"].shape == (5, 5)
+    assert spatial["regularization_strength"] == pytest.approx(0.01)
+    assert spatial["experimental_validation"] == "not_performed"
