@@ -443,3 +443,12 @@ def test_effective_mode_optical_depth_uses_logsumexp_for_extreme_mode_contrast()
     )
     expected = -np.log(1.0e-300 + np.exp(-1000.0))
     assert result["total_optical_depth"][0] == pytest.approx(expected, rel=2e-14)
+
+
+@pytest.mark.parametrize("bad_gaunt", [np.nan, np.inf, -np.inf])
+def test_free_free_absorption_rejects_nonfinite_gaunt_factor(bad_gaunt):
+    with pytest.raises(ValueError, match="gaunt_factor must be positive and finite"):
+        thermal_bremsstrahlung_absorption_si(
+            np.array([100e9]), 1.0e19, np.array([1.0e19]),
+            np.array([1.0]), 1000.0, gaunt_factor=bad_gaunt,
+        )
