@@ -74,7 +74,7 @@ def test_bi_maxwellian_projection_rejects_nonunit_geometry():
 
 def test_multi_pitch_anisotropy_inversion_propagates_pitch_geometry_covariance():
     common = dict(
-        projected_temperature_eV=[200.0, 175.0, 100.0],
+        projected_temperature_eV=[200.0, 125.0, 100.0],
         magnetic_pitch_cosine=[1.0, 0.5, 0.0],
         projected_temperature_covariance_eV2=np.diag([4.0, 4.0, 4.0]),
     )
