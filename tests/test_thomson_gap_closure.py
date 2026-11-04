@@ -111,6 +111,10 @@ def test_projected_compton_kinematics_matches_rest_electron_compton_shift():
     assert weights.shape == velocity.shape
     assert np.all(np.isfinite(weights))
     assert np.all(weights >= 0.0)
+    thomson_weights = result["relative_lab_thomson_differential_scattering_weight"]
+    assert thomson_weights.shape == velocity.shape
+    assert np.all(np.isfinite(thomson_weights))
+    assert np.all(thomson_weights >= 0.0)
 
 
 def test_projected_compton_inverse_uses_recoil_and_polarized_kn_weight():
