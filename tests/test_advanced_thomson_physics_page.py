@@ -218,3 +218,16 @@ def test_dashboard_routes_microwave_background_to_receiver_power_and_brightness_
     registered = {item["execution_contract"]["formula_key"] for item in formula}
     assert keys <= registered
     assert formula == packaged
+
+
+def test_dashboard_exposes_and_executes_gyrotropic_anisotropic_kappa_fit():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "gyrotropic_bi_kappa_spectral_fit"
+    assert model in MODEL_LABELS and model in EXAMPLES
+    result = run_advanced_thomson_physics(model, **EXAMPLES[model])
+    assert result["public_physics_entrypoint"] == model
+    assert result["model"] == "gyrotropic_bi_kappa_nonrelativistic_optical_thomson"
+    assert result["kappa_finite_variance_domain"] is True
+    assert result["model_validity"]["relativistic_corrections"] is False
