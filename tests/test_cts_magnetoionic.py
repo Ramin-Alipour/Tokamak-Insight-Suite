@@ -210,3 +210,36 @@ def test_cold_fluid_absorption_is_available_from_public_dispatcher():
     assert result["public_physics_entrypoint"] == "cold_plasma_absorbed_power_density"
     assert result["absorbed_power_density_W_m3"] > 0.0
     assert result["automatic_model_substitution"] is False
+
+
+def test_magnetized_multispecies_collisional_dissipation_is_passive():
+    from tokamak_analysis.cts_magnetoionic import (
+        cold_plasma_absorbed_power_density,
+        cold_plasma_dielectric_tensor,
+    )
+
+    species = [
+        {
+            "name": "e-", "mass_kg": ME, "charge_C": -E,
+            "density_m3": 3.0e19, "collision_frequency_rad_s": 4.0e7,
+        },
+        {
+            "name": "D+", "mass_kg": 2.0*ME*1836.15267343, "charge_C": E,
+            "density_m3": 1.5e19, "collision_frequency_rad_s": 8.0e6,
+        },
+    ]
+    dielectric = cold_plasma_dielectric_tensor(
+        75e9, [0.3, -0.4, 2.0], species,
+    )
+    assert dielectric["model_scope"].endswith(
+        "_with_species_resolved_cold_fluid_collisions"
+    )
+    electric = np.array([1.0+0.2j, -0.3+0.7j, 0.5-0.1j])
+    result = cold_plasma_absorbed_power_density(
+        75e9, [0.3, -0.4, 2.0], species, electric,
+    )
+    eigenvalues = np.linalg.eigvalsh(
+        result["hermitian_dissipative_dielectric_tensor"]
+    )
+    assert eigenvalues.min() >= -1e-11 * max(eigenvalues.max(), 1.0)
+    assert result["absorbed_power_density_W_m3"] > 0.0
