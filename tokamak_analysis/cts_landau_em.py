@@ -44,7 +44,7 @@ def landau_full_em_current_response(
         raise ValueError("angular_frequency_rad_s must be a finite non-zero vector")
     if direction.shape != (3,) or np.any(~np.isfinite(direction)) or np.linalg.norm(direction) == 0:
         raise ValueError("propagation_direction must be a finite non-zero 3-vector")
-    direction /= np.linalg.norm(direction)
+    direction = direction / np.linalg.norm(direction)
     flow = np.asarray(system.metadata["common_bulk_flow_m_s"], dtype=float)
     if flow.shape != (3,) or np.any(~np.isfinite(flow)) or np.linalg.norm(flow) > 1e-10:
         raise ValueError("Full-EM Landau bridge currently requires a zero-flow equilibrium")
