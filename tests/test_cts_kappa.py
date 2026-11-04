@@ -12,6 +12,8 @@ def test_kappa_response_is_finite_and_normalized():
     assert np.isclose(np.trapz(r["normalized_probability_density_s_m"],a["v"]),1,rtol=1e-8)
     assert np.isfinite(r["electron_susceptibility"].real)
     assert r["pole"].imag>0
+    assert r["velocity_grid_probability_coverage"] >= 0.99
+    assert r["finite_grid_normalization_bias_prevented"] is True
 
 def test_kappa_requires_kappa_above_three_halves():
     with pytest.raises(ValueError,match="greater than 3/2"):
@@ -47,3 +49,19 @@ def test_kappa_reports_nonrelativistic_finite_support_scope():
     assert result["distribution_model"] == "exact_1D_marginal_of_isotropic_3D_Kappa"
     assert result["finite_velocity_grid_truncation"] is True
     assert any("non-relativistic" in item for item in result["limitations"])
+
+
+def test_kappa_heavy_tail_truncation_is_rejected_before_finite_grid_renormalization():
+    parameters = args()
+    parameters["v"] = np.linspace(-5.0e6, 5.0e6, 1001)
+    with pytest.raises(ValueError, match="analytic Kappa probability mass"):
+        kappa_electron_susceptibility(**parameters)
+
+
+def test_kappa_coverage_can_be_relaxed_only_by_explicit_user_choice():
+    parameters = args()
+    parameters["v"] = np.linspace(-5.0e6, 5.0e6, 1001)
+    parameters["minimum_velocity_grid_probability_coverage"] = 0.5
+    result = kappa_electron_susceptibility(**parameters)
+    assert result["velocity_grid_probability_coverage"] < 0.99
+    assert result["minimum_velocity_grid_probability_coverage"] == 0.5
