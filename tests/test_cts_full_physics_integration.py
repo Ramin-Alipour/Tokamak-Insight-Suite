@@ -19,7 +19,7 @@ def test_integrated_landau_fdt_cts_returns_screened_spectrum_and_convergence_gat
     result = analyze_landau_fdt_cts(
         [1.0e5, 2.0e5], axis, axis, axis, _species(),
         common_temperature_J=100.0*1.602176634e-19,
-        wave_number_m_inverse=10.0,
+        wave_number_m_inverse=1.0e-3,
         coulomb_logarithm=12.0,
     )
     assert result["dynamic_structure_factor_m3_s"].shape == (2, 2, 2)
