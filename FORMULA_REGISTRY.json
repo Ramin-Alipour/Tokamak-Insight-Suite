@@ -5977,5 +5977,116 @@
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
       ]
     }
+  },
+  {
+    "name": "Species-resolved ion Doppler response in electrostatic CTS",
+    "equation": "ζ_j=(ω−k u_{j,∥})/(k v_{t,j}); χ_j=(k² λ_{D,j}²)⁻¹[1+ζ_j Z(ζ_j)]; S(k,ω)=(2π/k){|1−χ_e/ε|²f_e+Σ_j(Z_j²n_j/n_e)|χ_j/ε|²f_j}",
+    "inputs": "Calibrated CTS spectrum, frequency-shift axis, probe frequency, scattering geometry, fixed electron density/temperature, per-species ion temperature/composition, electron projected flow, measured response matrix and spectral uncertainty.",
+    "output": "Conditional per-ion-species projected flow u_{j,∥} [m/s], covariance and identifiability diagnostics.",
+    "assumptions": "Unmagnetized electrostatic longitudinal CTS; Maxwellian bulk species; each ion species has a constant projected flow over the scattering volume; density, temperatures, composition and geometry are fixed external inputs.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_analysis.fit_cts_ion_species_flows",
+      "formula_key": "cts_species_resolved_ion_flow_inference",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz",
+          "description": "Strictly increasing calibrated CTS frequency-shift samples.",
+          "required": true
+        },
+        {
+          "name": "measured_spectrum",
+          "unit": "calibrated spectral units",
+          "description": "Non-negative measured CTS spectrum on the frequency grid.",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "description": "Fixed positive electron density; not fitted by this conditional flow inversion.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Fixed positive electron temperature; not fitted by this conditional flow inversion.",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "description": "Positive scalar or one fixed temperature per ion species.",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata",
+          "description": "Unique species names, integer charge states and masses.",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "dimensionless",
+          "description": "Positive charge-density fractions summing to one.",
+          "required": true
+        },
+        {
+          "name": "ion_velocity_initial_m_s",
+          "unit": "m s^-1",
+          "description": "Initial projected velocity for every ion species.",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "calibrated spectral units",
+          "description": "Positive per-bin Gaussian standard uncertainty.",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "dimensionless",
+          "description": "Supplied calibrated response matrix on the measured frequency grid.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Species-name mapping of fitted projected flows; withheld unless the complete fit Jacobian is full rank."
+        },
+        {
+          "name": "ion_velocity_uncertainty_m_s",
+          "unit": "m s^-1",
+          "description": "Conditional 1-sigma uncertainties from the inverse weighted Jacobian information matrix."
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "mixed parameter units",
+          "description": "Joint covariance of species flows, log spectral scale and normalized offset; returned only for full-rank inference."
+        },
+        {
+          "name": "identifiability",
+          "unit": "categorical",
+          "description": "Full-rank conditional identifiability or non-identifiable species-flow combination."
+        }
+      ],
+      "prerequisites": [
+        "Fixed calibrated plasma density, temperatures, composition and scattering geometry.",
+        "Calibrated instrument response and positive per-bin spectral uncertainties.",
+        "Sufficient spectral information to distinguish each species Doppler shift."
+      ],
+      "uncertainty_model": "Independent Gaussian per-bin spectral errors supplied explicitly; local covariance is reported only when the complete weighted spectral Jacobian is full rank.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_multi_ion_flow_inference_recovers_species_resolved_projections",
+        "tests/test_cts_analysis.py::test_cts_differential_multi_ion_flow_changes_physical_spectrum",
+        "tests/test_advanced_thomson_physics_page.py::test_dashboard_routes_conditional_multi_ion_cts_flow_inference"
+      ],
+      "note": "Conditional physical inference: density, temperatures, composition, electron flow, geometry and response are fixed supplied inputs. An optimizer success alone never upgrades a rank-deficient solution to a reportable measurement."
+    }
   }
 ]
