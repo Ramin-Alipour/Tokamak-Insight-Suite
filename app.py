@@ -3607,6 +3607,8 @@ elif page=='Advanced Analysis':
         response_upload=st.file_uploader('Measured calibrated wavelength-response matrix CSV',type=['csv','txt'],key='ts_kinetic_bg_response')
         uncertainty_upload=st.file_uploader('Optional pointwise measured 1-sigma uncertainty CSV',type=['csv','txt'],key='ts_kinetic_bg_uncertainty')
         covariance_upload=st.file_uploader('Optional full measured spectral covariance CSV (mutually exclusive with uncertainty)',type=['csv','txt'],key='ts_kinetic_bg_covariance')
+        discrepancy_upload=st.file_uploader('Optional model-discrepancy covariance CSV (added to measurement covariance)',type=['csv','txt'],key='ts_kinetic_bg_discrepancy')
+        systematic_upload=st.file_uploader('Optional systematic spectral covariance CSV (added to other covariance components)',type=['csv','txt'],key='ts_kinetic_bg_systematic')
         model=st.selectbox('Physical electron model',['kappa','relativistic_maxwell_juttner'],key='ts_kinetic_bg_model')
         c1,c2,c3=st.columns(3)
         with c1:
@@ -3647,6 +3649,10 @@ elif page=='Advanced Analysis':
                     optional['measurement_uncertainty']=pd.read_csv(uncertainty_upload,header=None).to_numpy(dtype=float).reshape(-1)
                 if covariance_upload is not None:
                     optional['measurement_covariance']=pd.read_csv(covariance_upload,header=None).to_numpy(dtype=float)
+                if discrepancy_upload is not None:
+                    optional['model_discrepancy_covariance']=pd.read_csv(discrepancy_upload,header=None).to_numpy(dtype=float)
+                if systematic_upload is not None:
+                    optional['systematic_covariance']=pd.read_csv(systematic_upload,header=None).to_numpy(dtype=float)
                 initial=[_parse_ts_scalar(te_seed,'Initial electron temperature',minimum=1e-12),_parse_ts_scalar(flow_seed,'Initial flow projection')]
                 if model=='kappa':
                     initial.append(_parse_ts_scalar(kappa_seed,'Initial Kappa index',minimum=1.500001))
