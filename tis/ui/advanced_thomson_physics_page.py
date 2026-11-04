@@ -30,7 +30,7 @@ EXAMPLES = {
             {"name": "electrons", "density_m3": 1.0e18, "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
             {"name": "ions", "density_m3": 1.0e18, "mass_kg": 1.67262192369e-27, "charge_C": 1.602176634e-19}
         ],
-        "common_temperature_J": 100.0,
+        "common_temperature_J": 1.602176634e-17,  # 100 eV in joules
         "wave_number_m_inverse": 0.001,
         "coulomb_logarithm": 12.0
     },
@@ -41,7 +41,7 @@ EXAMPLES = {
         "magnetic_field_T": [[0.0, 0.0, 2.0]],
         "electron_density_m3": [1.0e19],
         "electron_temperature_eV": [1000.0],
-        "mode_electric_field_unit_flux": {"real": [[[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]]], "imag": [[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]},
+        "mode_electric_field_unit_flux": {"real": [[[27.449, 0.0], [0.0, 27.449], [0.0, 0.0]]], "imag": [[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]},
         "dielectric_z_m": [0.0, 0.001],
         "dielectric_tensor_r": {"real": [[[1,0,0],[0,1,0],[0,0,1]], [[1,0,0],[0,1,0],[0,0,1]]], "imag": [[[0,0,0],[0,0,0],[0,0,0]], [[0,0,0],[0,0,0],[0,0,0]]]},
         "harmonic_order": 2,
