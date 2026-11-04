@@ -63,3 +63,40 @@ def test_zero_density_path_rejects_nonzero_ece_absorption():
         integrate_thermal_microwave_background(
             **_vacuum_case(ece_absorption_coefficient_m_inverse=alpha)
         )
+
+
+def test_free_free_emissivity_uses_per_steradian_si_normalization():
+    # Rybicki-Lightman thermal free-free coefficient: 6.8e-38 in
+    # erg s^-1 cm^-3 Hz^-1, integrated over 4*pi sr.  Converting to
+    # W m^-3 and dividing by 4*pi gives 5.41e-40 per steradian.
+    frequency = np.array([80e9, 120e9])
+    ne = 2.0e19
+    ni = np.array([1.0e19, 2.0e18])
+    charge = np.array([1.0, 2.0])
+    temperature_eV = 2.0e3
+    gaunt = np.array([1.2, 1.4])
+    temperature_K = temperature_eV * 1.602176634e-19 / 1.380649e-23
+    expected = (
+        5.44e-40 * ne * np.sum(charge**2 * ni)
+        * temperature_K**-0.5
+        * np.exp(-6.62607015e-34 * frequency / (1.380649e-23 * temperature_K))
+        * gaunt
+    )
+    actual = thermal_bremsstrahlung_emissivity_si(
+        frequency, ne, ni, charge, temperature_eV, gaunt_factor=gaunt
+    )
+    np.testing.assert_allclose(actual, expected, rtol=2e-15, atol=0.0)
+    assert np.all(actual > 1e11 * 5.44e-52 * ne * np.sum(charge**2 * ni) * temperature_K**-0.5 * 1e-12)
+
+
+def test_free_free_optical_depth_uses_corrected_emissivity_via_kirchhoff():
+    case = _vacuum_case(
+        electron_density_m3=np.array([1.0e19, 1.0e19]),
+        ion_densities_m3=np.array([[1.0e19], [1.0e19]]),
+        electron_temperature_eV=np.array([2.0e3, 2.0e3]),
+        path_length_m=np.array([0.1, 0.2]),
+    )
+    result = integrate_thermal_microwave_background(**case)
+    assert np.all(result["thermal_bremsstrahlung_optical_depth"] > 0.0)
+    assert np.all(result["spectral_radiance_W_m2_sr_Hz"] > 0.0)
+    assert result["background_status"] == "plasma_emission_or_absorption_present"
