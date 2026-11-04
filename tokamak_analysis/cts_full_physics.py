@@ -40,7 +40,10 @@ from .cts_stokes_transfer import (
 )
 from .thomson_evdf import reconstruct_thomson_evdf
 from .advanced_inference import reconstruct_multiview_3d_evdf
-from .thomson_anisotropic_inference import (\n    fit_gyrotropic_bi_maxwellian_thomson,\n    fit_gyrotropic_bi_kappa_thomson,\n)
+from .thomson_anisotropic_inference import (
+    fit_gyrotropic_bi_maxwellian_thomson,
+    fit_gyrotropic_bi_kappa_thomson,
+)
 from .thomson_gap_closure import (
     reconstruct_relativistic_projected_thomson_evdf,
     reconstruct_psf_aware_thomson_profile,
@@ -618,7 +621,8 @@ __all__ = [
     "relativistic_projected_compton_kinematics",
     "reconstruct_psf_aware_thomson_profile",
     "infer_gyrotropic_bi_maxwellian_temperatures",
-    "fit_gyrotropic_bi_maxwellian_thomson",\n    "fit_gyrotropic_bi_kappa_thomson",
+    "fit_gyrotropic_bi_maxwellian_thomson",
+    "fit_gyrotropic_bi_kappa_thomson",
     "infer_three_dimensional_flow_from_thomson_projections",
     "run_advanced_thomson_physics",
 ]
