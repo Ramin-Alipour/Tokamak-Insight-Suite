@@ -423,3 +423,15 @@ def test_evdf_covariance_psd_validation_is_scale_invariant_for_small_si_units():
     invalid[1, 1] = 1.0e-24
     with pytest.raises(ValueError, match="positive semidefinite"):
         _run(wavelength, signal, background, systematic_covariance=invalid)
+
+
+def test_evdf_allows_systematic_only_weighting_with_explicit_provenance():
+    wavelength, signal, background = _case()
+    systematic = 0.4**2 * np.eye(signal.size)
+    out = _run(
+        wavelength, signal, background,
+        systematic_covariance=systematic,
+    )
+    assert out["measurement_uncertainty_model"] == "systematic_only_weighting"
+    assert out["systematic_covariance_included"] is True
+    assert out["model_discrepancy_covariance_included"] is False
