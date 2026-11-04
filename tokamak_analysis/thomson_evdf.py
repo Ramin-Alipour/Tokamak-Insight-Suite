@@ -287,9 +287,19 @@ def reconstruct_thomson_evdf(
             else residual_covariance + additive_covariance
         )
         if signal_covariance_matrix is None and background_covariance_matrix is None:
-            uncertainty_model = "model_discrepancy_and_systematic_covariance_only"
+            labels = []
+            if discrepancy_covariance_matrix is not None:
+                labels.append("model_discrepancy")
+            if systematic_covariance_matrix is not None:
+                labels.append("systematic")
+            uncertainty_model = "_plus_".join(labels) + "_only_weighting"
         else:
-            uncertainty_model += "+independent_model_discrepancy_and_systematic_covariance"
+            labels = []
+            if discrepancy_covariance_matrix is not None:
+                labels.append("model_discrepancy")
+            if systematic_covariance_matrix is not None:
+                labels.append("systematic")
+            uncertainty_model += "+independent_" + "_plus_".join(labels) + "_covariance"
 
     if residual_covariance is not None:
         try:
