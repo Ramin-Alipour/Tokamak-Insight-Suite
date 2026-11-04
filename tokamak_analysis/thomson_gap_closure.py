@@ -229,6 +229,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
     instrument_response_matrix, background_signal, velocity_grid_m_s,
     signal_uncertainty=None, signal_covariance=None,
     background_uncertainty=None, background_covariance=None,
+    model_discrepancy_covariance=None,
     include_compton_recoil=False, incident_polarization=None,
     incident_direction=None, scattered_direction=None,
     maximum_recoil_correction_fraction=0.01,
@@ -283,8 +284,56 @@ def reconstruct_relativistic_projected_thomson_evdf(
         raise ValueError("signal covariance must be finite, symmetric, and wavelength-sized")
     if bc is not None and (bc.shape != (n,n) or not np.all(np.isfinite(bc)) or not np.allclose(bc,bc.T,rtol=1e-10,atol=1e-13)):
         raise ValueError("background covariance must be finite, symmetric, and wavelength-sized")
-    residual_cov = None if sc is None and bc is None else (0 if sc is None else sc) + (0 if bc is None else bc)
-    whiten, noise_status = _whitener(n, covariance=residual_cov) if residual_cov is not None else _whitener(n)
+    measurement_covariance = (
+        (np.zeros((n, n), dtype=float) if sc is None else sc)
+        + (np.zeros((n, n), dtype=float) if bc is None else bc)
+    ) if sc is not None or bc is not None else None
+    discrepancy_covariance = None
+    if model_discrepancy_covariance is not None:
+        raw_discrepancy = np.asarray(model_discrepancy_covariance)
+        if (raw_discrepancy.dtype.kind not in "iuf"
+                or raw_discrepancy.shape != (n, n)
+                or not np.all(np.isfinite(raw_discrepancy))):
+            raise ValueError("model_discrepancy_covariance must be a finite real wavelength-sized square matrix")
+        discrepancy_covariance = 0.5 * (
+            raw_discrepancy.astype(float, copy=False)
+            + raw_discrepancy.astype(float, copy=False).T
+        )
+        scale_cov = max(
+            float(np.max(np.abs(discrepancy_covariance))),
+            np.finfo(float).tiny,
+        )
+        if not np.allclose(
+            raw_discrepancy, raw_discrepancy.T,
+            rtol=1e-9, atol=1e-11 * scale_cov,
+        ):
+            raise ValueError("model_discrepancy_covariance must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(discrepancy_covariance)
+        eigen_scale = max(
+            float(np.max(np.abs(eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if float(eigenvalues[0]) < -1e-10 * eigen_scale:
+            raise ValueError("model_discrepancy_covariance must be positive semidefinite")
+
+    if measurement_covariance is None and discrepancy_covariance is None:
+        residual_covariance = None
+    else:
+        residual_covariance = (
+            np.zeros((n, n), dtype=float)
+            if measurement_covariance is None else measurement_covariance.copy()
+        )
+        if discrepancy_covariance is not None:
+            residual_covariance += discrepancy_covariance
+
+    whiten, noise_status = (
+        _whitener(n, covariance=residual_covariance)
+        if residual_covariance is not None else _whitener(n)
+    )
+    if measurement_covariance is None and discrepancy_covariance is not None:
+        noise_status = "model_discrepancy_only_no_measurement_noise_covariance"
+    elif discrepancy_covariance is not None:
+        noise_status = "measurement_plus_independent_model_discrepancy_covariance"
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
     if include_compton_recoil and incident_polarization is None:
@@ -436,6 +485,17 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "velocity_quadrature": "trapezoidal_integral_over_velocity_in_forward_operator",
         "velocity_quadrature_weights_m_s": velocity_weights.copy(),
         "noise_model": noise_status,
+        "measurement_covariance": (
+            None if measurement_covariance is None else measurement_covariance.copy()
+        ),
+        "model_discrepancy_covariance": (
+            None if discrepancy_covariance is None else discrepancy_covariance.copy()
+        ),
+        "effective_spectral_covariance": (
+            None if residual_covariance is None else residual_covariance.copy()
+        ),
+        "model_discrepancy_included": discrepancy_covariance is not None,
+        "covariance_components_independent": True,
         "absolute_density_inferred": False,
         "assumptions": [
             "symmetric incident/scattered geometry about the scattering-vector bisector",
