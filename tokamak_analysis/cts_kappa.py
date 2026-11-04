@@ -8,7 +8,7 @@ Kappa closure.
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import gammaln
+from scipy.special import gammaln, betainc
 
 from .thomson_generalized_dispersion import generalized_landau_integral
 
@@ -39,13 +39,15 @@ def kappa_electron_susceptibility(
     wavenumber_m_inverse,
     mass_kg=ME,
     pole_imaginary_part_m_s=None,
+    minimum_velocity_grid_probability_coverage=0.999,
 ):
     """Return chi_e for the normalized 1-D marginal of an isotropic 3-D Kappa.
 
     The temperature parameter is the usual second-moment temperature, so the
-    marginal variance is k_B T / m.  The retarded Landau contour is selected by
-    a positive imaginary phase-velocity displacement.  The finite velocity
-    interval and that displacement remain explicit numerical limitations.
+    marginal variance is k_B T / m. The analytic Kappa CDF quantifies the mass
+    represented by the finite grid. Grids truncating too much of the heavy tail
+    are rejected rather than silently renormalized into an artificially narrow
+    distribution. The retarded Landau contour uses a positive imaginary pole.
     """
     raw_v = np.asarray(v)
     if raw_v.dtype.kind not in "iuf":
@@ -70,6 +72,13 @@ def kappa_electron_susceptibility(
         raise ValueError("phase_velocity_m_s must be a finite real scalar")
     if pole_imaginary_part_m_s is not None:
         _positive_real_scalar(pole_imaginary_part_m_s, "pole_imaginary_part_m_s")
+    if (isinstance(minimum_velocity_grid_probability_coverage, (bool, np.bool_))
+            or not isinstance(minimum_velocity_grid_probability_coverage,
+                              (int, float, np.integer, np.floating))):
+        raise ValueError("minimum_velocity_grid_probability_coverage must be in (0, 1]")
+    minimum_coverage = float(minimum_velocity_grid_probability_coverage)
+    if not np.isfinite(minimum_coverage) or not 0.0 < minimum_coverage <= 1.0:
+        raise ValueError("minimum_velocity_grid_probability_coverage must be in (0, 1]")
 
     # For an isotropic 3-D Kappa, integrating over the two perpendicular
     # velocity coordinates gives f_1D(v) proportional to
@@ -85,6 +94,18 @@ def kappa_electron_susceptibility(
         velocity * velocity / scale_squared
     )
     pdf = np.exp(log_pdf)
+    # Exact CDF of the normalized 1-D Kappa marginal. This avoids estimating
+    # heavy-tail coverage from a coarse-grid trapezoid integral.
+    cdf_argument = velocity**2 / (velocity**2 + scale_squared)
+    cdf = 0.5 + 0.5*np.sign(velocity)*betainc(0.5, kap-0.5, cdf_argument)
+    grid_coverage = float(cdf[-1] - cdf[0])
+    if grid_coverage < minimum_coverage:
+        raise ValueError(
+            "velocity grid captures only "
+            f"{grid_coverage:.8g} of the analytic Kappa probability mass; "
+            f"minimum_velocity_grid_probability_coverage={minimum_coverage:.8g}. "
+            "Expand the velocity grid or explicitly lower the coverage threshold."
+        )
     response = generalized_landau_integral(
         velocity,
         pdf,
@@ -102,7 +123,10 @@ def kappa_electron_susceptibility(
         "kappa": kap,
         "theta_m_s": float(np.sqrt(theta_squared)),
         "second_moment_m2_s2": float(E * te / mass),
-        "finite_velocity_grid_truncation": True,
+        "velocity_grid_probability_coverage": grid_coverage,
+        "minimum_velocity_grid_probability_coverage": minimum_coverage,
+        "finite_velocity_grid_truncation": bool(grid_coverage < 1.0 - 1e-12),
+        "finite_grid_normalization_bias_prevented": True,
         "limitations": [
             "Collisionless unmagnetized longitudinal response only.",
             "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
