@@ -127,3 +127,18 @@ derived and converged. Added a regression test for this boundary and explicit
 result metadata stating that real-frequency replacement is not performed.
 This is a physical numerical correction; near-zero nonzero bins remain at
 their measured frequencies. The exact-zero static limit remains OPEN.
+
+
+Electrostatic CTS tabulated-fast-ion boundary correction (2026-11-04):
+`cts_analysis._component_tabulated` evaluates the Landau susceptibility for a
+finite tabulated 1-D ion VDF. The previous integral included only the
+piecewise-interior derivative and omitted the distributional endpoint jumps
+when the finite-support VDF was extended by zero outside its grid. The
+susceptibility now includes
+`f(v_min)/(v_min-ζ) - f(v_max)/(v_max-ζ)` in addition to the interior
+principal-value integral and the retarded Landau residue
+`+iπ f'(v_res)` when the resonance lies inside the support. Added an
+independent analytic regression using a constant finite-support VDF, for
+which the interior derivative vanishes and the entire response comes from
+the two endpoint terms. This corrects the finite-support electrostatic CTS
+kinetic response; it does not extend the model to a 3-D fast-ion VDF.
