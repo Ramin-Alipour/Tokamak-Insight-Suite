@@ -14,7 +14,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
 
 MODEL_LABELS = {
-    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",\n    "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
