@@ -7,7 +7,7 @@ from tokamak_analysis.cts_landau_fdt import (
 
 
 def _system():
-    axis = np.linspace(-4.0e6, 4.0e6, 3)
+    axis = np.linspace(-3.0e5, 3.0e5, 3)
     species = [
         {"name": "electrons", "density_m3": 1.0e18,
          "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
@@ -48,8 +48,8 @@ def test_landau_entropy_and_matching_fdt_covariance_are_positive():
 def test_landau_resolvent_returns_density_response_and_noise_spectrum():
     system = _system()
     observation = np.zeros((2, system.operator_s_inverse.shape[0]))
-    for sl in system.species_slices:
-        observation[system.species_slices.index(sl), sl] = system.equilibrium_weights[sl]
+    for index, sl in enumerate(system.species_slices):
+        observation[index, sl] = system.equilibrium_weights[sl]
     result = landau_density_response(system, [1.0e5, 2.0e5], observation)
     assert result["response"].shape[0] == 2
     assert result["fluctuation_spectral_matrix"].shape == (2, 2, 2)
