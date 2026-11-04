@@ -457,5 +457,6 @@ __all__ = [
     "propagate_stratified_polarized_lte_stokes",
     "cold_plasma_dielectric_tensor",
     "cold_plasma_magnetoionic_modes",
+    "plasma_charge_state_moments",
     "run_advanced_thomson_physics",
 ]
