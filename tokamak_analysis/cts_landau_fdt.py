@@ -327,9 +327,45 @@ def landau_cts_dynamic_structure_factor(
         raise ValueError("species must be a sequence of species mappings")
     if len(species) != len(system.species_slices) or not species:
         raise ValueError("species must match the species used to assemble the Landau system")
-    charges = np.asarray([float(item["charge_C"]) for item in species], dtype=float)
-    if np.any(~np.isfinite(charges)) or np.any(charges == 0.0):
-        raise ValueError("every species charge_C must be finite and non-zero")
+    # The Landau operator, equilibrium weights and velocity grids were
+    # assembled for one exact species mixture.  Reusing that operator with a
+    # different mass, charge or density changes both the kinetic response and
+    # the Poisson coupling; accepting such a mismatch silently mixes two
+    # different plasmas in a single spectrum.
+    reference_species = system.metadata.get("species")
+    if not isinstance(reference_species, Sequence) or len(reference_species) != len(species):
+        raise ValueError(
+            "Landau system metadata must contain the complete assembled species contract"
+        )
+    charges = np.empty(len(species), dtype=float)
+    for index, (item, reference) in enumerate(zip(species, reference_species)):
+        if not isinstance(item, Mapping) or not isinstance(reference, Mapping):
+            raise ValueError(f"species[{index}] and its assembled reference must be mappings")
+        try:
+            actual = np.asarray(
+                [item["mass_kg"], item["charge_C"], item["density_m3"]],
+                dtype=float,
+            )
+            expected = np.asarray(
+                [reference["mass_kg"], reference["charge_C"], reference["density_m3"]],
+                dtype=float,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"species[{index}] must provide mass_kg, charge_C and density_m3"
+            ) from exc
+        if (actual.shape != (3,) or expected.shape != (3,)
+                or np.any(~np.isfinite(actual)) or np.any(~np.isfinite(expected))
+                or actual[0] <= 0.0 or actual[1] == 0.0 or actual[2] <= 0.0):
+            raise ValueError(
+                f"species[{index}] mass, non-zero charge and density must be finite and physical"
+            )
+        if not np.allclose(actual, expected, rtol=1e-12, atol=0.0):
+            raise ValueError(
+                f"species[{index}] mass_kg, charge_C and density_m3 must match "
+                "the mixture used to assemble the Landau operator"
+            )
+        charges[index] = expected[1]
     direction = np.asarray(propagation_direction, dtype=float)
     if direction.shape != (3,) or np.any(~np.isfinite(direction)) or np.linalg.norm(direction) == 0:
         raise ValueError("propagation_direction must be a finite non-zero 3-vector")
