@@ -1254,6 +1254,7 @@ def analyze_thomson_spectra(
         if (
             joint_spectral_covariance is not None
             or model_discrepancy_covariance is not None
+            or systematic_covariance is not None
             or lsf_unc is not None
         ):
             require_zero_scattered_power_covariance(
@@ -1283,6 +1284,7 @@ def analyze_thomson_spectra(
         if (
             joint_spectral_covariance is not None
             or model_discrepancy_covariance is not None
+            or systematic_covariance is not None
             or lsf_unc is not None
         ):
             require_zero_scattered_power_covariance(
