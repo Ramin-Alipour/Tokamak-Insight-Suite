@@ -867,7 +867,20 @@ def thomson_electron_temperature_from_spectral_width(intrinsic_sigma_nm, laser_w
     if not 0 < angle < math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi).")
     supplied=(sigma_intrinsic_sigma_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
     if any(v is not None for v in supplied) and not all(v is not None for v in supplied): raise ValueError("Provide all three independent uncertainties, or none.")
-    sine=math.sin(angle/2); te=(sigma/laser)**2*510998.95069/(4*sine**2); out={"electron_temperature_eV":te}
+    sine=math.sin(angle/2); te=(sigma/laser)**2*510998.95069/(4*sine**2)
+    theta_e = te / 510998.95069
+    out={
+        "electron_temperature_eV":te,
+        "temperature_identifiability":"conditional_on_non_collective_isotropic_nonrelativistic_maxwellian_model",
+        "model_assumption":"intrinsic Gaussian spectral width is the thermal Doppler width of an isotropic non-relativistic Maxwellian; flow broadening, non-Maxwellian tails, unresolved populations and residual instrumental broadening must be handled by the selected spectral forward model",
+        "relativistic_temperature_parameter_theta_e":theta_e,
+        "nonrelativistic_screen_status":(
+            "within_conservative_theta_e_screen"
+            if theta_e <= 0.01 else
+            "outside_conservative_theta_e_screen_use_relativistic_model"
+        ),
+        "screen_threshold_theta_e":0.01,
+    }
     if all(v is not None for v in supplied):
         ss,sl,sa=[_nonnegative(n,v) for n,v in zip(("sigma_intrinsic_sigma_nm","sigma_laser_wavelength_nm","sigma_scattering_angle_rad"),supplied)]
         out["uncertainty_electron_temperature_eV"]=te*math.sqrt((2*ss/sigma)**2+(2*sl/laser)**2+(math.cos(angle/2)/sine*sa)**2)
