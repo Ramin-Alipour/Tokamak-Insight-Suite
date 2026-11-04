@@ -40,3 +40,32 @@ def test_spitzer_cts_collision_frequency_rejects_invalid_coulomb_logarithm(bad):
             1.0e19, 1000.0, ions, [1.0], 500.0,
             coulomb_logarithm=bad,
         )
+
+def test_species_conductivity_uses_physical_collision_rate_separately_from_numerical_width():
+    from tokamak_analysis import cts_full_em
+
+    species = {
+        "mass": cts_full_em.ME,
+        "charge": -cts_full_em.E_CHARGE,
+        "density": 1.0e19,
+        "temperature": 1000.0,
+        "flow": np.zeros(3),
+    }
+    common = dict(
+        omega=2.0 * np.pi * 1.0e9,
+        k_vector=np.array([12.0, 0.0, 20.0]),
+        magnetic_field_T=np.array([0.0, 0.0, 2.0]),
+        species=species,
+        harmonic_order=2,
+        quadrature_order=4,
+        damping_rate_rad_s=1.0,
+    )
+    collisionless = cts_full_em._species_conductivity(
+        **common, collision_frequency_rad_s=0.0
+    )
+    collisional = cts_full_em._species_conductivity(
+        **common, collision_frequency_rad_s=2.0e5
+    )
+    assert np.all(np.isfinite(collisional))
+    assert not np.allclose(collisional, collisionless)
+
