@@ -122,3 +122,65 @@ def propagate_stokes_slab(
         ],
         "coefficient_provenance": "externally supplied magnetoionic coefficients; not inferred from scalar magnetic-field magnitude",
     }
+
+
+
+def propagate_polarized_lte_stokes(
+    frequency_Hz,
+    temperature_K,
+    incident_stokes,
+    *,
+    alpha_I_m_inverse,
+    alpha_Q_m_inverse=0.0,
+    alpha_U_m_inverse=0.0,
+    alpha_V_m_inverse=0.0,
+    rho_Q_m_inverse=0.0,
+    rho_U_m_inverse=0.0,
+    rho_V_m_inverse=0.0,
+    path_length_m,
+):
+    """Propagate polarized LTE radiation using Kirchhoff's law.
+
+    For the Planck equilibrium Stokes vector S_eq=(B_nu,0,0,0), polarized
+    Kirchhoff balance requires j=M S_eq.  Consequently the emissivity vector
+    is B_nu times the first column of the Mueller absorption/propagation
+    matrix, including dichroic Q/U/V emission.  This makes S_eq an exact
+    stationary solution even when Faraday rotation/conversion is non-zero.
+
+    Coefficients are local magnetoionic inputs in m^-1.  This routine closes
+    their LTE source consistently; it does not derive them from |B| or assume
+    LTE for a non-LTE plasma.
+    """
+    from .cts_em_background import planck_spectral_radiance
+
+    nu = np.asarray(frequency_Hz)
+    temp = np.asarray(temperature_K)
+    if nu.dtype.kind not in "iuf" or nu.ndim != 0:
+        raise ValueError("frequency_Hz must be a positive finite real scalar")
+    if temp.dtype.kind not in "iuf" or temp.ndim != 0:
+        raise ValueError("temperature_K must be a positive finite real scalar")
+    nu_value, temp_value = float(nu), float(temp)
+    if (not np.isfinite(nu_value) or nu_value <= 0.0
+            or not np.isfinite(temp_value) or temp_value <= 0.0):
+        raise ValueError("frequency_Hz and temperature_K must be positive and finite")
+
+    matrix = stokes_mueller_absorption_matrix(
+        alpha_I_m_inverse, alpha_Q_m_inverse, alpha_U_m_inverse,
+        alpha_V_m_inverse, rho_Q_m_inverse, rho_U_m_inverse,
+        rho_V_m_inverse,
+    )
+    source = float(planck_spectral_radiance(nu_value, temp_value))
+    emissivity = source * matrix[:, 0]
+    result = propagate_stokes_slab(
+        incident_stokes, emissivity, matrix, path_length_m
+    )
+    result.update({
+        "frequency_Hz": nu_value,
+        "temperature_K": temp_value,
+        "planck_radiance_W_m2_sr_Hz": source,
+        "lte_emissivity_stokes_W_m3_sr_Hz": emissivity,
+        "kirchhoff_relation": "j_stokes = M_mueller @ [B_nu(T),0,0,0]",
+        "source_closure": "polarized_LTE_Planck_Kirchhoff",
+        "coefficient_provenance": "explicit magnetoionic absorption and birefringence coefficients",
+    })
+    return result
