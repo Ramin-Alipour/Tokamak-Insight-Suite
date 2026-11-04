@@ -11,8 +11,6 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 
 EPS0 = 8.8541878128e-12
-C = 299792458.0
-
 
 def _real_scalar(value, name, *, positive=False, nonnegative=False):
     if isinstance(value, (bool, np.bool_)) or not isinstance(
