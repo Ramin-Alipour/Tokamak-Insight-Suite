@@ -286,10 +286,10 @@ def integrate_thermal_microwave_background(
                 raise ValueError("mode-resolved ECE absorption must contain at least one mode")
             if ece_mode_weights is None:
                 raise ValueError("ece_mode_weights is required for mode-resolved ECE absorption")
-            mode_weights = np.asarray(ece_mode_weights, dtype=float)
-            if (mode_weights.shape != (n_modes,) or np.any(~np.isfinite(mode_weights))
-                    or np.any(mode_weights < 0.0) or not np.isclose(mode_weights.sum(), 1.0, rtol=1e-8, atol=1e-10)):
-                raise ValueError("ece_mode_weights must be a non-negative length-n_modes vector summing to one")
+            mode_weights = _real_array(ece_mode_weights, "ece_mode_weights")
+            if (mode_weights.shape != (n_modes,) or np.any(mode_weights < 0.0)
+                    or not np.isclose(mode_weights.sum(), 1.0, rtol=1e-8, atol=1e-10)):
+                raise ValueError("ece_mode_weights must be a non-negative real length-n_modes vector summing to one")
             ece_alpha = supplied_alpha
             ece_status = "independently propagated mode-resolved ECE absorption; source function selected separately"
         else:
@@ -369,14 +369,20 @@ def integrate_thermal_microwave_background(
         tau_ece_modes += ece_alpha[index].T * length[index]
     intensity = mode_weights @ intensity_modes
     # An incoherent receiver mixture attenuates as sum_m w_m exp(-tau_m),
-    # not exp(-sum_m w_m tau_m).  Report the exact effective optical depth
-    # for incident radiation as well as the mode-resolved depths.
+    # not exp(-sum_m w_m tau_m).  Evaluate the weighted transmission with a
+    # log-sum-exp reduction over *active* receiver modes.  Including a zero-
+    # weight mode in the reference minimum can underflow every contributing
+    # term (e.g. weights=[0,1], tau=[0,1000]) and spuriously return infinity.
     total_tau_by_mode = alpha_ff_total[None, :] + tau_ece_modes
-    minimum_tau = np.min(total_tau_by_mode, axis=0)
-    scaled_transmission = mode_weights @ np.exp(
-        -(total_tau_by_mode - minimum_tau[None, :])
+    active_modes = mode_weights > 0.0
+    active_log_weights = np.log(mode_weights[active_modes])
+    active_tau = total_tau_by_mode[active_modes]
+    log_terms = active_log_weights[:, None] - active_tau
+    log_scale = np.max(log_terms, axis=0)
+    log_weighted_transmission = log_scale + np.log(
+        np.sum(np.exp(log_terms - log_scale[None, :]), axis=0)
     )
-    effective_total_tau = minimum_tau - np.log(scaled_transmission)
+    effective_total_tau = -log_weighted_transmission
     has_free_free = bool(np.any(alpha_ff_total > 0.0))
     has_ece = bool(np.any(tau_ece_modes > 0.0) or (
         ece_emissivity is not None and np.any(ece_emissivity > 0.0)
