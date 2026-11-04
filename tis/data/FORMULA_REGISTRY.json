@@ -5734,5 +5734,103 @@
       ],
       "note": "Mapped to the public advanced-physics dispatcher and dashboard. This is not a conserving collisional Kappa operator, FDT noise closure, magnetized dielectric, relativistic Kappa response or Full-EM CTS vertex."
     }
+  },
+  {
+    "name": "Relativistic projected Compton kinematics and polarized Klein–Nishina weight",
+    "equation": "r=ε′_s/ε′_i=[1+(hν′_i/m_ec²)(1−cosθ′)]⁻¹; λ_s=λ_i[(1−βμ_s)/(1−βμ_i)]/r; dσ′/dΩ′=(r_e²/2)r²[r+r⁻¹−2|e′·n′_s|²]",
+    "inputs": "Strictly increasing subluminal projected electron-velocity grid v_q [m s^-1], laser wavelength [nm], scattering angle [rad]; optional incident polarization unit vector transverse to the incident ray.",
+    "output": "Thomson-limit and Compton scattered wavelengths [nm], rest-frame photon-energy ratio, rest-frame scattering-angle cosine, maximum recoil correction fraction, and relative lab-frame polarized differential-scattering weight.",
+    "assumptions": "Single scattering; electron velocity restricted to the scattering-vector direction; incident/scattered geometry symmetric about the q bisector; exact Lorentz aberration and Compton four-momentum conservation; supplied polarization is transformed to the electron rest frame. No unrestricted 3-D EVDF or absolute density is inferred.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_gap_closure.relativistic_projected_compton_kinematics",
+      "formula_key": "thomson_projected_compton_kinematics",
+      "input_specs": [
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1; finite, strictly increasing and subluminal",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; positive finite incident wavelength",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; strictly between 0 and π",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "dimensionless 3-vector; optional and transverse to the incident ray",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "thomson_scattered_wavelength_nm",
+          "unit": "nm; exact relativistic Doppler map in the zero-recoil limit"
+        },
+        {
+          "name": "compton_scattered_wavelength_nm",
+          "unit": "nm; exact single-scattering Compton map"
+        },
+        {
+          "name": "compton_energy_ratio_rest_frame",
+          "unit": "dimensionless; scattered/incident photon energy in the electron rest frame"
+        },
+        {
+          "name": "rest_frame_scattering_angle_cosine",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "maximum_recoil_correction_fraction",
+          "unit": "dimensionless; maximum 1−ε′_s/ε′_i over the velocity grid"
+        },
+        {
+          "name": "relative_lab_differential_scattering_weight",
+          "unit": "dimensionless; polarized Klein–Nishina weight including flux and aberration Jacobians, or null when polarization is omitted"
+        },
+        {
+          "name": "cross_section_weight_reference",
+          "unit": "reference scale for the returned differential weight"
+        },
+        {
+          "name": "kinematics",
+          "unit": "model identifier"
+        }
+      ],
+      "prerequisites": [
+        "One-dimensional projected velocity support parallel to the scattering vector.",
+        "Symmetric incident/scattered geometry about the scattering-vector bisector.",
+        "A transverse incident polarization vector is required to calculate the polarized Klein–Nishina weight."
+      ],
+      "uncertainty_model": "Deterministic kinematic transform. The helper does not infer uncertainties in velocity, wavelength, angle or polarization; uncertainty propagation must be performed by the enclosing inference using supplied covariance.",
+      "test_links": [
+        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
+      ],
+      "note": "This is a projected single-scattering Compton kernel. It does not recover transverse velocity structure or an unrestricted 3-D EVDF."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "projected_velocity_grid_and_declared_scattering_geometry",
+    "execution_scope": "relativistic_projected_single_scattering_compton_kinematics",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — relativistic projected EVDF and Compton recoil",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_gap_closure.relativistic_projected_compton_kinematics",
+      "function_links": [
+        "tokamak_analysis.thomson_gap_closure.relativistic_projected_compton_kinematics"
+      ],
+      "formula_key": "thomson_projected_compton_kinematics",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
+      ]
+    }
   }
 ]
