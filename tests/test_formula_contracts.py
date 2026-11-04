@@ -117,7 +117,7 @@ def test_thomson_width_temperature_is_explicitly_conditional_and_screened():
         0.001, 532.0, math.pi / 2.0
     )
     hot = thomson_electron_temperature_from_spectral_width(
-        0.05, 532.0, math.pi / 2.0
+        100.0, 532.0, math.pi / 2.0
     )
     assert cold["temperature_identifiability"].startswith("conditional_on_")
     assert cold["nonrelativistic_screen_status"] == "within_conservative_theta_e_screen"
