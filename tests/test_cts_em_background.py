@@ -320,3 +320,18 @@ def test_charge_state_moments_are_reachable_through_advanced_physics_dispatcher(
     )
     assert result["public_physics_entrypoint"] == "plasma_charge_state_moments"
     assert result["effective_charge_Zeff"] == pytest.approx(1.8e19 / 1.4e19)
+
+
+
+def test_microwave_background_carries_path_resolved_charge_state_moments():
+    case = _vacuum_case(
+        electron_density_m3=np.array([1.0e19, 1.4e19]),
+        ion_densities_m3=np.array([[1.0e19, 0.0], [1.0e19, 2.0e18]]),
+        ion_charge_states=np.array([1.0, 2.0]),
+    )
+    result = integrate_thermal_microwave_background(**case)
+    moments = result["plasma_charge_state_moments_by_path"]
+    assert len(moments) == 2
+    assert moments[0]["effective_charge_Zeff"] == pytest.approx(1.0)
+    assert moments[1]["effective_charge_Zeff"] == pytest.approx(1.8e19 / 1.4e19)
+    assert moments[1]["quasineutrality_relative_residual"] == pytest.approx(0.0, abs=1e-15)
