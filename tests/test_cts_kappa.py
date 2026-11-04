@@ -88,3 +88,20 @@ def test_analytic_kappa_tail_does_not_receive_artificial_zero_extension_edge_jum
     )
     assert result["finite_support_boundary_integral"] == 0.0j
     assert result["tail_model"].startswith("analytic_isotropic_Kappa_marginal")
+
+
+def test_kappa_landau_susceptibility_integrates_the_analytic_tail_not_the_finite_grid():
+    narrow = args()
+    wide = args()
+    wide["v"] = np.linspace(-1.2e8, 1.2e8, 4001)
+    first = kappa_electron_susceptibility(**narrow)
+    second = kappa_electron_susceptibility(**wide)
+    assert first["landau_integral_tail_complete"] is True
+    assert first["susceptibility_uses_complete_analytic_kappa_tail"] is True
+    assert first["quadrature"].endswith("minus_infinity_to_infinity")
+    assert first["integral"] == pytest.approx(second["integral"], rel=2e-7, abs=1e-12)
+    assert first["electron_susceptibility"] == pytest.approx(
+        second["electron_susceptibility"], rel=2e-7, abs=1e-12
+    )
+    assert first["landau_integral_real_absolute_error"] >= 0.0
+    assert first["landau_integral_imag_absolute_error"] >= 0.0
