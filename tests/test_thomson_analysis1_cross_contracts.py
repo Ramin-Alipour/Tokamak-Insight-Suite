@@ -202,3 +202,36 @@ def test_analysis1_public_output_identifiability_contract_matches_runtime_produc
             for item in get_analysis(analysis_id)["execution_contract"]["output_specs"]
         }
         assert "parameter_identifiability" in outputs, analysis_id
+
+
+def test_analysis1_runtime_and_packaged_registries_are_byte_and_contract_consistent():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    for registry_name in (
+        "ANALYSIS_FAMILIES.json",
+        "DIAGNOSTIC_REGISTRY.json",
+        "FORMULA_REGISTRY.json",
+    ):
+        assert (root / registry_name).read_bytes() == (
+            root / "tis" / "data" / registry_name
+        ).read_bytes(), registry_name
+
+    diagnostic_records = json.loads(
+        (root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    by_name = {record["diagnostic"]: record for record in diagnostic_records}
+    expected = {
+        1: "Thomson scattering",
+        30: "Collective Thomson / coherent scattering (CTS)",
+        46: "Thomson spatial profile reconstruction",
+        81: "Thomson spectral distribution",
+    }
+    for analysis_id, diagnostic_name in expected.items():
+        runtime_contract = get_analysis(analysis_id)["execution_contract"]
+        packaged_contract = by_name[diagnostic_name]["execution_contract"]
+        assert packaged_contract == runtime_contract, (
+            analysis_id,
+            diagnostic_name,
+        )
