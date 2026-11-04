@@ -267,6 +267,11 @@ def full_em_cts_spectral_density(
         raise ValueError("frequency_shift_Hz must be a finite non-empty vector")
     if np.any(np.diff(shifts) <= 0):
         raise ValueError("frequency_shift_Hz must be strictly increasing")
+    if np.any(shifts == 0.0):
+        raise ValueError(
+            "zero frequency shift requires a separately derived and converged static-Maxwell limit; "
+            "resonance damping is not a substitute for the real frequency"
+        )
     f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
     ne = _positive(electron_density_m3, "electron_density_m3")
     te = _positive(electron_temperature_eV, "electron_temperature_eV")
@@ -696,9 +701,10 @@ def full_em_cts_spectral_density(
             if ion_flow_projections is not None:
                 for ion_index, ion_name in enumerate(ion_names, start=1):
                     species[ion_index]["flow"] = ion_flow_projections[ion_name] * khat_flow
+        # Preserve the measured real frequency shift exactly.  The positive
+        # damping term belongs only in kinetic resonance denominators; it must
+        # never replace or floor the physical omega used by Maxwell's equations.
         omega = 2.0 * np.pi * shift
-        if abs(omega) < damping:
-            omega = np.copysign(damping, omega if omega else 1.0)
         sigmas = []
         fast_bare_covariances = {}
         fast_kinetic_at_frequency = []
@@ -942,6 +948,9 @@ def full_em_cts_spectral_density(
                 damping, caller_supplied=damping_rate_rad_s is not None,
                 probe_frequency_Hz=f0,
             )},
+        "real_frequency_shift_preserved": True,
+        "resonance_damping_changes_real_frequency": False,
+        "zero_frequency_static_limit_supported": False,
         "electron_thermal_relativistic_parameter": theta_e,
         "bulk_electron_closure": ("explicit_relativistic_gyrotropic_distribution" if electron_distribution is not None else "Maxwellian_Bindslev_low_temperature_closure"),
         "bulk_electron_closure_validity_status": bindslev_validity_status,
