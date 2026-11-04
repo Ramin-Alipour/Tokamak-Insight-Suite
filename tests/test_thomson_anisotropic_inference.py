@@ -249,3 +249,15 @@ def test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen():
             instrument_response_matrix=np.eye(wavelength.size),
             maximum_projected_rms_beta=1.0,
         )
+
+
+def test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen():
+    wavelength, spectra, b, q = _synthetic_spectra()
+    with pytest.raises(ValueError, match="non-relativistic validity screen"):
+        fit_gyrotropic_bi_maxwellian_thomson(
+            wavelength, spectra, laser_wavelength_nm=1064.0,
+            scattering_angle_rad=np.pi / 2.0,
+            magnetic_field_unit=b, scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            maximum_projected_rms_beta=0.001,
+        )
