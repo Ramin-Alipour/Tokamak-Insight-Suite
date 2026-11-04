@@ -6291,5 +6291,88 @@
       ],
       "note": "Brightness temperature characterizes radiance and must not be reported as the local electron temperature."
     }
+  },
+  {
+    "name": "Frequency-dependent CTS scattering wave number",
+    "equation": "k = (2π/c)√[f₀² + (f₀+Δf)² − 2f₀(f₀+Δf)cosθ]",
+    "inputs": "Probe frequency f₀ [Hz], measured spectral frequency shift Δf [Hz], scattering angle θ [rad]",
+    "output": "Scattering wave-number magnitude k [m⁻¹]",
+    "assumptions": "Single-scattering vacuum photon kinematics; fixed scattering angle over the spectral channel. The electrostatic CTS flow parameter remains the projection along the central scattering direction.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+      "formula_key": "cts_frequency_dependent_scattering_wave_number",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz; finite vector; f₀+Δf > 0",
+          "required": true
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz; positive scalar",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; (0,π]",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "scattering_wave_number_m_inverse",
+          "unit": "m⁻¹; one value per frequency shift"
+        }
+      ],
+      "prerequisites": [
+        "Vacuum single-scattering geometry",
+        "Positive incident and scattered photon frequencies"
+      ],
+      "uncertainty_model": "Deterministic geometric relation; uncertainty propagation requires supplied frequency and angle covariance and is not inferred by this helper.",
+      "limitations": [
+        "The electrostatic CTS model retains the central scattering direction for scalar flow projections; frequency-dependent q-direction rotation is not included.",
+        "Vacuum photon kinematics; refractive-index and ray-bending effects belong to the Full-EM/ray model."
+      ],
+      "function_links": [
+        "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+        "tokamak_analysis.cts_analysis.cts_spectral_density"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_scattering_wave_number_includes_scattered_photon_frequency"
+      ]
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield et al.",
+        "year": 2011,
+        "publisher": "Academic Press"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+      "function_links": [
+        "tokamak_analysis.cts_analysis._frequency_dependent_scattering_wave_number",
+        "tokamak_analysis.cts_analysis.cts_spectral_density"
+      ],
+      "formula_key": "cts_frequency_dependent_scattering_wave_number",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_scattering_wave_number_includes_scattered_photon_frequency"
+      ]
+    }
   }
 ]
