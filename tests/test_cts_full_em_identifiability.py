@@ -65,3 +65,14 @@ def test_full_em_identifiability_distinguishes_supplied_but_failed_refits():
 def test_full_em_identifiability_rejects_impossible_propagation_provenance(kwargs):
     with pytest.raises(ValueError, match="cannot be propagated unless it was supplied"):
         cts_full_em_identifiability(["D+"], **kwargs)
+
+
+def test_full_em_inversion_passes_actual_uncertainty_provenance_to_identifiability():
+    import inspect
+    from tokamak_analysis.cts_full_em import analyze_full_em_cts_spectrum
+
+    source = inspect.getsource(analyze_full_em_cts_spectrum)
+    assert "external_input_covariance_supplied=bool(out.get" in source
+    assert "external_input_covariance_propagated=bool(out.get" in source
+    assert "instrument_response_uncertainty_supplied=bool(out.get" in source
+    assert "instrument_response_uncertainty_propagated=bool(out.get" in source
