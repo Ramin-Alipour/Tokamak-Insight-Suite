@@ -1413,9 +1413,13 @@ elif page=='Spectral Analysis':
                     st.warning('The optimizer completed, but the requested physical profiles are not reportable as identified from the measured data.')
                 else:
                     st.success('Thomson spectral inference completed within the selected physical model.')
-                if result.get('spectral_bin_integration'):
+                finite_bin_channels=[
+                    channel for channel in result.get('channels',[])
+                    if channel.get('spectral_bin_integration')
+                ]
+                if finite_bin_channels:
                     st.markdown('**Finite wavelength-bin physical integration**')
-                    st.caption(result['spectral_bin_integration'])
+                    st.caption(f"Model kernel: {finite_bin_channels[0]['spectral_bin_integration']}")
                     coverage_rows=[
                         {
                             'channel_index':channel.get('channel_index'),
@@ -1424,7 +1428,7 @@ elif page=='Spectral Analysis':
                             'window_truncation_warning':channel.get('spectral_window_truncation_warning')
                                 or channel.get('spectral_window_coverage_warning'),
                         }
-                        for channel in result.get('channels',[])
+                        for channel in finite_bin_channels
                         if channel.get('captured_spectral_probability') is not None
                     ]
                     if coverage_rows:
