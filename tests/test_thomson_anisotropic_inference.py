@@ -4,6 +4,8 @@ import pytest
 from tokamak_analysis.thomson_anisotropic_inference import (
     fit_gyrotropic_bi_maxwellian_thomson,
     _apply_response_in_bin_integrated_space,
+    _gaussian_bin_average,
+    _kappa_bin_average,
 )
 
 
@@ -191,4 +193,62 @@ def test_gyrotropic_bi_kappa_rejects_fit_outside_nonrelativistic_speed_screen():
             scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
             scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
             maximum_projected_rms_beta=0.01,
+        )
+
+
+def test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins():
+    from scipy.special import ndtr
+
+    wavelength = np.array([499.70, 499.79, 499.94, 500.02, 500.21, 500.34])
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    centre, sigma = 500.0, 0.075
+
+    density, probability = _gaussian_bin_average(wavelength, centre, sigma)
+    expected = np.diff(ndtr((edges - centre) / sigma))
+
+    np.testing.assert_allclose(probability, expected, rtol=1e-13, atol=1e-15)
+    np.testing.assert_allclose(density * np.diff(edges), expected, rtol=1e-13, atol=1e-15)
+    assert np.all(density >= 0.0)
+    assert np.sum(probability) < 1.0  # finite measured window; no tail renormalization
+
+
+def test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities():
+    from scipy.special import stdtr
+
+    wavelength = np.array([499.70, 499.79, 499.94, 500.02, 500.21, 500.34])
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    laser, angle, flow, theta, kappa = 500.0, np.pi / 2.0, 2.0e4, 1.5e6, 4.2
+    q_factor = 2.0 * np.sin(angle / 2.0)
+    density, probability = _kappa_bin_average(
+        wavelength, laser, q_factor, flow, theta, kappa
+    )
+    velocity_edges = (299792458.0 / q_factor) * (1.0 - edges / laser) - flow
+    dof = 2.0 * kappa - 1.0
+    scale = theta * np.sqrt(kappa / dof)
+    expected = (
+        stdtr(dof, velocity_edges[:-1] / scale)
+        - stdtr(dof, velocity_edges[1:] / scale)
+    )
+
+    np.testing.assert_allclose(probability, expected, rtol=1e-12, atol=1e-14)
+    np.testing.assert_allclose(density * np.diff(edges), expected, rtol=1e-12, atol=1e-14)
+    assert np.all(probability >= 0.0)
+    assert np.sum(probability) < 1.0
+
+
+def test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen():
+    wavelength, spectra, b, q = _synthetic_spectra()
+    with pytest.raises(ValueError, match="maximum_projected_rms_beta"):
+        fit_gyrotropic_bi_maxwellian_thomson(
+            wavelength, spectra, laser_wavelength_nm=1064.0,
+            scattering_angle_rad=np.pi / 2.0,
+            magnetic_field_unit=b, scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            maximum_projected_rms_beta=1.0,
         )
