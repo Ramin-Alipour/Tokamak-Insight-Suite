@@ -7,7 +7,7 @@ from tokamak_analysis.cts_landau_fdt import (
 
 
 def _system():
-    axis = np.linspace(-3.0e5, 3.0e5, 3)
+    axis = np.linspace(-4.0, 4.0, 3)
     species = [
         {"name": "electrons", "density_m3": 1.0e18,
          "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
