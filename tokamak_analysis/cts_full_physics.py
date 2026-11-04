@@ -476,6 +476,12 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_mode_radiative_coefficients
     elif model == "cold_plasma_mode_group_velocity":
         solver = cold_plasma_mode_group_velocity
+    elif model == "thomson_projected_evdf":
+        solver = reconstruct_thomson_evdf
+    elif model == "thomson_relativistic_projected_evdf":
+        solver = reconstruct_relativistic_projected_thomson_evdf
+    elif model == "thomson_psf_profile_inverse":
+        solver = reconstruct_psf_aware_thomson_profile
     elif model == "gyrotropic_bi_maxwellian_anisotropy":
         solver = infer_gyrotropic_bi_maxwellian_temperatures
     elif model == "thomson_three_dimensional_flow":
@@ -516,7 +522,10 @@ __all__ = [
     "cold_plasma_mode_radiative_coefficients",
     "cold_plasma_mode_group_velocity",
     "plasma_charge_state_moments",
-    "reconstruct_thomson_evdf",\n    "reconstruct_relativistic_projected_thomson_evdf",\n    "reconstruct_psf_aware_thomson_profile",\n    "infer_gyrotropic_bi_maxwellian_temperatures",
+    "reconstruct_thomson_evdf",
+    "reconstruct_relativistic_projected_thomson_evdf",
+    "reconstruct_psf_aware_thomson_profile",
+    "infer_gyrotropic_bi_maxwellian_temperatures",
     "infer_three_dimensional_flow_from_thomson_projections",
     "run_advanced_thomson_physics",
 ]
