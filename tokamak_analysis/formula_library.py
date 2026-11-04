@@ -889,6 +889,83 @@ def thomson_velocity_projection(fitted_center_nm, laser_wavelength_nm, scatterin
     return out
 
 
+
+def thomson_velocity_projection_relativistic_exact(
+    fitted_center_nm, laser_wavelength_nm, scattering_angle_rad, *,
+    sigma_fitted_center_nm=None, sigma_laser_wavelength_nm=None,
+    sigma_scattering_angle_rad=None,
+):
+    """Exact relativistic Doppler inversion for a mono-velocity q projection.
+
+    For q_hat=(n_s-n_i)/|n_s-n_i| and an electron velocity parallel to q_hat,
+    lambda_s/lambda_0=(1-beta sin(theta/2))/(1+beta sin(theta/2)).
+    This inverts that relation without the first-order beta<<1 expansion.
+    The result is a single projected velocity, not a 3-D flow or the mean of
+    an arbitrary broad/non-Maxwellian EVDF. The centroid must represent a
+    physically fitted intrinsic line centre, not an uncorrected raw centroid.
+    """
+    center = _positive("fitted_center_nm", fitted_center_nm)
+    laser = _positive("laser_wavelength_nm", laser_wavelength_nm)
+    angle = _finite("scattering_angle_rad", scattering_angle_rad)
+    if not 0.0 < angle < math.pi:
+        raise ValueError("scattering_angle_rad must lie strictly inside (0, pi).")
+    supplied = (
+        sigma_fitted_center_nm, sigma_laser_wavelength_nm,
+        sigma_scattering_angle_rad,
+    )
+    if any(value is not None for value in supplied) and not all(
+        value is not None for value in supplied
+    ):
+        raise ValueError("Provide all three independent uncertainties, or none.")
+    ratio = center / laser
+    sine = math.sin(angle / 2.0)
+    beta = (1.0 - ratio) / (sine * (1.0 + ratio))
+    if not math.isfinite(beta) or abs(beta) >= 1.0:
+        raise ValueError("The fitted centroid implies a non-subluminal projected velocity.")
+    velocity = C_LIGHT * beta
+    result = {
+        "electron_velocity_projection_m_s": velocity,
+        "beta_parallel": beta,
+        "doppler_ratio_lambda_scattered_over_laser": ratio,
+        "kinematics": "exact_relativistic_single_projected_velocity_doppler",
+        "velocity_axis": "parallel_to_scattering_vector_q",
+        "identifiability": "one_projected_velocity_only",
+        "assumption": (
+            "the fitted intrinsic spectral centre represents a single bulk-velocity "
+            "projection; a broad distribution centroid is not generally its mean"
+        ),
+        "uncertainty_model": "not_supplied",
+    }
+    if all(value is not None for value in supplied):
+        sc, sl, sa = [
+            _nonnegative(name, value)
+            for name, value in zip(
+                ("sigma_fitted_center_nm", "sigma_laser_wavelength_nm",
+                 "sigma_scattering_angle_rad"), supplied
+            )
+        ]
+        dv_dcenter = -2.0 * C_LIGHT / (
+            sine * laser * (1.0 + ratio) ** 2
+        )
+        dv_dlaser = 2.0 * C_LIGHT * ratio / (
+            sine * laser * (1.0 + ratio) ** 2
+        )
+        dv_dangle = -0.5 * velocity / math.tan(angle / 2.0)
+        variance = (
+            (dv_dcenter * sc) ** 2
+            + (dv_dlaser * sl) ** 2
+            + (dv_dangle * sa) ** 2
+        )
+        result["uncertainty_electron_velocity_projection_m_s"] = math.sqrt(variance)
+        result["uncertainty_model"] = (
+            "first_order_independent_input_uncertainties; no unprovided "
+            "cross-covariances are assumed"
+        )
+        result["sensitivity_m_s_per_nm_center"] = dv_dcenter
+        result["sensitivity_m_s_per_nm_laser"] = dv_dlaser
+        result["sensitivity_m_s_per_rad_scattering_angle"] = dv_dangle
+    return result
+
 def thomson_density_from_scattered_power(*args, **kwargs):
     """Expose the shared polarization-aware absolute Thomson-density inversion."""
     from .thomson_scattering import density_from_thomson_scattered_power
