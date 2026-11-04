@@ -499,17 +499,18 @@ def relativistic_maxwell_juttner_spectrum(
     exact_distribution_normalization = (
         4.0*np.pi*theta*float(kve(2, 1.0/theta))
     )
-    momentum_probability_coverage = (
+    momentum_quadrature_to_analytic_ratio = (
         distribution_normalization/exact_distribution_normalization
     )
-    if (not np.isfinite(momentum_probability_coverage)
-            or momentum_probability_coverage <= 0.0
-            or momentum_probability_coverage > 1.0 + 5e-3):
+    if (not np.isfinite(momentum_quadrature_to_analytic_ratio)
+            or momentum_quadrature_to_analytic_ratio <= 0.0
+            or momentum_quadrature_to_analytic_ratio > 1.0 + 1e-4):
         raise ValueError(
             "Maxwell-Juttner momentum quadrature is inconsistent with the "
             f"analytic normalization (captured={momentum_probability_coverage:.8g}); "
             "increase radial_order or revise the momentum quadrature."
         )
+    momentum_probability_coverage = min(1.0, momentum_quadrature_to_analytic_ratio)
     if momentum_probability_coverage < 0.999:
         raise ValueError(
             "Maxwell-Juttner momentum quadrature captures only "
@@ -583,6 +584,7 @@ def relativistic_maxwell_juttner_spectrum(
         "momentum_probability_coverage": float(momentum_probability_coverage),
         "analytic_momentum_normalization": float(exact_distribution_normalization),
         "quadrature_momentum_normalization": float(distribution_normalization),
+        "quadrature_to_analytic_normalization_ratio": float(momentum_quadrature_to_analytic_ratio),
         "momentum_tail_renormalization_performed": False,
         "effective_differential_cross_section_m2_sr": float(effective_differential_cross_section),
         "fitted_centroid_nm": centroid,
