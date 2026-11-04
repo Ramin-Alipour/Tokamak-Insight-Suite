@@ -351,6 +351,38 @@ def test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_vie
     assert result["electron_velocity_covariance_m2_s2"].shape == (3, 3)
 
 
+def test_thomson_three_dimensional_flow_propagates_correlated_direction_covariance():
+    from tokamak_analysis.thomson_kinetic_models import infer_three_dimensional_flow_from_thomson_projections
+
+    directions = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [2**-0.5, 2**-0.5, 0.0],
+    ])
+    expected = np.array([1.0e5, -2.0e5, 3.0e5])
+    projections = directions @ expected
+    result = infer_three_dimensional_flow_from_thomson_projections(
+        projections,
+        directions,
+        projection_covariance_m2_s2=np.eye(4) * 1.0e4,
+        scattering_vector_covariance=np.eye(12) * 1.0e-6,
+    )
+
+    assert result["geometry_uncertainty_included"] is True
+    assert result["geometry_covariance_iterations"] >= 1
+    assert result["geometry_covariance_method"] == "iterative_first_order_tangent_plane_errors_in_variables_GLS"
+    assert result["identifiability"] == "identifiable_from_three_dimensional_view_geometry"
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["tangent_plane_scattering_vector_covariance"].shape == (12, 12)
+    assert result["effective_projection_covariance_m2_s2"].shape == (4, 4)
+    assert not np.allclose(
+        result["effective_projection_covariance_m2_s2"],
+        result["input_projection_covariance_m2_s2"],
+    )
+    np.testing.assert_allclose(result["electron_velocity_vector_m_s"], expected, rtol=1e-5, atol=1e-3)
+
+
 def test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views():
     from tokamak_analysis.thomson_kinetic_models import infer_three_dimensional_flow_from_thomson_projections
 

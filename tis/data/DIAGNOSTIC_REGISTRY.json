@@ -1140,7 +1140,7 @@
         "equation": "v_q,i = q_hat_i dot v_e",
         "input_contract": "Flow projections extracted from calibrated Thomson spectra across views, unit scattering vectors and full projection covariance.",
         "identifiability": "Requires rank-3 scattering-vector geometry; otherwise the 3-D vector is withheld.",
-        "scope": "Common subluminal bulk-flow vector across views; geometry covariance is not included."
+        "scope": "Common subluminal bulk-flow vector across views. Optional correlated Cartesian covariance of the measured scattering-vector directions is propagated by iterative first-order tangent-plane errors-in-variables GLS; without supplied direction covariance, geometry is held fixed."
       },
       {
         "model": "gyrotropic_bi_maxwellian_spectral_fit",
