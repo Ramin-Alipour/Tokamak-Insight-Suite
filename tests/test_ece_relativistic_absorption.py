@@ -43,3 +43,39 @@ def test_relativistic_kinetic_ece_requires_explicit_distribution():
     inputs["electron_distribution"] = None
     with pytest.raises((ValueError, TypeError)):
         relativistic_kinetic_ece_absorption_coefficient(**inputs)
+
+
+def test_relativistic_ece_profile_keeps_signed_absorption_and_declares_no_transfer():
+    from tokamak_analysis.ece_kinetic import solve_relativistic_kinetic_ece_profile
+
+    base = _inputs()
+    result = solve_relativistic_kinetic_ece_profile(
+        [base["frequency_Hz"]],
+        [0.1, 0.2],
+        wavevector_rad_m=np.array([base["wavevector_rad_m"], base["wavevector_rad_m"]]),
+        magnetic_field_T=np.array([base["magnetic_field_T"], base["magnetic_field_T"]]),
+        polarization=np.array([base["polarization"], base["polarization"]]),
+        electron_density_m3=[1e19, 2e19],
+        electron_distributions=[base["electron_distribution"], base["electron_distribution"]],
+        quadrature_order=4, gyrophase_points=16,
+        resonance_width_rad_s=2e7,
+    )
+    assert result["absorption_coefficient_m_inverse"].shape == (1, 2)
+    assert result["net_gain_mask"].shape == (1, 2)
+    assert result["transfer_performed"] is False
+
+
+def test_relativistic_ece_profile_requires_one_distribution_per_segment():
+    from tokamak_analysis.ece_kinetic import solve_relativistic_kinetic_ece_profile
+
+    base = _inputs()
+    with pytest.raises(ValueError, match="one explicit EVDF"):
+        solve_relativistic_kinetic_ece_profile(
+            [base["frequency_Hz"]], [0.1, 0.2],
+            wavevector_rad_m=np.array([base["wavevector_rad_m"], base["wavevector_rad_m"]]),
+            magnetic_field_T=np.array([base["magnetic_field_T"], base["magnetic_field_T"]]),
+            polarization=np.array([base["polarization"], base["polarization"]]),
+            electron_density_m3=[1e19, 2e19],
+            electron_distributions=[base["electron_distribution"]],
+            quadrature_order=4, gyrophase_points=16,
+        )

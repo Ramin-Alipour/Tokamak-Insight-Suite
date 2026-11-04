@@ -156,6 +156,80 @@ def relativistic_kinetic_ece_absorption_coefficient(
 from scipy.constants import Boltzmann as K_B, elementary_charge as E_CHARGE
 
 
+
+def solve_relativistic_kinetic_ece_profile(
+    frequency_Hz, segment_length_m, *, wavevector_rad_m, magnetic_field_T,
+    polarization, electron_density_m3, electron_distributions,
+    quadrature_order=8, gyrophase_points=32, resonance_width_rad_s=1e6,
+):
+    """Evaluate relativistic gyrotropic ECE absorption along a supplied ray.
+
+    One explicit normalized EVDF is required for each path segment. The
+    function returns signed local absorption and does not assume LTE or
+    construct an emissivity/source function for a non-Maxwellian population.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    if f.ndim == 0:
+        f = f.reshape(1)
+    if f.ndim != 1 or f.size == 0 or np.any(~np.isfinite(f)) or np.any(f <= 0):
+        raise ValueError("frequency_Hz must be a positive finite scalar or vector")
+    lengths = np.asarray(segment_length_m, dtype=float)
+    if lengths.ndim != 1 or lengths.size == 0 or np.any(~np.isfinite(lengths)) or np.any(lengths <= 0):
+        raise ValueError("segment_length_m must be a non-empty positive finite vector")
+    ns, nf = lengths.size, f.size
+
+    def stack(value, name, complex_values=False):
+        array = np.asarray(value, dtype=complex if complex_values else float)
+        if array.shape == (ns, 3):
+            array = np.broadcast_to(array[None, :, :], (nf, ns, 3))
+        if array.shape != (nf, ns, 3) or np.any(~np.isfinite(array)):
+            raise ValueError(f"{name} must have shape (n_segment,3) or (n_frequency,n_segment,3)")
+        return array
+
+    k_stack = stack(wavevector_rad_m, "wavevector_rad_m")
+    b_stack = stack(magnetic_field_T, "magnetic_field_T")
+    e_stack = stack(polarization, "polarization", complex_values=True)
+    density = np.asarray(electron_density_m3, dtype=float)
+    if density.shape != (ns,) or np.any(~np.isfinite(density)) or np.any(density <= 0):
+        raise ValueError("electron_density_m3 must contain one positive finite value per segment")
+    if not isinstance(electron_distributions, (list, tuple)) or len(electron_distributions) != ns:
+        raise ValueError("electron_distributions must contain one explicit EVDF mapping per segment")
+
+    alpha = np.empty((nf, ns), dtype=float)
+    local_results = []
+    for i in range(nf):
+        row = []
+        for j in range(ns):
+            local = relativistic_kinetic_ece_absorption_coefficient(
+                f[i], k_stack[i, j], b_stack[i, j],
+                electron_density_m3=density[j],
+                electron_distribution=electron_distributions[j],
+                polarization=e_stack[i, j],
+                quadrature_order=quadrature_order,
+                gyrophase_points=gyrophase_points,
+                resonance_width_rad_s=resonance_width_rad_s,
+            )
+            alpha[i, j] = local["absorption_coefficient_m_inverse"]
+            row.append(local)
+        local_results.append(row)
+    return {
+        "frequency_Hz": f.copy(),
+        "segment_length_m": lengths.copy(),
+        "absorption_coefficient_m_inverse": alpha,
+        "local_relativistic_responses": local_results,
+        "net_gain_mask": alpha < 0.0,
+        "profile_solver": "segmentwise_relativistic_gyrotropic_Vlasov_absorption",
+        "transfer_performed": False,
+        "limitations": [
+            "The EVDF is explicit per segment; no distribution or temperature is inferred.",
+            "Signed gain is retained. No passive LTE transfer or Kirchhoff source is assumed.",
+            "A non-LTE emissivity requires a consistent fluctuation/noise closure and is not inferred from the conductivity alone.",
+            "Ray trajectory, mode conversion and eigenmode evolution are external inputs.",
+            "Momentum, gyrophase and resonance-width convergence remain required.",
+        ],
+    }
+
+
 def integrate_kinetic_ece_radiative_transfer(
     frequency_Hz, segment_length_m, absorption_coefficient_m_inverse,
     electron_temperature_eV, *, incident_brightness_temperature_K=0.0,
