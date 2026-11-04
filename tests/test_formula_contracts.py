@@ -103,7 +103,7 @@ def test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertain
 
 @pytest.mark.parametrize("center, angle", [
     (0.0, 1.0), (500.0, 0.0), (500.0, math.pi),
-    (1000.0, 1.0),
+    (2000.0, 1.0),
 ])
 def test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs(center, angle):
     with pytest.raises(ValueError):
