@@ -472,3 +472,125 @@ def radiance_to_receiver_spectral_power(
     if not 0 < efficiency <= 1:
         raise ValueError("end_to_end_efficiency must lie in (0,1]")
     return radiance * etendue * efficiency
+
+
+
+def propagate_receiver_spectral_power_covariance(
+    spectral_radiance_W_m2_sr_Hz, *, receiver_etendue_m2_sr,
+    end_to_end_efficiency, input_covariance,
+):
+    """Propagate a complete joint covariance into receiver spectral power.
+
+    The input vector ordering is [L_nu[0], ..., L_nu[N-1], G, eta], where
+    G=A*Omega is receiver etendue and eta is end-to-end power efficiency.
+    P_nu[i] = L_nu[i] * G * eta.  Full radiance/etendue/efficiency cross
+    covariances are retained; omitted correlations are not manufactured.
+    """
+    radiance = _real_array(
+        spectral_radiance_W_m2_sr_Hz, "spectral_radiance_W_m2_sr_Hz"
+    )
+    if radiance.ndim != 1 or np.any(radiance < 0.0):
+        raise ValueError("spectral_radiance_W_m2_sr_Hz must be a non-negative vector")
+    etendue = _real_scalar(
+        receiver_etendue_m2_sr, "receiver_etendue_m2_sr", positive=True
+    )
+    efficiency = _real_scalar(
+        end_to_end_efficiency, "end_to_end_efficiency", positive=True
+    )
+    if efficiency > 1.0:
+        raise ValueError("end_to_end_efficiency must lie in (0,1]")
+    n = radiance.size
+    covariance = _real_array(input_covariance, "input_covariance")
+    if covariance.shape != (n + 2, n + 2):
+        raise ValueError(
+            "input_covariance must have shape (n_frequency+2,n_frequency+2) "
+            "in [radiance vector, etendue, efficiency] ordering"
+        )
+    scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+    if not np.allclose(covariance, covariance.T, rtol=1e-9, atol=1e-12 * scale):
+        raise ValueError("input_covariance must be symmetric")
+    covariance = 0.5 * (covariance + covariance.T)
+    eigenvalues = np.linalg.eigvalsh(covariance)
+    if eigenvalues[0] < -1e-10 * scale:
+        raise ValueError("input_covariance must be positive semidefinite")
+    jacobian = np.zeros((n, n + 2), dtype=float)
+    jacobian[:, :n] = np.eye(n) * etendue * efficiency
+    jacobian[:, n] = radiance * efficiency
+    jacobian[:, n + 1] = radiance * etendue
+    output_covariance = jacobian @ covariance @ jacobian.T
+    output_covariance = 0.5 * (output_covariance + output_covariance.T)
+    output_scale = max(
+        float(np.max(np.abs(output_covariance))), np.finfo(float).tiny
+    )
+    output_eigenvalues = np.linalg.eigvalsh(output_covariance)
+    if output_eigenvalues[0] < -1e-10 * output_scale:
+        raise ValueError("propagated receiver covariance lost positive semidefiniteness")
+    return {
+        "receiver_spectral_power_W_Hz": radiance * etendue * efficiency,
+        "receiver_spectral_power_covariance_W2_Hz2": output_covariance,
+        "receiver_spectral_power_uncertainty_W_Hz": np.sqrt(
+            np.maximum(np.diag(output_covariance), 0.0)
+        ),
+        "input_covariance_order": [
+            *[f"spectral_radiance_W_m2_sr_Hz[{i}]" for i in range(n)],
+            "receiver_etendue_m2_sr",
+            "end_to_end_efficiency",
+        ],
+        "propagation_jacobian": jacobian,
+        "uncertainty_method": "first_order_full_joint_covariance_J_C_JT",
+    }
+
+
+def integrate_receiver_spectral_power(
+    frequency_Hz, receiver_spectral_power_W_Hz, *,
+    spectral_power_covariance_W2_Hz2=None,
+):
+    """Integrate receiver spectral power over a measured nonuniform frequency grid.
+
+    Uses composite trapezoidal quadrature, represented as an explicit linear
+    weight vector. If the full spectral-power covariance is supplied, the
+    integrated-power variance is w.T @ C_P @ w, retaining spectral-bin
+    correlations. This is band-integrated receiver power in watts.
+    """
+    frequency = _positive_array(frequency_Hz, "frequency_Hz")
+    power_density = _real_array(
+        receiver_spectral_power_W_Hz, "receiver_spectral_power_W_Hz"
+    )
+    if frequency.ndim != 1 or frequency.size < 2 or np.any(np.diff(frequency) <= 0.0):
+        raise ValueError("frequency_Hz must be a strictly increasing vector with at least two samples")
+    if power_density.shape != frequency.shape or np.any(power_density < 0.0):
+        raise ValueError("receiver_spectral_power_W_Hz must be a non-negative vector matching frequency_Hz")
+    weights = np.empty_like(frequency)
+    delta = np.diff(frequency)
+    weights[0] = 0.5 * delta[0]
+    weights[-1] = 0.5 * delta[-1]
+    if frequency.size > 2:
+        weights[1:-1] = 0.5 * (delta[:-1] + delta[1:])
+    integrated_power = float(weights @ power_density)
+    result = {
+        "integrated_receiver_power_W": integrated_power,
+        "frequency_integration_weights_Hz": weights,
+        "frequency_integration_method": "composite_trapezoidal_quadrature_on_measured_nonuniform_frequency_grid",
+    }
+    if spectral_power_covariance_W2_Hz2 is not None:
+        covariance = _real_array(
+            spectral_power_covariance_W2_Hz2,
+            "spectral_power_covariance_W2_Hz2",
+        )
+        if covariance.shape != (frequency.size, frequency.size):
+            raise ValueError("spectral_power_covariance_W2_Hz2 must be square on the measured frequency grid")
+        scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+        if not np.allclose(covariance, covariance.T, rtol=1e-9, atol=1e-12 * scale):
+            raise ValueError("spectral_power_covariance_W2_Hz2 must be symmetric")
+        covariance = 0.5 * (covariance + covariance.T)
+        eigenvalues = np.linalg.eigvalsh(covariance)
+        if eigenvalues[0] < -1e-10 * scale:
+            raise ValueError("spectral_power_covariance_W2_Hz2 must be positive semidefinite")
+        variance = float(weights @ covariance @ weights)
+        if variance < -1e-10 * max(abs(variance), 1.0):
+            raise ValueError("integrated receiver-power variance is negative")
+        result["integrated_receiver_power_uncertainty_W"] = float(
+            np.sqrt(max(variance, 0.0))
+        )
+        result["integrated_receiver_power_variance_W2"] = max(variance, 0.0)
+    return result
