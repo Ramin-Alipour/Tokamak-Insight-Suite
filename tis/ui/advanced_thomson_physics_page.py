@@ -25,6 +25,22 @@ MODEL_LABELS = {
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
+}
+
+MODEL_PHYSICS_NOTES = {
+    "gyrotropic_bi_maxwellian_spectral_fit": (
+        "Physical forward model: exact Gaussian-CDF integration over each finite wavelength bin, "
+        "followed by the measured response acting on bin-integrated spectral power. "
+        "The result reports captured spectral probability without renormalizing truncated tails. "
+        "A declared projected thermal-rms beta screen and a 0.1 bulk-flow beta screen guard the "
+        "non-relativistic approximation."
+    ),
+    "gyrotropic_bi_kappa_spectral_fit": (
+        "Physical forward model: the projected bi-Kappa marginal is integrated exactly using "
+        "its Student-t CDF (nu = 2*kappa - 1) over each finite wavelength bin, before measured "
+        "response convolution. Wavelength-window tails are not renormalized."
+    ),
+}
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
@@ -183,7 +199,8 @@ EXAMPLES = {
         "initial_temperature_parallel_eV": 800.0,
         "initial_temperature_perpendicular_eV": 300.0,
         "temperature_bounds_eV": [10.0, 5000.0],
-        "flow_bounds_m_s": [-1000000.0, 1000000.0]
+        "flow_bounds_m_s": [-1000000.0, 1000000.0],
+        "maximum_projected_rms_beta": 0.1
     },
     "gyrotropic_bi_kappa_spectral_fit": {
         "wavelength_nm": np.linspace(499.65, 500.35, 141).tolist(),
@@ -202,7 +219,8 @@ EXAMPLES = {
         "initial_kappa": 4.0,
         "kappa_bounds": [1.5001, 100.0],
         "temperature_bounds_eV": [10.0, 5000.0],
-        "flow_bounds_m_s": [-1000000.0, 1000000.0]
+        "flow_bounds_m_s": [-1000000.0, 1000000.0],
+        "maximum_projected_rms_beta": 0.1
     },
     "landau_fdt_cts": {
         "angular_frequency_rad_s": [1.0e5, 2.0e5],
@@ -313,6 +331,8 @@ def render_advanced_thomson_physics_page(st) -> None:
         format_func=lambda key: MODEL_LABELS[key],
         key="ts_advanced_physics_model",
     )
+    if model in MODEL_PHYSICS_NOTES:
+        st.info(MODEL_PHYSICS_NOTES[model])
     st.caption(
         "Enter one JSON object containing the keyword arguments for the selected solver. "
         "For complex-valued arrays use {\"real\": [...], \"imag\": [...]}; both arrays must have identical shapes. "
@@ -333,6 +353,19 @@ def render_advanced_thomson_physics_page(st) -> None:
             result = run_advanced_thomson_physics(model, **config)
             safe = json_safe(result)
             st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
+            if isinstance(result, Mapping) and "captured_spectral_probability" in result:
+                coverage = np.asarray(result["captured_spectral_probability"], dtype=float).ravel()
+                st.subheader("Measured wavelength-window coverage")
+                st.write([
+                    {"view": index + 1, "captured_probability": float(value),
+                     "missing_tail_probability": float(max(0.0, 1.0 - value))}
+                    for index, value in enumerate(coverage)
+                ])
+                if result.get("spectral_window_coverage_warning"):
+                    st.warning(result["spectral_window_coverage_warning"])
+            if isinstance(result, Mapping) and "validity_screening" in result:
+                st.subheader("Non-relativistic validity screen")
+                st.json(json_safe(result["validity_screening"]))
             st.json(safe)
             st.download_button(
                 "Export advanced physics result (JSON)",
