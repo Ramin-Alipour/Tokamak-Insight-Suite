@@ -5836,5 +5836,143 @@
         "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
       ]
     }
+  },
+  {
+    "name": "Gyrotropic bi-Maxwellian optical Thomson spectral inference",
+    "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; sigma_v,q²=e T_q/m_e; lambda_s/lambda_0 ≈ 1 - q_hat·v/c",
+    "inputs": "Calibrated multi-view optical Thomson spectra, measured spectral response, laser wavelength, scattering angle, magnetic-field and scattering-vector directions",
+    "output": "T_parallel [eV], T_perpendicular [eV], per-view q-projected flow [m s^-1], fit and covariance diagnostics",
+    "assumptions": "Gyrotropic bi-Maxwellian electrons with zero heat flux; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles required to separate parallel and perpendicular temperatures",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+      "formula_key": "gyrotropic_bi_maxwellian_optical_thomson_joint_fit",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated bins",
+          "required": true
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral density; view x wavelength",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "unit 3-vector or view x 3",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "view x unit 3-vectors",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized wavelength response matrix",
+          "required": true
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full channel-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "view x wavelength; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "full channel-major additive PSD covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; emitted only when identifiable"
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; emitted only when identifiable"
+        },
+        {
+          "name": "directional_temperature_eV",
+          "unit": "eV; one projected temperature per view"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; one q-projection per view"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "residual_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "parameter covariance; withheld when anisotropy is non-identifiable"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated spectra and measured response operator",
+        "Magnetic-field and scattering-vector geometry for each view",
+        "At least two distinct squared magnetic pitch angles to identify both temperatures"
+      ],
+      "uncertainty_model": "Full channel-major measurement covariance or pointwise standard uncertainties; optional independent additive model-discrepancy covariance is added once. Geometry covariance is not inferred or propagated by this spectral fitter.",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
+        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
+      ],
+      "note": "This is a non-relativistic small-beta multi-view spectral inference model. It does not infer a general 3-D EVDF, magnetic geometry, or calibration, and it does not apply relativistic corrections. Synthetic regression tests are not experimental validation."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+      "function_links": [
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson"
+      ],
+      "formula_key": "gyrotropic_bi_maxwellian_optical_thomson_joint_fit",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
+        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
+      ]
+    }
   }
 ]
