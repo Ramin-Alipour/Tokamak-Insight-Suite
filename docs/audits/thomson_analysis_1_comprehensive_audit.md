@@ -1132,3 +1132,14 @@ Adaptive real/imaginary quadrature errors are returned separately. The finite in
 ### CTS Kappa full-tail solver dashboard and formula registration
 
 The full-axis collisionless isotropic-Kappa susceptibility is now selectable in the Advanced Analysis-1 Dashboard as `kappa_electrostatic_susceptibility`. The dashboard example supplies a finite velocity grid only for the exact CDF coverage gate; the physical Landau integral itself is evaluated over the full real axis. The public dispatcher remains the execution path. The root and packaged formula registries both declare the equation, units, required inputs, outputs, quadrature-error metadata, test link and model-domain limitations. A dashboard/dispatcher/registry contract test checks the executable path and parity of both formula registries.
+
+
+### Optical anisotropy geometry-covariance propagation (OPT-03 / OPT-11)
+
+The multi-pitch gyrotropic bi-Maxwellian inversion now accepts the full covariance of the magnetic pitch cosines `μ_i=b̂·q̂_i`. For `T_{q,i}=T_⊥+(T_∥−T_⊥)μ_i²`, the first-order geometry sensitivity is `∂T_{q,i}/∂μ_i=2μ_i(T_∥−T_⊥)`. An iterative errors-in-variables GLS updates the effective covariance
+
+```
+C_eff = C_T + diag(2 μ ΔT) C_μ diag(2 μ ΔT)
+```
+
+until the inferred temperatures converge. The geometry covariance must be positive semidefinite; measurement covariance remains positive definite. The result exposes the effective covariance, whether geometry uncertainty was included, and the iteration count. Temperature/geometry cross-covariance is not inferred. The public advanced-physics dispatcher, dashboard example, root/package formula registries and regression tests are synchronized. This propagates uncertainty in the supplied pitch cosines; it does not infer magnetic equilibrium or recover arbitrary anisotropic EVDFs.
