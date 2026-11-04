@@ -64,6 +64,40 @@ def _parameter_vector(result, names):
     return vector
 
 
+
+def _update_ray_geometry_identifiability(output, *, propagated, requested_samples, successful_samples):
+    """Keep identifiability uncertainty provenance synchronized with ray refits."""
+    identifiability = output.get("parameter_identifiability")
+    if not isinstance(identifiability, dict):
+        return
+    conditional = identifiability.setdefault("conditional", [])
+    if not isinstance(conditional, list):
+        raise ValueError("parameter_identifiability.conditional must be a list")
+    conditional[:] = [
+        item for item in conditional
+        if not (
+            isinstance(item, Mapping)
+            and item.get("parameter") == "ray_geometry_uncertainty_contribution"
+        )
+    ]
+    if propagated:
+        status = "propagated_by_complete_ray_equilibrium_beam_geometry_refits"
+    else:
+        status = "requested_but_not_propagated_insufficient_successful_geometry_refits"
+    conditional.append({
+        "parameter": "ray_geometry_uncertainty_contribution",
+        "status": status,
+        "propagated": bool(propagated),
+        "requested_samples": int(requested_samples),
+        "successful_samples": int(successful_samples),
+    })
+    identifiability["uncertainty_scope"] = (
+        "conditional local fit covariance augmented only by explicitly supplied "
+        "and successfully refitted instrument-response, local external-input, "
+        "and/or complete ray/equilibrium/beam-geometry covariance components"
+    )
+
+
 def propagate_full_em_cts_ray_geometry_uncertainty(
     *,
     inference_kwargs: Mapping,
@@ -186,6 +220,10 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
         "propagated": False,
     }
     output["ray_geometry_uncertainty"] = diagnostics
+    _update_ray_geometry_identifiability(
+        output, propagated=False, requested_samples=samples,
+        successful_samples=len(draws),
+    )
     if len(draws) < required:
         diagnostics["warning"] = "Insufficient successful geometry refits; no geometry covariance was reported."
         return output
@@ -224,6 +262,10 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
         "conditional local-fit covariance plus any successfully propagated baseline instrument-response "
         "covariance and full-forward Monte-Carlo ray/equilibrium/beam-geometry covariance; "
         "cross-covariance among jointly sampled geometry/external inputs is retained; cross-covariance with separately propagated instrument-response covariance is not included"
+    )
+    _update_ray_geometry_identifiability(
+        output, propagated=True, requested_samples=samples,
+        successful_samples=len(draws),
     )
     diagnostics.update({
         "propagated": True,
