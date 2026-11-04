@@ -287,6 +287,7 @@ def test_anisotropic_thomson_multi_pitch_model_is_wired_to_dispatcher_dashboard_
 
 def test_three_dimensional_thomson_flow_is_connected_to_dashboard_and_formula_registry():
     import json
+    import numpy as np
     from pathlib import Path
     import pytest
     from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
@@ -298,7 +299,7 @@ def test_three_dimensional_thomson_flow_is_connected_to_dashboard_and_formula_re
         velocity_projection_m_s=[1.0e5, 2.0e5, 3.0e5],
         scattering_vector_unit=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         projection_covariance_m2_s2=[[1.0e4, 0.0, 0.0], [0.0, 1.0e4, 0.0], [0.0, 0.0, 1.0e4]],
-        scattering_vector_covariance=(1.0e-6*__import__("numpy").eye(9)).tolist(),
+        scattering_vector_covariance=(1.0e-6*np.eye(9)).tolist(),
     )
     assert result["electron_velocity_vector_m_s"] == pytest.approx([1.0e5, 2.0e5, 3.0e5])
     assert result["geometry_uncertainty_included"] is True
