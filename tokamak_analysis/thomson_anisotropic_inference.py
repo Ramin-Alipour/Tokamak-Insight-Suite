@@ -56,7 +56,16 @@ def _gaussian_bin_average(wavelength_nm, centre_nm, sigma_nm):
     centre = float(centre_nm)
     if not np.isfinite(sigma) or sigma <= 0.0 or not np.isfinite(centre):
         raise ValueError("Gaussian centre must be finite and sigma must be positive")
-    probability = np.diff(ndtr((edges - centre) / sigma))
+    standardized_edges = (edges - centre) / sigma
+    lower_cdf = ndtr(standardized_edges[:-1])
+    upper_cdf = ndtr(standardized_edges[1:])
+    probability = upper_cdf - lower_cdf
+    # Avoid cancellation when both bin edges lie deep in the positive tail.
+    positive_tail = standardized_edges[:-1] > 0.0
+    probability[positive_tail] = (
+        ndtr(-standardized_edges[:-1][positive_tail])
+        - ndtr(-standardized_edges[1:][positive_tail])
+    )
     widths = np.diff(edges)
     return probability / widths, probability
 
@@ -83,9 +92,18 @@ def _kappa_bin_average(wavelength_nm, laser_wavelength_nm, scattering_q_factor,
     degrees_of_freedom = 2.0 * kappa_value - 1.0
     student_scale = theta * np.sqrt(kappa_value / degrees_of_freedom)
     # Wavelength edges map in descending velocity order.
+    upper_standardized = velocity_edges[:-1] / student_scale
+    lower_standardized = velocity_edges[1:] / student_scale
     probability = (
-        stdtr(degrees_of_freedom, velocity_edges[:-1] / student_scale)
-        - stdtr(degrees_of_freedom, velocity_edges[1:] / student_scale)
+        stdtr(degrees_of_freedom, upper_standardized)
+        - stdtr(degrees_of_freedom, lower_standardized)
+    )
+    # Use survival probabilities for positive-tail intervals to avoid 1-1
+    # cancellation in the Student-t CDF.
+    positive_tail = lower_standardized > 0.0
+    probability[positive_tail] = (
+        stdtr(degrees_of_freedom, -lower_standardized[positive_tail])
+        - stdtr(degrees_of_freedom, -upper_standardized[positive_tail])
     )
     widths = np.diff(edges)
     probability = np.maximum(probability, 0.0)
