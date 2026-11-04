@@ -366,3 +366,139 @@ def propagate_vectorial_angular_spectrum(
         "maxwell_constraint": "k_dot_E_zero_per_transverse_Fourier_component",
         "approximation_scope": "homogeneous_isotropic_segment_only; anisotropic_stratified_mode_conversion_is_separate",
     }
+
+
+
+def _periodic_derivative_matrix(size, spacing):
+    """Second-order periodic spectral-domain derivative on a uniform grid."""
+    from scipy.sparse import diags, lil_matrix
+    if size < 3:
+        raise ValueError("each periodic grid dimension must contain at least three points")
+    matrix = lil_matrix((size, size), dtype=float)
+    rows = np.arange(size)
+    matrix[rows, (rows + 1) % size] = 0.5 / spacing
+    matrix[rows, (rows - 1) % size] = -0.5 / spacing
+    return matrix.tocsr()
+
+
+def solve_3d_periodic_full_wave(
+    omega_rad_s, x_m, y_m, z_m, epsilon_r, *,
+    impressed_current_density_A_m2, solver_rtol=1e-9,
+):
+    """Solve the full vector Maxwell equation in a 3-D periodic plasma cell.
+
+    Uses a second-order finite-difference frequency-domain (FDFD) discretization
+    of curl(curl(E)) - (omega/c)^2 epsilon_r(r) E = i*omega*mu0*J.
+    The full complex 3x3 dielectric tensor may vary independently at every
+    Cartesian grid point; off-diagonal terms therefore couple all vector
+    components and permit coherent 3-D polarization/mode conversion.
+
+    Boundary condition: periodic in x, y and z (a periodic unit cell).
+    This is not an open-boundary/PML scattering solver. It is appropriate for
+    periodic media or Bloch-periodic cells at zero Bloch wavevector. Open
+    launcher/receiver ports, plasma-vacuum interfaces and outgoing radiation
+    require a separate boundary-value formulation.
+    """
+    from scipy.sparse import bmat, diags, eye, kron
+    from scipy.sparse.linalg import MatrixRankWarning, spsolve
+    import warnings
+
+    x = np.asarray(x_m, dtype=float)
+    y = np.asarray(y_m, dtype=float)
+    z = np.asarray(z_m, dtype=float)
+    for axis, name in ((x, "x_m"), (y, "y_m"), (z, "z_m")):
+        if (axis.ndim != 1 or axis.size < 3 or np.any(~np.isfinite(axis))
+                or np.any(np.diff(axis) <= 0)
+                or not np.allclose(np.diff(axis), np.diff(axis)[0], rtol=1e-9, atol=1e-14)):
+            raise ValueError(f"{name} must be a finite, uniformly spaced increasing grid with >=3 points")
+    omega = float(omega_rad_s)
+    if not np.isfinite(omega) or omega <= 0:
+        raise ValueError("omega_rad_s must be positive and finite")
+    nx, ny, nz = x.size, y.size, z.size
+    shape = (nz, ny, nx)
+    eps = np.asarray(epsilon_r, dtype=complex)
+    current = np.asarray(impressed_current_density_A_m2, dtype=complex)
+    if eps.shape == (3, 3):
+        eps = np.broadcast_to(eps, shape + (3, 3)).copy()
+    if eps.shape != shape + (3, 3) or np.any(~np.isfinite(eps)):
+        raise ValueError("epsilon_r must have shape (nz,ny,nx,3,3), or be a single 3x3 tensor")
+    if current.shape != shape + (3,) or np.any(~np.isfinite(current)):
+        raise ValueError("impressed_current_density_A_m2 must have finite shape (nz,ny,nx,3)")
+    # Passivity for exp(-i omega t): the Hermitian dissipative part must be PSD.
+    dissipative = (eps - np.swapaxes(eps.conj(), -1, -2)) / (2j)
+    dissipative = 0.5 * (dissipative + np.swapaxes(dissipative.conj(), -1, -2))
+    loss_eigenvalues = np.linalg.eigvalsh(dissipative)
+    if np.min(loss_eigenvalues) < -1e-9 * max(1.0, float(np.max(np.abs(eps)))):
+        raise ValueError("epsilon_r must be passive: its Hermitian dissipative part must be positive semidefinite")
+
+    # Flattening order is (z,y,x), so x is the fastest varying coordinate.
+    dx, dy, dz = float(x[1]-x[0]), float(y[1]-y[0]), float(z[1]-z[0])
+    Dx1 = _periodic_derivative_matrix(nx, dx)
+    Dy1 = _periodic_derivative_matrix(ny, dy)
+    Dz1 = _periodic_derivative_matrix(nz, dz)
+    Ix, Iy, Iz = eye(nx, format="csr"), eye(ny, format="csr"), eye(nz, format="csr")
+    Dx = kron(kron(Iz, Iy), Dx1, format="csr")
+    Dy = kron(kron(Iz, Dy1), Ix, format="csr")
+    Dz = kron(kron(Dz1, Iy), Ix, format="csr")
+    zero = Dx * 0.0
+    curl = bmat([
+        [zero, -Dz, Dy],
+        [Dz, zero, -Dx],
+        [-Dy, Dx, zero],
+    ], format="csr")
+    n = nx * ny * nz
+    blocks = [[None] * 3 for _ in range(3)]
+    for a in range(3):
+        for b in range(3):
+            blocks[a][b] = diags(eps[..., a, b].ravel(), format="csr")
+    epsilon_operator = bmat(blocks, format="csr")
+    k0 = omega / C
+    operator = (curl @ curl - (k0*k0) * epsilon_operator).tocsc()
+    rhs = (1j * omega * MU0 * current.reshape(-1)).astype(complex)
+    if not np.isfinite(solver_rtol) or solver_rtol <= 0:
+        raise ValueError("solver_rtol must be positive and finite")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", MatrixRankWarning)
+            solution = spsolve(operator, rhs)
+    except (MatrixRankWarning, RuntimeError, ValueError) as exc:
+        raise RuntimeError(
+            "3-D periodic Maxwell operator is singular or could not be solved; "
+            "add physically justified damping or use a non-resonant frequency"
+        ) from exc
+    if np.any(~np.isfinite(solution)):
+        raise RuntimeError("3-D periodic Maxwell solve returned non-finite fields")
+    residual = operator @ solution - rhs
+    relative_residual = float(np.linalg.norm(residual) / max(np.linalg.norm(rhs), np.finfo(float).tiny))
+    if relative_residual > max(100.0 * float(solver_rtol), 1e-7):
+        raise RuntimeError(f"3-D periodic Maxwell solve did not meet residual tolerance: {relative_residual:g}")
+    electric = np.stack([
+        solution[a*n:(a+1)*n].reshape(shape) for a in range(3)
+    ], axis=-1)
+    curl_e = (curl @ solution).reshape(3, n)
+    magnetic = np.stack([
+        curl_e[a].reshape(shape) / (1j * omega * MU0) for a in range(3)
+    ], axis=-1)
+    # Time-averaged local material absorption for the exp(-i omega t) convention.
+    absorption = 0.5 * omega * EPS0 * np.real(np.einsum(
+        "...i,...ij,...j->...", electric.conj(), dissipative, electric
+    ))
+    return {
+        "x_m": x.copy(), "y_m": y.copy(), "z_m": z.copy(),
+        "electric_field_V_m": electric,
+        "magnetic_field_A_m": magnetic,
+        "epsilon_r": eps,
+        "local_absorbed_power_density_W_m3": absorption,
+        "integrated_absorbed_power_W": float(np.sum(absorption) * dx * dy * dz),
+        "relative_linear_system_residual": relative_residual,
+        "grid_shape_nz_ny_nx": shape,
+        "boundary_condition": "three_dimensional_periodic_zero_bloch_wavevector",
+        "solver": "sparse_second_order_vector_finite_difference_frequency_domain",
+        "maxwell_operator": "curl_curl_minus_k0_squared_full_tensor_epsilon",
+        "mode_conversion": "full_coherent_3D_vector_coupling_through_spatially_varying_complex_tensor_epsilon",
+        "approximation_scope": (
+            "3-D local dielectric tensor, periodic Cartesian unit cell, second-order "
+            "finite differences; no open boundaries, PML, finite-orbit-width "
+            "nonlocality, or self-consistent plasma dielectric closure"
+        ),
+    }
