@@ -5440,7 +5440,8 @@
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_single_pitch_does_not_invent_anisotropy",
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance"
       ],
-      "note": "Physical GLS inversion of the gyrotropic pressure/temperature tensor projection. This is a constrained two-temperature model, not a general anisotropic distribution reconstruction."
+      "note": "Physical GLS inversion of the gyrotropic pressure/temperature tensor projection. This is a constrained two-temperature model, not a general anisotropic distribution reconstruction.",
+      "calibrated_measurements_to_physics": false
     },
     "references": [
       {
@@ -5463,7 +5464,7 @@
       }
     ],
     "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": true,
+    "calibrated_measurements_to_physics": false,
     "input_data_level": "directional_physical_parameters_extracted_from_measured_calibrated_spectra",
     "execution_scope": "conditional_multi_view_gyrotropic_anisotropy_inference",
     "analysis_family": "Analysis 1 — Thomson scattering",
@@ -5479,7 +5480,8 @@
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_multi_pitch_gls_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_single_pitch_does_not_invent_anisotropy",
         "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance"
-      ]
+      ],
+      "calibrated_measurements_to_physics": false
     }
   }
 ]
