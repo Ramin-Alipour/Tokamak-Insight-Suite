@@ -12,7 +12,9 @@ def test_kappa_response_is_finite_and_normalized():
     assert np.isclose(np.trapz(r["normalized_probability_density_s_m"],a["v"]),1,rtol=1e-8)
     assert np.isfinite(r["electron_susceptibility"].real)
     assert r["pole"].imag>0
-    assert r["velocity_grid_probability_coverage"] >= 0.99
+    assert r["velocity_grid_probability_coverage"] >= 0.999
+    assert np.trapz(r["analytic_kappa_pdf_s_m"], a["v"]) == pytest.approx(r["velocity_grid_probability_coverage"], rel=2e-4)
+    assert r["finite_support_probability_mass"] == pytest.approx(r["velocity_grid_probability_coverage"])
     assert r["finite_grid_normalization_bias_prevented"] is True
 
 def test_kappa_requires_kappa_above_three_halves():
