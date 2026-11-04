@@ -25,6 +25,20 @@ MODEL_LABELS = {
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
     "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
+    "relativistic_kinetic_ece_profile": "ECE — segment-resolved relativistic gyrotropic kinetic absorption (supplied ray and modes)",
+    "relativistic_kinetic_ece": "ECE — local relativistic gyrotropic Vlasov absorption kernel",
+    "microwave_background": "CTS — thermal free-free and explicitly supplied ECE microwave background transfer",
+    "multispecies_thermal_collision_matrix": "CTS — species-resolved thermal Coulomb collision matrix (not a kinetic fluctuation closure)",
+    "quantum_fdt": "CTS — symmetrized quantum fluctuation-dissipation spectrum for a supplied causal response",
+    "quantum_fdt_unsymmetrized": "CTS — unsymmetrized quantum S-greater spectrum with KMS detailed balance",
+    "polarized_lte_stokes": "CTS — polarized Stokes LTE transfer with dichroism and Faraday rotation/conversion",
+    "stratified_polarized_lte_stokes": "CTS — ordered segment-by-segment polarized LTE Stokes transfer",
+    "cold_plasma_dielectric": "CTS — local multispecies cold-plasma dielectric tensor",
+    "cold_plasma_magnetoionic_modes": "CTS — local cold-plasma magnetoionic modes and polarization eigenvectors",
+    "cold_plasma_absorbed_power_density": "CTS — local collisional wave-absorption power density",
+    "cold_plasma_mode_radiative_coefficients": "CTS — modal attenuation and explicitly selected LTE Kirchhoff emissivity",
+    "cold_plasma_mode_group_velocity": "CTS — collisionless cold-plasma group velocity and wave-normal walk-off",
+    "plasma_charge_state_moments": "CTS — quasineutrality, effective charge and multispecies charge moments",
 }
 
 EXAMPLES = {
