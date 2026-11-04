@@ -28,7 +28,7 @@ from .cts_em_background import (
     plasma_charge_state_moments,
 )
 from .cts_kappa import kappa_electron_susceptibility
-from .cts_analysis import fit_cts_ion_species_flows
+from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from .cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
@@ -451,6 +451,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = analyze_cts_microwave_background
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "cts_electrostatic_measured_spectrum_inference":
+        solver = analyze_cts_spectrum
     elif model == "cts_multi_ion_flow_inference":
         solver = fit_cts_ion_species_flows
     elif model == "multispecies_thermal_collision_matrix":
