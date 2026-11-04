@@ -5821,6 +5821,11 @@
           "name": "physical_background_zero",
           "unit": "boolean or null",
           "description": "True/false only when physical background is supplied or modelled; null when omitted."
+        },
+        {
+          "name": "collision_frequencies_s_inverse",
+          "unit": "s^-1 by thermal species",
+          "description": "Optional Spitzer/Krook resonance rates; present only when collisional_model is supplied."
         }
       ],
       "assumptions": [
@@ -6368,6 +6373,11 @@
         "name": "background_reference_parameter_covariance",
         "unit": "physical plasma-parameter covariance",
         "description": "Bootstrap refit covariance contribution from finite reference-PCA basis uncertainty; covers ne, Te, species Ti and fitted flow projections, not fast-ion shape parameters."
+      },
+      {
+        "name": "collision_frequencies_s_inverse",
+        "unit": "s^-1 by thermal species",
+        "description": "Optional Spitzer/Krook resonance rates; present only when collisional_model is supplied."
       }
     ],
     "uncertainty_model": "undefined Electrostatic CTS can add an explicitly supplied correlated model-discrepancy covariance to the measurement covariance before GLS; when supplied, reduced-chi-square overdispersion inflation is disabled. Reference-PCA bootstrap covariance is reported separately and remains conditional in the plasma-parameter covariance."
