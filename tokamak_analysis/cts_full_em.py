@@ -2118,7 +2118,9 @@ def fit_full_em_gyrotropic_population_shape(
     gyrotropic Full-EM forward solver; this is not a linear-kernel shortcut.
 
     For an electron population, electron_flow_projection_m_s must be explicitly
-    zero because a drifted relativistic gyrotropic VDF is not implemented.
+    zero to avoid double-counting an external Doppler shift. A non-zero mean
+    parallel velocity is represented by asymmetry of the fitted tabulated
+    gyrotropic EVDF and reported as a distribution moment along the magnetic field.
     For a fast-ion population, density, mass and charge state must be supplied.
     """
     from .advanced_inference import fit_nonlinear_nonnegative_distribution
