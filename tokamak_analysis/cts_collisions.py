@@ -18,10 +18,25 @@ AMU = 1.66053906660e-27
 
 
 def _positive(value, name):
+    """Validate a physical scalar before coercion; reject bool/string/complex."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a positive finite real scalar")
     x = float(value)
     if not np.isfinite(x) or x <= 0.0:
-        raise ValueError(f"{name} must be positive and finite")
+        raise ValueError(f"{name} must be a positive finite real scalar")
     return x
+
+
+def _real_vector(value, name):
+    raw = np.asarray(value)
+    if raw.dtype.kind not in "iuf" or raw.ndim != 1 or raw.size == 0:
+        raise ValueError(f"{name} must be a non-empty real numeric vector")
+    result = raw.astype(float, copy=False)
+    if np.any(~np.isfinite(result)):
+        raise ValueError(f"{name} must contain only finite values")
+    return result
 
 
 def coulomb_logarithm_electron(
@@ -72,9 +87,9 @@ def full_em_cts_coulomb_collision_rates(
     """
     ne = _positive(electron_density_m3, "electron_density_m3")
     te = _positive(electron_temperature_eV, "electron_temperature_eV")
-    ni = np.asarray(ion_densities_m3, dtype=float)
-    z = np.asarray(ion_charge_states, dtype=float)
-    masses = np.asarray(ion_masses_amu, dtype=float)
+    ni = _real_vector(ion_densities_m3, "ion_densities_m3")
+    z = _real_vector(ion_charge_states, "ion_charge_states")
+    masses = _real_vector(ion_masses_amu, "ion_masses_amu")
     if ni.ndim != 1 or ni.size == 0 or z.shape != ni.shape or masses.shape != ni.shape:
         raise ValueError("ion_densities_m3, ion_charge_states and ion_masses_amu must be matching non-empty 1-D arrays")
     if np.any(~np.isfinite(ni)) or np.any(ni < 0.0):
@@ -113,4 +128,117 @@ def full_em_cts_coulomb_collision_rates(
             "A collisional CTS spectrum requires a conserving linearized "
             "collision operator and its consistent fluctuation source/FDT."
         ),
+    }
+
+
+
+def multispecies_thermal_coulomb_collision_matrix(
+    species,
+    *,
+    coulomb_logarithm_matrix=None,
+):
+    """Return leading-log thermal test-particle collision frequencies nu_ab.
+
+    Each species mapping supplies name, density_m3, mass_kg, charge_C and
+    temperature_eV. Row a is the test population and column b the field
+    population. The Maxwellian thermal-speed estimate is
+
+      nu_ab = (4 sqrt(2 pi)/3) n_b (q_a q_b)^2 ln(Lambda_ab) /
+              ((4 pi eps0)^2 m_a^2 (vTa^2 + vTb^2)^(3/2)),
+
+    with vTs^2 = kB Ts/ms. Pair impact parameters use the reduced mass and
+    relative thermal speed; Debye screening includes every supplied species.
+
+    This is a thermal-rate matrix, not a linearized multispecies Landau
+    operator: it has no field-particle terms, conservation projection or
+    matching FDT noise and must not be used as an ad-hoc resonance width.
+    """
+    from collections.abc import Mapping, Sequence
+
+    if not isinstance(species, Sequence) or isinstance(species, (str, bytes)) or not species:
+        raise ValueError("species must be a non-empty sequence of species mappings")
+    parsed = []
+    for index, item in enumerate(species):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"species[{index}] must be a mapping")
+        name = str(item.get("name", f"species_{index}"))
+        density = _positive(item.get("density_m3"), f"species[{index}].density_m3")
+        mass = _positive(item.get("mass_kg"), f"species[{index}].mass_kg")
+        temperature = _positive(item.get("temperature_eV"), f"species[{index}].temperature_eV") * E_CHARGE
+        charge = item.get("charge_C")
+        if isinstance(charge, (bool, np.bool_)) or not isinstance(
+            charge, (int, float, np.integer, np.floating)
+        ):
+            raise ValueError(f"species[{index}].charge_C must be a finite non-zero real scalar")
+        charge = float(charge)
+        if not np.isfinite(charge) or charge == 0.0:
+            raise ValueError(f"species[{index}].charge_C must be a finite non-zero real scalar")
+        parsed.append((name, density, mass, charge, temperature))
+
+    n_species = len(parsed)
+    debye_inverse_squared = sum(
+        density * charge**2 / (EPS0 * temperature)
+        for _, density, _, charge, temperature in parsed
+    )
+    debye_length = float(1.0 / np.sqrt(debye_inverse_squared))
+    rates = np.zeros((n_species, n_species), dtype=float)
+    logs = np.zeros_like(rates)
+    impact_classical = np.zeros_like(rates)
+    impact_quantum = np.zeros_like(rates)
+    relative_thermal_speed = np.zeros_like(rates)
+    prefactor = 4.0 * np.sqrt(2.0 * np.pi) / 3.0
+
+    if coulomb_logarithm_matrix is not None:
+        raw_logs = np.asarray(coulomb_logarithm_matrix)
+        if raw_logs.dtype.kind not in "iuf" or raw_logs.shape != (n_species, n_species):
+            raise ValueError("coulomb_logarithm_matrix must be a real (n_species,n_species) matrix")
+        logs_input = raw_logs.astype(float, copy=False)
+        if np.any(~np.isfinite(logs_input)) or np.any(logs_input < 0.0):
+            raise ValueError("coulomb_logarithm_matrix must be finite and non-negative")
+        if not np.allclose(logs_input, logs_input.T, rtol=1e-10, atol=1e-12):
+            raise ValueError("coulomb_logarithm_matrix must be symmetric")
+    else:
+        logs_input = None
+
+    for a, (_, _, mass_a, charge_a, temp_a) in enumerate(parsed):
+        for b, (_, density_b, mass_b, charge_b, temp_b) in enumerate(parsed):
+            vrel2 = temp_a / mass_a + temp_b / mass_b
+            vrel = np.sqrt(vrel2)
+            reduced_mass = mass_a * mass_b / (mass_a + mass_b)
+            b_classical = abs(charge_a * charge_b) / (
+                4.0 * np.pi * EPS0 * reduced_mass * vrel2
+            )
+            b_quantum = H_BAR / (2.0 * reduced_mass * vrel)
+            b_min = max(b_classical, b_quantum)
+            log_lambda = (
+                float(logs_input[a, b]) if logs_input is not None
+                else 0.5 * np.log1p((debye_length / b_min)**2)
+            )
+            rates[a, b] = (
+                prefactor * density_b * (charge_a * charge_b)**2 * log_lambda
+                / ((4.0 * np.pi * EPS0)**2 * mass_a**2 * vrel**3)
+            )
+            logs[a, b] = log_lambda
+            impact_classical[a, b] = b_classical
+            impact_quantum[a, b] = b_quantum
+            relative_thermal_speed[a, b] = vrel
+
+    return {
+        "species_order": [item[0] for item in parsed],
+        "collision_frequency_matrix_s_inverse": rates,
+        "coulomb_logarithm_matrix": logs,
+        "debye_length_m": debye_length,
+        "classical_minimum_impact_parameter_matrix_m": impact_classical,
+        "quantum_minimum_impact_parameter_matrix_m": impact_quantum,
+        "relative_thermal_speed_matrix_m_s": relative_thermal_speed,
+        "row_definition": "test_species_a",
+        "column_definition": "field_species_b",
+        "collision_rate_model": "Maxwellian_thermal_Rutherford_small_angle_leading_log",
+        "collision_operator_status": "thermal_rates_only_no_field_particle_conservation_or_FDT",
+        "limitations": [
+            "Leading-log thermal rate estimate; not velocity-resolved.",
+            "No magnetization, relativistic, strong-coupling or quantum-degenerate corrections.",
+            "No conserving Landau operator or matching fluctuation source is constructed.",
+            "Do not use as an arbitrary CTS resonance broadening parameter.",
+        ],
     }
