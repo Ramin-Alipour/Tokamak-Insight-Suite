@@ -55,3 +55,16 @@ Regression tests cover the stationary-electron Compton wavelength shift,
 polarization-dependent Klein–Nishina weighting, the no-recoil validity screen,
 and the required polarization input. These tests establish numerical software
 contracts only; they are not experimental validation.
+
+
+The same relativistic projected inverse is now called by the canonical
+`analyze_thomson_spectra` workflow when the selected physical model is
+`non_collective_relativistic_maxwell_juttner`. It reuses the fitted
+detector-space background basis, measured response, measurement covariance,
+incident polarization, recoil switch and recoil validity threshold. The
+velocity support is obtained by numerically inverting the same relativistic
+single-electron wavelength map over the interior of the measured spectral
+range. A finite-bandwidth incident laser profile is explicitly reported as
+unsupported by this inverse rather than silently omitted. Data-only
+non-identifiability remains conditional and does not become a primary EVDF
+measurement.
