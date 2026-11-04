@@ -274,8 +274,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
             or recoil_limit >= 1.0):
         raise ValueError("maximum_recoil_correction_fraction must be finite and lie in (0, 1)")
     kinematics = relativistic_projected_compton_kinematics(
-        v, laser, angle,
-        incident_polarization=incident_polarization if include_compton_recoil else None,
+        v, laser, angle, incident_polarization=incident_polarization,
     )
     maximum_recoil = kinematics["maximum_recoil_correction_fraction"]
     if not include_compton_recoil and maximum_recoil > recoil_limit:
