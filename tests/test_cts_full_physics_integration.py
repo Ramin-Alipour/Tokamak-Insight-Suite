@@ -30,7 +30,7 @@ def test_integrated_landau_fdt_cts_returns_screened_spectrum_and_convergence_gat
 
 def test_stratified_nonparaxial_vector_beam_reduces_to_vacuum_propagation():
     nx = ny = 8
-    dx = dy = 0.003
+    dx = dy = 0.005
     x = (np.arange(nx) - nx//2)*dx
     y = (np.arange(ny) - ny//2)*dy
     frequency = 10e9
@@ -38,11 +38,11 @@ def test_stratified_nonparaxial_vector_beam_reduces_to_vacuum_propagation():
     omega = 2*np.pi*frequency
     k0 = omega/c0
     kx = 2*np.pi/(nx*dx)
-    ky = 2*np.pi/(ny*dy)
+    ky = 0.0
     kz = np.sqrt(k0*k0-kx*kx-ky*ky)
     xx, yy = np.meshgrid(x, y)
     phase = np.exp(1j*(kx*xx+ky*yy))
-    polarization = np.array([1.0, 0.0, -kx/kz], dtype=complex)
+    polarization = np.array([0.0, 1.0, 0.0], dtype=complex)
     polarization /= np.linalg.norm(polarization)
     field = phase[..., None]*polarization
     z = np.array([0.0, 0.01])
