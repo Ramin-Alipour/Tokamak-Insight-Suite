@@ -126,14 +126,55 @@ def kappa_electron_susceptibility(
         )*pdf_value
         return derivative/(complex(real_velocity, 0.0)-zeta)
 
-    integral_real, real_error = quad(
-        lambda value: float(np.real(landau_integrand(value))),
-        -np.inf, np.inf, epsabs=1e-11, epsrel=2e-8, limit=500,
+    # Resolve the narrow resonant Lorentzian explicitly.  Direct adaptive
+    # integration on (-inf,+inf) can miss it when eta is many orders smaller
+    # than the thermal speed.  Split at v_phi +/- 50 eta and integrate the
+    # central interval in t=(v-v_phi)/eta, where the pole is O(1) wide.
+    pole_half_width = 50.0*eta
+    def derivative_of_pdf(real_velocity):
+        pdf_value = np.exp(
+            log_normalization - kap*np.log1p(real_velocity**2/scale_squared)
+        )
+        return (
+            -2.0*kap*real_velocity/(scale_squared+real_velocity**2)
+        )*pdf_value
+
+    def outer_integrand(real_velocity):
+        return derivative_of_pdf(real_velocity)/(
+            complex(real_velocity, 0.0)-zeta
+        )
+
+    def central_integrand(scaled_offset):
+        real_velocity = phase_velocity + eta*scaled_offset
+        # The Jacobian dv=eta dt cancels the eta in v-zeta=eta(t-i).
+        return derivative_of_pdf(real_velocity)/(complex(scaled_offset, -1.0))
+
+    quadrature_absolute_tolerance = max(
+        np.finfo(float).tiny, 1.0e-12/scale_squared
     )
-    integral_imag, imag_error = quad(
-        lambda value: float(np.imag(landau_integrand(value))),
-        -np.inf, np.inf, epsabs=1e-11, epsrel=2e-8, limit=500,
-    )
+    def integrate_component(component):
+        central_value, central_error = quad(
+            lambda offset: float(component(central_integrand(offset))),
+            -50.0, 50.0, epsabs=quadrature_absolute_tolerance,
+            epsrel=2e-8, limit=500,
+        )
+        left_value, left_error = quad(
+            lambda value: float(component(outer_integrand(value))),
+            -np.inf, phase_velocity-pole_half_width,
+            epsabs=quadrature_absolute_tolerance, epsrel=2e-8, limit=500,
+        )
+        right_value, right_error = quad(
+            lambda value: float(component(outer_integrand(value))),
+            phase_velocity+pole_half_width, np.inf,
+            epsabs=quadrature_absolute_tolerance, epsrel=2e-8, limit=500,
+        )
+        return (
+            central_value+left_value+right_value,
+            central_error+left_error+right_error,
+        )
+
+    integral_real, real_error = integrate_component(lambda value: np.real(value))
+    integral_imag, imag_error = integrate_component(lambda value: np.imag(value))
     integral = complex(integral_real, integral_imag)
     if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
         raise ValueError("full-tail Kappa Landau integral did not converge to a finite value")
