@@ -94,6 +94,15 @@ def test_dashboard_routes_conditional_multi_ion_cts_flow_inference():
     assert result["model"] == "unmagnetized_electrostatic_multi_ion_maxwellian_cts"
     assert result["reportable_as_inferred_parameter"] is True
 
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == "cts_species_resolved_ion_flow_inference"]
+    assert len(matches) == 1
+    assert matches[0]["execution_contract"]["function_link"] == "tokamak_analysis.cts_analysis.fit_cts_ion_species_flows"
+    assert formula == packaged
+
 
 def test_dashboard_exposes_all_json_callable_advanced_physics_routes():
     from tis.ui.advanced_thomson_physics_page import MODEL_LABELS
