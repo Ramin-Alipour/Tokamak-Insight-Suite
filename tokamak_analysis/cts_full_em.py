@@ -1768,6 +1768,20 @@ def analyze_full_em_cts_spectrum(
         "physical_background_status": physical_background_status,
         "physical_background_zero": physical_background_zero,
         "physical_background_zero_status": physical_background_zero_status,
+        "background_state": (
+            "uncharacterized_constant_offset"
+            if supplied_physical_background is None and physical_background_radiative_transfer is None
+            else "explicit_physical_background_plus_profiled_constant_offset"
+        ),
+        "background_state_is_explicit": (
+            supplied_physical_background is not None or physical_background_radiative_transfer is not None
+        ),
+        "background_zero_assumption": False,
+        "background_state_provenance": (
+            "no_fixed_physical_background_supplied; a detector-space constant offset is profiled, and the physical background is unknown rather than assumed zero"
+            if supplied_physical_background is None and physical_background_radiative_transfer is None
+            else "researcher-supplied physical background or explicit radiative-transfer model; the profiled constant offset remains a separate nuisance parameter"
+        ),
         "physical_background_transfer_diagnostics": physical_background_transfer_diagnostics,
         "physical_background_covariance_W2_per_Hz2": None if physical_background_covariance is None else physical_background_covariance.copy(),
         "physical_background_covariance_used_in_gls": physical_background_covariance is not None,
