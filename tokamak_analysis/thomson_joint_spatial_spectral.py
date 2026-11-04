@@ -144,7 +144,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
-    model_discrepancy_covariance=None,
+    model_discrepancy_covariance=None, regularization_sensitivity_strengths=None,
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
@@ -216,6 +216,17 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie strictly between 0 and pi")
     if not np.isfinite(lam_reg) or lam_reg < 0:
         raise ValueError("regularization_strength must be finite and non-negative")
+    sensitivity_strengths = None
+    if regularization_sensitivity_strengths is not None:
+        sensitivity_strengths = _real_array(
+            regularization_sensitivity_strengths, "regularization_sensitivity_strengths"
+        )
+        if (sensitivity_strengths.ndim != 1 or sensitivity_strengths.size < 2
+                or np.any(sensitivity_strengths <= 0.0)
+                or np.any(np.diff(sensitivity_strengths) <= 0.0)):
+            raise ValueError(
+                "regularization_sensitivity_strengths must contain at least two strictly increasing positive finite values"
+            )
     if signal_uncertainty is not None and joint_spectral_covariance is not None:
         raise ValueError("supply signal_uncertainty or joint_spectral_covariance, not both")
 
@@ -541,7 +552,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         if physical_covariance is not None else None
     )
     n = r.size
-    return {
+    result = {
         "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
         "analysis_status": ("model_domain_rejected" if fit.success and not model_domain_valid else "completed" if fit.success else "optimizer_not_converged"),
         "primary_result_status": primary_status,
@@ -687,3 +698,76 @@ def reconstruct_joint_thomson_spatial_spectra(
         },
         "experimental_validation": "not_performed; numerical software inference only",
     }
+
+    if sensitivity_strengths is not None:
+        sensitivity_profiles = []
+        sensitivity_candidates = []
+        for strength in sensitivity_strengths:
+            candidate = reconstruct_joint_thomson_spatial_spectra(
+                wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix,
+                laser_wavelength_nm=laser_wavelength_nm,
+                scattering_angle_rad=scattering_angle_rad,
+                instrument_response=instrument_response,
+                laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
+                laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
+                signal_uncertainty=signal_uncertainty,
+                joint_spectral_covariance=joint_spectral_covariance,
+                model_discrepancy_covariance=model_discrepancy_covariance,
+                regularization_sensitivity_strengths=None,
+                regularization_strength=float(strength),
+                positive_amplitude=positive_amplitude,
+                max_nfev=max_nfev,
+                background_model=background_model,
+                background_degree=background_degree,
+                background_interior_knots=background_interior_knots,
+                background_templates=background_templates,
+                physical_model=physical_model,
+                kappa_index=kappa_index,
+                fit_kappa_index=fit_kappa_index,
+                incident_polarization=incident_polarization,
+                radial_order=radial_order,
+                angular_order=angular_order,
+                maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
+            )
+            numerical = candidate["optimizer_candidate"]
+            profile = np.concatenate((
+                np.asarray(numerical["electron_temperature_profile_eV"], dtype=float),
+                np.asarray(numerical["electron_velocity_projection_profile_m_s"], dtype=float),
+                np.asarray(numerical["relative_spectral_amplitude_profile"], dtype=float),
+            ))
+            if not np.all(np.isfinite(profile)):
+                raise ValueError(
+                    "regularization sensitivity produced a non-finite numerical profile candidate"
+                )
+            sensitivity_profiles.append(profile)
+            sensitivity_candidates.append({
+                "regularization_strength": float(strength),
+                "optimizer_success": bool(candidate["optimizer"]["success"]),
+                "primary_result_status": candidate["primary_result_status"],
+                "data_only_jacobian_rank": int(candidate["optimizer"]["data_only_jacobian_rank"]),
+                "parameter_count": int(candidate["optimizer"]["parameter_count"]),
+            })
+        profile_matrix = np.asarray(sensitivity_profiles, dtype=float)
+        profile_names = (
+            [f"Te_{i}_eV" for i in range(n)]
+            + [f"flow_projection_{i}_m_s" for i in range(n)]
+            + [f"relative_amplitude_{i}" for i in range(n)]
+        )
+        result["regularization_sensitivity"] = {
+            "strengths": sensitivity_strengths.copy(),
+            "selected_strength": lam_reg,
+            "profile_parameter_order": profile_names,
+            "profile_candidates": profile_matrix,
+            "profile_mean": profile_matrix.mean(axis=0),
+            "profile_standard_deviation": profile_matrix.std(axis=0, ddof=1),
+            "profile_covariance_across_regularization": np.atleast_2d(
+                np.cov(profile_matrix, rowvar=False)
+            ),
+            "candidate_diagnostics": sensitivity_candidates,
+            "interpretation": (
+                "regularization-choice sensitivity of numerical profile candidates; "
+                "not measurement uncertainty and not a substitute for data-only identifiability"
+            ),
+        }
+    return result

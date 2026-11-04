@@ -983,6 +983,7 @@ elif page=='Spectral Analysis':
                 st.caption('The selected nuisance basis is fitted simultaneously with each measured Thomson spectrum. It is not interpreted as plasma emission.')
             spatial_mixing_upload=None
             spatial_regularization_text='0'
+            spatial_regularization_sensitivity_text=''
             spatial_background_model='linear'
             spatial_background_degree=2
             spatial_background_interior_knots=3
@@ -992,6 +993,11 @@ elif page=='Spectral Analysis':
             if joint_spatial_spectral:
                 spatial_mixing_upload=st.file_uploader('Fixed measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
                 spatial_regularization_text=st.text_input('Spatial curvature regularization strength (dimensionless numerical control; explicit)',value='0',key='ts_infer_spatial_regularization')
+                spatial_regularization_sensitivity_text=st.text_input(
+                    'Optional regularization-sensitivity strengths (comma-separated, strictly increasing and positive)',
+                    value='',key='ts_infer_spatial_regularization_sensitivity',
+                    help='Runs the complete joint spectral inverse at each supplied strength. The resulting profile spread is reported separately from measurement uncertainty.',
+                )
                 spatial_background_model=st.selectbox(
                     'Joint detector-background basis',
                     ['constant','linear','polynomial','cubic_spline','templates'],
@@ -1107,6 +1113,7 @@ elif page=='Spectral Analysis':
                 'spatial_background_interior_knots': spatial_background_interior_knots,
                 'spatial_background_templates_upload': _ts_upload_digest(spatial_background_templates_upload),
                 'spatial_regularization_strength': spatial_regularization_text,
+                'spatial_regularization_sensitivity_strengths': spatial_regularization_sensitivity_text,
                 'identity_response': identity_response,
                 'relativistic_incident_direction': relativistic_incident_direction_text,
                 'relativistic_incident_direction_uncertainty': relativistic_incident_direction_unc_text,
@@ -1252,6 +1259,13 @@ elif page=='Spectral Analysis':
                             'spatial_background_degree':int(spatial_background_degree),
                             'spatial_background_interior_knots':int(spatial_background_interior_knots),
                         })
+                        if spatial_regularization_sensitivity_text.strip():
+                            strengths = [
+                                _parse_ts_scalar(item.strip(),'Regularization-sensitivity strength',minimum=1e-300)
+                                for item in spatial_regularization_sensitivity_text.split(',')
+                                if item.strip()
+                            ]
+                            kwargs['regularization_sensitivity_strengths']=strengths
                         if spatial_background_model=='templates':
                             if spatial_background_templates_upload is None:
                                 raise ValueError('Upload the researcher-supplied background template matrix for the templates background model.')

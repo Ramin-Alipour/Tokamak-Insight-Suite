@@ -215,3 +215,16 @@ covariance scaling, discrepancy-only weighting and invalid/singular matrices.
 This closes one end-to-end covariance-propagation gap; it does not infer
 discrepancy from residuals or establish the remaining OPT/PROF/CTS
 requirements. CI on the resulting commit must still be checked.
+
+
+PROF-07 optical joint-inverse regularization-choice sensitivity (2026-11-04):
+the wavelength-resolved spatial Thomson inverse now optionally reruns the
+complete measured-spectrum fit over a researcher-supplied, strictly increasing
+positive regularization grid. It returns the candidate Te, projected-flow and
+relative-amplitude profiles at every strength, their across-strength spread
+and covariance, and per-run optimizer/data-rank diagnostics. This sensitivity
+is explicitly separate from the data-only measurement covariance and cannot
+promote a rank-deficient profile to an identified measurement. The public
+workflow, Dashboard control and profile registry input contract are connected;
+regression tests cover output shape, labeling and invalid grids. The grid is
+optional and no default regularization scale is invented.

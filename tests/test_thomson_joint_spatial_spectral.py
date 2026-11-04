@@ -416,3 +416,35 @@ def test_joint_inverse_accepts_discrepancy_only_and_rejects_invalid_discrepancy_
             scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
             model_discrepancy_covariance=singular,
         )
+
+
+def test_joint_inverse_reports_regularization_choice_sensitivity_separately():
+    x, y, r, h, *_ = _synthetic_case()
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        regularization_strength=1.0e-5,
+        regularization_sensitivity_strengths=[1.0e-7, 1.0e-3],
+    )
+    sensitivity = out["regularization_sensitivity"]
+    assert sensitivity["strengths"].tolist() == [1.0e-7, 1.0e-3]
+    assert sensitivity["selected_strength"] == pytest.approx(1.0e-5)
+    assert sensitivity["profile_candidates"].shape == (2, 3*r.size)
+    assert sensitivity["profile_standard_deviation"].shape == (3*r.size,)
+    assert "not measurement uncertainty" in sensitivity["interpretation"]
+    assert len(sensitivity["candidate_diagnostics"]) == 2
+
+
+@pytest.mark.parametrize(
+    "strengths",
+    [[1.0e-4], [1.0e-3, 1.0e-4], [0.0, 1.0e-3], [1.0e-3, np.inf]],
+)
+def test_joint_inverse_rejects_invalid_regularization_sensitivity_grid(strengths):
+    x, y, r, h, *_ = _synthetic_case()
+    with pytest.raises(ValueError, match="strictly increasing positive finite values"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+            regularization_sensitivity_strengths=strengths,
+        )

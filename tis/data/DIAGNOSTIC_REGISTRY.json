@@ -7089,6 +7089,12 @@
           "unit": "full channel-major spectral-intensity covariance",
           "required": false,
           "description": "Optional finite symmetric positive-semidefinite covariance of optical forward-model discrepancy, shaped (Nchannel × Nλ, Nchannel × Nλ) in channel-major order. It is added once to the supplied measurement covariance; cross-covariance with measurement noise is assumed zero. It may be used alone only when positive definite."
+        },
+        {
+          "name": "regularization_sensitivity_strengths",
+          "unit": "strictly increasing positive dimensionless regularization strengths",
+          "required": false,
+          "description": "Optional grid of at least two strictly increasing positive strengths. The full measured-spectrum spatial inverse is rerun at each value; profile spread is reported as regularization-choice sensitivity, never as measurement uncertainty."
         }
       ],
       "output_specs": [
