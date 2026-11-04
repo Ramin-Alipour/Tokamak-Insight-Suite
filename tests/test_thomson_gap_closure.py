@@ -406,3 +406,33 @@ def test_nonuniform_velocity_grid_uses_composite_trapezoid_weights():
     expected = np.r_[0.5 * steps[0], 0.5 * (steps[:-1] + steps[1:]), 0.5 * steps[-1]]
     np.testing.assert_allclose(result["velocity_quadrature_weights_m_s"], expected)
     assert result["regularization_discretization"] == "nonuniform_quadratic_second_derivative_with_dual_cell_quadrature"
+
+
+def test_projected_evdf_reports_total_fit_including_structured_background():
+    wavelength = np.linspace(520.0, 544.0, 101)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    background = 0.03 + 0.01 * (wavelength - wavelength.mean()) / np.ptp(wavelength)
+    scattered = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    measured = background + scattered
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        velocity_grid_m_s=velocity,
+        regularization_strength=1e-3,
+    )
+    np.testing.assert_allclose(
+        result["fitted_spectrum"],
+        result["fitted_background_spectrum"] + result["fitted_scattered_spectrum"],
+        rtol=1e-12, atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        result["residual"], measured - result["fitted_spectrum"],
+        rtol=1e-12, atol=1e-12,
+    )
+    np.testing.assert_allclose(result["fitted_background_spectrum"], background)
+    assert result["residual_definition"] == (
+        "measured_total_signal_minus_fitted_background_and_scattered_signal"
+    )
+
