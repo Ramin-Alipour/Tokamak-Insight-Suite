@@ -252,3 +252,31 @@ def test_optical_model_validity_is_declared_in_python_and_json_registries():
     json_outputs = {item["name"] for item in entry["execution_contract"]["output_specs"]}
     assert "model_validity" in json_outputs
     assert "tokamak_analysis.thomson_identifiability.optical_model_validity" in entry["implementation_functions"]
+
+
+def test_anisotropic_thomson_multi_pitch_model_is_wired_to_dispatcher_dashboard_and_formula_registry():
+    import json
+    from pathlib import Path
+    import pytest
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    root = Path(__file__).resolve().parents[1]
+    model = "gyrotropic_bi_maxwellian_anisotropy"
+    result = run_advanced_thomson_physics(
+        model,
+        projected_temperature_eV=[180.0, 105.0, 80.0],
+        magnetic_pitch_cosine=[1.0, 0.5, 0.0],
+        projected_temperature_covariance_eV2=[[4.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 4.0]],
+    )
+    assert result["electron_temperature_parallel_eV"] == pytest.approx(180.0)
+    assert result["electron_temperature_perpendicular_eV"] == pytest.approx(80.0)
+    assert result["public_physics_entrypoint"] == model
+
+    dashboard = (root/"tis"/"ui"/"advanced_thomson_physics_page.py").read_text(encoding="utf-8")
+    assert model in dashboard
+    formula = json.loads((root/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_formula = json.loads((root/"tis"/"data"/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "thomson_gyrotropic_bimaxwellian_anisotropy"
+    matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
+    assert len(matches) == 1
+    assert matches == [item for item in packaged_formula if item.get("execution_contract", {}).get("formula_key") == key]
