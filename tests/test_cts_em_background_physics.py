@@ -145,3 +145,34 @@ def test_path_and_frequency_resolved_gaunt_factor_is_used_per_path():
     assert np.all(np.isfinite(resolved["spectral_radiance_W_m2_sr_Hz"]))
     assert np.all(resolved["spectral_radiance_W_m2_sr_Hz"] >=
                   scalar["spectral_radiance_W_m2_sr_Hz"])
+
+
+
+def test_free_free_reports_dimensionless_relativistic_regime_without_fake_correction():
+    from tokamak_analysis.cts_em_background import E_CHARGE, C
+
+    frequency = np.array([100.0e9, 150.0e9])
+    temperatures = np.array([2.0e3, 2.0e6])
+    result = integrate_thermal_microwave_background(
+        frequency,
+        np.array([0.1, 0.2]),
+        temperatures,
+        electron_density_m3=np.array([1.0e19, 1.0e19]),
+        ion_densities_m3=np.array([[1.0e19], [1.0e19]]),
+        ion_charge_states=np.array([1.0]),
+    )
+    screening = result["free_free_relativistic_screening"]
+    expected = temperatures * E_CHARGE / (9.1093837015e-31 * C**2)
+    np.testing.assert_allclose(
+        screening["electron_temperature_parameter_kT_over_mec2_by_path"],
+        expected,
+        rtol=2e-15,
+    )
+    np.testing.assert_allclose(
+        screening["photon_recoil_parameter_hnu_over_mec2"],
+        6.62607015e-34 * frequency / (9.1093837015e-31 * C**2),
+        rtol=2e-15,
+    )
+    assert screening["maximum_electron_temperature_parameter_kT_over_mec2"] == np.max(expected)
+    assert screening["relativistic_corrections_applied"] is False
+    assert screening["model_scope"] == "nonrelativistic_Maxwellian_free_free_only"
