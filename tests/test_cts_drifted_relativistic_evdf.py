@@ -82,3 +82,19 @@ def test_relativistic_three_wave_vertex_scales_with_incident_field_amplitude():
         incident_electric_field=np.array([0.0, 2.0, 0.0]), **common
     )["current_vertex_A_m2_per_V_m"]
     np.testing.assert_allclose(doubled, 2.0 * unit, rtol=2e-10, atol=1e-30)
+
+
+@pytest.mark.parametrize("bad_value", [True, "100000", 1.0 + 0.0j])
+def test_relativistic_distribution_rejects_coerced_temperature_and_mass(bad_value):
+    with pytest.raises(ValueError, match="positive finite real scalar"):
+        _momentum_grid(
+            {"kind": "relativistic_maxwell_juttner", "temperature_eV": bad_value},
+            9.1093837015e-31,
+            16,
+        )
+    with pytest.raises(ValueError, match="positive finite real scalar"):
+        _momentum_grid(
+            {"kind": "relativistic_maxwell_juttner", "temperature_eV": 1.0e5},
+            bad_value,
+            16,
+        )
