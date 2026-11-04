@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.special import gammaln
+from scipy.special import gammaln, ndtr
 from numpy.polynomial.legendre import leggauss
 
 E_CHARGE = 1.602176634e-19
@@ -88,13 +88,17 @@ def project_bi_maxwellian_electron_vdf(
     sigma = float(np.sqrt(variance))
     standardized = (grid - flow) / sigma
     distribution = np.exp(-0.5 * standardized**2) / (np.sqrt(2.0 * np.pi) * sigma)
-    integral = _trapezoid(distribution, grid)
-    if not np.isfinite(integral) or integral <= 0.0:
-        raise ValueError("velocity_grid_m_s does not resolve a positive finite portion of the projected distribution")
-    distribution = distribution / integral
+    represented_probability = float(
+        ndtr((grid[-1] - flow) / sigma) - ndtr((grid[0] - flow) / sigma)
+    )
+    if not np.isfinite(represented_probability) or represented_probability <= 0.0:
+        raise ValueError("velocity_grid_m_s does not cover a positive finite portion of the projected distribution")
+    # Do not renormalize a truncated grid: doing so would silently change the
+    # physical distribution and bias its moments near the velocity boundaries.
     return {
         "velocity_grid_m_s": grid.copy(),
         "projected_vdf_s_m": distribution,
+        "velocity_grid_probability_coverage": represented_probability,
         "projected_temperature_eV": float(directional_temperature),
         "projected_velocity_mean_m_s": flow,
         "projected_velocity_standard_deviation_m_s": sigma,
