@@ -44,7 +44,7 @@ def stokes_mueller_absorption_matrix(
         raise ValueError("all Mueller coefficients must be finite real scalars")
     ai, aq, au, av, rq, ru, rv = values.astype(float)
     dichroism = np.sqrt(aq*aq + au*au + av*av)
-    if ai < 0.0 or dichroism > ai + 1e-12*max(ai, 1.0):
+    if ai < 0.0 or dichroism > ai + 1e-12*max(ai, dichroism, np.finfo(float).tiny):
         raise ValueError(
             "passive-medium absorption requires alpha_I >= "
             "sqrt(alpha_Q^2 + alpha_U^2 + alpha_V^2) >= 0"
