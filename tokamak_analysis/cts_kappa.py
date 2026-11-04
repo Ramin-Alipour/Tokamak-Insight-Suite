@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.special import gammaln, betainc
+from scipy.integrate import quad
 
 from .thomson_generalized_dispersion import generalized_landau_integral
 
@@ -106,28 +107,52 @@ def kappa_electron_susceptibility(
             f"minimum_velocity_grid_probability_coverage={minimum_coverage:.8g}. "
             "Expand the velocity grid or explicitly lower the coverage threshold."
         )
-    response = generalized_landau_integral(
-        velocity,
-        pdf,
-        phase_velocity,
-        pole_imaginary_part_m_s=pole_imaginary_part_m_s,
-        # The analytic Kappa marginal is non-zero outside the numerical grid.
-        # Do not introduce artificial delta-function jumps at the truncation
-        # boundary; the omitted tail is controlled by the exact CDF coverage.
-        include_finite_support_boundary_terms=False,
+    # Evaluate the Landau integral over the complete analytic Kappa tail.
+    # A finite-grid derivative integral omits the non-zero derivative outside
+    # the tabulated interval; merely multiplying by the represented probability
+    # mass does not restore that missing susceptibility.  Integrate the exact
+    # marginal derivative on (-inf, inf), keeping the positive retarded pole.
+    eta = (
+        1e-6 * float(np.median(np.diff(velocity)))
+        if pole_imaginary_part_m_s is None
+        else float(pole_imaginary_part_m_s)
     )
-    # generalized_landau_integral normalizes arbitrary tabulated inputs on
-    # their finite interval. Here pdf is already analytically normalized on
-    # the infinite axis, so restore the exact represented probability mass
-    # after that internal normalization. This keeps the omitted Kappa tail
-    # omitted (and bounded by the coverage gate) instead of amplifying the
-    # represented distribution to unit mass.
-    for key in ("integral", "interior_derivative_integral",
-                "finite_support_boundary_integral"):
-        if key in response:
-            response[key] = complex(response[key]) * grid_coverage
-    response["finite_support_probability_mass"] = grid_coverage
-    response["analytic_kappa_pdf_s_m"] = pdf.copy()
+    zeta = complex(phase_velocity, eta)
+    def landau_integrand(real_velocity):
+        pdf_value = np.exp(
+            log_normalization - kap*np.log1p(real_velocity**2/scale_squared)
+        )
+        derivative = (
+            -2.0*kap*real_velocity/(scale_squared+real_velocity**2)
+        )*pdf_value
+        return derivative/(complex(real_velocity, 0.0)-zeta)
+
+    integral_real, real_error = quad(
+        lambda value: float(np.real(landau_integrand(value))),
+        -np.inf, np.inf, epsabs=1e-11, epsrel=2e-8, limit=500,
+    )
+    integral_imag, imag_error = quad(
+        lambda value: float(np.imag(landau_integrand(value))),
+        -np.inf, np.inf, epsabs=1e-11, epsrel=2e-8, limit=500,
+    )
+    integral = complex(integral_real, integral_imag)
+    if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
+        raise ValueError("full-tail Kappa Landau integral did not converge to a finite value")
+    response = {
+        "integral": integral,
+        "interior_derivative_integral": integral,
+        "finite_support_boundary_integral": 0.0j,
+        "normalized_probability_density_s_m": pdf.copy(),
+        "pole": zeta,
+        "pole_imaginary_part_m_s": eta,
+        "pole_order": 1,
+        "quadrature": "adaptive_complex_quadrature_of_exact_analytic_Kappa_derivative_over_minus_infinity_to_infinity",
+        "finite_support_extension": "analytic_Kappa_tail_integrated_to_infinity",
+        "finite_support_boundary_terms_included": False,
+        "landau_integral_real_absolute_error": float(real_error),
+        "landau_integral_imag_absolute_error": float(imag_error),
+        "landau_integral_tail_complete": True,
+    }
     plasma_frequency_squared = ne * E**2 / (EPS0 * mass)
     response.update({
         "electron_susceptibility": complex(
@@ -143,6 +168,8 @@ def kappa_electron_susceptibility(
         "minimum_velocity_grid_probability_coverage": minimum_coverage,
         "finite_velocity_grid_truncation": bool(grid_coverage < 1.0 - 1e-12),
         "finite_grid_renormalization_bias_prevented": True,
+        "finite_grid_normalization_bias_prevented": True,
+        "susceptibility_uses_complete_analytic_kappa_tail": True,
         "finite_support_boundary_terms_included": False,
         "tail_model": "analytic_isotropic_Kappa_marginal_truncated_only_for_numerical_quadrature; no artificial zero-extension edge jumps",
 
