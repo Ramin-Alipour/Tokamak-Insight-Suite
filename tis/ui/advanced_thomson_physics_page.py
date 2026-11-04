@@ -25,7 +25,7 @@ MODEL_LABELS = {
 
 EXAMPLES = {
     "kappa_electrostatic_susceptibility": {
-        "v": Array.from(__import__("numpy").linspace(-5.0e7, 5.0e7, 2001)),
+        "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
         "phase_velocity_m_s": 1.0e6,
         "electron_density_m3": 2.0e18,
         "electron_temperature_eV": 250.0,
