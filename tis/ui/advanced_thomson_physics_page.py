@@ -15,6 +15,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
 MODEL_LABELS = {
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
     "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
@@ -72,6 +73,25 @@ EXAMPLES = {
         "regularization_strength": 0.001,
         "velocity_limit_m_s": 8000.0,
         "velocity_points": 81
+    },
+    "cts_multi_ion_flow_inference": {
+        "frequency_shift_Hz": np.linspace(-6.0e9, 6.0e9, 41).tolist(),
+        "measured_spectrum": (2.0 + 80.0*np.exp(-0.5*(np.linspace(-6.0, 6.0, 41)/1.8)**2)).tolist(),
+        "probe_frequency_Hz": 140.0e9,
+        "scattering_geometry": {"scattering_angle_rad": 1.9198621771937625},
+        "electron_density_m3": 2.0e19,
+        "electron_temperature_eV": 1200.0,
+        "ion_temperature_eV": [800.0, 900.0],
+        "ion_species": [
+            {"name": "D+", "charge_state": 1, "mass_amu": 2.014},
+            {"name": "C6+", "charge_state": 6, "mass_amu": 12.0}
+        ],
+        "ion_fractions": [0.7, 0.3],
+        "electron_velocity_projection_m_s": 0.0,
+        "instrument_response": np.eye(41).tolist(),
+        "ion_velocity_initial_m_s": {"D+": -40000.0, "C6+": 80000.0},
+        "signal_uncertainty": np.full(41, 1.0).tolist(),
+        "ion_velocity_bounds_m_s": [-500000.0, 500000.0]
     },
     "kappa_electrostatic_susceptibility": {
         "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
