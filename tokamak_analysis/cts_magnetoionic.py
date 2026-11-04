@@ -1,0 +1,194 @@
+"""Cold-plasma magnetoionic dielectric and local wave branches.
+
+Stix R/L/S/D/P dielectric for a homogeneous, collisionless, cold,
+quasineutral or non-neutral multispecies plasma in a uniform magnetic field.
+This is a local dispersion kernel, not a warm kinetic CTS vertex or a
+ray-tracing/mode-conversion solution.
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+import numpy as np
+
+EPS0 = 8.8541878128e-12
+C = 299792458.0
+
+
+def _real_scalar(value, name, *, positive=False, nonnegative=False):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a real finite scalar")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be a real finite scalar")
+    if positive and result <= 0.0:
+        raise ValueError(f"{name} must be positive")
+    if nonnegative and result < 0.0:
+        raise ValueError(f"{name} must be non-negative")
+    return result
+
+
+def cold_plasma_dielectric_tensor(
+    frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
+    magnetic_field_direction=(0.0, 0.0, 1.0),
+) -> dict:
+    """Return the cold-plasma Stix dielectric tensor for exp(-i omega t).
+
+    Each species mapping contains mass_kg, charge_C (signed), and density_m3.
+    The signed gyrofrequency is Omega_s=q_s |B|/m_s. With B along +z:
+      R=1-sum(omega_ps^2/[omega(omega+Omega_s)]),
+      L=1-sum(omega_ps^2/[omega(omega-Omega_s)]),
+      S=(R+L)/2, D=(R-L)/2, P=1-sum(omega_ps^2/omega^2).
+    The tensor in a right-handed field-aligned basis is
+      [[S,-iD,0],[iD,S,0],[0,0,P]].
+    No collisions, finite-temperature corrections or relativistic effects
+    are included. Cyclotron/plasma resonant singularities are reported rather
+    than regularized by an invented damping rate.
+    """
+    f = _real_scalar(frequency_Hz, "frequency_Hz", positive=True)
+    b = np.asarray(magnetic_field_T)
+    direction = np.asarray(magnetic_field_direction, dtype=float)
+    if b.dtype.kind not in "iuf" or b.shape != (3,) or np.any(~np.isfinite(b)):
+        raise ValueError("magnetic_field_T must be a finite real 3-vector")
+    if direction.shape != (3,) or np.any(~np.isfinite(direction)):
+        raise ValueError("magnetic_field_direction must be a finite real 3-vector")
+    bnorm = float(np.linalg.norm(b.astype(float)))
+    dnorm = float(np.linalg.norm(direction))
+    if bnorm <= 0.0 or dnorm <= 0.0:
+        raise ValueError("magnetic field and its direction must be non-zero")
+    direction = direction / dnorm
+    if not isinstance(species, Sequence) or isinstance(species, (str, bytes)) or not species:
+        raise ValueError("species must be a non-empty sequence of species mappings")
+    omega = 2.0 * np.pi * f
+    wp2_total = 0.0
+    r_sum = 1.0 + 0.0j
+    l_sum = 1.0 + 0.0j
+    parsed = []
+    for index, item in enumerate(species):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"species[{index}] must be a mapping")
+        mass = _real_scalar(item.get("mass_kg"), f"species[{index}].mass_kg", positive=True)
+        charge = _real_scalar(item.get("charge_C"), f"species[{index}].charge_C")
+        density = _real_scalar(item.get("density_m3"), f"species[{index}].density_m3", nonnegative=True)
+        if charge == 0.0:
+            raise ValueError(f"species[{index}].charge_C must be non-zero")
+        wp2 = density * charge**2 / (EPS0 * mass)
+        gyro = charge * bnorm / mass
+        plus = omega * (omega + gyro)
+        minus = omega * (omega - gyro)
+        scale = max(omega**2, abs(omega * gyro), 1.0)
+        if abs(plus) <= 1e-14 * scale or abs(minus) <= 1e-14 * scale:
+            raise ValueError("frequency lies on a cold-plasma cyclotron pole; supply a kinetic/collisional dielectric model")
+        wp2_total += wp2
+        r_sum -= wp2 / plus
+        l_sum -= wp2 / minus
+        parsed.append({
+            "name": str(item.get("name", f"species_{index}")),
+            "mass_kg": mass, "charge_C": charge, "density_m3": density,
+            "plasma_frequency_squared_s_minus2": float(wp2),
+            "signed_gyrofrequency_rad_s": float(gyro),
+        })
+    p_value = 1.0 - wp2_total / omega**2
+    s_value = 0.5 * (r_sum + l_sum)
+    d_value = 0.5 * (r_sum - l_sum)
+    tensor_b = np.array([
+        [s_value, -1j*d_value, 0.0j],
+        [1j*d_value, s_value, 0.0j],
+        [0.0j, 0.0j, p_value],
+    ], dtype=complex)
+    # Rotate the field-aligned tensor into the caller's laboratory basis.
+    # The first transverse basis vector is chosen deterministically and is
+    # only a coordinate convention; physical results are rotation invariant.
+    reference = np.array([1.0, 0.0, 0.0])
+    if abs(float(reference @ direction)) > 0.9:
+        reference = np.array([0.0, 1.0, 0.0])
+    e1 = reference - (reference @ direction) * direction
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(direction, e1)
+    basis = np.column_stack((e1, e2, direction))
+    tensor_lab = basis @ tensor_b @ basis.T
+    return {
+        "frequency_Hz": f,
+        "angular_frequency_rad_s": omega,
+        "magnetic_field_magnitude_T": bnorm,
+        "magnetic_field_direction": direction,
+        "species": parsed,
+        "stix_R": complex(r_sum), "stix_L": complex(l_sum),
+        "stix_S": complex(s_value), "stix_D": complex(d_value),
+        "stix_P": float(p_value),
+        "dielectric_tensor_field_aligned": tensor_b,
+        "dielectric_tensor_lab": tensor_lab,
+        "dielectric_convention": "exp(-i*omega*t); Stix R/L/S/D/P",
+        "model_scope": "homogeneous_collisionless_cold_multispecies_plasma",
+        "limitations": [
+            "No finite-temperature/Landau damping or collisional broadening.",
+            "No relativistic response, finite-Larmor-radius correction or kinetic CTS vertex.",
+            "Local homogeneous tensor only; no ray tracing, interfaces or mode conversion.",
+            "At cyclotron/plasma resonances a cold-fluid tensor is singular or inadequate; no artificial damping is inserted.",
+        ],
+    }
+
+
+def cold_plasma_magnetoionic_modes(
+    frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
+    wave_normal_direction=(0.0, 0.0, 1.0),
+    magnetic_field_direction=(0.0, 0.0, 1.0),
+) -> dict:
+    """Solve the two local cold-plasma refractive-index branches.
+
+    Solves det[epsilon - N(I-nhat nhat^T)]=0 for N=n^2. Since the
+    transverse projector has rank two, the determinant is quadratic in N.
+    Complex roots are retained (evanescent/absorbing algebraic branches);
+    no root is silently discarded. Eigenvectors are returned in the lab basis.
+    """
+    dielectric = cold_plasma_dielectric_tensor(
+        frequency_Hz, magnetic_field_T, species,
+        magnetic_field_direction=magnetic_field_direction,
+    )
+    nhat = np.asarray(wave_normal_direction, dtype=float)
+    if nhat.shape != (3,) or np.any(~np.isfinite(nhat)) or np.linalg.norm(nhat) <= 0.0:
+        raise ValueError("wave_normal_direction must be a finite non-zero 3-vector")
+    nhat /= np.linalg.norm(nhat)
+    epsilon = dielectric["dielectric_tensor_lab"]
+    projector = np.eye(3) - np.outer(nhat, nhat)
+
+    def determinant(index_squared):
+        return np.linalg.det(epsilon - index_squared * projector)
+
+    c0 = determinant(0.0)
+    p_plus = determinant(1.0)
+    p_minus = determinant(-1.0)
+    c1 = 0.5 * (p_plus - p_minus)
+    c2 = 0.5 * (p_plus + p_minus) - c0
+    scale = max(abs(c0), abs(c1), abs(c2), 1.0)
+    if abs(c2) <= 1e-12 * scale:
+        if abs(c1) <= 1e-12 * scale:
+            raise ValueError("cold-plasma dispersion polynomial is degenerate at this frequency and direction")
+        roots = np.asarray([-c0 / c1], dtype=complex)
+    else:
+        roots = np.roots(np.asarray([c2, c1, c0], dtype=complex))
+    modes = []
+    for root in roots:
+        matrix = epsilon - root * projector
+        _, singular_values, vh = np.linalg.svd(matrix)
+        vector = vh.conj().T[:, -1]
+        pivot = int(np.argmax(np.abs(vector)))
+        if abs(vector[pivot]) > 0.0:
+            vector *= np.exp(-1j * np.angle(vector[pivot]))
+        modes.append({
+            "refractive_index_squared": complex(root),
+            "refractive_index": complex(np.sqrt(root)),
+            "electric_polarization_unit": vector,
+            "dispersion_residual": float(np.linalg.norm(matrix @ vector)),
+            "smallest_singular_value": float(singular_values[-1]),
+        })
+    return {
+        **dielectric,
+        "wave_normal_direction": nhat,
+        "dispersion_polynomial_coefficients_high_to_low": np.asarray([c2, c1, c0]),
+        "modes": modes,
+        "dispersion_relation": "det(epsilon_r - n^2*(I - nhat*nhat^T)) = 0",
+        "mode_solver": "quadratic_cold_plasma_magnetoionic_dispersion",
+        "mode_conversion_performed": False,
+    }
