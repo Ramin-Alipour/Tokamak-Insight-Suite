@@ -125,14 +125,14 @@ def cold_plasma_dielectric_tensor(
         "species": parsed,
         "stix_R": complex(r_sum), "stix_L": complex(l_sum),
         "stix_S": complex(s_value), "stix_D": complex(d_value),
-        "stix_P": float(p_value),
+        "stix_P": complex(p_value),
         "dielectric_tensor_field_aligned": tensor_b,
         "dielectric_tensor_lab": tensor_lab,
         "dielectric_convention": "exp(-i*omega*t); Stix R/L/S/D/P",
         "model_scope": (
-            "homogeneous_collisionless_cold_multispecies_unmagnetized_plasma"
+            "homogeneous_cold_multispecies_unmagnetized_plasma"
             if bnorm == 0.0 else
-            "homogeneous_collisionless_cold_multispecies_magnetized_plasma"
+            "homogeneous_cold_multispecies_magnetized_plasma"
         ),
         "limitations": [
             "No finite-temperature/Landau damping; collisional response is cold-fluid Drude only.",
