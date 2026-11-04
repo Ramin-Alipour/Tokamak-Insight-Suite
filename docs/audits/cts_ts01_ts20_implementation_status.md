@@ -36,6 +36,8 @@
 5. A successful optimizer is not sufficient for a reportable physical measurement. Data-only identifiability, covariance provenance, model discrepancy and external inputs must be reported.
 6. CI establishes software checks only. It is not experimental validation.
 
+TS-03 regime-diagnostic correction (2026-11-04): the thermal free-free transfer result now reports the path-resolved dimensionless electron temperature parameter kT/(m_e c^2) and frequency-resolved photon parameter h nu/(m_e c^2). These diagnostics make the non-relativistic model scope auditable and explicitly report that no relativistic correction has been applied. They do not close TS-03: a validated relativistic and magnetized-mode emissivity/opacity kernel, limiting-case tests, and end-to-end CTS integration remain required.
+
 TS-02 incremental implementation note (2026-11-04): the relativistic ECE absorption entry point is conditional on an explicitly supplied normalized gyrotropic EVDF, density, local wavevector, magnetic field and polarization. It does not infer the EVDF, implement a collisional operator, or close polarized transfer. Resonance-width and quadrature convergence remain numerical release gates.
 
 Analysis 1 must not be advertised as having all TS-01–TS-20 closed until every remaining PARTIAL/OPEN item has code-level implementation, tests, public API/dashboard integration, synchronized documentation, and successful CI on the exact release commit.
