@@ -132,6 +132,82 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
         })
     return result
 
+def _spitzer_species_collision_frequencies(
+    electron_density_m3, electron_temperature_eV, ion_species,
+    ion_fractions, ion_temperature_eV, coulomb_logarithm,
+):
+    """Weak-coupling Spitzer momentum-transfer rates in s^-1.
+
+    Electron-ion rates use 2.91e-6 n[cm^-3] Z_eff lnΛ / T_e[eV]^(3/2).
+    Ion rates combine ion-ion deflection with electron-ion momentum transfer.
+    Rates are used as species-resolved Krook resonance widths, not as a
+    conserving linearized Landau collision operator.
+    """
+    ne = _positive(electron_density_m3, "electron_density_m3")
+    te = _positive(electron_temperature_eV, "electron_temperature_eV")
+    ln_lambda = _positive(coulomb_logarithm, "coulomb_logarithm")
+    fractions = _real_array(ion_fractions, "ion_fractions", 1)
+    if (not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes))
+            or len(ion_species) == 0 or fractions.shape != (len(ion_species),)
+            or np.any(fractions <= 0.0)
+            or not np.isclose(np.sum(fractions), 1.0, rtol=1e-6, atol=1e-8)):
+        raise ValueError("ion_species and positive ion_fractions summing to one are required")
+    names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
+    if isinstance(ion_temperature_eV, Mapping):
+        if set(ion_temperature_eV) != set(names):
+            raise ValueError("ion_temperature_eV must contain exactly the supplied ion species names")
+        temperatures = [_positive(ion_temperature_eV[name], f"ion_temperature_eV[{name}]") for name in names]
+    elif np.isscalar(ion_temperature_eV):
+        temperatures = [_positive(ion_temperature_eV, "ion_temperature_eV")] * len(names)
+    else:
+        temperatures = _real_array(ion_temperature_eV, "ion_temperature_eV", 1)
+        if temperatures.shape != fractions.shape or np.any(temperatures <= 0.0):
+            raise ValueError("ion_temperature_eV must contain one positive value per ion species")
+    zeff, records = 0.0, []
+    for i, item in enumerate(ion_species):
+        if not isinstance(item, Mapping):
+            raise ValueError("each ion species must be a mapping")
+        z = _charge_state(item.get("charge_state"), f"ion_species[{i}].charge_state")
+        mass_amu = _positive(item.get("mass_amu"), f"ion_species[{i}].mass_amu")
+        density = fractions[i] * ne / z
+        zeff += fractions[i] * z
+        records.append((names[i], z, mass_amu, density, float(temperatures[i])))
+    nu_ei = 2.91e-6 * (ne * 1e-6) * zeff * ln_lambda / te**1.5
+    rates = {"e-": float(nu_ei)}
+    me_over_amu = 5.48579909065e-4
+    for name, z, mass_amu, density, ti in records:
+        nu_ii = 4.80e-8 * (density * 1e-6) * z**4 * ln_lambda / (np.sqrt(mass_amu) * ti**1.5)
+        nu_ie = (ne * me_over_amu / (density * mass_amu)) * nu_ei
+        rates[name] = float(nu_ii + nu_ie)
+    return {
+        "collision_frequencies_s_inverse": rates,
+        "effective_charge_Zeff": float(zeff),
+        "coulomb_logarithm": float(ln_lambda),
+        "collision_model": "species_resolved_spitzer_krook",
+        "collision_operator_conserves_momentum_and_energy": False,
+        "limitations": [
+            "weakly coupled, fully ionized, non-degenerate plasma",
+            "classical Coulomb logarithm is supplied externally",
+            "species-resolved Krook resonance correction, not a conserving linearized Landau operator",
+            "neutral collisions, strong coupling, relativistic corrections and velocity-space redistribution are omitted",
+        ],
+    }
+
+
+def _validate_collisional_model(model, ne, te, ions, fractions, ti):
+    if model is None:
+        return {
+            "collision_frequencies_s_inverse": {"e-": 0.0, **{
+                str(item.get("name", f"ion_{i}")): 0.0 for i, item in enumerate(ions)
+            }},
+            "collision_model": "disabled_collisionless",
+            "collision_operator_conserves_momentum_and_energy": None,
+            "limitations": ["collisional corrections not requested"],
+        }
+    if not isinstance(model, Mapping) or set(model) != {"coulomb_logarithm"}:
+        raise ValueError("collisional_model must be None or {'coulomb_logarithm': positive finite value}")
+    return _spitzer_species_collision_frequencies(ne, te, ions, fractions, ti, model["coulomb_logarithm"])
+
 
 def _gyro_basis(magnetic_field_T, k_vector):
     b = _real_array(magnetic_field_T, "magnetic_field_T", 1)
@@ -155,7 +231,8 @@ def _gyro_basis(magnetic_field_T, k_vector):
 
 
 def _species_conductivity(omega, k_vector, magnetic_field_T, species,
-                          *, harmonic_order, quadrature_order, damping_rate_rad_s):
+                          *, harmonic_order, quadrature_order, damping_rate_rad_s,
+                          collision_frequency_rad_s=0.0):
     """Numerical magnetized-Maxwellian Vlasov conductivity in the B-aligned basis."""
     rotation, kperp, kpar, bhat = _gyro_basis(magnetic_field_T, k_vector)
     mass, charge = species["mass"], species["charge"]
@@ -164,6 +241,9 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
     omega_c = charge * np.linalg.norm(magnetic_field_T) / mass
     vth = np.sqrt(2.0 * temperature * E_CHARGE / mass)
     omega_d = omega - float(np.dot(k_vector, flow))
+    collision_frequency = float(collision_frequency_rad_s)
+    if not np.isfinite(collision_frequency) or collision_frequency < 0.0:
+        raise ValueError("collision_frequency_rad_s must be finite and non-negative")
     n_h = int(harmonic_order)
     harmonics = np.arange(-n_h, n_h + 1)
     nh = harmonics.size
@@ -179,8 +259,9 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
         matrix_coupling = kperp * vperp * coupling
         for xz, wz in zip(xpar, wpar):
             vpar = vth * xz
+            # Keep numerical regularization and physical collisional relaxation distinct.
             denom = (omega_d - kpar * vpar - harmonics * omega_c
-                     + 1j * damping_rate_rad_s)
+                     + 1j * (damping_rate_rad_s + collision_frequency))
             operator = np.diag(denom.astype(complex)) + matrix_coupling
             source = np.zeros((nh, 3), dtype=complex)
             # Fourier coefficients of E dot v in exp(i*n*gyro-angle).
@@ -249,7 +330,7 @@ def full_em_cts_spectral_density(
     incident_polarization=None, scattered_polarization=None,
     electron_flow_projection_m_s=None, ion_flow_projection_m_s=None,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
-    fast_ion_populations=None, electron_distribution=None,
+    collisional_model=None, fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
     response_mc_samples=100,
 ):
@@ -387,6 +468,7 @@ def full_em_cts_spectral_density(
                     scattered_polarization=sample.get("scattered_polarization", scattered_polarization),
                     harmonic_order=harmonic_order, quadrature_order=quadrature_order,
                     damping_rate_rad_s=damping_rate_rad_s,
+                    collisional_model=collisional_model,
                     fast_ion_populations=sample.get("fast_ion_populations", fast_ion_populations),
                     electron_distribution=sample.get("electron_distribution", electron_distribution),
                 )
@@ -562,6 +644,10 @@ def full_em_cts_spectral_density(
         ion_flow_vectors = ion_flow_velocity_m_s
     species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
                             electron_flow_seed, ion_flow_vectors)
+    collisional_diagnostics = _validate_collisional_model(
+        collisional_model, ne, te, ion_species, ion_fractions, ion_temperature_eV
+    )
+    collision_rates = collisional_diagnostics["collision_frequencies_s_inverse"]
     electron_distribution_used = None
     if electron_distribution is not None:
         if electron_flow_projection_m_s is not None and abs(electron_flow_projection_m_s) > 0.0:
@@ -735,7 +821,8 @@ def full_em_cts_spectral_density(
                 sigmas.append(_species_conductivity(
                     omega, kvec, b_bin, sp, harmonic_order=int(harmonic_order),
                     quadrature_order=int(quadrature_order),
-                    damping_rate_rad_s=damping
+                    damping_rate_rad_s=damping,
+                    collision_frequency_rad_s=collision_rates.get(sp["name"], 0.0),
                 ))
         fast_ion_kinetic_diagnostics.append(fast_kinetic_at_frequency)
         sigma_total = np.sum(sigmas, axis=0)
@@ -959,7 +1046,8 @@ def full_em_cts_spectral_density(
             **_resonance_broadening_metadata(
                 damping, caller_supplied=damping_rate_rad_s is not None,
                 probe_frequency_Hz=f0,
-            )},
+            ),
+            **collisional_diagnostics,
         "real_frequency_shift_preserved": True,
         "resonance_damping_changes_real_frequency": False,
         "zero_frequency_static_limit_supported": False,
@@ -1129,8 +1217,8 @@ def _resonance_broadening_metadata(damping_rate_rad_s, *, caller_supplied, probe
         "resonance_broadening_semantics": (
             "numerical_resonance_regularization_in_kinetic_denominators_only"
         ),
-        "collisional_cts_model_status": "not_implemented",
-        "collision_operator": None,
+        "collisional_cts_model_status": "optional_species_resolved_spitzer_krook_approximation",
+        "collision_operator": "species_resolved_spitzer_krook; not a conserving Landau operator",
     }
 
 
@@ -1237,7 +1325,7 @@ def analyze_full_em_cts_spectrum(
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
-    response_mc_samples=100, external_input_covariance=None,
+    collisional_model=None, response_mc_samples=100, external_input_covariance=None,
     external_input_parameter_order=None, external_input_mc_samples=100,
     external_input_mc_seed=84622,
     physical_background_spectrum_W_Hz=None,
@@ -1644,6 +1732,7 @@ def analyze_full_em_cts_spectrum(
             scattered_polarization=active_scattered_polarization,
             harmonic_order=harmonic_order, quadrature_order=quadrature_order,
             damping_rate_rad_s=damping_rate_rad_s,
+            collisional_model=collisional_model,
             fast_ion_populations=fast_ion_populations,
             electron_distribution=electron_distribution,
             bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
@@ -1751,6 +1840,7 @@ def analyze_full_em_cts_spectrum(
         scattered_polarization=scattered_polarization,
         harmonic_order=harmonic_order, quadrature_order=quadrature_order,
         damping_rate_rad_s=damping_rate_rad_s,
+        collisional_model=collisional_model,
         fast_ion_populations=fast_ion_populations,
         electron_distribution=electron_distribution,
         bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
@@ -2043,6 +2133,7 @@ def analyze_full_em_cts_spectrum(
             incident_polarization=incident_polarization,
             scattered_polarization=scattered_polarization,
             damping_rate_rad_s=damping_rate_rad_s,
+            collisional_model=collisional_model,
             fast_ion_populations=fast_ion_populations,
             electron_distribution=electron_distribution,
             bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
@@ -2154,7 +2245,7 @@ def fit_full_em_gyrotropic_population_shape(
     electron_flow_projection_m_s=None, ion_flow_projection_m_s=None,
     measurement_uncertainty=None, measurement_covariance=None,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
-    max_nfev=300, bindslev_validity_theta_e_limit=None,
+    collisional_model=None, max_nfev=300, bindslev_validity_theta_e_limit=None,
 ):
     """Infer a relativistic gyrotropic electron or fast-ion VDF shape with Full-EM CTS.
 
@@ -2242,6 +2333,7 @@ def fit_full_em_gyrotropic_population_shape(
             scattered_polarization=scattered_polarization,
             harmonic_order=harmonic_order, quadrature_order=quadrature_order,
             damping_rate_rad_s=damping_rate_rad_s,
+            collisional_model=collisional_model,
             fast_ion_populations=fast_populations,
             electron_distribution=electron_vdf,
             bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
