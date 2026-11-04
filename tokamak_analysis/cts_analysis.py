@@ -294,7 +294,7 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         if ni*(1-hf)>0: terms.append((s["Z"]**2*ni*(1-hf)/ne,cb,fb))
         if hf:
             if hot[2]=="tabulated":
-                ch,fh=_component_tabulated(om,k,ni*hf,s["mass"],s["Z"],ui,
+                ch,fh=_component_tabulated(om,k,ni*hf,s["mass"],s["Z"],ui_i,
                     hot[3]["velocity_m_s"],hot[3]["probability_density_m_s_inverse"])
             else:
                 ch,fh=_component(om,k,ni*hf,hot[3],s["mass"],s["Z"],ui_i)
