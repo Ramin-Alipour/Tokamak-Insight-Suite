@@ -228,3 +228,6 @@ promote a rank-deficient profile to an identified measurement. The public
 workflow, Dashboard control and profile registry input contract are connected;
 regression tests cover output shape, labeling and invalid grids. The grid is
 optional and no default regularization scale is invented.
+
+
+PROF-07 update (2026-11-04): `thomson_psf_profile_inverse` now supports automatic curvature-penalty selection by GCV when `regularization_strength` is omitted. It reports the selected value, candidate grid, GCV scores and active-set effective degrees of freedom. Data-only rank remains independent of regularization; null-space modes are never promoted to primary results. The covariance remains conditional on the selected penalty and fixed PSF. PSF uncertainty and GCV selection for wavelength-resolved joint-profile inversion remain open.
