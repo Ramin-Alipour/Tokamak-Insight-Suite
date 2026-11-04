@@ -1601,3 +1601,29 @@ def test_canonical_relativistic_thomson_workflow_runs_compton_projected_evdf_inv
     assert evdf["projected_evdf_s_m"] is None or np.all(
         np.isfinite(evdf["projected_evdf_s_m"])
     )
+
+
+def test_primary_optical_kappa_fit_propagates_additive_systematic_covariance():
+    wavelength, measured, _ = _spectral_case(120.0, n=241)
+    systematic = np.eye(wavelength.size) * 0.01**2
+    result = analyze_thomson_spectra(
+        wavelength, measured[None, :], [0.2],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full((1, wavelength.size), 0.1),
+        systematic_covariance=systematic,
+    )
+    channel = result["channels"][0]
+    assert channel["systematic_covariance_supplied"] is True
+    assert channel["systematic_covariance_included"] is True
+    assert channel["systematic_covariance_model"] == (
+        "researcher_supplied_additive_correlated_spectral_systematic_covariance"
+    )
+    assert channel["spectral_weighting_status"] == (
+        "within_channel_gls_with_measurement_and_systematic_covariance"
+    )
+    assert channel["fit_covariance_interpretation"] == (
+        "local_parameter_covariance_from_measurement_and_systematic_covariance"
+    )
+    assert np.all(np.isfinite(channel["fit_covariance"]))
