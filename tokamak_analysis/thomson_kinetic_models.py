@@ -21,6 +21,7 @@ C = 299792458.0
 E_REST_EV = 510998.95069
 ELECTRON_CLASSICAL_RADIUS_M = 2.8179403262e-15
 _LANDAU_NODES, _LANDAU_WEIGHTS = leggauss(192)
+_FULL_AXIS_LANDAU_NODES, _FULL_AXIS_LANDAU_WEIGHTS = leggauss(384)
 
 
 def _trapezoid(y, x):
@@ -754,9 +755,8 @@ def _landau_susceptibility(phase_velocity, plasma_frequency_squared, wavenumber,
     # Map x in [0, infinity) to t in [0, 1): x=sigma*t/(1-t).
     # Gauss-Legendre quadrature resolves the resonant neighbourhood and the
     # slowly decaying algebraic tails without a finite velocity cutoff.
-    nodes, weights = leggauss(384)
-    t = 0.5*(nodes+1.0)
-    wt = 0.5*weights
+    t = 0.5*(_FULL_AXIS_LANDAU_NODES+1.0)
+    wt = 0.5*_FULL_AXIS_LANDAU_WEIGHTS
     one_minus_t = 1.0-t
     offset = sigma*t/one_minus_t
     jacobian = sigma/(one_minus_t*one_minus_t)
