@@ -59,15 +59,30 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
                 right_delta ** (1 - pole_order) - left_delta ** (1 - pole_order)
             ) / (1 - pole_order)
         integral += float(slope) * interval_integral
+
+    # The tabulated VDF is interpreted as zero outside its finite support.
+    # Its distributional derivative therefore contains endpoint jumps:
+    # +f(v_min) delta(v-v_min) - f(v_max) delta(v-v_max).  These terms are
+    # required by the Landau susceptibility integral whenever a supplied
+    # finite-grid VDF does not decay to zero at both endpoints.  Omitting them
+    # makes even a top-hat distribution appear to have zero susceptibility.
+    boundary_integral = (
+        float(f[0]) / (complex(v[0], 0.0) - zeta) ** pole_order
+        - float(f[-1]) / (complex(v[-1], 0.0) - zeta) ** pole_order
+    )
+    integral += boundary_integral
     if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
         raise ValueError("generalized Landau integral is non-finite")
     return {
         "integral": complex(integral),
+        "interior_derivative_integral": complex(integral - boundary_integral),
+        "finite_support_boundary_integral": complex(boundary_integral),
         "normalized_probability_density_s_m": f,
         "pole": zeta,
         "pole_imaginary_part_m_s": eta,
-        "quadrature": "analytic_interval_integral_of_piecewise_constant_derivative_of_piecewise_linear_VDF",
+        "quadrature": "analytic_piecewise_linear_derivative_integral_plus_distributional_finite_support_endpoint_jumps",
         "pole_order": pole_order,
+        "finite_support_extension": "zero_outside_tabulated_velocity_interval",
         "limitation": "one complex pole per call; finite velocity support and positive pole displacement are explicit numerical inputs",
     }
 
