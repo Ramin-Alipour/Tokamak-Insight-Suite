@@ -20,6 +20,7 @@ from tokamak_analysis.thomson_inference import analyze_thomson_spectra
 from tokamak_analysis.thomson_scattering import infer_thomson_path_averaged_density
 from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
 from tokamak_analysis.cts_analysis import analyze_cts_spectrum, analyze_cts_spectrum_model
+from tis.ui.advanced_thomson_physics_page import render_advanced_thomson_physics_page
 from tokamak_analysis.cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
@@ -3404,8 +3405,10 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
-    if workflow=='Analysis 1 / Optical multi-channel Thomson inference':
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    if workflow=='Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers':
+        render_advanced_thomson_physics_page(st)
+    elif workflow=='Analysis 1 / Optical multi-channel Thomson inference':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
             st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'

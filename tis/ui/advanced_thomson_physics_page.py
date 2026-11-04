@@ -1,0 +1,147 @@
+"""Streamlit entry point for explicit advanced Analysis-1 physics solvers.
+
+The numerical kernels live in tokamak_analysis.cts_full_physics. This page only
+collects already-calibrated/user-prepared arrays and forwards them unchanged;
+it performs no calibration, geometry reconstruction, or hidden model fallback.
+"""
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+import numpy as np
+
+from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+
+MODEL_LABELS = {
+    "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
+    "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
+    "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
+    "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
+}
+
+EXAMPLES = {
+    "landau_fdt_cts": {
+        "angular_frequency_rad_s": [1.0e5, 2.0e5],
+        "normalized_velocity_x": [-4.0, 0.0, 4.0],
+        "normalized_velocity_y": [-4.0, 0.0, 4.0],
+        "normalized_velocity_z": [-4.0, 0.0, 4.0],
+        "species": [
+            {"name": "electrons", "density_m3": 1.0e18, "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
+            {"name": "ions", "density_m3": 1.0e18, "mass_kg": 1.67262192369e-27, "charge_C": 1.602176634e-19}
+        ],
+        "common_temperature_J": 100.0,
+        "wave_number_m_inverse": 0.001,
+        "coulomb_logarithm": 12.0
+    },
+    "polarized_kinetic_ece": {
+        "frequency_Hz": [45.0e9],
+        "segment_length_m": [0.001],
+        "wavevector_rad_m": [[0.0, 0.0, 942.0]],
+        "magnetic_field_T": [[0.0, 0.0, 2.0]],
+        "electron_density_m3": [1.0e19],
+        "electron_temperature_eV": [1000.0],
+        "mode_electric_field_unit_flux": {"real": [[[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]]], "imag": [[[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]},
+        "dielectric_z_m": [0.0, 0.001],
+        "dielectric_tensor_r": {"real": [[[1,0,0],[0,1,0],[0,0,1]], [[1,0,0],[0,1,0],[0,0,1]]], "imag": [[[0,0,0],[0,0,0],[0,0,0]], [[0,0,0],[0,0,0],[0,0,0]]]},
+        "harmonic_order": 2,
+        "quadrature_order": 16,
+        "damping_rate_rad_s": 2.0e7
+    },
+    "stratified_nonparaxial_vector": {
+        "x_m": [-0.006, -0.004, -0.002, 0.0, 0.002, 0.004, 0.006, 0.008],
+        "y_m": [-0.006, -0.004, -0.002, 0.0, 0.002, 0.004, 0.006, 0.008],
+        "electric_field_V_m": {"real": [[[0,0,0] for _ in range(8)] for _ in range(8)], "imag": [[[0,0,0] for _ in range(8)] for _ in range(8)]},
+        "z_m": [0.0, 0.001],
+        "epsilon_r": {"real": [[[1,0,0],[0,1,0],[0,0,1]], [[1,0,0],[0,1,0],[0,0,1]]], "imag": [[[0,0,0],[0,0,0],[0,0,0]], [[0,0,0],[0,0,0],[0,0,0]]]},
+        "frequency_Hz": 10.0e9
+    },
+    "stratified_mode_conversion": {
+        "omega_rad_s": 6.283185307179586e10,
+        "z_m": [0.0, 0.001],
+        "epsilon_r": {"real": [[[1,0,0],[0,1,0],[0,0,1]], [[1,0,0],[0,1,0],[0,0,1]]], "imag": [[[0,0,0],[0,0,0],[0,0,0]], [[0,0,0],[0,0,0],[0,0,0]]]},
+        "kx_rad_m": 0.0,
+        "ky_rad_m": 0.0
+    }
+}
+
+
+def decode_complex_json(value):
+    """Decode nested JSON arrays; {real: ..., imag: ...} denotes complex data."""
+    if isinstance(value, Mapping):
+        if set(value) == {"real", "imag"}:
+            real = np.asarray(decode_complex_json(value["real"]), dtype=float)
+            imag = np.asarray(decode_complex_json(value["imag"]), dtype=float)
+            if real.shape != imag.shape:
+                raise ValueError("Complex JSON real and imag arrays must have identical shapes.")
+            return real + 1j * imag
+        return {key: decode_complex_json(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [decode_complex_json(item) for item in value]
+    return value
+
+
+def json_safe(value):
+    """Convert numerical solver outputs to JSON-compatible values."""
+    if isinstance(value, Mapping):
+        return {str(key): json_safe(item) for key, item in value.items() if key != "landau_system"}
+    if isinstance(value, np.ndarray):
+        if np.iscomplexobj(value):
+            return {"real": value.real.tolist(), "imag": value.imag.tolist()}
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, complex):
+        return {"real": float(value.real), "imag": float(value.imag)}
+    if isinstance(value, (tuple, list)):
+        return [json_safe(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    # Sparse matrices and internal solver objects are deliberately not expanded.
+    return str(value)
+
+
+def render_advanced_thomson_physics_page(st) -> None:
+    """Render the explicit advanced Analysis-1 solver interface."""
+    st.subheader("Analysis 1 — advanced kinetic and electromagnetic physics")
+    st.info(
+        "These are explicit numerical solvers, not automatic fits to an arbitrary uploaded file. "
+        "Supply calibrated/prepared physical inputs and geometry. No calibration, equilibrium "
+        "reconstruction, or missing-input estimation is performed."
+    )
+    model = st.selectbox(
+        "Select the physical solver",
+        list(MODEL_LABELS),
+        format_func=lambda key: MODEL_LABELS[key],
+        key="ts_advanced_physics_model",
+    )
+    st.caption(
+        "Enter one JSON object containing the keyword arguments for the selected solver. "
+        "For complex-valued arrays use {\"real\": [...], \"imag\": [...]}; both arrays must have identical shapes. "
+        "The example is an input-shape template, not experimental data or a recommended physical operating point."
+    )
+    raw = st.text_area(
+        "Prepared physical inputs (JSON)",
+        value=json.dumps(EXAMPLES[model], indent=2),
+        height=360,
+        key=f"ts_advanced_physics_config_{model}",
+    )
+    if st.button("Run selected advanced physics solver", type="primary", key="run_ts_advanced_physics"):
+        try:
+            parsed = json.loads(raw)
+            if not isinstance(parsed, dict):
+                raise ValueError("The solver configuration must be a JSON object.")
+            config = decode_complex_json(parsed)
+            result = run_advanced_thomson_physics(model, **config)
+            safe = json_safe(result)
+            st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
+            st.json(safe)
+            st.download_button(
+                "Export advanced physics result (JSON)",
+                data=json.dumps(safe, indent=2, allow_nan=False),
+                file_name=f"tis_{model}_result.json",
+                mime="application/json",
+                key="download_ts_advanced_physics_result",
+            )
+        except Exception as exc:
+            st.error(f"Advanced physics solver failed: {exc}")
