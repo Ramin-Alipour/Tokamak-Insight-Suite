@@ -291,7 +291,7 @@ def analyze_cts_microwave_background(
 
 
 def run_advanced_thomson_physics(model, **kwargs):
-    """Public, explicit dispatcher for the four advanced Analysis-1 physics solvers.
+    """Public, explicit dispatcher for the advanced Analysis-1 physics solvers.
 
     Supported models:
       - landau_fdt_cts: multispecies electrostatic CTS with the discrete
@@ -310,7 +310,9 @@ def run_advanced_thomson_physics(model, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "microwave_background":\n        solver = analyze_cts_microwave_background\n    elif model == "landau_fdt_cts":
+    if model == "microwave_background":
+        solver = analyze_cts_microwave_background
+    elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
     elif model == "polarized_kinetic_ece":
         solver = solve_polarized_kinetic_ece_with_mode_conversion
@@ -335,6 +337,7 @@ def run_advanced_thomson_physics(model, **kwargs):
 
 
 __all__ = [
+    "analyze_cts_microwave_background",
     "analyze_landau_fdt_cts",
     "propagate_stratified_nonparaxial_vector_field",
     "solve_polarized_kinetic_ece_with_mode_conversion",
