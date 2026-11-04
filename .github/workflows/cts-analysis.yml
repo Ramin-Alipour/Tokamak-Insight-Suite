@@ -42,6 +42,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Run physics-contract tests only for the newest relevant commit per ref.
+  group: cts-analysis-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   cts-physics-contracts:
     runs-on: ubuntu-latest
