@@ -6413,6 +6413,12 @@
           "name": "scattering_vector_unit",
           "unit": "unit vector per view",
           "required": true
+        },
+        {
+          "name": "maximum_projected_rms_beta",
+          "unit": "dimensionless; conservative non-relativistic rms speed screen",
+          "required": false,
+          "default": 0.1
         }
       ],
       "output_specs": [
@@ -6431,6 +6437,14 @@
         {
           "name": "directional_temperature_eV",
           "unit": "eV per view"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; fraction of fitted marginal within measured wavelength window"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "dimensionless beta diagnostics and declared screen"
         }
       ],
       "prerequisites": [
@@ -6443,7 +6457,8 @@
         "Non-relativistic elastic-Thomson Doppler approximation only",
         "Gyrotropic bi-Kappa closure is not an unrestricted measured 3-D EVDF",
         "Parallel/perpendicular temperatures require rank-two pitch-angle design and full-rank spectral Jacobian",
-        "Kappa finite-variance domain is strictly greater than 3/2"
+        "Kappa finite-variance domain is strictly greater than 3/2",
+        "The forward fit is withheld when projected thermal rms beta or fitted bulk-flow beta exceeds its declared non-relativistic screen."
       ],
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
