@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tokamak_analysis.thomson_gap_closure import (
     reconstruct_psf_aware_thomson_profile,
