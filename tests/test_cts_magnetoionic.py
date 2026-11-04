@@ -103,3 +103,47 @@ def test_magnetoionic_mode_solver_does_not_mutate_wave_normal_input():
         wave_normal_direction=direction,
     )
     np.testing.assert_array_equal(direction, original)
+
+
+
+def test_species_resolved_cold_fluid_collisions_modify_all_stix_responses():
+    frequency = 100e9
+    density = 1.0e18
+    collision = 2.0e8
+    species = _electron_only(density)
+    species[0]["collision_frequency_rad_s"] = collision
+    result = cold_plasma_dielectric_tensor(
+        frequency, [0.0, 0.0, 2.0], species
+    )
+    omega = 2*np.pi*frequency
+    omega_p2 = density*E**2/(EPS0*ME)
+    gyro = -E*2.0/ME
+    expected_p = 1.0 - omega_p2/(omega*(omega + 1j*collision))
+    expected_r = 1.0 - omega_p2/(omega*(omega + 1j*collision + gyro))
+    expected_l = 1.0 - omega_p2/(omega*(omega + 1j*collision - gyro))
+    assert result["stix_P"] == pytest.approx(expected_p)
+    assert result["stix_R"] == pytest.approx(expected_r)
+    assert result["stix_L"] == pytest.approx(expected_l)
+    assert result["species"][0]["collision_frequency_rad_s"] == collision
+    assert np.any(np.abs(result["dielectric_tensor_lab"].imag) > 0.0)
+
+
+def test_zero_collision_parameter_recovers_collisionless_tensor_exactly():
+    species = _electron_only()
+    baseline = cold_plasma_dielectric_tensor(100e9, [0.0, 0.0, 2.0], species)
+    species[0]["collision_frequency_rad_s"] = 0.0
+    explicit_zero = cold_plasma_dielectric_tensor(100e9, [0.0, 0.0, 2.0], species)
+    np.testing.assert_allclose(
+        explicit_zero["dielectric_tensor_lab"],
+        baseline["dielectric_tensor_lab"],
+        rtol=0.0,
+        atol=0.0,
+    )
+
+
+def test_negative_or_nonfinite_collision_frequency_is_rejected():
+    for value in (-1.0, np.nan, np.inf, 1.0 + 2.0j, True):
+        species = _electron_only()
+        species[0]["collision_frequency_rad_s"] = value
+        with pytest.raises(ValueError, match="collision_frequency_rad_s"):
+            cold_plasma_dielectric_tensor(100e9, [0.0, 0.0, 2.0], species)
