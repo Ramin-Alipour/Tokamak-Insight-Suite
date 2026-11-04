@@ -127,6 +127,7 @@ def project_bi_maxwellian_electron_vdf(
 def infer_gyrotropic_bi_maxwellian_temperatures(
     projected_temperature_eV, magnetic_pitch_cosine, *,
     projected_temperature_covariance_eV2,
+    magnetic_pitch_cosine_covariance=None,
 ):
     """Infer T_parallel and T_perpendicular from independent 1-D TS projections.
 
@@ -138,8 +139,12 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
 
     A single pitch angle (or repeated equivalent |mu|) cannot separate the
     two temperatures. In that case no anisotropy parameters are returned.
-    The covariance describes only the supplied projected-temperature errors;
-    pitch-angle/geometry uncertainty must be propagated separately.
+    Optional pitch-cosine covariance is propagated by first-order errors-in-
+    variables GLS. The effective data covariance is
+      C_eff = C_T + diag(2 mu (T_parallel-T_perp)) C_mu
+                    diag(2 mu (T_parallel-T_perp)).
+    The fit iterates because this geometry term depends on the inferred
+    anisotropy. Temperature/geometry cross-covariance is not inferred.
     """
     tq = np.asarray(projected_temperature_eV)
     mu = np.asarray(magnetic_pitch_cosine)
@@ -165,6 +170,23 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
     tolerance = np.finfo(float).eps*max(cov.shape)*max(float(eigenvalues[-1]), np.finfo(float).tiny)
     if eigenvalues[0] <= tolerance:
         raise ValueError("projected_temperature_covariance_eV2 must be positive definite")
+    pitch_covariance = None
+    if magnetic_pitch_cosine_covariance is not None:
+        raw_pitch_covariance = np.asarray(magnetic_pitch_cosine_covariance)
+        if (raw_pitch_covariance.dtype.kind not in "iuf"
+                or raw_pitch_covariance.shape != (tq.size, tq.size)):
+            raise ValueError("magnetic_pitch_cosine_covariance must be a real square matrix matching the views")
+        pitch_covariance = raw_pitch_covariance.astype(float, copy=False)
+        if np.any(~np.isfinite(pitch_covariance)):
+            raise ValueError("magnetic_pitch_cosine_covariance must be finite")
+        pitch_scale = max(float(np.max(np.abs(pitch_covariance))), np.finfo(float).tiny)
+        if not np.allclose(pitch_covariance, pitch_covariance.T, rtol=1e-10, atol=1e-12*pitch_scale):
+            raise ValueError("magnetic_pitch_cosine_covariance must be symmetric")
+        pitch_covariance = 0.5*(pitch_covariance+pitch_covariance.T)
+        pitch_eigenvalues = np.linalg.eigvalsh(pitch_covariance)
+        pitch_tolerance = np.finfo(float).eps*max(pitch_covariance.shape)*max(float(pitch_eigenvalues[-1]), np.finfo(float).tiny)
+        if pitch_eigenvalues[0] < -pitch_tolerance:
+            raise ValueError("magnetic_pitch_cosine_covariance must be positive semidefinite")
     mu2 = mu*mu
     design = np.column_stack((1.0-mu2, mu2))
     rank = int(np.linalg.matrix_rank(design))
@@ -177,7 +199,12 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         "number_of_independent_pitch_angles": int(np.unique(np.round(mu2, 12)).size),
         "input_projected_temperature_eV": tq.copy(),
         "input_projected_temperature_covariance_eV2": cov.copy(),
-        "geometry_uncertainty_included": False,
+        "geometry_uncertainty_included": pitch_covariance is not None,
+        "input_magnetic_pitch_cosine_covariance": None if pitch_covariance is None else pitch_covariance.copy(),
+        "geometry_covariance_method": (
+            "iterative_first_order_errors_in_variables_GLS"
+            if pitch_covariance is not None else "not_supplied"
+        ),
         "assumptions": [
             "Gyrotropic bi-Maxwellian electron distribution",
             "Zero heat flux and a common magnetic-field axis",
@@ -196,14 +223,35 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
             "reason": "At least two distinct squared magnetic pitch cosines are required to separate T_parallel and T_perpendicular.",
         }
 
-    chol = np.linalg.cholesky(cov)
-    whitened_design = np.linalg.solve(chol, design)
-    whitened_data = np.linalg.solve(chol, tq)
-    information = whitened_design.T @ whitened_design
-    parameter_covariance = np.linalg.inv(information)
-    parameters = parameter_covariance @ (whitened_design.T @ whitened_data)
+    def gls_solve(data_covariance):
+        chol_local = np.linalg.cholesky(data_covariance)
+        whitened_design_local = np.linalg.solve(chol_local, design)
+        whitened_data_local = np.linalg.solve(chol_local, tq)
+        information_local = whitened_design_local.T @ whitened_design_local
+        covariance_local = np.linalg.inv(information_local)
+        parameters_local = covariance_local @ (whitened_design_local.T @ whitened_data_local)
+        return parameters_local, covariance_local
+
+    effective_covariance = cov.copy()
+    parameters, parameter_covariance = gls_solve(effective_covariance)
+    geometry_iterations = 0
+    if pitch_covariance is not None:
+        for geometry_iterations in range(1, 51):
+            derivative_mu = 2.0*mu*(parameters[1]-parameters[0])
+            effective_covariance = (
+                cov + derivative_mu[:, None]*pitch_covariance*derivative_mu[None, :]
+            )
+            updated_parameters, updated_covariance = gls_solve(effective_covariance)
+            change = np.linalg.norm(updated_parameters-parameters) / max(
+                np.linalg.norm(parameters), np.finfo(float).tiny
+            )
+            parameters, parameter_covariance = updated_parameters, updated_covariance
+            if change < 1e-10:
+                break
+        else:
+            raise ValueError("anisotropy geometry-covariance GLS did not converge in 50 iterations")
     residual = tq-design@parameters
-    chi2 = float(residual @ np.linalg.solve(cov, residual))
+    chi2 = float(residual @ np.linalg.solve(effective_covariance, residual))
     dof = int(tq.size-2)
     physical = bool(np.all(np.isfinite(parameters)) and np.all(parameters > 0.0))
     return {
@@ -213,6 +261,8 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         "electron_temperature_perpendicular_eV": float(parameters[0]) if physical else None,
         "electron_temperature_parallel_eV": float(parameters[1]) if physical else None,
         "temperature_covariance_eV2": parameter_covariance if physical else None,
+        "effective_projected_temperature_covariance_eV2": effective_covariance,
+        "geometry_covariance_iterations": geometry_iterations,
         "parameter_order": ["electron_temperature_perpendicular_eV", "electron_temperature_parallel_eV"],
         "fit_residual_projected_temperature_eV": residual,
         "chi_square": chi2,
