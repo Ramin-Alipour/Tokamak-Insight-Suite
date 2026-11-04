@@ -167,9 +167,6 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     tlo, thi = map(float, temperature_bounds_eV)
     if not (np.isfinite(t0p) and np.isfinite(t0t) and 0.0 < tlo < thi and tlo <= t0p <= thi and tlo <= t0t <= thi):
         raise ValueError("positive initial temperatures must lie inside ordered temperature_bounds_eV")
-    beta_limit = float(maximum_projected_rms_beta)
-    if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
-        raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
     flow_lo, flow_hi = map(float, flow_bounds_m_s)
     if not np.isfinite(flow_lo + flow_hi) or flow_lo >= flow_hi or flow_lo <= -_C or flow_hi >= _C:
         raise ValueError("flow_bounds_m_s must be ordered and strictly subluminal")
@@ -383,6 +380,9 @@ def fit_gyrotropic_bi_kappa_thomson(
         raise ValueError("initial temperatures must lie inside positive temperature_bounds_eV")
     if not (1.5 < klo < khi and klo <= k0 <= khi):
         raise ValueError("kappa_bounds and initial_kappa must satisfy 1.5 < lower <= initial <= upper")
+    beta_limit = float(maximum_projected_rms_beta)
+    if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
+        raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
     flow_lo, flow_hi = map(float, flow_bounds_m_s)
     if not np.isfinite(flow_lo + flow_hi) or flow_lo >= flow_hi or flow_lo <= -_C or flow_hi >= _C:
         raise ValueError("flow_bounds_m_s must be ordered and strictly subluminal")
