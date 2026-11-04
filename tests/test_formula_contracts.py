@@ -108,3 +108,18 @@ def test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertain
 def test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs(center, angle):
     with pytest.raises(ValueError):
         thomson_velocity_projection_relativistic_exact(center, 500.0, angle)
+
+
+def test_thomson_width_temperature_is_explicitly_conditional_and_screened():
+    from tokamak_analysis.formula_library import thomson_electron_temperature_from_spectral_width
+
+    cold = thomson_electron_temperature_from_spectral_width(
+        0.001, 532.0, math.pi / 2.0
+    )
+    hot = thomson_electron_temperature_from_spectral_width(
+        0.05, 532.0, math.pi / 2.0
+    )
+    assert cold["temperature_identifiability"].startswith("conditional_on_")
+    assert cold["nonrelativistic_screen_status"] == "within_conservative_theta_e_screen"
+    assert hot["nonrelativistic_screen_status"] == "outside_conservative_theta_e_screen_use_relativistic_model"
+    assert hot["relativistic_temperature_parameter_theta_e"] > 0.01
