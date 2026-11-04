@@ -82,3 +82,32 @@ def test_landau_fdt_full_em_rejects_species_or_temperature_mismatch():
             common_temperature_J=temperature,
             wave_number_m_inverse=1.0e-3,
         )
+
+
+def test_integrated_landau_fdt_full_em_builder_is_public_and_preserves_scope():
+    axis = np.linspace(-4.0, 4.0, 3)
+    species = [
+        {"name": "electrons", "density_m3": 1.0e18,
+         "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
+        {"name": "ions", "density_m3": 1.0e18,
+         "mass_kg": 1.67262192369e-27, "charge_C": 1.602176634e-19},
+    ]
+    temperature = 100.0 * 1.602176634e-19
+    result = run_advanced_thomson_physics(
+        "landau_fdt_full_em_constitutive",
+        angular_frequency_rad_s=[1.0e5],
+        normalized_velocity_x=axis,
+        normalized_velocity_y=axis,
+        normalized_velocity_z=axis,
+        species=species,
+        common_temperature_J=temperature,
+        wave_number_m_inverse=1.0e-3,
+        coulomb_logarithm=12.0,
+    )
+    assert result["public_physics_entrypoint"] == "landau_fdt_full_em_constitutive"
+    assert result["conductivity_tensor_S_m"].shape == (1, 3, 3)
+    assert result["current_fluctuation_spectral_matrix"].shape == (1, 3, 3)
+    assert result["cts_three_wave_vertex_connected"] is False
+    assert result["automatic_model_substitution"] is False
+    assert result["quantitative_release_gate"]["magnetized_response_required_for_magnetized_plasma"] is True
+    assert result["operator_metadata"]["operator"] == "multispecies_linearized_Coulomb_Landau_test_and_field_particle"

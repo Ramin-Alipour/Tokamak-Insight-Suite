@@ -42,3 +42,17 @@ Analysis 1 must not be advertised as having all TS-01–TS-20 closed until every
 
 
 TS-01 Full-EM response bridge (2026-11-04): `cts_landau_em.py` projects the same discrete Landau resolvent and its matching FDT source covariance onto the three Cartesian current components, returning a collisional conductivity tensor, dielectric tensor and current-noise spectral matrix for the unmagnetized, zero-flow common-Maxwellian reference domain. It is exposed as `landau_fdt_full_em_response`. This is a genuine kinetic-to-Maxwell constitutive bridge, but it is **not** the magnetized Full-EM CTS three-wave scattering vertex and does not close TS-01. The finite-grid convergence gate remains mandatory.
+
+
+TS-01 Full-EM public assembly entry point (2026-11-04): added
+`analyze_landau_fdt_full_em_constitutive` and dispatcher key
+`landau_fdt_full_em_constitutive`. The public route now assembles the same
+conserving multispecies Landau operator from velocity axes, species and
+equilibrium inputs, then returns its Cartesian conductivity, dielectric and
+matching FDT current-noise tensors without requiring callers to manually
+construct a `LandauFDTSystem`. Regression coverage checks public dispatch,
+tensor shapes, operator provenance and the explicit magnetized-plasma gate.
+This improves API integration only: it remains an unmagnetized, zero-flow,
+common-temperature Maxwellian constitutive kernel, not a magnetized Full-EM
+CTS three-wave vertex or end-to-end measured-spectrum inference. TS-01 remains
+PARTIAL until those physical and inference layers are implemented and tested.
