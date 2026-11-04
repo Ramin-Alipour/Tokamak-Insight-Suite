@@ -446,6 +446,8 @@ def landau_cts_dynamic_structure_factor(
         "quantum_fdt_closure": quantum_fdt["closure"],
         "quantum_unsymmetrized_dynamic_structure_factor_m3_s": quantum_greater_spectrum,
         "quantum_detailed_balance_relation": quantum_greater["detailed_balance_relation"],
+        "quantum_response_status": "conditional_requires_quantum_consistent_retarded_susceptibility",
+        "quantum_spectra_quantitative": False,
         "landau_langevin_spectral_matrix_m3_s": screened_noise,
         "landau_fdt_relative_consistency_residual": discrepancy,
         "angular_frequency_rad_s": omega.copy(),
