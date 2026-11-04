@@ -40,4 +40,5 @@ jobs:
           tests/test_cts_em_background.py
           tests/test_cts_landau_fdt_operator.py
           tests/test_cts_spatial_inference.py
+          tests/test_cts_full_physics_dispatch.py
           tests/test_thomson_contracts.py
