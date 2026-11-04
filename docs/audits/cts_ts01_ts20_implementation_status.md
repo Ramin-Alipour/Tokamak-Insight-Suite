@@ -158,3 +158,18 @@ derivative, oblique walk-off, collision rejection and degenerate-mode
 rejection. This is a genuine additional 3-D physical relation, but remains a
 local homogeneous cold collisionless result: it is not spatial ray tracing,
 branch tracking or mode conversion. TS-04/05 remain PARTIAL.
+
+
+TS-04 Brillouin energy transport relation (2026-11-04): the local
+magnetoionic group-velocity kernel now also evaluates the dispersive wave
+energy density
+`W=1/4[ε₀ E†∂(ωε_r)/∂ω E+μ₀ H†H]`, the time-averaged Poynting vector
+`S=1/2 Re(E×H*)`, and energy velocity `v_energy=S/W`. The result reports
+the relative difference between energy velocity and the Hellmann–Feynman
+group velocity as a numerical/physical consistency diagnostic. This relation
+is restricted to the same transparent, collisionless, simple local mode;
+it is not applied to absorbing or degenerate branches. Regression coverage
+checks positive Brillouin energy and agreement of energy and group velocity
+for a parallel magnetoionic branch. The new relation strengthens the local
+3-D propagation physics but does not close the spatial ray-tracing or mode
+conversion requirements.
