@@ -280,3 +280,29 @@ def test_free_free_absorption_is_algebraically_consistent_with_kirchhoff_at_mode
         temperature_eV, gaunt_factor=[1.1, 1.2, 1.3],
     )
     np.testing.assert_allclose(opacity, emissivity / planck, rtol=3e-14, atol=0.0)
+
+
+def test_charge_state_moments_report_zeff_and_quasineutrality_without_repair():
+    from tokamak_analysis.cts_em_background import plasma_charge_state_moments
+    result = plasma_charge_state_moments(1.4e19, [1.0e19, 2.0e18], [1.0, 2.0])
+    assert result["ion_charge_density_equivalent_m3"] == pytest.approx(1.4e19)
+    assert result["ion_charge_squared_density_m3"] == pytest.approx(1.8e19)
+    assert result["effective_charge_Zeff"] == pytest.approx(1.8e19 / 1.4e19)
+    assert result["net_charge_density_C_m3"] == pytest.approx(0.0, abs=1e-35)
+    assert result["quasineutrality_relative_residual"] == pytest.approx(0.0, abs=1e-15)
+    assert result["quasineutrality_assumed_or_enforced"] is False
+
+
+def test_charge_state_moments_report_non_neutrality_instead_of_silently_correcting():
+    from tokamak_analysis.cts_em_background import plasma_charge_state_moments
+    result = plasma_charge_state_moments(1.0e19, [0.8e19], [1.0])
+    assert result["quasineutrality_relative_residual"] == pytest.approx(-0.2)
+    assert result["net_charge_density_C_m3"] < 0.0
+    assert result["effective_charge_Zeff"] == pytest.approx(0.8)
+
+
+def test_charge_state_moments_has_undefined_zeff_for_vacuum():
+    from tokamak_analysis.cts_em_background import plasma_charge_state_moments
+    result = plasma_charge_state_moments(0.0, [0.0], [1.0])
+    assert result["effective_charge_Zeff"] is None
+    assert result["quasineutrality_relative_residual"] == 0.0
