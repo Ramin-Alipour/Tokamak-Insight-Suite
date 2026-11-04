@@ -76,6 +76,7 @@ def integrate_thermal_microwave_background(
     electron_density_m3, ion_densities_m3, ion_charge_states,
     ece_absorption_coefficient_m_inverse=None,
     ece_mode_weights=None, gaunt_factor=1.0,
+    ece_emissivity_W_m3_sr_Hz=None, ece_lte=False,
     incident_radiance_W_m2_sr_Hz=0.0,
 ):
     """Integrate free-free and mode-resolved ECE radiative transfer.
@@ -83,10 +84,11 @@ def integrate_thermal_microwave_background(
     ECE absorption may be supplied as (path,frequency) for a single effective
     mode, or (path,frequency,mode) for independently propagated receiver modes.
     In the latter case ece_mode_weights is the measured receiver power fraction
-    for each mode and must be non-negative and sum to one.  Each mode is
-    propagated independently with Kirchhoff's LTE source function before the
-    receiver-weighted radiances are combined.  This does not model mode
-    conversion or coherent cross-mode coupling.
+    for each mode and must be non-negative and sum to one. ECE emissivity may be
+    supplied with the same shape. If it is omitted, callers must explicitly set
+    ece_lte=True to select the Planck source function; LTE is never inferred from
+    an absorption coefficient alone. Each mode is propagated independently.
+    This does not model mode conversion or coherent cross-mode coupling.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
     length = np.asarray(path_length_m, dtype=float)
@@ -159,6 +161,37 @@ def integrate_thermal_microwave_background(
         vacuum_path = ne == 0.0
         if np.any(vacuum_path) and np.any(ece_alpha[vacuum_path] != 0.0):
             raise ValueError("ECE absorption must be zero on path elements with zero electron density")
+    if not isinstance(ece_lte, (bool, np.bool_)):
+        raise ValueError("ece_lte must be an explicit boolean")
+    if ece_absorption_coefficient_m_inverse is None:
+        if ece_emissivity_W_m3_sr_Hz is not None or ece_lte:
+            raise ValueError("ECE emissivity or LTE source selection requires ECE absorption")
+        ece_emissivity = np.zeros_like(ece_alpha)
+        ece_source_model = "ECE omitted"
+    elif ece_emissivity_W_m3_sr_Hz is None:
+        if not ece_lte:
+            raise ValueError(
+                "ECE absorption alone does not define emissivity; supply "
+                "ece_emissivity_W_m3_sr_Hz or explicitly set ece_lte=True"
+            )
+        ece_emissivity = None
+        ece_source_model = "explicit_LTE_Planck_source_function"
+    else:
+        if ece_lte:
+            raise ValueError("supply ECE emissivity or ece_lte=True, not both")
+        supplied_j = np.asarray(ece_emissivity_W_m3_sr_Hz, dtype=float)
+        if supplied_j.ndim == 2 and supplied_j.shape == (length.size, nu.size) and n_modes == 1:
+            supplied_j = supplied_j[:, :, None]
+        if supplied_j.shape != (length.size, nu.size, n_modes):
+            raise ValueError(
+                "ece_emissivity_W_m3_sr_Hz must match ECE absorption as "
+                "(n_path,n_frequency) or (n_path,n_frequency,n_mode)"
+            )
+        if np.any(~np.isfinite(supplied_j)) or np.any(supplied_j < 0.0):
+            raise ValueError("ECE emissivity must be finite and non-negative")
+        ece_emissivity = supplied_j
+        ece_source_model = "explicit_mode_resolved_ECE_emissivity"
+
     incident = np.asarray(incident_radiance_W_m2_sr_Hz, dtype=float)
     if incident.ndim == 0:
         incident = np.full(nu.size, float(incident))
@@ -175,14 +208,27 @@ def integrate_thermal_microwave_background(
         b_nu = planck_spectral_radiance(nu, te[index] * E_CHARGE / K_B)
         alpha_ff = j_ff / np.maximum(b_nu, np.finfo(float).tiny)
         alpha_total = alpha_ff[None, :] + ece_alpha[index].T
+        j_ece = (
+            ece_alpha[index].T * b_nu[None, :]
+            if ece_emissivity is None else ece_emissivity[index].T
+        )
+        j_total = j_ff[None, :] + j_ece
         optical_depth = alpha_total * length[index]
-        transmission = np.exp(-np.minimum(optical_depth, 700.0))
-        intensity_modes = intensity_modes * transmission + b_nu[None, :] * (1.0 - transmission)
+        bounded_depth = np.minimum(optical_depth, 700.0)
+        transmission = np.exp(-bounded_depth)
+        emission_integral = np.full_like(alpha_total, length[index])
+        np.divide(
+            -np.expm1(-bounded_depth), alpha_total,
+            out=emission_integral, where=alpha_total > np.finfo(float).tiny,
+        )
+        intensity_modes = intensity_modes * transmission + j_total * emission_integral
         alpha_ff_total += alpha_ff * length[index]
         tau_ece_modes += ece_alpha[index].T * length[index]
     intensity = mode_weights @ intensity_modes
     has_free_free = bool(np.any(alpha_ff_total > 0.0))
-    has_ece = bool(np.any(tau_ece_modes > 0.0))
+    has_ece = bool(np.any(tau_ece_modes > 0.0) or (
+        ece_emissivity is not None and np.any(ece_emissivity > 0.0)
+    ))
     has_incident = bool(np.any(incident > 0.0))
     if has_free_free or has_ece:
         background_status = "plasma_emission_or_absorption_present"
@@ -219,6 +265,7 @@ def integrate_thermal_microwave_background(
         "ece_optical_depth_by_mode": tau_ece_modes,
         "total_optical_depth": alpha_ff_total + tau_ece_modes.T @ mode_weights,
         "ece_model_status": ece_status,
+        "ece_source_model": ece_source_model,
         "gaunt_factor_resolution": gaunt_status,
         "free_free_model": "nonrelativistic_Maxwellian_thermal_bremsstrahlung_with_supplied_Gaunt_factor",
         "radiative_transfer": "independent mode-by-mode slab formal solution with LTE Kirchhoff source function; receiver-mode weighted after propagation",
@@ -227,6 +274,7 @@ def integrate_thermal_microwave_background(
         "limitations": [
             "Free-free emissivity is non-relativistic and unmagnetized; use a relativistic/magnetized emissivity kernel outside that regime.",
             "The supplied Gaunt factor may be scalar, frequency-resolved, path-resolved, or path-and-frequency-resolved; it is not inferred from incomplete plasma inputs.",
+            "ECE emissivity is independent physical input unless LTE is explicitly selected; absorption alone does not determine a non-LTE source function.",
             "ECE absorption must be supplied by a mode-resolved magnetized plasma solver; no scalar approximation is silently substituted for multiple supplied modes.",
             "Mode conversion and coherent cross-mode coupling are not included; the receiver mode weights are external measured inputs.",
             "The result is spectral radiance, not detector power; receiver etendue and efficiency are external measured inputs.",
