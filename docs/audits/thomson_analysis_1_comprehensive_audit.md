@@ -963,3 +963,25 @@ The relativistic Maxwell-Juttner channel-wise path first obtains a deterministic
 This supersedes the earlier sentence in this audit claiming that the relativistic Maxwell-Juttner channel-wise route retained only a linear baseline. That sentence was stale relative to the current implementation and test suite. The separate limitation on profile-likelihood diagnostics for structured Kappa backgrounds remains.
 
 **Verification boundary:** source and regression coverage are present on `main`; this audit session has not executed the regression or full Analysis 1 test suite. No passing-CI or experimental-validation claim is made.
+
+
+## Direct-main implementation update — 2026-11-04: Full-EM physical-background state parity (TS-11)
+
+The Full-EM CTS inversion previously distinguished an omitted physical background from an explicit zero through the lower-level physical-background fields, but did not expose the same top-level background-state contract as the electrostatic CTS path. This left consumers liable to conflate the profiled detector-space constant offset with a physically known zero radiative background.
+
+**Fixed directly on main:** the Full-EM result now returns `background_state`, `background_state_is_explicit`, `background_zero_assumption`, `background_state_provenance`, and `physical_background_zero`. If neither a receiver-grid physical background nor a path-resolved radiative-transfer model is supplied, the state is `uncharacterized_constant_offset`, explicit is false, the physical zero flag is null, and the provenance states that the physical background is unknown rather than assumed zero. If a physical background is supplied/modelled, it is distinguished from the separately profiled constant offset. `background_zero_assumption` remains false: an explicitly supplied zero spectrum is a measured/model input, not an assumption.
+
+Added regression coverage for both omitted and explicitly zero receiver-grid backgrounds, including the independent profiled offset. Updated the CTS scientific note, Python runtime registry and both canonical JSON registry copies; root/package JSON registries were verified byte-for-byte equivalent after the update.
+
+Commits:
+- `afc287bfd50fae097bbd15dd15b450855c4bcf69` — Full-EM result contract.
+- `63e62b8b38d4edf4a95d4615d91c6b63f4724a1a` — regression coverage.
+- `157af3ef4d4e646f418a2152650e9fb3f8b49f79` — CTS scientific note.
+- `cf2d2fa44f2e99e65558d150775cda9dd87871a8` — Python runtime registry.
+- `a22c1456452d4ef68f4f4435420bcfc5e4a1181f` and `8e1f149fc93ec7ee9f6df4d8b7774c19300295cd` — root/package JSON registries.
+
+**Scope:** this closes the Full-EM omission-versus-zero reporting inconsistency within TS-11. It does not calculate missing Bremsstrahlung/ECE components, infer unprovided background covariance, or claim a complete physical-background model. The remaining TS items are not marked complete by this metadata/state correction.
+
+**Verification:** the source, tests, documentation and registries are present on `main`. GitHub combined commit status returned no status entries for the resulting registry commit; this update therefore does not claim that the regression or full test suite has passed. No experimental validation is performed or claimed.
+
+**TS-20 traceability:** the user-provided status table labels TS-20 as remaining but does not state its subject, acceptance criteria or associated code path. No scientifically meaningful implementation can be assigned to that identifier without inventing its scope; it remains explicitly unclassified rather than being falsely closed.
