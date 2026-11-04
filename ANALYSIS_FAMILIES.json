@@ -1,19 +1,20 @@
 {
   "schema_version": "1.0",
   "primary_analysis_count": 20,
-  "underlying_entry_point_count": 80,
-  "policy": "The 20 primary analyses are navigation/grouping families. The 80 registered underlying entry points remain intact as subanalyses/workflows; retired duplicate entry ID 7 is not registered.",
+  "underlying_entry_point_count": 81,
+  "policy": "The 20 primary analyses are navigation/grouping families. The 81 registered underlying entry points remain intact as subanalyses/workflows; retired duplicate entry ID 7 is not registered.",
   "families": [
     {
       "id": 1,
       "name": "Thomson Scattering",
       "category": "physical_diagnostic",
-      "description": "Navigation family for measured, calibrated optical Thomson physical inference, microwave CTS physical inference, per-channel spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction. Every registered physical workflow starts from measured diagnostic spectra; no pre-derived electron-density/electron-temperature profile entry point is provided.",
+      "description": "Navigation family for measured, calibrated optical Thomson physical inference, microwave CTS physical inference, per-channel spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction. Every registered physical workflow starts from measured diagnostic spectra; no pre-derived electron-density/electron-temperature profile entry point is provided. Includes a separately registered joint multi-view gyrotropic bi-Maxwellian optical Thomson inference path; parallel/perpendicular temperatures are reported only when view geometry and spectral Jacobian identify both.",
       "entry_ids": [
         1,
         30,
         46,
-        81
+        81,
+        82
       ]
     },
     {
