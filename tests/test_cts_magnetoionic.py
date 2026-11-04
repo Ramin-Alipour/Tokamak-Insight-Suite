@@ -125,7 +125,9 @@ def test_species_resolved_cold_fluid_collisions_modify_all_stix_responses():
     assert result["stix_R"] == pytest.approx(expected_r)
     assert result["stix_L"] == pytest.approx(expected_l)
     assert result["species"][0]["collision_frequency_rad_s"] == collision
-    assert np.any(np.abs(result["dielectric_tensor_lab"].imag) > 0.0)
+    assert np.linalg.norm(
+        result["dielectric_tensor_lab"] - result["dielectric_tensor_lab"].conj().T
+    ) > 0.0
 
 
 def test_zero_collision_parameter_recovers_collisionless_tensor_exactly():
