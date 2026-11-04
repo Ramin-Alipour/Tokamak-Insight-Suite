@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A push to main supersedes queued test runs for older commits.
+  group: python-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
