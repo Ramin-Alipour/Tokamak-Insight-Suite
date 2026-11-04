@@ -77,7 +77,7 @@ def test_free_free_emissivity_uses_per_steradian_si_normalization():
     gaunt = np.array([1.2, 1.4])
     temperature_K = temperature_eV * 1.602176634e-19 / 1.380649e-23
     expected = (
-        5.44e-40 * ne * np.sum(charge**2 * ni)
+        (6.8e-38 * 0.1 / (4.0 * np.pi)) * ne * np.sum(charge**2 * ni)
         * temperature_K**-0.5
         * np.exp(-6.62607015e-34 * frequency / (1.380649e-23 * temperature_K))
         * gaunt
