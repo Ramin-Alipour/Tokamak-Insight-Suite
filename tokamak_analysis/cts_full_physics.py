@@ -14,7 +14,8 @@ from scipy.fft import fft2, ifft2, fftfreq
 from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
-from .ece_kinetic import (\n    relativistic_kinetic_ece_absorption_coefficient,\n    solve_relativistic_kinetic_ece_profile,\n)
+from .ece_kinetic import (
+    relativistic_kinetic_ece_absorption_coefficient,\n    solve_relativistic_kinetic_ece_profile,\n)
 from .cts_em_background import integrate_thermal_microwave_background
 
 
