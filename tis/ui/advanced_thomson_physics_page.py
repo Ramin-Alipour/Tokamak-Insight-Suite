@@ -20,6 +20,7 @@ MODEL_LABELS = {
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware regularized spatial inversion",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
+    "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
@@ -93,6 +94,23 @@ EXAMPLES = {
         "magnetic_pitch_cosine": [1.0, 0.5, 0.0],
         "projected_temperature_covariance_eV2": [[25.0, 0.0, 0.0], [0.0, 25.0, 0.0], [0.0, 0.0, 25.0]],
         "magnetic_pitch_cosine_covariance": [[0.0001, 0.0, 0.0], [0.0, 0.0001, 0.0], [0.0, 0.0, 0.0001]]
+    },
+    "gyrotropic_bi_maxwellian_spectral_fit": {
+        "wavelength_nm": np.linspace(499.7, 500.3, 121).tolist(),
+        "measured_spectra": [
+            (0.02 + 0.8*np.exp(-0.5*((np.linspace(499.7, 500.3, 121)-500.0)/0.035)**2)).tolist(),
+            (0.02 + 0.8*np.exp(-0.5*((np.linspace(499.7, 500.3, 121)-500.0)/0.028)**2)).tolist(),
+            (0.02 + 0.8*np.exp(-0.5*((np.linspace(499.7, 500.3, 121)-500.0)/0.020)**2)).tolist()
+        ],
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "magnetic_field_unit": [0.0, 0.0, 1.0],
+        "scattering_vector_unit": [[0.0, 0.0, 1.0], [0.8660254038, 0.0, 0.5], [1.0, 0.0, 0.0]],
+        "instrument_response_matrix": np.eye(121).tolist(),
+        "initial_temperature_parallel_eV": 800.0,
+        "initial_temperature_perpendicular_eV": 300.0,
+        "temperature_bounds_eV": [10.0, 5000.0],
+        "flow_bounds_m_s": [-1000000.0, 1000000.0]
     },
     "landau_fdt_cts": {
         "angular_frequency_rad_s": [1.0e5, 2.0e5],
