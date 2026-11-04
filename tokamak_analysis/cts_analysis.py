@@ -159,7 +159,7 @@ def _frequency_dependent_scattering_wave_number(frequency_shift_Hz, probe_freque
     scattered = f0 + shift
     if np.any(scattered <= 0.0):
         raise ValueError("scattered photon frequencies must remain positive")
-    radicand = f0*f0 + scattered*scattered - 2.0*f0*scattered*np.cos(angle)
+    radicand = (f0 - scattered)**2 + 4.0*f0*scattered*np.sin(angle / 2.0)**2
     return (2.0*np.pi/C) * np.sqrt(np.maximum(radicand, 0.0))
 
 
@@ -721,8 +721,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         for key in species_bound_keys
     ]
     physical_flow_limit=float(np.nextafter(C,0.0))
-    q_fit = _maximum_geometry_wave_number(scattering_geometry, f0)
-    spectral_flow_limit = min(physical_flow_limit, 2.0*np.pi*float(np.max(np.abs(f)))/q_fit)
+    q_fit = _frequency_dependent_scattering_wave_number(f, f0, _geometry(scattering_geometry, f0)[2])
+    spectral_flow_limit = min(physical_flow_limit, float(np.max(2.0*np.pi*np.abs(f)/q_fit)))
     eub=tuple(map(float,b.get("electron_velocity_projection_m_s",(-spectral_flow_limit,spectral_flow_limit))))
     if len(eub)!=2 or not np.all(np.isfinite(eub)) or eub[0]>=eub[1] or max(map(abs,eub))>=C:
         raise ValueError("electron-flow bounds must be finite, increasing and subluminal")
@@ -1142,7 +1142,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if fast and fast["kind"]=="maxwellian":
         trans[fast_offset+1,fast_offset+1]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
-    alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
+    q_spectral=_frequency_dependent_scattering_wave_number(f,f0,angle)
+    debye_length=np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2))
+    alpha=1/(q*debye_length)
+    alpha_spectral=1/(q_spectral*debye_length)
     ion_names = ["ion_temperature_eV"] if n_species == 1 else [
         f"ion_temperature_{ions[i]['name']}" if "name" in ions[i] else f"ion_temperature_species_{i}"
         for i in range(n_species)
@@ -1159,8 +1162,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
       "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if effective_covariance_supplied else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
       "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"spectral_weighting_status":weighting_status,"spectral_uncertainty_supplied":bool(unc is not None or spectral_covariance is not None),"regularization_scope":"fast-ion VDF curvature and supplied reference-shape regularization only; no plasma-parameter prior","jacobian_rank":rank,"jacobian_condition_number":cond,
-      "degrees_of_freedom":int(dof),"scattering_wave_number_m-1":q,"scattering_wavevector_direction":qhat,
-      "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),"scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
+      "degrees_of_freedom":int(dof),"scattering_wave_number_m-1":q,
+      "scattering_wave_number_spectral_m-1":q_spectral.copy(),
+      "scattering_wavevector_direction":qhat,
+      "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),
+      "collective_parameter_alpha_spectral":alpha_spectral.copy(),
+      "scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
       "ion_species":ions,"ion_fractions_charge_density":[float(v) for v in ion_fractions],"probe_frequency_Hz":f0,
       "model":"unmagnetized electrostatic longitudinal microwave CTS",
       "species_resolved_ion_temperature_input_supported":True,
