@@ -31,6 +31,9 @@ def test_landau_operator_has_explicit_conservation_contract():
         "total_momentum": True,
         "total_energy": True,
     }
+    assert system.metadata["invariants_numerically_verified"] is True
+    assert system.metadata["invariant_relative_tolerance"] == 1.0e-8
+    assert residual / scale <= system.metadata["invariant_relative_tolerance"]
 
 
 def test_landau_entropy_and_matching_fdt_covariance_are_positive():
