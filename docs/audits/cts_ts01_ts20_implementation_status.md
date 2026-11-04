@@ -231,3 +231,6 @@ optional and no default regularization scale is invented.
 
 
 PROF-07 update (2026-11-04): `thomson_psf_profile_inverse` now supports automatic curvature-penalty selection by GCV when `regularization_strength` is omitted. It reports the selected value, candidate grid, GCV scores and active-set effective degrees of freedom. Data-only rank remains independent of regularization; null-space modes are never promoted to primary results. The covariance remains conditional on the selected penalty and fixed PSF. PSF uncertainty and GCV selection for wavelength-resolved joint-profile inversion remain open.
+
+
+PROF-02 / PROF-03 incremental implementation (2026-11-04): the PSF-aware profile inverse accepts an optional full covariance for row-major elements of the supplied spatial mixing matrix. It propagates this operator uncertainty by first-order differentiation of the regularized normal equations and reports the PSF-only contribution separately from the measurement/regularization covariance. A combined covariance is exposed only for data-only identifiable profiles. The propagation assumes independent measurement and operator errors; their cross-covariance and higher-order PSF effects remain open. The spatial mixing matrix itself remains researcher-supplied and is not inferred from profile data.
