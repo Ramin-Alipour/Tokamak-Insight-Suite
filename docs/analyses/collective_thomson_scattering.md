@@ -15,6 +15,10 @@ The electrostatic and Full-EM CTS analyses require the supplied calibrated measu
 
 All spectra and frequency axes are assumed to be measured, prepared and calibrated. The CTS workflows do not calibrate the instrument, correct raw detector counts, infer a missing frequency axis, or perform experimental validation.
 
+## Shared physical-background state contract
+
+Both CTS inversion branches distinguish an omitted physical background from an explicitly supplied zero physical background. In Full-EM, omission leaves the physical background unknown; the solver may still profile a detector-space constant offset, but that nuisance offset is not evidence that the physical radiative background is zero. The result reports background_state=uncharacterized_constant_offset, background_state_is_explicit=false, background_zero_assumption=false, and physical_background_zero=null. When a receiver-grid physical background or a radiative-transfer model is explicitly supplied, the result records that input separately from the profiled offset. An explicitly modelled zero is reported as a zero physical-background result, not as an assumption. This state contract does not infer missing background components or alter measured spectra.
+
 ## Electrostatic longitudinal CTS
 
 The electrostatic path remains an unmagnetized multi-species longitudinal dielectric model. It computes species susceptibilities, the longitudinal dielectric function, the dynamic structure factor and convolution with the supplied measured frequency-response matrix.
