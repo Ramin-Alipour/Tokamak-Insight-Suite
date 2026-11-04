@@ -2214,10 +2214,9 @@ def fit_full_em_gyrotropic_population_shape(
     inferred_parallel_velocity_m_s = None
     candidate_parallel_velocity_m_s = None
     if population_kind == "electron":
-        from .cts_full_em import ME as _ME
         momentum_magnitude = np.sqrt(pp[:, None]**2 + pa[None, :]**2)
-        gamma = np.sqrt(1.0 + (momentum_magnitude / (_ME * C))**2)
-        parallel_velocity = pa[None, :] / (gamma * _ME)
+        gamma = np.sqrt(1.0 + (momentum_magnitude / (ME * C))**2)
+        parallel_velocity = pa[None, :] / (gamma * ME)
         candidate_parallel_velocity_m_s = float(
             np.sum(candidate_distribution * weights * parallel_velocity)
         )
