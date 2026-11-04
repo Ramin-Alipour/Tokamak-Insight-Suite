@@ -12,6 +12,7 @@ import numpy as np
 from scipy.fft import fft2, ifft2, fftfreq
 
 from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
+from .cts_landau_em import landau_full_em_current_response
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
 from .ece_kinetic import (
@@ -322,6 +323,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = analyze_cts_microwave_background
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
+    elif model == "landau_fdt_full_em_response":
+        solver = landau_full_em_current_response
     elif model == "polarized_kinetic_ece":
         solver = solve_polarized_kinetic_ece_with_mode_conversion
     elif model == "stratified_nonparaxial_vector":
@@ -330,7 +333,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = solve_stratified_mode_conversion
     else:
         raise ValueError(
-            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, landau_fdt_cts, polarized_kinetic_ece, "
+            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, landau_fdt_cts, landau_fdt_full_em_response, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion; "
             "no automatic model substitution is performed"
         )
