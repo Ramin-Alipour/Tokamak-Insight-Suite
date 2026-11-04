@@ -448,73 +448,129 @@ def reconstruct_relativistic_projected_thomson_evdf(
 
 
 def reconstruct_psf_aware_thomson_profile(
-    measured_channel_values, spatial_mixing_matrix, *, regularization_strength,
+    measured_channel_values, spatial_mixing_matrix, *, regularization_strength=None,
     measurement_uncertainty=None, measurement_covariance=None,
-    positive=True, max_iter=3000,
+    positive=True, max_iter=3000, gcv_candidate_count=31,
+    gcv_log10_range=(-8.0, 8.0),
 ):
-    """Reconstruct latent spatial nodes from channel values and a fixed PSF/mixing matrix.
+    """PSF-aware profile inverse with optional GCV-selected curvature penalty.
 
-    The operator maps latent node values to measured channels. This is a
-    regularized inverse problem, not interpolation. Only data-supported modes
-    are reported as primary; null-space modes remain non-identifiable.
+    GCV is evaluated on whitened measured-channel residuals. For non-negative
+    fits its effective degrees of freedom use the fitted active set. The
+    data-only rank test is independent of regularization, so smoothing cannot
+    promote spatial null-space modes to measured outputs.
     """
     y = _real_vector(measured_channel_values, "measured_channel_values", minimum=2)
-    h = np.asarray(spatial_mixing_matrix, dtype=float)
+    raw_h = np.asarray(spatial_mixing_matrix)
+    if raw_h.dtype.kind not in "iuf":
+        raise ValueError("spatial_mixing_matrix must contain real numeric values")
+    h = raw_h.astype(float, copy=False)
     if h.ndim != 2 or h.shape[0] != y.size or not np.all(np.isfinite(h)) or np.any(h < 0):
         raise ValueError("spatial_mixing_matrix must be finite, non-negative, and have one row per measured channel")
-    lam = float(regularization_strength)
-    if not np.isfinite(lam) or lam <= 0:
-        raise ValueError("regularization_strength must be positive and finite")
-    whiten, noise_status = _whitener(y.size, measurement_uncertainty, measurement_covariance)
-    a = whiten(h); z = whiten(y)
     if h.shape[1] < 2:
         raise ValueError("at least two latent spatial nodes are required")
-    d2 = np.diff(np.eye(h.shape[1]), n=2, axis=0) if h.shape[1] >= 3 else np.zeros((0,h.shape[1]))
-    aw = np.vstack((a, np.sqrt(lam)*d2))
+    if not isinstance(positive, (bool, np.bool_)):
+        raise ValueError("positive must be boolean")
+    if isinstance(max_iter, (bool, np.bool_)) or not isinstance(max_iter, (int, np.integer)) or max_iter < 1:
+        raise ValueError("max_iter must be a positive integer")
+    whiten, noise_status = _whitener(y.size, measurement_uncertainty, measurement_covariance)
+    a, z = whiten(h), whiten(y)
+    d2 = np.diff(np.eye(h.shape[1]), n=2, axis=0) if h.shape[1] >= 3 else np.zeros((0, h.shape[1]))
+    bounds = (0.0, np.inf) if positive else (-np.inf, np.inf)
+
+    if regularization_strength is not None:
+        if isinstance(regularization_strength, (bool, np.bool_)) or not isinstance(regularization_strength, (int, float, np.integer, np.floating)):
+            raise ValueError("regularization_strength must be None or a positive finite real scalar")
+        lam = float(regularization_strength)
+        if not np.isfinite(lam) or lam <= 0:
+            raise ValueError("regularization_strength must be None for GCV selection or positive and finite")
+        selection, candidates = "researcher_supplied", np.array([lam])
+        scores, effective_dof = [], []
+    elif d2.shape[0] == 0:
+        lam, selection, candidates = 0.0, "not_applicable_fewer_than_three_nodes", np.array([0.0])
+        scores, effective_dof = [], []
+    else:
+        if isinstance(gcv_candidate_count, (bool, np.bool_)) or not isinstance(gcv_candidate_count, (int, np.integer)) or not 5 <= gcv_candidate_count <= 101:
+            raise ValueError("gcv_candidate_count must be an integer from 5 to 101")
+        exponents = np.asarray(gcv_log10_range)
+        if exponents.dtype.kind not in "iuf" or exponents.shape != (2,) or not np.all(np.isfinite(exponents)) or exponents[0] >= exponents[1]:
+            raise ValueError("gcv_log10_range must contain two finite increasing exponents")
+        scale_a = max(float(np.linalg.norm(a.T @ a, ord=2)), np.finfo(float).tiny)
+        scale_d = max(float(np.linalg.norm(d2.T @ d2, ord=2)), np.finfo(float).tiny)
+        candidates = (scale_a / scale_d) * np.logspace(float(exponents[0]), float(exponents[1]), int(gcv_candidate_count))
+        scores, effective_dof = [], []
+        for candidate in candidates:
+            aw = np.vstack((a, np.sqrt(candidate) * d2))
+            zw = np.r_[z, np.zeros(d2.shape[0])]
+            if positive:
+                candidate_fit = lsq_linear(aw, zw, bounds=bounds, method="trf", max_iter=int(max_iter), tol=1e-10)
+                if not candidate_fit.success:
+                    scores.append(np.inf); effective_dof.append(np.nan); continue
+                candidate_profile = candidate_fit.x
+                active_candidate = candidate_profile > max(float(np.max(candidate_profile)) * 1e-9, np.finfo(float).tiny)
+            else:
+                candidate_profile = np.linalg.lstsq(aw, zw, rcond=None)[0]
+                active_candidate = np.ones(candidate_profile.size, dtype=bool)
+            aa, pp = a[:, active_candidate], d2[:, active_candidate]
+            normal = aa.T @ aa + float(candidate) * (pp.T @ pp)
+            df = float(np.trace(aa @ np.linalg.pinv(normal, hermitian=True) @ aa.T)) if np.any(active_candidate) else 0.0
+            residual_candidate = z - a @ candidate_profile
+            denominator = max(float(y.size) - df, np.finfo(float).eps)
+            scores.append(float(residual_candidate @ residual_candidate) / denominator**2)
+            effective_dof.append(df)
+        scores_array = np.asarray(scores)
+        if not np.any(np.isfinite(scores_array)):
+            raise ValueError("GCV could not produce a finite converged candidate")
+        selected = int(np.nanargmin(scores_array))
+        lam, selection = float(candidates[selected]), "generalized_cross_validation_active_set"
+
+    aw = np.vstack((a, np.sqrt(lam) * d2))
     zw = np.r_[z, np.zeros(d2.shape[0])]
-    bounds = (0,np.inf) if positive else (-np.inf,np.inf)
     if positive:
         fit = lsq_linear(aw, zw, bounds=bounds, method="trf", max_iter=int(max_iter), tol=1e-10)
         if not fit.success:
             raise ValueError(f"PSF-aware profile inversion failed: {fit.message}")
         values = fit.x
     else:
-        values = np.linalg.lstsq(aw,zw,rcond=None)[0]
-    scaled = a / np.maximum(np.linalg.norm(a,axis=0),np.finfo(float).tiny)[None,:]
-    singular = np.linalg.svd(scaled,compute_uv=False)
-    tol = np.finfo(float).eps*max(scaled.shape)*(singular[0] if singular.size else 0)
-    rank = int(np.count_nonzero(singular>tol))
-    condition = float(singular[0]/singular[-1]) if singular.size and singular[-1]>tol else float("inf")
-    data_identifiable = rank == h.shape[1] and np.isfinite(condition) and condition < 1e12
-    active = np.ones(values.size,dtype=bool) if not positive else values > max(float(np.max(values))*1e-9,np.finfo(float).tiny)
-    aa = a[:,active]; pp = d2[:,active]
-    normal = aa.T@aa + lam*(pp.T@pp)
-    cov = np.zeros((values.size,values.size))
-    cov_active = np.linalg.pinv(normal,hermitian=True)
-    residual = z-a@values
+        values = np.linalg.lstsq(aw, zw, rcond=None)[0]
+    scaled = a / np.maximum(np.linalg.norm(a, axis=0), np.finfo(float).tiny)[None, :]
+    singular = np.linalg.svd(scaled, compute_uv=False)
+    tol = np.finfo(float).eps * max(scaled.shape) * (singular[0] if singular.size else 0.0)
+    rank = int(np.count_nonzero(singular > tol))
+    condition = float(singular[0] / singular[-1]) if singular.size and singular[-1] > tol else float("inf")
+    identifiable = rank == h.shape[1] and np.isfinite(condition) and condition < 1e12
+    active = np.ones(values.size, dtype=bool) if not positive else values > max(float(np.max(values)) * 1e-9, np.finfo(float).tiny)
+    aa, pp = a[:, active], d2[:, active]
+    covariance_active = np.linalg.pinv(aa.T @ aa + lam * (pp.T @ pp), hermitian=True)
+    residual = z - a @ values
     if noise_status == "unweighted_no_measurement_uncertainty_supplied":
-        cov_active *= float(residual@residual/max(1,y.size-rank))
-    cov[np.ix_(np.flatnonzero(active),np.flatnonzero(active))] = cov_active
+        covariance_active *= float(residual @ residual / max(1, y.size - rank))
+    covariance = np.zeros((values.size, values.size))
+    covariance[np.ix_(np.flatnonzero(active), np.flatnonzero(active))] = covariance_active
     return {
-        "status": "identified_from_measurement" if data_identifiable else "conditional_regularized_candidate",
-        "latent_profile": values if data_identifiable else None,
+        "status": "identified_from_measurement" if identifiable else "conditional_regularized_candidate",
+        "latent_profile": values if identifiable else None,
         "regularized_candidate_profile": values,
-        "profile_covariance": cov if data_identifiable else None,
-        "fitted_channel_values": h@values,
-        "residual": y-h@values,
+        "profile_covariance": covariance if identifiable else None,
+        "fitted_channel_values": h @ values,
+        "residual": y - h @ values,
         "spatial_mixing_matrix": h.copy(),
         "data_only_rank": rank,
         "latent_node_count": int(h.shape[1]),
         "condition_number": condition,
-        "null_space_dimension": int(max(0,h.shape[1]-rank)),
+        "null_space_dimension": int(max(0, h.shape[1] - rank)),
         "regularization_strength": lam,
+        "regularization_selection": selection,
+        "gcv_candidate_strengths": candidates.copy(),
+        "gcv_scores": np.asarray(scores, dtype=float),
+        "gcv_effective_degrees_of_freedom": np.asarray(effective_dof, dtype=float),
         "positive_constraint": bool(positive),
         "noise_model": noise_status,
         "identifiability": {
-            "primary": ["latent_profile"] if data_identifiable else [],
+            "primary": ["latent_profile"] if identifiable else [],
             "conditional": ["regularized_candidate_profile; conditional on supplied PSF, regularization, and noise model"],
             "non_identifiable": ["spatial modes in the data-only null space", "sub-resolution modes not encoded by the supplied mixing operator"],
         },
-        "uncertainty_interpretation": "local regularized linear covariance on the active set; it is not a posterior interval and excludes PSF/mixing-operator uncertainty",
+        "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval; excludes PSF/mixing-operator uncertainty",
         "experimental_validation": "not_performed",
     }
