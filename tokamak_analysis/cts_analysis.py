@@ -142,6 +142,27 @@ def _species(species,fractions):
     return out
 
 
+def _frequency_dependent_scattering_wave_number(frequency_shift_Hz, probe_frequency_Hz, scattering_angle_rad):
+    """Exact |k_s-k_i| for fixed scattering angle and shifted scattered frequency.
+
+    k_i=2*pi*f0/c and k_s=2*pi*(f0+df)/c. The common CTS approximation
+    k=2*k_i*sin(theta/2) is recovered at df/f0 -> 0. This retains the
+    frequency dependence of the scattered photon wave number while the
+    electrostatic model continues to use the central scattering direction
+    for the supplied scalar flow projections.
+    """
+    shift = _array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    angle = float(scattering_angle_rad)
+    if not np.isfinite(angle) or not 0.0 < angle <= np.pi:
+        raise ValueError("scattering_angle_rad must lie in (0, pi]")
+    scattered = f0 + shift
+    if np.any(scattered <= 0.0):
+        raise ValueError("scattered photon frequencies must remain positive")
+    radicand = f0*f0 + scattered*scattered - 2.0*f0*scattered*np.cos(angle)
+    return (2.0*np.pi/C) * np.sqrt(np.maximum(radicand, 0.0))
+
+
 def _component(omega,k,n,T,m,Z,u):
     if n<=0: return np.zeros_like(omega,dtype=complex),np.zeros_like(omega)
     vt=np.sqrt(2*T*E/m); z=(omega/k-u)/vt
@@ -167,7 +188,8 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
     susceptibility=np.empty(np.asarray(omega).shape,dtype=complex)
     resonant_density=np.empty(np.asarray(omega).shape,dtype=float)
     for index,frequency in np.ndenumerate(np.asarray(omega,dtype=float)):
-        resonance=float(frequency/k-flow)
+        local_k=float(np.asarray(k, dtype=float)[index]) if np.ndim(k) else float(k)
+        resonance=float(frequency/local_k-flow)
         if resonance<=velocity_grid[0] or resonance>=velocity_grid[-1]:
             if np.isclose(resonance,velocity_grid[0]) or np.isclose(resonance,velocity_grid[-1]):
                 raise ValueError("fast-ion velocity grid must extend beyond every resonant velocity")
@@ -192,7 +214,7 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
             if velocity_grid[0]<resonance<velocity_grid[-1]
             else pv + boundary_terms
         )
-        susceptibility[index]=-(plasma_frequency_squared/(k*k))*landau_integral
+        susceptibility[index]=-(plasma_frequency_squared/(local_k*local_k))*landau_integral
         resonant_density[index]=f_res
     return susceptibility,resonant_density
 
@@ -272,7 +294,7 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     if np.any(np.abs(ion_flows) >= C) or abs(ue) >= C:
         raise ValueError("flow projections must be subluminal")
     if np.any(f0+f<=0): raise ValueError("scattered frequencies must remain positive")
-    k,_,_=_geometry(scattering_geometry,f0); om=2*np.pi*f
+    _,_,scattering_angle=_geometry(scattering_geometry,f0); k=_frequency_dependent_scattering_wave_number(f,f0,scattering_angle); om=2*np.pi*f
     ce,fe=_component(om,k,ne,te,ME,1.,ue); total=ce.copy(); terms=[]
     hot=None
     if fast_ion is not None:
