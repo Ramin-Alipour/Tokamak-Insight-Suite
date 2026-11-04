@@ -106,6 +106,8 @@ def reconstruct_thomson_evdf(
     background_uncertainty=None,
     background_covariance=None,
     signal_background_cross_covariance=None,
+    model_discrepancy_covariance=None,
+    systematic_covariance=None,
     max_iter=3000,
 ):
     """Reconstruct the non-negative 1-D electron-velocity marginal along q.
@@ -115,6 +117,11 @@ def reconstruct_thomson_evdf(
     is convolved with the supplied measured response matrix before fitting.
     The fitted background is an explicit input. Regularization strength is optional: when omitted, the solver selects it by generalized cross-validation (GCV); a finite positive value overrides that selection. The result is
     shape-normalized; absolute density is not inferred by this inverse routine.
+
+    Optional model_discrepancy_covariance and systematic_covariance are additive
+    wavelength-space covariance components. Each is assumed independent of the
+    measurement/background components and of the other supplied component; no
+    unprovided cross-covariance is invented.
     """
     wavelength = _finite_vector(wavelength_nm, "wavelength_nm")
     measured = _finite_vector(signal, "signal")
@@ -202,8 +209,13 @@ def reconstruct_thomson_evdf(
         matrix = matrix.astype(float, copy=False)
         if matrix.shape != (measured.size, measured.size) or not np.all(np.isfinite(matrix)):
             raise ValueError(f"{name} must be a finite square matrix matching signal")
-        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=0.0):
+        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12 * max(float(np.max(np.abs(matrix))), 1.0)):
             raise ValueError(f"{name} must be symmetric")
+        matrix = 0.5 * (matrix + matrix.T)
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if eigenvalues[0] < -1e-10 * scale:
+            raise ValueError(f"{name} must be positive semidefinite")
         return matrix
 
     signal_covariance_matrix = None
@@ -253,6 +265,28 @@ def reconstruct_thomson_evdf(
     else:
         residual_covariance = None
         uncertainty_model = "not_supplied_unweighted_fit"
+
+    discrepancy_covariance_matrix = (
+        None if model_discrepancy_covariance is None else
+        _validated_covariance(model_discrepancy_covariance, "model_discrepancy_covariance")
+    )
+    systematic_covariance_matrix = (
+        None if systematic_covariance is None else
+        _validated_covariance(systematic_covariance, "systematic_covariance")
+    )
+    additive_components = [matrix for matrix in (
+        discrepancy_covariance_matrix, systematic_covariance_matrix
+    ) if matrix is not None]
+    if additive_components:
+        additive_covariance = np.sum(additive_components, axis=0)
+        residual_covariance = (
+            additive_covariance if residual_covariance is None
+            else residual_covariance + additive_covariance
+        )
+        if signal_covariance_matrix is None and background_covariance_matrix is None:
+            uncertainty_model = "model_discrepancy_and_systematic_covariance_only"
+        else:
+            uncertainty_model += "+independent_model_discrepancy_and_systematic_covariance"
 
     if residual_covariance is not None:
         try:
@@ -663,6 +697,18 @@ def reconstruct_thomson_evdf(
             "regularization and active set; not a posterior or experimental validation"
         ),
         "measurement_uncertainty_model": uncertainty_model,
+        "model_discrepancy_covariance": (
+            None if discrepancy_covariance_matrix is None else discrepancy_covariance_matrix.copy()
+        ),
+        "model_discrepancy_covariance_included": discrepancy_covariance_matrix is not None,
+        "systematic_covariance": (
+            None if systematic_covariance_matrix is None else systematic_covariance_matrix.copy()
+        ),
+        "systematic_covariance_included": systematic_covariance_matrix is not None,
+        "additive_covariance_independence_assumption": (
+            "model discrepancy and systematic components are mutually independent and independent of measurement/background errors; all omitted cross-covariances are zero by explicit assumption"
+            if additive_components else "no additive model-discrepancy/systematic covariance supplied"
+        ),
         "background_uncertainty_included": background_covariance_matrix is not None,
         "signal_background_cross_covariance_included": signal_background_cross_covariance is not None,
         "residual_covariance_interpretation": (
