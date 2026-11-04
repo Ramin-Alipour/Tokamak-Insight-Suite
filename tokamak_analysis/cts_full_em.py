@@ -995,7 +995,9 @@ def build_full_em_cts_physical_background(
 
     The mapping explicitly supplies path profiles, Gaunt factor, ECE opacity
     (or None to intentionally omit ECE), incident radiance, etendue and
-    efficiency. Frequency is probe_frequency_Hz + frequency_shift_Hz.
+    efficiency. If ECE opacity is present, also supply mode-resolved ECE
+    emissivity or explicitly set ece_lte=True to select a Planck source
+    function. Frequency is probe_frequency_Hz + frequency_shift_Hz.
     The measured response operator is applied exactly once. No physical
     profile, opacity, geometry, calibration or instrument response is inferred.
     """
