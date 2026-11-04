@@ -39,3 +39,6 @@
 TS-02 incremental implementation note (2026-11-04): the relativistic ECE absorption entry point is conditional on an explicitly supplied normalized gyrotropic EVDF, density, local wavevector, magnetic field and polarization. It does not infer the EVDF, implement a collisional operator, or close polarized transfer. Resonance-width and quadrature convergence remain numerical release gates.
 
 Analysis 1 must not be advertised as having all TS-01–TS-20 closed until every remaining PARTIAL/OPEN item has code-level implementation, tests, public API/dashboard integration, synchronized documentation, and successful CI on the exact release commit.
+
+
+TS-01 Full-EM response bridge (2026-11-04): `cts_landau_em.py` projects the same discrete Landau resolvent and its matching FDT source covariance onto the three Cartesian current components, returning a collisional conductivity tensor, dielectric tensor and current-noise spectral matrix for the unmagnetized, zero-flow common-Maxwellian reference domain. It is exposed as `landau_fdt_full_em_response`. This is a genuine kinetic-to-Maxwell constitutive bridge, but it is **not** the magnetized Full-EM CTS three-wave scattering vertex and does not close TS-01. The finite-grid convergence gate remains mandatory.
