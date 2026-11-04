@@ -39,7 +39,7 @@ def kappa_electron_susceptibility(
     wavenumber_m_inverse,
     mass_kg=ME,
     pole_imaginary_part_m_s=None,
-    minimum_velocity_grid_probability_coverage=0.999,
+    minimum_velocity_grid_probability_coverage=0.99,
 ):
     """Return chi_e for the normalized 1-D marginal of an isotropic 3-D Kappa.
 
