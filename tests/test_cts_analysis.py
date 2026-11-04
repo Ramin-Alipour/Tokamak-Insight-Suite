@@ -1989,3 +1989,56 @@ def test_cts_descriptive_spectrum_requires_explicit_valid_baseline(baseline):
     with pytest.raises(ValueError):
         describe_cts_spectrum(frequency, spectrum, baseline_level=baseline)
 
+
+
+@pytest.mark.parametrize("explicit_zero", [False, True])
+def test_full_em_cts_background_state_distinguishes_omission_from_explicit_zero(monkeypatch, explicit_zero):
+    import tokamak_analysis.cts_full_em as full_em
+
+    frequency = np.linspace(-1.0, 1.0, 41) * 1.0e8
+    x = np.linspace(-1.0, 1.0, frequency.size)
+
+    def synthetic_forward(*args, **kwargs):
+        return {"spectral_density": (
+            1.0
+            + 0.13 * np.log(kwargs["electron_density_m3"] / 2.0e19) * x
+            + 0.11 * np.log(kwargs["electron_temperature_eV"] / 1000.0) * x**2
+            + 0.09 * np.log(kwargs["ion_temperature_eV"]["D+"] / 500.0) * x**3
+            + 0.17 * (kwargs["electron_flow_projection_m_s"] / 1.0e6) * x**4
+            + 0.14 * (kwargs["ion_flow_projection_m_s"]["D+"] / 1.0e6) * x**5
+        )}
+
+    monkeypatch.setattr(full_em, "full_em_cts_spectral_density", synthetic_forward)
+    physical = synthetic_forward(
+        frequency, 140.0e9, {}, electron_density_m3=2.2e19,
+        electron_temperature_eV=1200.0, ion_temperature_eV={"D+": 700.0},
+        electron_flow_projection_m_s=2.2e5, ion_flow_projection_m_s={"D+": 1.6e5},
+    )["spectral_density"]
+    kwargs = dict(
+        probe_frequency_Hz=140.0e9, scattering_geometry={},
+        electron_density_initial_m3=2.0e19, electron_temperature_initial_eV=1000.0,
+        ion_temperature_initial_eV=500.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], magnetic_field_T=[0.0, 0.0, 2.0],
+        incident_polarization=[0.0, 0.0, 1.0], scattered_polarization=[0.0, 0.0, 1.0],
+        instrument_response=np.eye(frequency.size), numerical_convergence=False,
+        parameter_bounds={
+            "electron_flow_projection_m_s": [1.0e5, 8.0e5],
+            "ion_flow_projection_m_s:D+": [1.0e5, 8.0e5],
+        },
+    )
+    if explicit_zero:
+        kwargs["physical_background_spectrum_W_Hz"] = np.zeros(frequency.size)
+    result = full_em.analyze_full_em_cts_spectrum(frequency, 2.4 * physical + 0.7, **kwargs)
+    if explicit_zero:
+        assert result["background_state"] == "explicit_physical_background_plus_profiled_constant_offset"
+        assert result["background_state_is_explicit"] is True
+        assert result["physical_background_zero"] is True
+        assert result["physical_background_zero_status"] == "zero_background_exact_zero_receiver_grid_spectrum"
+    else:
+        assert result["background_state"] == "uncharacterized_constant_offset"
+        assert result["background_state_is_explicit"] is False
+        assert result["physical_background_zero"] is None
+        assert "physical background is unknown rather than assumed zero" in result["background_state_provenance"]
+    assert result["background_zero_assumption"] is False
+    assert result["profiled_offset"] == pytest.approx(0.7, abs=1e-5)
