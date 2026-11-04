@@ -29,6 +29,7 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
         background_model="linear",
         measurement_uncertainty=np.full(wavelength.size, 0.003),
         model_discrepancy_covariance=np.eye(wavelength.size) * 1.0e-6,
+        systematic_covariance=np.eye(wavelength.size) * 4.0e-7,
         max_nfev=5000,
     )
     assert result["optimizer_success"]
@@ -38,5 +39,37 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
     assert np.allclose(result["physical_parameters"], truth, rtol=0.04, atol=1e-3)
     assert result["absolute_density_inferred"] is False
     assert result["model_discrepancy_covariance_included"] is True
-    assert result["noise_model"] == "measurement_plus_model_discrepancy_covariance"
+    assert result["systematic_covariance_included"] is True
+    assert result["covariance_components"] == {
+        "measurement_covariance_supplied": True,
+        "model_discrepancy_covariance_supplied": True,
+        "systematic_covariance_supplied": True,
+        "combined_covariance_used_for_whitening": True,
+    }
+    assert result["noise_model"] == "measurement_plus_model_discrepancy_plus_systematic_covariance"
+    assert result["parameter_identifiability"]["status"] == "locally_identifiable_after_joint_structured_background_fit"
+    assert np.allclose(
+        result["joint_parameter_covariance"],
+        result["joint_parameter_covariance"].T,
+        rtol=1e-10,
+        atol=1e-14,
+    )
+    assert np.all(np.linalg.eigvalsh(result["joint_parameter_covariance"]) >= -1e-12)
     assert result["cross_section_model"] == "isotropic_finite_variance_Kappa_projection"
+
+
+def test_structured_background_fit_rejects_non_psd_model_discrepancy_covariance():
+    import pytest
+
+    wavelength = np.linspace(529.0, 535.0, 41)
+    measured = 1.0 + np.exp(-0.5 * ((wavelength - 532.0) / 0.5) ** 2)
+    with pytest.raises(ValueError, match="model_discrepancy_covariance must be positive semidefinite"):
+        fit_noncollective_kinetic_thomson_with_background(
+            wavelength, measured,
+            physical_model="kappa",
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response=np.eye(wavelength.size),
+            physical_initial=[300.0, 0.0, 3.5],
+            model_discrepancy_covariance=-np.eye(wavelength.size),
+        )
