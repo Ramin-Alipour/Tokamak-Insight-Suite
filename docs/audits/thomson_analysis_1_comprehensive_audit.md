@@ -1052,3 +1052,32 @@ the calibrated measured-spectrum optical Thomson fit. Regression tests cover
 recovery, rank-deficient non-identifiability, covariance validation and
 dispatcher/dashboard/formula-registry wiring. CI on the resulting main SHA
 and independent experimental validation remain unverified.
+
+
+## Physical implementation update — 2026-11-04: multi-view 3-D Thomson flow inversion
+
+A second measured-projection inverse now addresses the distinction between
+one-dimensional scattering-vector flow and a three-dimensional bulk-flow
+vector. The new callable
+`tokamak_analysis.thomson_kinetic_models.infer_three_dimensional_flow_from_thomson_projections`
+uses the physical projection equation
+
+```text
+v_q,i = q_hat_i · v_e
+v_hat_e = (Q.T C_v^-1 Q)^-1 Q.T C_v^-1 v_q
+```
+
+with the full supplied covariance of the fitted directional flow projections.
+The advanced-physics dispatcher exposes
+`thomson_three_dimensional_flow`, and the advanced Thomson Dashboard includes
+the model and an input template. The root and packaged formula registries carry
+the same formula key and implementation trace.
+
+The vector is withheld when the scattering-vector design matrix has rank
+below three, and it is also withheld for non-finite or superluminal solutions.
+This does not imply that one Thomson view measures transverse flow: at least
+three linearly independent scattering directions and a common-flow assumption
+across those views are required. Geometry covariance is not propagated here.
+Regression coverage checks exact vector recovery, rank-deficient withholding,
+and dispatcher/dashboard/formula-registry wiring. CI and experimental
+validation remain unverified.
