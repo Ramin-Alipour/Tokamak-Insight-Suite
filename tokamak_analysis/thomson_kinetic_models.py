@@ -53,7 +53,7 @@ def project_bi_maxwellian_electron_vdf(
     This is a forward marginal, not an inverse fit. A single scattering
     direction identifies T_q only; it cannot separate T_parallel from
     T_perpendicular. Multiple independent pitch angles are required for that
-    separation. The returned distribution is normalized over velocity.
+    separation. The analytic distribution is normalized on the infinite velocity axis. A finite supplied grid retains the represented probability mass and reports its coverage without renormalization.
     """
     grid = np.asarray(velocity_grid_m_s)
     if grid.dtype.kind not in "iuf" or grid.ndim != 1 or grid.size < 3:
