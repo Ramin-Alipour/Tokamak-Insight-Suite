@@ -5243,5 +5243,136 @@
     "input_data_level": "local_plasma_parameters_and_wave_geometry",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Microwave collective Thomson scattering"
+  },
+  {
+    "name": "Species-resolved Spitzer collision frequencies for Full-EM CTS",
+    "equation": "ν_ei = 2.91×10⁻⁶ n_e[cm⁻³] Z_eff lnΛ / T_e[eV]^(3/2); ν_ii = 4.80×10⁻⁸ n_i[cm⁻³] Z_i⁴ lnΛ / (A_i^(1/2) T_i[eV]^(3/2)); ν_ie = (n_e m_e / n_i m_i) ν_ei",
+    "inputs": [
+      {
+        "name": "electron_density_m3",
+        "unit": "m^-3",
+        "role": "measured-spectrum fit state or fixed local electron density"
+      },
+      {
+        "name": "electron_temperature_eV",
+        "unit": "eV",
+        "role": "electron temperature"
+      },
+      {
+        "name": "ion_species",
+        "unit": "species metadata",
+        "role": "positive integer charge state and mass in atomic mass units"
+      },
+      {
+        "name": "ion_fractions",
+        "unit": "dimensionless charge-density fractions",
+        "role": "positive fractions summing to one"
+      },
+      {
+        "name": "ion_temperature_eV",
+        "unit": "eV",
+        "role": "common or species-resolved thermal ion temperatures"
+      },
+      {
+        "name": "coulomb_logarithm",
+        "unit": "dimensionless",
+        "role": "explicit externally supplied classical Coulomb logarithm"
+      }
+    ],
+    "output": {
+      "name": "collision_frequencies_s_inverse",
+      "unit": "s^-1; one rate for electrons and each ion species"
+    },
+    "assumptions": [
+      "Weakly coupled, fully ionized, non-degenerate plasma.",
+      "Coulomb logarithm is supplied by the researcher and is not inferred.",
+      "Species-resolved Spitzer rates enter the magnetized kinetic resonance denominator as additive Krook widths.",
+      "The approximation is not a conserving linearized Landau collision operator; neutral collisions, strong coupling, relativistic corrections and velocity-space redistribution are omitted."
+    ],
+    "status": "implemented_with_declared_approximation",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_full_em.spitzer_cts_collision_frequencies",
+      "input_specs": [
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species mappings with name, charge_state and mass_amu",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "positive charge-density fractions summing to one",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; scalar or one value per ion species",
+          "required": true
+        },
+        {
+          "name": "coulomb_logarithm",
+          "unit": "dimensionless; positive finite externally supplied",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "collision_frequencies_s_inverse",
+          "unit": "s^-1"
+        },
+        {
+          "name": "effective_charge_Zeff",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "collision_model",
+          "unit": "model identifier"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of declared approximation limits"
+        }
+      ],
+      "prerequisites": [
+        "Weakly coupled, fully ionized plasma.",
+        "Externally supplied Coulomb logarithm."
+      ],
+      "uncertainty_model": "No uncertainty in the Coulomb logarithm or collision model is inferred. Propagation of Coulomb-logarithm uncertainty is not yet implemented.",
+      "test_links": [
+        "tests/test_cts_collisional_physics.py::test_spitzer_cts_collision_frequencies_match_electron_ion_reference",
+        "tests/test_cts_collisional_physics.py::test_spitzer_cts_collision_frequency_scaling"
+      ],
+      "note": "Physical collision-rate correction for the Full-EM magnetized Maxwellian kinetic resonance denominator. The Krook operator is explicitly non-conserving and is not represented as a complete collisional Vlasov-Landau solver."
+    },
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_full_em.spitzer_cts_collision_frequencies",
+      "function_links": [
+        "tokamak_analysis.cts_full_em.spitzer_cts_collision_frequencies"
+      ],
+      "formula_key": "cts_spitzer_species_collision_frequencies",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_collisional_physics.py::test_spitzer_cts_collision_frequencies_match_electron_ion_reference",
+        "tests/test_cts_collisional_physics.py::test_spitzer_cts_collision_frequency_scaling"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "execution_scope": "local_collision_frequency_kernel_connected_to_magnetized_full_em_cts",
+    "input_data_level": "local_plasma_parameters_and_supplied_coulomb_logarithm",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Microwave collective Thomson scattering — optional collisional correction"
   }
 ]
