@@ -26,6 +26,9 @@ from .ece_kinetic import (
 from .cts_em_background import (
     integrate_thermal_microwave_background,
     plasma_charge_state_moments,
+    radiance_to_receiver_spectral_power,
+    propagate_receiver_spectral_power_covariance,
+    integrate_receiver_spectral_power,
 )
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
@@ -358,13 +361,18 @@ def analyze_cts_microwave_background(
     ece_lte=False,
     gaunt_factor=1.0,
     incident_radiance_W_m2_sr_Hz=0.0,
+    receiver_etendue_m2_sr=None,
+    end_to_end_efficiency=None,
+    receiver_input_covariance=None,
 ):
-    """Evaluate the physical CTS microwave-background radiance on a ray path.
+    """Evaluate CTS plasma-background transfer and optional receiver coupling.
 
-    This public route connects the free-free/ECE radiative-transfer kernel to
-    the advanced Analysis-1 dispatcher. ECE opacity, Gaunt factors, mode
-    weights and incident radiance remain explicit inputs; this routine does
-    not infer missing dielectric or relativistic corrections.
+    The path solver returns spectral radiance. If receiver etendue and
+    end-to-end efficiency are both supplied, the radiance is converted to
+    receiver spectral power exactly once. An optional full joint covariance
+    for [radiance bins, etendue, efficiency] is propagated through that
+    multiplicative measurement equation; frequency integration then retains
+    all supplied spectral-bin correlations.
     """
     result = integrate_thermal_microwave_background(
         frequency_Hz,
@@ -380,6 +388,53 @@ def analyze_cts_microwave_background(
         gaunt_factor=gaunt_factor,
         incident_radiance_W_m2_sr_Hz=incident_radiance_W_m2_sr_Hz,
     )
+    has_etendue = receiver_etendue_m2_sr is not None
+    has_efficiency = end_to_end_efficiency is not None
+    if has_etendue != has_efficiency:
+        raise ValueError(
+            "receiver_etendue_m2_sr and end_to_end_efficiency must be supplied together"
+        )
+    if receiver_input_covariance is not None and not has_etendue:
+        raise ValueError(
+            "receiver_input_covariance requires receiver etendue and end-to-end efficiency"
+        )
+    if has_etendue:
+        if receiver_input_covariance is None:
+            receiver_power = radiance_to_receiver_spectral_power(
+                result["spectral_radiance_W_m2_sr_Hz"],
+                receiver_etendue_m2_sr=receiver_etendue_m2_sr,
+                end_to_end_efficiency=end_to_end_efficiency,
+            )
+            result["receiver_spectral_power_W_Hz"] = receiver_power
+            result["receiver_power_uncertainty_status"] = (
+                "not_propagated; full joint receiver_input_covariance not supplied"
+            )
+            integrated = integrate_receiver_spectral_power(
+                frequency_Hz, receiver_power
+            )
+        else:
+            propagated = propagate_receiver_spectral_power_covariance(
+                result["spectral_radiance_W_m2_sr_Hz"],
+                receiver_etendue_m2_sr=receiver_etendue_m2_sr,
+                end_to_end_efficiency=end_to_end_efficiency,
+                input_covariance=receiver_input_covariance,
+            )
+            result.update(propagated)
+            integrated = integrate_receiver_spectral_power(
+                frequency_Hz,
+                propagated["receiver_spectral_power_W_Hz"],
+                spectral_power_covariance_W2_Hz2=(
+                    propagated["receiver_spectral_power_covariance_W2_Hz2"]
+                ),
+            )
+        result.update(integrated)
+        result["receiver_conversion_model"] = (
+            "P_nu = L_nu * receiver_etendue * end_to_end_efficiency"
+        )
+        result["receiver_conversion_applied_once"] = True
+    else:
+        result["receiver_conversion_model"] = "not_applied; radiance output retained"
+        result["receiver_conversion_applied_once"] = False
     return {
         **result,
         "public_physics_entrypoint": "microwave_background",
