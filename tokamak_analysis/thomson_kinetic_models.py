@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.special import gammaln, ndtr
+from scipy.special import gammaln, ndtr, kve
 from numpy.polynomial.legendre import leggauss
 
 E_CHARGE = 1.602176634e-19
@@ -489,6 +489,34 @@ def relativistic_maxwell_juttner_spectrum(
     distribution_normalization = float(np.sum(distribution_quadrature_weight))
     if not np.isfinite(distribution_normalization) or distribution_normalization <= 0.0:
         raise ValueError("Maxwell-Juttner momentum quadrature has a non-positive normalization")
+    # Exact isotropic Maxwell-Juttner momentum-space normalization:
+    # integral_0^inf u^2 exp[-(sqrt(1+u^2)-1)/theta] du
+    #   = theta exp(1/theta) K_2(1/theta)
+    #   = theta Kve_2(1/theta).
+    # The angular integral contributes 4*pi.  Comparing the actual finite
+    # quadrature against this analytic value detects a truncated high-energy
+    # tail instead of silently renormalizing that missing population away.
+    exact_distribution_normalization = (
+        4.0*np.pi*theta*float(kve(2, 1.0/theta))
+    )
+    momentum_probability_coverage = (
+        distribution_normalization/exact_distribution_normalization
+    )
+    if (not np.isfinite(momentum_probability_coverage)
+            or momentum_probability_coverage <= 0.0
+            or momentum_probability_coverage > 1.0 + 5e-3):
+        raise ValueError(
+            "Maxwell-Juttner momentum quadrature is inconsistent with the "
+            f"analytic normalization (captured={momentum_probability_coverage:.8g}); "
+            "increase radial_order or revise the momentum quadrature."
+        )
+    if momentum_probability_coverage < 0.999:
+        raise ValueError(
+            "Maxwell-Juttner momentum quadrature captures only "
+            f"{momentum_probability_coverage:.6%} of the analytic momentum "
+            "probability; increase radial_order or the momentum cutoff. "
+            "The missing tail is not silently renormalized."
+        )
     quadrature_weight = distribution_quadrature_weight * differential_weight
 
     edges = np.empty(x.size+1, dtype=float)
@@ -552,6 +580,10 @@ def relativistic_maxwell_juttner_spectrum(
         "spectral_density_per_nm": density,
         "wavelength_bin_widths_nm": widths,
         "integrated_probability": 1.0,
+        "momentum_probability_coverage": float(momentum_probability_coverage),
+        "analytic_momentum_normalization": float(exact_distribution_normalization),
+        "quadrature_momentum_normalization": float(distribution_normalization),
+        "momentum_tail_renormalization_performed": False,
         "effective_differential_cross_section_m2_sr": float(effective_differential_cross_section),
         "fitted_centroid_nm": centroid,
         "spectral_rms_width_nm": float(np.sqrt(max(variance, 0.0))),
