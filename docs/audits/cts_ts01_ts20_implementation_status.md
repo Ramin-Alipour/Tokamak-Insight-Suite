@@ -142,3 +142,19 @@ independent analytic regression using a constant finite-support VDF, for
 which the interior derivative vanishes and the entire response comes from
 the two endpoint terms. This corrects the finite-support electrostatic CTS
 kinetic response; it does not extend the model to a 3-D fast-ion VDF.
+
+
+TS-04 local 3-D magnetoionic ray-velocity relation (2026-11-04): added
+`cold_plasma_mode_group_velocity`. For the local Maxwell dispersion matrix
+`M(ω,k)=ε_r(ω)−(c²/ω²)(k²I−kkᵀ)`, a simple mode eigenvector `e` gives
+`v_g,j=−(e†(∂M/∂k_j)e)/(e†(∂M/∂ω)e)`. The implementation evaluates the
+frequency derivative by symmetric finite difference and the wavevector
+derivative analytically, then returns the full Cartesian group-velocity
+vector, ray direction and wave-normal/ray walk-off angle. It is exposed
+through `run_advanced_thomson_physics("cold_plasma_mode_group_velocity")`
+and registered in both formula registries. Tests cover the parallel
+magnetoionic branch against an independent finite-difference dispersion
+derivative, oblique walk-off, collision rejection and degenerate-mode
+rejection. This is a genuine additional 3-D physical relation, but remains a
+local homogeneous cold collisionless result: it is not spatial ray tracing,
+branch tracking or mode conversion. TS-04/05 remain PARTIAL.
