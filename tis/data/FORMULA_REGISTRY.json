@@ -5116,9 +5116,9 @@
   },
   {
     "name": "Cold-plasma magnetoionic group velocity and ray walk-off",
-    "equation": "M(ω,k)=ε_r(ω)−(c²/ω²)(k²I−kkᵀ); v_g,j=−(e†(∂M/∂k_j)e)/(e†(∂M/∂ω)e)",
+    "equation": "M(ω,k)=ε_r(ω)−(c²/ω²)(k²I−kkᵀ); v_g,j=−(e†(∂M/∂k_j)e)/(e†(∂M/∂ω)e); W=1/4[ε₀ E†∂(ωε_r)/∂ω E+μ₀ H†H], S=1/2 Re(E×H*) and v_energy=S/W",
     "inputs": "Frequency [Hz], magnetic-field vector [T], species mass/charge/density, wave-normal direction, local mode index",
-    "output": "Group-velocity vector [m/s], ray direction, wave-normal-to-ray walk-off angle [rad]",
+    "output": "Group-velocity vector [m/s], ray direction, wave-normal-to-ray walk-off angle [rad]; Brillouin energy density [J m^-3 per (V m^-1)^2], Poynting vector [W m^-2 per (V m^-1)^2], energy velocity [m/s]",
     "assumptions": "Homogeneous, collisionless, transparent, cold multispecies plasma; simple non-degenerate propagating mode; local Hellmann–Feynman derivative",
     "status": "D",
     "category": "Microwave collective Thomson scattering",
@@ -5187,6 +5187,22 @@
         {
           "name": "group_velocity_relation",
           "unit": "text"
+        },
+        {
+          "name": "brillouin_energy_density_J_m3_per_V2_m2",
+          "unit": "J m^-3 per (V m^-1)^2"
+        },
+        {
+          "name": "poynting_flux_vector_W_m2_per_V2_m2",
+          "unit": "W m^-2 per (V m^-1)^2; 3-vector"
+        },
+        {
+          "name": "energy_velocity_m_s",
+          "unit": "m s^-1; 3-vector"
+        },
+        {
+          "name": "relative_group_energy_velocity_difference",
+          "unit": "dimensionless"
         }
       ],
       "prerequisites": [
@@ -5197,7 +5213,8 @@
       "test_links": [
         "tests/test_cts_magnetoionic.py::test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_derivative",
         "tests/test_cts_magnetoionic.py::test_oblique_magnetoionic_group_velocity_reports_ray_walkoff",
-        "tests/test_cts_magnetoionic.py::test_group_velocity_rejects_collisional_and_degenerate_modes"
+        "tests/test_cts_magnetoionic.py::test_group_velocity_rejects_collisional_and_degenerate_modes",
+        "tests/test_cts_magnetoionic.py::test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_derivative"
       ],
       "note": "Local 3-D group-velocity/ray-walk-off kernel. This does not implement spatial ray integration, mode conversion or warm/relativistic kinetic propagation."
     },
