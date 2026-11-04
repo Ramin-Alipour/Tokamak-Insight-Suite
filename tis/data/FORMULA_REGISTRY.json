@@ -6377,7 +6377,7 @@
   },
   {
     "name": "Gyrotropic anisotropic Kappa projected Thomson marginal",
-    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](2 k_B T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; κ>3/2",
+    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](k_B T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; Var(v_q)=k_B T_q/m_e; κ>3/2",
     "inputs": "Kappa index κ, magnetic pitch cosine b_hat·q_hat, second-moment directional temperature T_q [eV], electron mass m_e, Boltzmann constant k_B",
     "output": "Normalized one-dimensional electron-velocity marginal along q; mapped to wavelength using λ=λ0[1−2 sin(θ_s/2) v_q/c] in the non-relativistic elastic-Thomson limit",
     "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.",
