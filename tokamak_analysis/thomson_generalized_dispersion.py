@@ -168,9 +168,11 @@ def collective_tabulated_electron_spectral_density(
             or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
             or np.any(np.diff(vgrid) <= 0) or np.any(fgrid < 0)):
         raise ValueError("electron velocity grid and tabulated VDF must be matching finite non-negative arrays")
-    evdf_scale = max(float(np.max(fgrid)), np.finfo(float).tiny)
-    if max(float(fgrid[0]), float(fgrid[-1])) > 1e-6 * evdf_scale:
-        raise ValueError("tabulated electron VDF must decay to negligible values at both finite-support endpoints; otherwise omitted boundary delta contributions invalidate the susceptibility")
+    # The susceptibility kernel includes the distributional endpoint jumps
+    # for the declared zero extension outside [vgrid[0], vgrid[-1]].  Do not
+    # reject non-zero endpoint values here: doing so would silently make the
+    # forward model's accepted domain narrower than the corrected Landau
+    # integral and would prevent physically explicit compact-support VDFs.
     evdf_area = float(np.trapz(fgrid, vgrid))
     if not np.isfinite(evdf_area) or evdf_area <= 0:
         raise ValueError("tabulated electron VDF must have positive finite integral")
@@ -218,13 +220,14 @@ def collective_tabulated_electron_spectral_density(
         "electron_distribution_model": "researcher_supplied_tabulated_projected_1D_EVDF",
         "electron_distribution_normalization": "normalized internally for susceptibility and spectral shape; absolute density is supplied separately",
         "model": "unmagnetized electrostatic collective Thomson scattering with generalized tabulated electron VDF and Maxwellian ions",
-        "pole_quadrature": "piecewise_linear_first_order_Landau_pole",
+        "pole_quadrature": "piecewise_linear_first_order_Landau_pole_with_distributional_finite_support_edges",
+        "velocity_support_extension": "zero_outside_supplied_interval; endpoint jumps included in susceptibility",
         "pole_imaginary_part_m_s": pole_imaginary_part_m_s,
         "limitations": [
             "projected 1-D electron VDF only; no unrestricted 3-D or anisotropic EVDF inversion",
             "non-relativistic unmagnetized electrostatic longitudinal response",
             "first-order Landau pole quadrature; no arbitrary-order pole closure",
-            "finite velocity support and pole displacement are numerical model inputs",
+            "finite velocity support is interpreted with an explicit zero extension; endpoint jumps are included; pole displacement is a numerical model input",
             "ion populations are Maxwellian and supplied externally",
         ],
         "experimental_validation": "not_performed",
