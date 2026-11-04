@@ -162,6 +162,7 @@ def test_cts_public_dispatcher_signature_and_conditional_outputs_match_registry(
     assert outputs["parameter_identifiability"]["unit"].startswith("structured")
     assert outputs["electron_density_m3"]["unit"] == "m^-3"
     assert outputs["electron_temperature_eV"]["unit"] == "eV"
+    assert "tokamak_analysis.cts_kappa.kappa_electron_susceptibility" in entry["execution_contract"]["function_links"]
     optical = get_analysis(1)["execution_contract"]["output_specs"]
     profile = get_analysis(46)["execution_contract"]["output_specs"]
     optical_units = {item["name"]: item["unit"] for item in optical}
