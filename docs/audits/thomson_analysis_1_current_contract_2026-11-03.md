@@ -110,3 +110,27 @@ This closes the spatial-profile route's covariance-integration and response
 contract gaps within the declared model. It does not supply geometry/profile
 cross-covariance, infer missing correlations, or validate the underlying
 physical Full-EM model experimentally.
+
+
+## Addendum — arbitrary 3-D ray geometry for projected Compton inversion (2026-11-04)
+
+`relativistic_projected_compton_kinematics` and
+`reconstruct_relativistic_projected_thomson_evdf` now accept an optional
+pair of arbitrary non-collinear laboratory-frame unit vectors
+`incident_direction` and `scattered_direction`. The routine constructs
+the scattering-vector axis, Lorentz-transforms both photon directions and the
+supplied transverse incident polarization into the electron rest frame, applies
+the exact single-electron Compton energy relation and polarized
+Klein-Nishina differential weight, and transforms the scattered wavelength and
+differential weight back to the laboratory frame. The historical symmetric
+geometry remains the default and must agree with the vector formulation under
+rigid 3-D rotations.
+
+This extends OPT-07 geometry handling, not EVDF dimensionality: the inverse
+still reconstructs only the one-dimensional velocity marginal parallel to the
+scattering vector. It does not infer transverse velocity structure, arbitrary
+3-D EVDFs, multiple scattering, collective recoil corrections, or absolute
+density. The cross-section weight remains relative to the classical electron
+radius squared. Regression tests cover rotation covariance and reject
+inconsistent/non-unit ray geometry. CI on the resulting main commit must be
+checked before release; software regression is not experimental validation.
