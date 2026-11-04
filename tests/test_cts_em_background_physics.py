@@ -53,6 +53,7 @@ def test_lte_transfer_preserves_planck_radiance_at_thermal_equilibrium():
         ion_densities_m3=np.array([[2.0e19], [1.8e19]]),
         ion_charge_states=np.array([1.0]),
         ece_absorption_coefficient_m_inverse=np.full((2, frequency.size), 0.02),
+        ece_lte=True,
         gaunt_factor=1.1,
         incident_radiance_W_m2_sr_Hz=incident,
     )
@@ -79,11 +80,35 @@ def test_mode_resolved_ece_opacity_changes_transfer_and_is_reported():
     with_ece = integrate_thermal_microwave_background(
         **common,
         ece_absorption_coefficient_m_inverse=np.full((1, frequency.size), 0.5),
+        ece_lte=True,
     )
     assert np.all(with_ece["spectral_radiance_W_m2_sr_Hz"] >
                   without_ece["spectral_radiance_W_m2_sr_Hz"])
     assert with_ece["ece_model_status"].startswith("mode-resolved")
     assert np.all(with_ece["ece_optical_depth"] > 0.0)
+
+
+def test_non_lte_ece_requires_independent_emissivity_or_explicit_lte():
+    import pytest
+    frequency = np.array([100.0e9, 150.0e9])
+    common = dict(
+        frequency_Hz=frequency,
+        path_length_m=np.array([0.2]),
+        electron_temperature_eV=np.array([1200.0]),
+        electron_density_m3=np.array([2.0e19]),
+        ion_densities_m3=np.array([[2.0e19]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=np.full((1, 2), 0.5),
+    )
+    with pytest.raises(ValueError, match="absorption alone does not define emissivity"):
+        integrate_thermal_microwave_background(**common)
+
+    emissivity = np.full((1, 2), 2.0e-8)
+    result = integrate_thermal_microwave_background(
+        **common, ece_emissivity_W_m3_sr_Hz=emissivity
+    )
+    assert result["ece_source_model"] == "explicit_mode_resolved_ECE_emissivity"
+    assert np.all(result["spectral_radiance_W_m2_sr_Hz"] > 0.0)
 
 
 def test_receiver_conversion_applies_etendue_and_efficiency_once():
@@ -132,6 +157,7 @@ def test_path_and_frequency_resolved_gaunt_factor_is_used_per_path():
         ion_densities_m3=np.array([[2.0e19], [1.5e19]]),
         ion_charge_states=np.array([1.0]),
         ece_absorption_coefficient_m_inverse=np.zeros((2, 2)),
+        ece_lte=True,
         incident_radiance_W_m2_sr_Hz=0.0,
     )
     scalar = integrate_thermal_microwave_background(
