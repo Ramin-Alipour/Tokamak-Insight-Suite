@@ -61,3 +61,36 @@ def test_full_em_landau_fdt_constitutive_kernel_is_exposed_without_overclaiming(
     assert config["common_bulk_flow_m_s"] == [0.0, 0.0, 0.0]
     assert len(config["species"]) == 2
     assert config["common_temperature_J"] > 0.0
+
+
+def test_dashboard_exposes_all_json_callable_advanced_physics_routes():
+    from tis.ui.advanced_thomson_physics_page import MODEL_LABELS
+
+    expected = {
+        "kappa_electrostatic_susceptibility",
+        "landau_fdt_cts",
+        "landau_fdt_full_em_constitutive",
+        "quantum_fdt",
+        "quantum_fdt_unsymmetrized",
+        "relativistic_kinetic_ece_profile",
+        "relativistic_kinetic_ece",
+        "microwave_background",
+        "multispecies_thermal_collision_matrix",
+        "polarized_kinetic_ece",
+        "stratified_nonparaxial_vector",
+        "stratified_mode_conversion",
+        "polarized_lte_stokes",
+        "stratified_polarized_lte_stokes",
+        "cold_plasma_dielectric",
+        "cold_plasma_magnetoionic_modes",
+        "cold_plasma_absorbed_power_density",
+        "cold_plasma_mode_radiative_coefficients",
+        "cold_plasma_mode_group_velocity",
+        "thomson_projected_evdf",
+        "thomson_relativistic_projected_evdf",
+        "thomson_psf_profile_inverse",
+        "gyrotropic_bi_maxwellian_anisotropy",
+        "thomson_three_dimensional_flow",
+        "plasma_charge_state_moments",
+    }
+    assert expected <= set(MODEL_LABELS)
