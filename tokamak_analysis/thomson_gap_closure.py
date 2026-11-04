@@ -86,6 +86,8 @@ def relativistic_projected_compton_kinematics(
         raise ValueError("laser_wavelength_nm must be positive and finite")
     if not np.isfinite(angle) or not 0.0 < angle < np.pi:
         raise ValueError("scattering_angle_rad must lie strictly inside (0, pi)")
+    if np.any(np.diff(velocity) <= 0.0):
+        raise ValueError("velocity_grid_m_s must be strictly increasing")
     if np.any(np.abs(velocity) >= _C):
         raise ValueError("every represented electron velocity must be strictly subluminal")
 
@@ -257,6 +259,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
     whiten, noise_status = _whitener(n, covariance=residual_cov) if residual_cov is not None else _whitener(n)
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
+    if include_compton_recoil and incident_polarization is None:
+        raise ValueError("incident_polarization is required for polarized Klein-Nishina Compton inversion")
     recoil_limit = float(maximum_recoil_correction_fraction)
     if (not np.isfinite(recoil_limit) or recoil_limit <= 0.0
             or recoil_limit >= 1.0):
