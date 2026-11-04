@@ -352,7 +352,7 @@ def cold_plasma_mode_group_velocity(
     ray integrator and is not valid for collisional/complex roots or a
     degenerate mode crossing.
     """
-    from scipy.constants import c
+    from scipy.constants import c, epsilon_0, mu_0
 
     frequency = _real_scalar(frequency_Hz, "frequency_Hz", positive=True)
     if (isinstance(mode_index, (bool, np.bool_))
@@ -429,6 +429,8 @@ def cold_plasma_mode_group_velocity(
     matrix_plus = dispersion_matrix(omega + delta_omega, wavevector, eps_plus)
     matrix_minus = dispersion_matrix(omega - delta_omega, wavevector, eps_minus)
     derivative_omega = (matrix_plus - matrix_minus) / (2.0 * delta_omega)
+    derivative_epsilon_omega = (eps_plus - eps_minus) / (2.0 * delta_omega)
+    d_omega_epsilon = epsilon + omega * derivative_epsilon_omega
     denominator = np.vdot(polarization, derivative_omega @ polarization)
     denominator_scale = max(
         float(np.linalg.norm(derivative_omega, ord=2)), np.finfo(float).tiny
@@ -459,6 +461,32 @@ def cold_plasma_mode_group_velocity(
     ray_direction = group_velocity / magnitude
     wave_normal = nhat.copy()
     walkoff = float(np.arccos(np.clip(np.dot(ray_direction, wave_normal), -1.0, 1.0)))
+
+    # Brillouin energy density for a transparent, temporally dispersive,
+    # spatially local dielectric: W=1/4[eps0 E*.d(omega eps)/domega.E
+    # + mu0 |H|^2]. The plane-wave Poynting vector is S=1/2 Re(E x H*).
+    magnetic_field_amplitude = np.cross(wavevector, polarization) / (mu_0 * omega)
+    electric_energy_term = float(np.real(
+        np.vdot(polarization, d_omega_epsilon @ polarization)
+    ))
+    magnetic_energy_term = float(np.real(
+        np.vdot(magnetic_field_amplitude, magnetic_field_amplitude)
+    ))
+    energy_density = 0.25 * (
+        epsilon_0 * electric_energy_term + mu_0 * magnetic_energy_term
+    )
+    poynting_vector = 0.5 * np.real(
+        np.cross(polarization, np.conj(magnetic_field_amplitude))
+    )
+    if not np.isfinite(energy_density) or energy_density <= 0.0:
+        raise ArithmeticError(
+            "Brillouin wave energy density is non-positive for the selected mode"
+        )
+    energy_velocity = poynting_vector / energy_density
+    energy_velocity_difference = float(
+        np.linalg.norm(energy_velocity - group_velocity)
+        / max(magnitude, np.finfo(float).tiny)
+    )
     return {
         "frequency_Hz": frequency,
         "mode_index": int(mode_index),
@@ -469,11 +497,20 @@ def cold_plasma_mode_group_velocity(
         "group_velocity_m_s": group_velocity,
         "group_speed_m_s": magnitude,
         "ray_direction": ray_direction,
+        "brillouin_energy_density_J_m3_per_V2_m2": float(energy_density),
+        "poynting_flux_vector_W_m2_per_V2_m2": poynting_vector,
+        "energy_velocity_m_s": energy_velocity,
+        "relative_group_energy_velocity_difference": energy_velocity_difference,
         "wave_normal_to_ray_walkoff_angle_rad": walkoff,
         "dispersion_relation": "det(epsilon_r - (c^2/omega^2)*(k^2*I-k*k^T)) = 0",
         "group_velocity_relation": (
             "v_g,j = -(e^dagger*dM/dk_j*e)/(e^dagger*dM/domega*e)"
         ),
+        "wave_energy_relation": (
+            "W=1/4*(epsilon_0*E^dagger*d(omega*epsilon_r)/domega*E"
+            "+mu_0*H^dagger*H); S=1/2*real(E cross H*)"
+        ),
+        "energy_velocity_relation": "v_energy = S/W; equals group velocity for a transparent simple local mode",
         "frequency_derivative_method": "symmetric_finite_difference",
         "wavevector_derivative_method": "analytic_Hellmann_Feynman",
         "mode_is_simple": True,
