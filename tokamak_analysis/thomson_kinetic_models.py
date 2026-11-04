@@ -224,6 +224,89 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         "physicality_status": "positive_temperatures" if physical else "non_positive_GLS_temperature_estimate; no physical temperatures reported",
     }
 
+
+def infer_three_dimensional_flow_from_thomson_projections(
+    velocity_projection_m_s, scattering_vector_unit, *,
+    projection_covariance_m2_s2,
+):
+    """Infer a 3-D bulk-flow vector from independent measured TS projections.
+
+    Each view measures v_q = q_hat dot v_e.  The vector is identifiable only
+    when the stacked scattering-vector directions span R^3.  A single view
+    therefore returns a non-identifiable result rather than an invented
+    transverse velocity.  Geometry uncertainty is not included in the
+    supplied projection covariance.
+    """
+    projections = np.asarray(velocity_projection_m_s)
+    directions = np.asarray(scattering_vector_unit)
+    covariance = np.asarray(projection_covariance_m2_s2)
+    if projections.dtype.kind not in "iuf" or projections.ndim != 1 or projections.size < 1:
+        raise ValueError("velocity_projection_m_s must be a non-empty real vector")
+    if directions.dtype.kind not in "iuf" or directions.shape != (projections.size, 3):
+        raise ValueError("scattering_vector_unit must have shape (n_views, 3)")
+    if covariance.dtype.kind not in "iuf" or covariance.shape != (projections.size, projections.size):
+        raise ValueError("projection_covariance_m2_s2 must be square and match the views")
+    projections = projections.astype(float, copy=False)
+    directions = directions.astype(float, copy=False)
+    covariance = covariance.astype(float, copy=False)
+    norms = np.linalg.norm(directions, axis=1)
+    if (np.any(~np.isfinite(projections)) or np.any(~np.isfinite(directions))
+            or np.any(~np.isfinite(norms)) or np.any(norms <= 0.0)
+            or np.any(~np.isfinite(covariance))):
+        raise ValueError("projections, non-zero directions and covariance must be finite")
+    if not np.allclose(norms, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("each scattering_vector_unit row must have unit norm")
+    covariance_scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+    if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12*covariance_scale):
+        raise ValueError("projection_covariance_m2_s2 must be symmetric")
+    covariance = 0.5*(covariance+covariance.T)
+    eigenvalues = np.linalg.eigvalsh(covariance)
+    tolerance = np.finfo(float).eps*max(covariance.shape)*max(float(eigenvalues[-1]), np.finfo(float).tiny)
+    if eigenvalues[0] <= tolerance:
+        raise ValueError("projection_covariance_m2_s2 must be positive definite")
+    rank = int(np.linalg.matrix_rank(directions))
+    result = {
+        "model": "three_dimensional_electron_flow_from_multi_view_thomson_projections",
+        "projection_relation": "v_q = q_hat dot v_e",
+        "scattering_vector_unit": directions.copy(),
+        "design_rank": rank,
+        "input_velocity_projection_m_s": projections.copy(),
+        "input_projection_covariance_m2_s2": covariance.copy(),
+        "geometry_uncertainty_included": False,
+    }
+    if rank < 3:
+        return {
+            **result,
+            "identifiability": "non_identifiable",
+            "reportable_as_inferred_parameter": False,
+            "electron_velocity_vector_m_s": None,
+            "electron_velocity_covariance_m2_s2": None,
+            "reason": "At least three linearly independent scattering-vector directions are required to identify all three velocity components.",
+        }
+    chol = np.linalg.cholesky(covariance)
+    whitened_design = np.linalg.solve(chol, directions)
+    whitened_data = np.linalg.solve(chol, projections)
+    information = whitened_design.T @ whitened_design
+    parameter_covariance = np.linalg.inv(information)
+    velocity = parameter_covariance @ (whitened_design.T @ whitened_data)
+    residual = projections-directions@velocity
+    chi2 = float(residual @ np.linalg.solve(covariance, residual))
+    speed = float(np.linalg.norm(velocity))
+    physical = bool(np.all(np.isfinite(velocity)) and speed < C)
+    return {
+        **result,
+        "identifiability": "identifiable_from_three_dimensional_view_geometry",
+        "reportable_as_inferred_parameter": physical,
+        "electron_velocity_vector_m_s": velocity if physical else None,
+        "electron_velocity_covariance_m2_s2": parameter_covariance if physical else None,
+        "electron_speed_m_s": speed if physical else None,
+        "fit_residual_projection_m_s": residual,
+        "chi_square": chi2,
+        "degrees_of_freedom": int(projections.size-3),
+        "reduced_chi_square": chi2/(projections.size-3) if projections.size > 3 else None,
+        "physicality_status": "subluminal" if physical else "non_finite_or_superluminal_solution; vector withheld",
+    }
+
 def _apply_response(response, spectrum, wavelength_nm):
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(spectrum, dtype=float)
