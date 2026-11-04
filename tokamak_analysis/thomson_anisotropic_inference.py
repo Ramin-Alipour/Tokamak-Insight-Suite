@@ -299,9 +299,9 @@ def fit_gyrotropic_bi_kappa_thomson(
     Its exact one-dimensional marginal along a view q is
       p(v_q) = Gamma(kappa)/(sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)
                [1 + v_q^2/(kappa*theta_q^2)]^(-kappa),
-    where theta_q^2 = (2*kappa-3)/kappa * k_B*T_q/m_e.
+    where theta_q^2 = (2*kappa-3)/kappa * e*T_q/m_e (T_q in eV).
     This parameterization makes T_q the actual second-moment temperature
-    (m_e <(v_q-u_q)^2>/k_B), not the Kappa core/scale temperature.
+    (m_e <(v_q-u_q)^2>/e, with T_q in eV), not the Kappa core/scale temperature.
     The finite-variance domain kappa>3/2 is enforced.
 
     Only the non-relativistic elastic-Thomson wavelength mapping is used.
@@ -462,7 +462,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         "model": "gyrotropic_bi_kappa_nonrelativistic_optical_thomson",
         "distribution_definition": "f3(v) proportional to [1 + v_parallel^2/(kappa*theta_parallel^2) + v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1))",
         "projected_marginal": "p(v_q)=Gamma(kappa)/(sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)*(1+v_q^2/(kappa*theta_q^2))^(-kappa)",
-        "temperature_definition": "T_q=m_e*Var(v_q)/k_B; theta_q^2=((2*kappa-3)/kappa)*(k_B*T_q/m_e)",
+        "temperature_definition": "T_q[eV]=m_e*Var(v_q)/e; theta_q^2=((2*kappa-3)/kappa)*(e*T_q/m_e)",
         "electron_temperature_parallel_eV": float(np.exp(fit.x[0])) if reportable else None,
         "electron_temperature_perpendicular_eV": float(np.exp(fit.x[1])) if reportable else None,
         "kappa_index": float(kappa) if full_rank else None,
