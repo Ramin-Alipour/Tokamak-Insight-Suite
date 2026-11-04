@@ -17,9 +17,36 @@ C = 299792458.0
 E_CHARGE = 1.602176634e-19
 
 
+def _real_array(value, name):
+    """Convert real numeric inputs without silently accepting booleans or strings."""
+    raw = np.asarray(value)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values (booleans and strings are invalid)")
+    result = raw.astype(float, copy=False)
+    if result.size == 0 or np.any(~np.isfinite(result)):
+        raise ValueError(f"{name} must contain finite, non-empty real values")
+    return result
+
+
+def _real_scalar(value, name, *, positive=False, nonnegative=False):
+    """Validate a genuine real scalar before any float coercion."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a real numeric scalar; booleans and strings are invalid")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be finite")
+    if positive and result <= 0:
+        raise ValueError(f"{name} must be positive")
+    if nonnegative and result < 0:
+        raise ValueError(f"{name} must be non-negative")
+    return result
+
+
 def _positive_array(value, name):
-    a = np.asarray(value, dtype=float)
-    if a.size == 0 or np.any(~np.isfinite(a)) or np.any(a <= 0):
+    a = _real_array(value, name)
+    if np.any(a <= 0):
         raise ValueError(f"{name} must contain positive finite values")
     return a
 
@@ -46,15 +73,17 @@ def thermal_bremsstrahlung_emissivity_si(
     Relativistic corrections and magnetized-mode anisotropy are not included.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
-    ne = float(electron_density_m3)
-    te = float(electron_temperature_eV)
-    ni = np.asarray(ion_densities_m3, dtype=float)
-    z = np.asarray(ion_charge_states, dtype=float)
-    g = np.asarray(gaunt_factor, dtype=float)
+    ne = _real_scalar(electron_density_m3, "electron_density_m3", nonnegative=True)
+    te = _real_scalar(electron_temperature_eV, "electron_temperature_eV", positive=True)
+    ni = _real_array(ion_densities_m3, "ion_densities_m3")
+    z = _real_array(ion_charge_states, "ion_charge_states")
+    g = _real_array(gaunt_factor, "gaunt_factor")
     if not np.isfinite(ne) or ne < 0 or not np.isfinite(te) or te <= 0:
         raise ValueError("electron_density_m3 must be finite and non-negative; electron_temperature_eV must be positive and finite")
-    if ni.ndim != 1 or z.shape != ni.shape or ni.size == 0 or np.any(~np.isfinite(ni)) or np.any(ni < 0) or np.any(~np.isfinite(z)) or np.any(z <= 0):
+    if ni.ndim != 1 or z.shape != ni.shape or ni.size == 0 or np.any(ni < 0) or np.any(z <= 0):
         raise ValueError("ion densities and charge states must be matching finite vectors with n_i>=0 and Z_i>0")
+    if np.any(z != np.floor(z)):
+        raise ValueError("ion_charge_states must be positive integer ionic charge states")
     if ne == 0.0 and np.any(ni != 0.0):
         raise ValueError("zero electron density requires zero positive-ion densities in this quasineutral plasma model")
     if np.any(~np.isfinite(g)) or np.any(g <= 0):
@@ -92,11 +121,11 @@ def integrate_thermal_microwave_background(
     This does not model mode conversion or coherent cross-mode coupling.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
-    length = np.asarray(path_length_m, dtype=float)
-    te = np.asarray(electron_temperature_eV, dtype=float)
-    ne = np.asarray(electron_density_m3, dtype=float)
-    ni = np.asarray(ion_densities_m3, dtype=float)
-    z = np.asarray(ion_charge_states, dtype=float)
+    length = _real_array(path_length_m, "path_length_m")
+    te = _real_array(electron_temperature_eV, "electron_temperature_eV")
+    ne = _real_array(electron_density_m3, "electron_density_m3")
+    ni = _real_array(ion_densities_m3, "ion_densities_m3")
+    z = _real_array(ion_charge_states, "ion_charge_states")
     if length.ndim != 1 or te.shape != length.shape or ne.shape != length.shape:
         raise ValueError("path_length_m, electron_temperature_eV and electron_density_m3 must be matching 1-D path arrays")
     if ni.ndim != 2 or ni.shape[0] != length.size or z.shape != (ni.shape[1],):
@@ -107,7 +136,7 @@ def integrate_thermal_microwave_background(
             or np.any(~np.isfinite(te)) or np.any(te <= 0)
             or np.any(~np.isfinite(ne)) or np.any(ne < 0)):
         raise ValueError("path lengths and temperatures must be positive finite; electron densities must be finite and non-negative")
-    gaunt = np.asarray(gaunt_factor, dtype=float)
+    gaunt = _real_array(gaunt_factor, "gaunt_factor")
     if np.any(~np.isfinite(gaunt)) or np.any(gaunt <= 0.0):
         raise ValueError("gaunt_factor must contain positive finite values")
     if gaunt.ndim == 0:
@@ -135,7 +164,7 @@ def integrate_thermal_microwave_background(
         ece_status = "ECE omitted; no mode-resolved absorption supplied"
         mode_weights = np.ones(n_modes, dtype=float)
     else:
-        supplied_alpha = np.asarray(ece_absorption_coefficient_m_inverse, dtype=float)
+        supplied_alpha = _real_array(ece_absorption_coefficient_m_inverse, "ece_absorption_coefficient_m_inverse")
         if supplied_alpha.ndim == 2 and supplied_alpha.shape == (length.size, nu.size):
             if ece_mode_weights is not None:
                 raise ValueError("ece_mode_weights is only valid with a 3-D mode-resolved ECE absorption array")
@@ -180,7 +209,7 @@ def integrate_thermal_microwave_background(
     else:
         if ece_lte:
             raise ValueError("supply ECE emissivity or ece_lte=True, not both")
-        supplied_j = np.asarray(ece_emissivity_W_m3_sr_Hz, dtype=float)
+        supplied_j = _real_array(ece_emissivity_W_m3_sr_Hz, "ece_emissivity_W_m3_sr_Hz")
         if supplied_j.ndim == 2 and supplied_j.shape == (length.size, nu.size) and n_modes == 1:
             supplied_j = supplied_j[:, :, None]
         if supplied_j.shape != (length.size, nu.size, n_modes):
@@ -193,7 +222,7 @@ def integrate_thermal_microwave_background(
         ece_emissivity = supplied_j
         ece_source_model = "explicit_mode_resolved_ECE_emissivity"
 
-    incident = np.asarray(incident_radiance_W_m2_sr_Hz, dtype=float)
+    incident = _real_array(incident_radiance_W_m2_sr_Hz, "incident_radiance_W_m2_sr_Hz")
     if incident.ndim == 0:
         incident = np.full(nu.size, float(incident))
     if incident.shape != nu.shape or np.any(~np.isfinite(incident)) or np.any(incident < 0):
@@ -293,13 +322,11 @@ def radiance_to_receiver_spectral_power(
     the radiative-transfer calculation. Efficiency is applied once here; do
     not apply it again to the resulting receiver-plane spectrum.
     """
-    radiance = np.asarray(spectral_radiance_W_m2_sr_Hz, dtype=float)
-    etendue = float(receiver_etendue_m2_sr)
-    efficiency = float(end_to_end_efficiency)
+    radiance = _real_array(spectral_radiance_W_m2_sr_Hz, "spectral_radiance_W_m2_sr_Hz")
+    etendue = _real_scalar(receiver_etendue_m2_sr, "receiver_etendue_m2_sr", positive=True)
+    efficiency = _real_scalar(end_to_end_efficiency, "end_to_end_efficiency", positive=True)
     if radiance.size == 0 or np.any(~np.isfinite(radiance)) or np.any(radiance < 0):
         raise ValueError("spectral radiance must be finite and non-negative")
-    if not np.isfinite(etendue) or etendue <= 0:
-        raise ValueError("receiver_etendue_m2_sr must be positive and finite")
-    if not np.isfinite(efficiency) or not 0 < efficiency <= 1:
+    if not 0 < efficiency <= 1:
         raise ValueError("end_to_end_efficiency must lie in (0,1]")
     return radiance * etendue * efficiency
