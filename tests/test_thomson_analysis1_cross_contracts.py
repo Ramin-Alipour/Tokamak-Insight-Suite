@@ -128,6 +128,17 @@ def test_thomson_family_maps_all_four_distinct_executable_subanalyses():
         "Thomson spectral distribution",
     } <= names
 
+    by_name = {item["diagnostic"]: item for item in diagnostic_registry}
+    expected_functions = {
+        1: ("Thomson scattering", "tokamak_analysis.thomson_workflow.analyze_thomson_spectra"),
+        30: ("Collective Thomson / coherent scattering (CTS)", "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model"),
+        46: ("Thomson spatial profile reconstruction", "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"),
+        81: ("Thomson spectral distribution", "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"),
+    }
+    for analysis_id, (diagnostic_name, function_path) in expected_functions.items():
+        assert function_path in by_name[diagnostic_name]["implementation_functions"]
+        assert callable(resolve_analysis(analysis_id))
+
 
 def test_cts_public_dispatcher_signature_and_conditional_outputs_match_registry():
     import inspect
@@ -151,6 +162,16 @@ def test_cts_public_dispatcher_signature_and_conditional_outputs_match_registry(
     assert outputs["parameter_identifiability"]["unit"].startswith("structured")
     assert outputs["electron_density_m3"]["unit"] == "m^-3"
     assert outputs["electron_temperature_eV"]["unit"] == "eV"
+    optical = get_analysis(1)["execution_contract"]["output_specs"]
+    profile = get_analysis(46)["execution_contract"]["output_specs"]
+    optical_units = {item["name"]: item["unit"] for item in optical}
+    profile_units = {item["name"]: item["unit"] for item in profile}
+    for name in (
+        "electron_temperature_profile_eV",
+        "electron_density_profile_m3",
+        "electron_velocity_projection_profile_m_s",
+    ):
+        assert optical_units[name] == profile_units[name]
 
 
 def test_analysis1_public_output_identifiability_contract_matches_runtime_producers():
