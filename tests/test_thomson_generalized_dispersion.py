@@ -97,3 +97,30 @@ def test_generalized_landau_integral_includes_distributional_finite_support_edge
     assert result["finite_support_boundary_integral"] == expected
     assert result["integral"] == expected
     assert result["finite_support_extension"] == "zero_outside_tabulated_velocity_interval"
+
+
+def test_collective_tabulated_evdf_accepts_compact_support_and_includes_edge_terms():
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    velocity = np.linspace(-8.0e6, 8.0e6, 1601)
+    # A compact-support top-hat has finite non-zero endpoint values. Under
+    # the model's declared zero extension, its derivative includes both
+    # endpoint delta terms, which generalized_landau_integral now evaluates.
+    distribution = np.ones_like(velocity)
+    result = collective_tabulated_electron_spectral_density(
+        wavelength, 1064.0, np.pi / 2.0,
+        electron_density_m3=1.0e18,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=distribution,
+        ion_species=[{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[10.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+    assert np.all(np.isfinite(result["spectral_density_per_nm"]))
+    assert np.any(result["spectral_density_per_nm"] > 0.0)
+    assert "distributional_finite_support_edges" in result["pole_quadrature"]
+    assert result["velocity_support_extension"].startswith("zero_outside_supplied_interval")
