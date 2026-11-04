@@ -30,7 +30,7 @@ MODEL_LABELS = {
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
     "relativistic_kinetic_ece_profile": "ECE — segment-resolved relativistic gyrotropic kinetic absorption (supplied ray and modes)",
     "relativistic_kinetic_ece": "ECE — local relativistic gyrotropic Vlasov absorption kernel",
-    "microwave_background": "CTS — thermal free-free/ECE radiative transfer with optional receiver-power and covariance closure",
+    "microwave_background": "CTS — free-free/ECE transfer, Planck/RJ brightness temperature and receiver-power closure",
     "multispecies_thermal_collision_matrix": "CTS — species-resolved thermal Coulomb collision matrix (not a kinetic fluctuation closure)",
     "quantum_fdt": "CTS — symmetrized quantum fluctuation-dissipation spectrum for a supplied causal response",
     "quantum_fdt_unsymmetrized": "CTS — unsymmetrized quantum S-greater spectrum with KMS detailed balance",
