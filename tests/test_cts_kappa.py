@@ -3,7 +3,7 @@ import pytest
 from tokamak_analysis.cts_kappa import kappa_electron_susceptibility
 
 def args(k=4.0):
-    return dict(v=np.linspace(-2e7,2e7,1001),phase_velocity_m_s=1e6,
+    return dict(v=np.linspace(-5e7,5e7,2001),phase_velocity_m_s=1e6,
         electron_density_m3=2e18,electron_temperature_eV=250.0,
         kappa=k,wavenumber_m_inverse=120.0,pole_imaginary_part_m_s=2e3)
 
