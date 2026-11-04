@@ -65,3 +65,6 @@ TS-15 / TS-18 Full-EM uncertainty provenance correction (2026-11-04): the Full-E
 
 
 TS-10 bounded Kappa API integration (2026-11-04): the collisionless isotropic-Kappa susceptibility kernel is now reachable through `run_advanced_thomson_physics("kappa_electrostatic_susceptibility", ...)`, and its callable is linked from the CTS Analysis-1 and diagnostic registries. The route reports the 1-D marginal scope and does not claim a complete Kappa CTS spectrum or FDT/noise closure. Regression coverage compares direct and dispatched numerical outputs.
+
+
+TS-15 / TS-18 ray-geometry provenance correction (2026-11-04): the full-forward geometry/equilibrium/beam Monte-Carlo refit already added its sample covariance to the CTS fit covariance, but the nested `parameter_identifiability` descriptor was left at the baseline status and did not report that contribution. The geometry-uncertainty wrapper now adds or replaces a `ray_geometry_uncertainty_contribution` conditional record on both insufficient-refit and successful-refit paths, including requested/successful draw counts, and synchronizes the stated uncertainty scope. This keeps nominal magnetic field and geometry as external inputs while accurately reporting their propagated uncertainty.
