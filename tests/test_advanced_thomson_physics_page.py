@@ -104,12 +104,48 @@ def test_dashboard_routes_conditional_multi_ion_cts_flow_inference():
     assert formula == packaged
 
 
+def test_dashboard_routes_measured_cts_spectrum_through_tabulated_fast_ion_inversion():
+    from tokamak_analysis.cts_analysis import cts_spectral_density
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+
+    model = "cts_electrostatic_measured_spectrum_inference"
+    assert model in MODEL_LABELS
+    config = dict(EXAMPLES[model])
+    frequency = np.asarray(config["frequency_shift_Hz"], dtype=float)
+    fast_ion = dict(config["fast_ion"])
+    fast_ion["fraction"] = fast_ion["fraction_initial"]
+    physical = cts_spectral_density(
+        frequency,
+        config["probe_frequency_Hz"],
+        config["scattering_geometry"],
+        electron_density_m3=config["electron_density_initial_m3"],
+        electron_temperature_eV=config["electron_temperature_initial_eV"],
+        ion_temperature_eV=config["ion_temperature_initial_eV"],
+        ion_species=config["ion_species"],
+        ion_fractions=config["ion_fractions"],
+        electron_velocity_projection_m_s=config["electron_velocity_projection_m_s"],
+        ion_velocity_projection_m_s=config["ion_velocity_initial_m_s"],
+        fast_ion=fast_ion,
+    )
+    measured = 2.4e4 * physical + 3.0
+    config["measured_spectrum"] = measured.tolist()
+    config["signal_uncertainty"] = np.full(frequency.size, 0.01*np.max(measured)).tolist()
+
+    result = run_advanced_thomson_physics(model, **config)
+    assert result["public_physics_entrypoint"] == model
+    assert result["fast_ion_vdf_provenance"].startswith("externally supplied normalized tabulated")
+    assert "fast_ion_fraction" in result["parameter_names"]
+    assert result["automatic_model_substitution"] is False
+
+
 def test_dashboard_exposes_all_json_callable_advanced_physics_routes():
     from tis.ui.advanced_thomson_physics_page import MODEL_LABELS
 
     expected = {
         "kappa_electrostatic_susceptibility",
         "cts_multi_ion_flow_inference",
+        "cts_electrostatic_measured_spectrum_inference",
         "landau_fdt_cts",
         "landau_fdt_full_em_constitutive",
         "quantum_fdt",
