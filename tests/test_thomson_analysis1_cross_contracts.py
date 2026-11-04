@@ -267,9 +267,12 @@ def test_anisotropic_thomson_multi_pitch_model_is_wired_to_dispatcher_dashboard_
         projected_temperature_eV=[180.0, 105.0, 80.0],
         magnetic_pitch_cosine=[1.0, 0.5, 0.0],
         projected_temperature_covariance_eV2=[[4.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 4.0]],
+        magnetic_pitch_cosine_covariance=[[1.0e-5, 0.0, 0.0], [0.0, 1.0e-5, 0.0], [0.0, 0.0, 1.0e-5]],
     )
     assert result["electron_temperature_parallel_eV"] == pytest.approx(180.0)
     assert result["electron_temperature_perpendicular_eV"] == pytest.approx(80.0)
+    assert result["geometry_uncertainty_included"] is True
+    assert result["geometry_covariance_iterations"] > 0
     assert result["public_physics_entrypoint"] == model
 
     dashboard = (root/"tis"/"ui"/"advanced_thomson_physics_page.py").read_text(encoding="utf-8")
