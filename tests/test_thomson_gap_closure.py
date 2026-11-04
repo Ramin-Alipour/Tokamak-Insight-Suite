@@ -247,3 +247,43 @@ def test_compton_kinematics_rejects_inconsistent_arbitrary_ray_geometry():
             incident_direction=[0.0, 0.0, 2.0],
             scattered_direction=[1.0, 0.0, 0.0],
         )
+
+
+
+def test_psf_aware_profile_selects_regularization_by_gcv_when_omitted():
+    mixing = np.array([
+        [0.80, 0.20, 0.00, 0.00],
+        [0.20, 0.60, 0.20, 0.00],
+        [0.00, 0.20, 0.60, 0.20],
+        [0.00, 0.00, 0.20, 0.80],
+        [0.10, 0.30, 0.30, 0.10],
+    ])
+    truth = np.array([1.0, 2.0, 2.0, 1.0])
+    measured = mixing @ truth + np.array([0.01, -0.02, 0.01, 0.0, 0.01])
+    result = reconstruct_psf_aware_thomson_profile(
+        measured, mixing, measurement_uncertainty=np.full(measured.size, 0.02),
+    )
+    assert result["regularization_selection"] == "generalized_cross_validation_active_set"
+    assert result["regularization_strength"] > 0.0
+    assert result["gcv_candidate_strengths"].size == 31
+    assert result["gcv_scores"].shape == result["gcv_candidate_strengths"].shape
+    assert np.all(np.isfinite(result["gcv_scores"]))
+    assert result["data_only_rank"] == np.linalg.matrix_rank(mixing)
+    assert result["status"] in {"identified_from_measurement", "conditional_regularized_candidate"}
+
+
+def test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes():
+    mixing = np.array([[1.0, 1.0, 0.0], [0.0, 1.0, 1.0]])
+    result = reconstruct_psf_aware_thomson_profile(np.array([2.0, 2.0]), mixing)
+    assert result["regularization_selection"] == "generalized_cross_validation_active_set"
+    assert result["latent_profile"] is None
+    assert result["status"] == "conditional_regularized_candidate"
+    assert result["null_space_dimension"] >= 1
+
+
+def test_psf_aware_profile_rejects_invalid_gcv_controls():
+    mixing = np.eye(3)
+    with pytest.raises(ValueError, match="gcv_candidate_count"):
+        reconstruct_psf_aware_thomson_profile(np.ones(3), mixing, gcv_candidate_count=3)
+    with pytest.raises(ValueError, match="regularization_strength"):
+        reconstruct_psf_aware_thomson_profile(np.ones(3), mixing, regularization_strength=0.0)
