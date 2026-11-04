@@ -118,7 +118,7 @@ def project_bi_maxwellian_electron_vdf(
         "limitations": [
             "This callable is a forward projected-VDF kernel, not a measured-spectrum optimizer",
             "A single scattering direction cannot independently identify parallel and perpendicular temperatures",
-            "The velocity grid truncates and numerically renormalizes the represented marginal",
+            "The finite velocity grid may truncate probability mass; coverage is reported and the represented marginal is not renormalized",
         ],
     }
 
@@ -157,6 +157,9 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
             or np.any(~np.isfinite(mu)) or np.any(np.abs(mu) > 1.0)
             or np.any(~np.isfinite(cov))):
         raise ValueError("projected temperatures must be positive, pitch cosines in [-1,1], and covariance finite")
+    covariance_scale = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+    if not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-12*covariance_scale):
+        raise ValueError("projected_temperature_covariance_eV2 must be symmetric")
     cov = 0.5*(cov+cov.T)
     eigenvalues = np.linalg.eigvalsh(cov)
     tolerance = np.finfo(float).eps*max(cov.shape)*max(float(eigenvalues[-1]), np.finfo(float).tiny)
