@@ -48,3 +48,20 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
     assert np.all(result["regularized_candidate_distribution_kg_m_s_inverse3"] >= 0)
     assert np.isclose(np.sum(result["regularized_candidate_distribution_kg_m_s_inverse3"]*weights), 1.0)
     assert result["bulk_plasma_and_geometry_fixed"] is True
+
+    from tokamak_analysis.cts_full_em import C, ME
+    candidate = result["regularized_candidate_distribution_kg_m_s_inverse3"]
+    momentum = np.sqrt(p_perp[:, None]**2 + p_parallel[None, :]**2)
+    gamma = np.sqrt(1.0 + (momentum / (ME*C))**2)
+    velocity_parallel = p_parallel[None, :] / (gamma*ME)
+    expected_candidate_mean = float(np.sum(candidate*weights*velocity_parallel))
+    assert result["electron_parallel_mean_velocity_candidate_m_s"] == expected_candidate_mean
+    assert result["electron_parallel_velocity_definition"].startswith("integral(")
+    if result["distribution_kg_m_s_inverse3"] is None:
+        assert result["electron_parallel_mean_velocity_m_s"] is None
+        assert result["electron_parallel_mean_velocity_status"] == "conditional_candidate_only_shape_not_identifiable"
+    else:
+        fitted = result["distribution_kg_m_s_inverse3"]
+        expected_fitted_mean = float(np.sum(fitted*weights*velocity_parallel))
+        assert result["electron_parallel_mean_velocity_m_s"] == expected_fitted_mean
+        assert result["electron_parallel_mean_velocity_status"] == "identified_from_fitted_gyrotropic_EVDF"
