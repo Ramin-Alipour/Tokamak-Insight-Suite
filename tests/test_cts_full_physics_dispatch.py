@@ -86,3 +86,31 @@ def test_relativistic_kinetic_ece_rejects_missing_distribution():
             polarization=[1.0, 0.0, 0.0],
             quadrature_order=4, gyrophase_points=16,
         )
+
+
+def test_isotropic_kappa_electrostatic_susceptibility_is_publicly_dispatched():
+    from tokamak_analysis.cts_kappa import kappa_electron_susceptibility
+
+    inputs = {
+        "v": np.linspace(-2.0e7, 2.0e7, 1001),
+        "phase_velocity_m_s": 1.0e6,
+        "electron_density_m3": 2.0e18,
+        "electron_temperature_eV": 250.0,
+        "kappa": 4.0,
+        "wavenumber_m_inverse": 120.0,
+        "pole_imaginary_part_m_s": 2.0e3,
+    }
+    direct = kappa_electron_susceptibility(**inputs)
+    dispatched = run_advanced_thomson_physics(
+        "kappa_electrostatic_susceptibility", **inputs
+    )
+    assert dispatched["public_physics_entrypoint"] == "kappa_electrostatic_susceptibility"
+    assert dispatched["automatic_model_substitution"] is False
+    np.testing.assert_allclose(
+        dispatched["electron_susceptibility"],
+        direct["electron_susceptibility"],
+        rtol=0.0,
+        atol=0.0,
+    )
+    assert dispatched["distribution_model"] == "exact_1D_marginal_of_isotropic_3D_Kappa"
+    assert "No conserving collisions" in " ".join(dispatched["limitations"])
