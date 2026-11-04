@@ -112,3 +112,18 @@ available through the advanced physics dispatcher and has neutral, non-neutral
 and vacuum regression cases. This improves mixture bookkeeping and exposes
 inconsistent inputs; it is not a relativistic/magnetized free-free emissivity
 or opacity correction. TS-03 remains OPEN for those kernels.
+
+
+Full-EM real-frequency preservation correction (2026-11-04): the CTS kernel
+previously replaced every measured angular-frequency shift satisfying
+`|ω| < damping` with `sign(ω) damping` before assembling the Maxwell wave
+tensor. This incorrectly moved the real spectral frequency and changed the
+physical wave operator; resonance broadening is an imaginary denominator
+regularization and must not be used as a real-frequency floor. The kernel now
+uses the measured `ω=2π Δf` unchanged and reserves damping for kinetic
+resonance denominators. An exactly zero shift is rejected with an explicit
+static-Maxwell-limit message because that limit has not yet been separately
+derived and converged. Added a regression test for this boundary and explicit
+result metadata stating that real-frequency replacement is not performed.
+This is a physical numerical correction; near-zero nonzero bins remain at
+their measured frequencies. The exact-zero static limit remains OPEN.
