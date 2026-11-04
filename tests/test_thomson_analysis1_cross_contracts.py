@@ -280,3 +280,28 @@ def test_anisotropic_thomson_multi_pitch_model_is_wired_to_dispatcher_dashboard_
     matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
     assert len(matches) == 1
     assert matches == [item for item in packaged_formula if item.get("execution_contract", {}).get("formula_key") == key]
+
+
+def test_three_dimensional_thomson_flow_is_connected_to_dashboard_and_formula_registry():
+    import json
+    from pathlib import Path
+    import pytest
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    root = Path(__file__).resolve().parents[1]
+    model = "thomson_three_dimensional_flow"
+    result = run_advanced_thomson_physics(
+        model,
+        velocity_projection_m_s=[1.0e5, 2.0e5, 3.0e5],
+        scattering_vector_unit=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        projection_covariance_m2_s2=[[1.0e4, 0.0, 0.0], [0.0, 1.0e4, 0.0], [0.0, 0.0, 1.0e4]],
+    )
+    assert result["electron_velocity_vector_m_s"] == pytest.approx([1.0e5, 2.0e5, 3.0e5])
+    assert result["public_physics_entrypoint"] == model
+    dashboard = (root/"tis"/"ui"/"advanced_thomson_physics_page.py").read_text(encoding="utf-8")
+    assert model in dashboard
+    root_formula = json.loads((root/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_formula = json.loads((root/"tis"/"data"/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "thomson_three_dimensional_flow_from_projections"
+    assert len([item for item in root_formula if item.get("execution_contract", {}).get("formula_key") == key]) == 1
+    assert root_formula == packaged_formula
