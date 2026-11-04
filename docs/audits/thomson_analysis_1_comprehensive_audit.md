@@ -1018,3 +1018,37 @@ consistency diagnostic and covered by a parallel-branch regression. These
 relations are evaluated only for transparent collisionless simple modes;
 they are not used to manufacture an energy velocity for dissipative or
 degenerate modes.
+
+
+## Physical implementation update — 2026-11-04: multi-pitch gyrotropic anisotropy inversion
+
+A physical GLS inverse for optical Thomson directional-temperature measurements
+is now implemented in
+`tokamak_analysis.thomson_kinetic_models.infer_gyrotropic_bi_maxwellian_temperatures`
+and exposed through the advanced-physics dispatcher as
+`gyrotropic_bi_maxwellian_anisotropy`. For a gyrotropic bi-Maxwellian with
+zero heat flux, the one-dimensional projected variance obeys
+
+```text
+T_q = T_perp (1 - mu^2) + T_parallel mu^2
+mu = b_hat dot q_hat
+```
+
+The inverse uses the full supplied covariance of directional temperatures:
+`theta = (X.T C_T^-1 X)^-1 X.T C_T^-1 T_q`, with columns
+`[1-mu^2, mu^2]`. It returns the two-temperature covariance and GLS residual
+diagnostics only when the design matrix has rank two and both fitted
+temperatures are positive. Repeated equivalent pitch angles return
+`non_identifiable` and null parallel/perpendicular temperatures; no anisotropy
+is fabricated from a single projection. The advanced Thomson dashboard now
+exposes the model and a self-consistent input-shape example. The root and
+packaged formula registries are synchronized.
+
+This closes a bounded, two-temperature gyrotropic inference capability under
+its explicit assumptions; it does **not** implement a general anisotropic
+EVDF, pitch-angle uncertainty propagation, or a direct raw-spectrum
+multi-view optimizer. Directional temperatures must first be obtained from
+the calibrated measured-spectrum optical Thomson fit. Regression tests cover
+recovery, rank-deficient non-identifiability, covariance validation and
+dispatcher/dashboard/formula-registry wiring. CI on the resulting main SHA
+and independent experimental validation remain unverified.
