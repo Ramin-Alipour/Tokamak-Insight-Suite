@@ -194,7 +194,12 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     singular = np.linalg.svd(fit.jac, compute_uv=False)
     tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
     full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
-    parameter_covariance = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if full_rank else None
+    parameter_covariance = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if (full_rank and geometry_rank == 2) else None
+    covariance_scale_method = "supplied_absolute_covariance"
+    if parameter_covariance is not None and measurement_covariance is None and signal_uncertainty is None:
+        dof = max(1, size - fit.x.size)
+        parameter_covariance *= (2.0 * float(fit.cost) / dof)
+        covariance_scale_method = "unweighted_residual_scaled"
     if parameter_covariance is not None:
         transform = np.eye(fit.x.size)
         transform[0, 0] = np.exp(fit.x[0])
