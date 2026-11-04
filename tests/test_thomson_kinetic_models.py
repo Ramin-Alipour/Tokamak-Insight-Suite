@@ -247,3 +247,44 @@ def test_kappa_landau_susceptibility_remains_finite_near_finite_variance_boundar
     assert np.all(np.isfinite(np.asarray(values).real))
     assert np.all(np.isfinite(np.asarray(values).imag))
     assert len({round(float(value.real), 8) for value in values}) == len(values)
+
+
+def test_near_critical_kappa_landau_tail_matches_adaptive_infinite_domain_quadrature():
+    from scipy.integrate import quad
+    from tokamak_analysis.thomson_kinetic_models import (
+        _kappa_pdf_and_derivatives,
+        _landau_susceptibility,
+    )
+
+    sigma = 1.7e6
+    phase_velocity = 0.8*sigma
+    kappa = 1.5001
+    omega_p2 = 2.0e20
+    wave_number = 110.0
+
+    def symmetric_integrand(t):
+        offset = sigma*t/(1.0-t)
+        jacobian = sigma/(1.0-t)**2
+        _, derivative_plus, _ = _kappa_pdf_and_derivatives(
+            np.asarray(phase_velocity+offset), sigma, kappa
+        )
+        _, derivative_minus, _ = _kappa_pdf_and_derivatives(
+            np.asarray(phase_velocity-offset), sigma, kappa
+        )
+        return float(jacobian*(derivative_plus-derivative_minus)/offset)
+
+    principal, _ = quad(
+        symmetric_integrand, 0.0, 1.0,
+        epsabs=1e-25, epsrel=2e-9, limit=1000,
+    )
+    _, derivative_at, _ = _kappa_pdf_and_derivatives(
+        np.asarray(phase_velocity), sigma, kappa
+    )
+    expected = -(omega_p2/wave_number**2)*(
+        principal+1j*np.pi*float(derivative_at)
+    )
+    actual = _landau_susceptibility(
+        phase_velocity, omega_p2, wave_number, sigma,
+        distribution="kappa", kappa=kappa,
+    )
+    np.testing.assert_allclose(actual, expected, rtol=3e-7, atol=1e-14)
