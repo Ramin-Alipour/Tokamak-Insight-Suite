@@ -1081,3 +1081,37 @@ across those views are required. Geometry covariance is not propagated here.
 Regression coverage checks exact vector recovery, rank-deficient withholding,
 and dispatcher/dashboard/formula-registry wiring. CI and experimental
 validation remain unverified.
+
+
+## Direct-main physical-model corrections — 2026-11-04
+
+### Relativistic Maxwell-Juttner momentum-tail normalization (OPT-06 / OPT-07)
+
+The relativistic optical Thomson forward model now checks its finite radial momentum quadrature against the exact isotropic Maxwell-Juttner normalization. With dimensionless momentum u=p/(m_e c) and theta=k_B T_e/(m_e c^2),
+
+\[
+\int_0^\infty u^2\exp\!\left[-\frac{\sqrt{1+u^2}-1}{\theta}\right]du
+=\theta e^{1/\theta}K_2(1/\theta)
+=\theta K_2^{\mathrm{(scaled)}}(1/\theta).
+\]
+
+The full isotropic normalization is 4*pi*theta*K2_scaled(1/theta). The code compares the actual Gauss-Legendre momentum quadrature against this analytic value, rejects a quadrature that represents less than 99.9% of the momentum probability, and rejects a material normalization overshoot. The missing tail is not silently renormalized. The coverage and normalization ratio are returned by both the forward kernel and the fitted optical result, and are declared in the Python and diagnostic registries. This is a numerical-physics correction to the relativistic EVDF integration, not a claim of general relativistic EVDF inversion or complete Compton transport.
+
+### Generalized CTS Landau integral finite-support derivative (TS-10)
+
+For a tabulated projected VDF interpreted as zero outside its finite interval, the distributional derivative contains endpoint terms. The susceptibility integral now includes
+
+\[
+\int \frac{df}{dv}\frac{dv}{(v-\zeta)^p}
+=
+\int_{v_{\min}}^{v_{\max}}\frac{f'_{\mathrm{piecewise}}(v)}{(v-\zeta)^p}\,dv
++\frac{f(v_{\min})}{(v_{\min}-\zeta)^p}
+-\frac{f(v_{\max})}{(v_{\max}-\zeta)^p}.
+\]
+The interior and endpoint contributions are returned separately. This prevents a finite-support top-hat VDF from incorrectly producing zero response merely because its interior derivative vanishes. A regression test checks the analytic endpoint expression. This does not close the separate conserving-collision, magnetized, relativistic-Kappa, FDT-noise or Full-EM Kappa requirements.
+
+### CTS free-free opacity input correction (TS-03 background path)
+
+The free-free absorption kernel now rejects non-finite Gaunt factors, including NaN and infinities, before evaluating the Kirchhoff opacity alpha_nu=j_nu/B_nu(T_e). The emissivity path already enforced this condition; the opacity path now has matching finite-domain behavior. Tests cover all three non-finite cases.
+
+**Verification boundary:** the code, focused tests, Analysis-1 Python output contract, root diagnostic registry, and this audit note were committed directly to main. These changes do not mark the full OPT/CTS/PROF/INT defect list complete. GitHub Actions must pass on the final resulting SHA before software-test success is claimed; no experimental validation is claimed.
