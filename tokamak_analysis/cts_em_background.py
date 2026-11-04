@@ -62,6 +62,41 @@ def planck_spectral_radiance(frequency_Hz, temperature_K):
     return (2.0 * H * nu**3 / C**2) * occupation
 
 
+def plasma_charge_state_moments(electron_density_m3, ion_densities_m3, ion_charge_states):
+    """Return charge balance and effective ionic charge without forcing neutrality.
+
+    n_i are ion number densities and Z_i are positive integer charge states:
+      n_e,quasi = sum_i Z_i n_i,
+      Z_eff = sum_i Z_i^2 n_i / n_e,
+      rho_q = e (sum_i Z_i n_i - n_e).
+    A non-neutral state is reported, not silently repaired. Z_eff is undefined
+    when n_e=0 and is returned as None in that case.
+    """
+    ne = _real_scalar(electron_density_m3, "electron_density_m3", nonnegative=True)
+    ni = _real_array(ion_densities_m3, "ion_densities_m3")
+    z = _real_array(ion_charge_states, "ion_charge_states")
+    if ni.ndim != 1 or ni.size == 0 or z.shape != ni.shape:
+        raise ValueError("ion_densities_m3 and ion_charge_states must be matching non-empty vectors")
+    if np.any(ni < 0.0) or np.any(z <= 0.0) or np.any(z != np.floor(z)):
+        raise ValueError("ion densities must be non-negative and charge states positive integers")
+    ion_charge_density = float(np.sum(z * ni))
+    ion_charge_squared_density = float(np.sum(z**2 * ni))
+    scale = max(ne, ion_charge_density, np.finfo(float).tiny)
+    return {
+        "electron_density_m3": ne,
+        "ion_charge_density_equivalent_m3": ion_charge_density,
+        "ion_charge_squared_density_m3": ion_charge_squared_density,
+        "effective_charge_Zeff": (
+            float(ion_charge_squared_density / ne) if ne > 0.0 else None
+        ),
+        "net_charge_density_C_m3": float(E_CHARGE * (ion_charge_density - ne)),
+        "quasineutrality_relative_residual": float(
+            (ion_charge_density - ne) / scale
+        ),
+        "quasineutrality_assumed_or_enforced": False,
+    }
+
+
 def thermal_bremsstrahlung_emissivity_si(
     frequency_Hz, electron_density_m3, ion_densities_m3,
     ion_charge_states, electron_temperature_eV, *, gaunt_factor=1.0,
@@ -355,8 +390,13 @@ def integrate_thermal_microwave_background(
     electron_rest_energy_J = 9.1093837015e-31 * C**2
     theta_e = (te * E_CHARGE) / electron_rest_energy_J
     photon_recoil_parameter = (H * nu) / electron_rest_energy_J
+    charge_balance = [
+        plasma_charge_state_moments(ne[index], ni[index], z)
+        for index in range(length.size)
+    ]
     return {
         "spectral_radiance_W_m2_sr_Hz": intensity,
+        "plasma_charge_state_moments_by_path": charge_balance,
         "background_status": background_status,
         "free_free_relativistic_screening": {
             "electron_temperature_parameter_kT_over_mec2_by_path": theta_e.copy(),
