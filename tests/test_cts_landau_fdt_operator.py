@@ -54,3 +54,26 @@ def test_landau_resolvent_returns_density_response_and_noise_spectrum():
     assert result["response"].shape[0] == 2
     assert result["fluctuation_spectral_matrix"].shape == (2, 2, 2)
     assert np.all(np.isfinite(result["fluctuation_spectral_matrix"]))
+
+
+
+def test_landau_resolvent_uses_sparse_adjoint_solve_without_dense_inverse(monkeypatch):
+    system = _system()
+    observation = np.zeros((2, system.operator_s_inverse.shape[0]))
+    for index, sl in enumerate(system.species_slices):
+        observation[index, sl] = system.equilibrium_weights[sl]
+
+    def forbidden_inverse(*args, **kwargs):
+        raise AssertionError("dense inverse must not be used by the Landau resolvent")
+
+    monkeypatch.setattr(np.linalg, "inv", forbidden_inverse)
+    result = landau_density_response(
+        system, [1.0e5, 2.0e5], observation,
+        wave_number_m_inverse=1.0e-3,
+    )
+    assert result["dense_velocity_space_inverse_formed"] is False
+    assert result["resolvent_solver"] == "sparse_LU_adjoint_observation_projection"
+    assert result["response"].shape == (2, 2, system.operator_s_inverse.shape[0])
+    assert result["fluctuation_spectral_matrix"].shape == (2, 2, 2)
+    assert np.all(np.isfinite(result["response"]))
+    assert np.all(np.isfinite(result["fluctuation_spectral_matrix"]))

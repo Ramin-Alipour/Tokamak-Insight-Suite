@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.constants import epsilon_0
 from scipy.sparse import csr_matrix, lil_matrix, diags
-from scipy.sparse.linalg import norm as sparse_norm
+from scipy.sparse.linalg import norm as sparse_norm, splu
 
 
 def _positive(value, name):
@@ -201,11 +201,15 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
                             density_observation, *, forcing=None,
                             wave_number_m_inverse=0.0,
                             propagation_direction=(1.0, 0.0, 0.0)):
-    """Compute a linear resolvent and FDT spectrum for supplied velocity moments.
+    """Compute the Landau resolvent and matching FDT spectrum with sparse solves.
 
-    Electrostatic screening, CTS geometry and optical normalization are not
-    inferred here; the caller supplies the observation and forcing operators.
+    The adjoint resolvent is solved only for the requested observation
+    functionals. This evaluates O A^-1 B and O A^-1 Q A^-H O^H without forming
+    a dense inverse or a dense velocity-space covariance. If forcing is None,
+    the historical identity-forcing contract is preserved.
     """
+    from scipy.sparse import diags as sparse_diags
+
     omega = np.asarray(angular_frequency_rad_s, dtype=float)
     if omega.ndim != 1 or omega.size == 0 or np.any(~np.isfinite(omega)):
         raise ValueError("angular_frequency_rad_s must be a finite non-empty vector")
@@ -213,8 +217,11 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
     n = system.operator_s_inverse.shape[0]
     if obs.ndim != 2 or obs.shape[1] != n or np.any(~np.isfinite(obs)):
         raise ValueError("density_observation must have shape (n_observable,n_dof)")
-    drive = np.eye(n, dtype=complex) if forcing is None else np.asarray(forcing, dtype=complex)
-    if drive.ndim != 2 or drive.shape[0] != n or np.any(~np.isfinite(drive.real)) or np.any(~np.isfinite(drive.imag)):
+    drive = None if forcing is None else np.asarray(forcing, dtype=complex)
+    if drive is not None and (
+        drive.ndim != 2 or drive.shape[0] != n
+        or np.any(~np.isfinite(drive.real)) or np.any(~np.isfinite(drive.imag))
+    ):
         raise ValueError("forcing must have shape (n_dof,n_input)")
     wave_number = float(wave_number_m_inverse)
     direction = np.asarray(propagation_direction, dtype=float)
@@ -222,26 +229,50 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
         raise ValueError("wave_number_m_inverse must be finite and non-negative")
     if direction.shape != (3,) or np.any(~np.isfinite(direction)) or np.linalg.norm(direction) == 0:
         raise ValueError("propagation_direction must be a finite non-zero 3-vector")
-    direction = direction/np.linalg.norm(direction)
-    streaming = (system.velocity_grid_m_s @ direction).ravel()
-    L = system.operator_s_inverse.toarray() - 1j*wave_number*np.diag(streaming)
-    Q = system.fdt_source_covariance_s_inverse.toarray()
-    result = np.empty((omega.size, obs.shape[0], drive.shape[1]), complex)
-    spectrum = np.empty((omega.size, obs.shape[0], obs.shape[0]), complex)
-    identity = np.eye(n)
-    for i, w in enumerate(omega):
-        R = np.linalg.inv(-1j*w*identity-L)
-        result[i] = obs@R@drive
-        spectrum[i] = obs@R@Q@R.conj().T@obs.T
-    return {"response": result, "fluctuation_spectral_matrix": spectrum,
-            "angular_frequency_rad_s": omega.copy(),
-            "collision_operator": system.metadata["operator"],
-            "fdt": system.metadata["fdt"],
-            "limitations": list(system.metadata["limitations"])+[
-                "Self-consistent electrostatic screening and CTS scattering normalization are not applied.",
-                "Streaming is represented by the supplied Fourier wave number and direction; the velocity grid remains finite."
-            ]}
-
+    direction = direction / np.linalg.norm(direction)
+    streaming = system.velocity_grid_m_s @ direction
+    generator = (
+        system.operator_s_inverse
+        - 1j * wave_number * sparse_diags(streaming, format="csr")
+    ).tocsr()
+    source_covariance = system.fdt_source_covariance_s_inverse.tocsr()
+    observation_adjoint = obs.T.conj()
+    result = np.empty(
+        (omega.size, obs.shape[0], n if drive is None else drive.shape[1]),
+        dtype=complex,
+    )
+    spectrum = np.empty((omega.size, obs.shape[0], obs.shape[0]), dtype=complex)
+    identity = sparse_diags(np.ones(n), format="csc")
+    for index, frequency in enumerate(omega):
+        resolvent = (-1j * frequency * identity - generator).tocsc()
+        try:
+            # X=A^-H O^H; do not construct A^-1 in velocity space.
+            adjoint_solution = splu(resolvent.getH().tocsc()).solve(observation_adjoint)
+        except RuntimeError as exc:
+            raise ValueError(
+                f"Landau resolvent is singular at angular frequency {frequency:g} rad/s"
+            ) from exc
+        result[index] = (
+            adjoint_solution.conj().T
+            if drive is None else adjoint_solution.conj().T @ drive
+        )
+        spectrum[index] = (
+            adjoint_solution.conj().T @ source_covariance @ adjoint_solution
+        )
+        spectrum[index] = 0.5 * (spectrum[index] + spectrum[index].conj().T)
+    return {
+        "response": result,
+        "fluctuation_spectral_matrix": spectrum,
+        "angular_frequency_rad_s": omega.copy(),
+        "collision_operator": system.metadata["operator"],
+        "fdt": system.metadata["fdt"],
+        "resolvent_solver": "sparse_LU_adjoint_observation_projection",
+        "dense_velocity_space_inverse_formed": False,
+        "limitations": list(system.metadata["limitations"]) + [
+            "Self-consistent electrostatic screening and CTS scattering normalization are not applied.",
+            "Streaming is represented by the supplied Fourier wave number and direction; the velocity grid remains finite."
+        ],
+    }
 
 
 def landau_cts_dynamic_structure_factor(
