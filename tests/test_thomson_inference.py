@@ -1644,7 +1644,7 @@ def test_primary_optical_fit_propagates_additive_systematic_covariance():
 
 
 def test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs():
-    from scipy.special import ndtr, stdtr
+    from scipy.special import gammaln, ndtr, stdtr
 
     wavelength = np.array([500.0, 500.15, 500.42, 500.9, 501.1])
     edges = np.empty(wavelength.size + 1)
@@ -1670,8 +1670,7 @@ def test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs(
     )
     expected_probability = np.diff(stdtr(degrees, (edges-centre)/scale))
     shape_integral = scale*np.sqrt(degrees*np.pi)*np.exp(
-        __import__("scipy").special.gammaln(kappa-0.5)
-        - __import__("scipy").special.gammaln(kappa)
+        gammaln(kappa-0.5)-gammaln(kappa)
     )
     np.testing.assert_allclose(kappa_probability, expected_probability, rtol=1e-12, atol=1e-14)
     np.testing.assert_allclose(
