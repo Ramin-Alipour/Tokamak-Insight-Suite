@@ -1,35 +1,114 @@
-"""Collisionless isotropic-Kappa electrostatic susceptibility."""
+"""Collisionless isotropic-Kappa electrostatic susceptibility.
+
+This is the exact one-dimensional marginal of an isotropic three-dimensional
+Kappa distribution. It is deliberately limited to a collisionless,
+unmagnetized, longitudinal response; it is not a relativistic or Full-EM
+Kappa closure.
+"""
+from __future__ import annotations
+
 import numpy as np
 from scipy.special import gammaln
-from .thomson_generalized_dispersion import generalized_landau_integral
-E=1.602176634e-19
-EPS0=8.8541878128e-12
-ME=9.1093837015e-31
 
-def kappa_electron_susceptibility(v, phase_velocity_m_s, *, electron_density_m3,
-        electron_temperature_eV, kappa, wavenumber_m_inverse,
-        mass_kg=ME, pole_imaginary_part_m_s=None):
-    """Exact 1-D marginal of isotropic 3-D Kappa; collisionless, unmagnetized."""
-    v=np.asarray(v,dtype=float)
-    ne,te,kap,k,m=map(float,(electron_density_m3,electron_temperature_eV,kappa,wavenumber_m_inverse,mass_kg))
-    if v.ndim!=1 or v.size<9 or np.any(~np.isfinite(v)) or np.any(np.diff(v)<=0):
+from .thomson_generalized_dispersion import generalized_landau_integral
+
+E = 1.602176634e-19
+EPS0 = 8.8541878128e-12
+ME = 9.1093837015e-31
+
+
+def _positive_real_scalar(value, name):
+    """Reject bool/string/complex coercions before validating a physical scalar."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a positive finite real scalar")
+    result = float(value)
+    if not np.isfinite(result) or result <= 0.0:
+        raise ValueError(f"{name} must be a positive finite real scalar")
+    return result
+
+
+def kappa_electron_susceptibility(
+    v,
+    phase_velocity_m_s,
+    *,
+    electron_density_m3,
+    electron_temperature_eV,
+    kappa,
+    wavenumber_m_inverse,
+    mass_kg=ME,
+    pole_imaginary_part_m_s=None,
+):
+    """Return chi_e for the normalized 1-D marginal of an isotropic 3-D Kappa.
+
+    The temperature parameter is the usual second-moment temperature, so the
+    marginal variance is k_B T / m.  The retarded Landau contour is selected by
+    a positive imaginary phase-velocity displacement.  The finite velocity
+    interval and that displacement remain explicit numerical limitations.
+    """
+    raw_v = np.asarray(v)
+    if raw_v.dtype.kind not in "iuf":
+        raise ValueError("v must contain real numeric values")
+    velocity = raw_v.astype(float, copy=False)
+    ne = _positive_real_scalar(electron_density_m3, "electron_density_m3")
+    te = _positive_real_scalar(electron_temperature_eV, "electron_temperature_eV")
+    kap = _positive_real_scalar(kappa, "kappa")
+    wave_number = _positive_real_scalar(wavenumber_m_inverse, "wavenumber_m_inverse")
+    mass = _positive_real_scalar(mass_kg, "mass_kg")
+    if (velocity.ndim != 1 or velocity.size < 9
+            or np.any(~np.isfinite(velocity)) or np.any(np.diff(velocity) <= 0.0)):
         raise ValueError("velocity grid must be finite, increasing, and contain at least 9 points")
-    if not np.isfinite(ne) or ne<=0 or not np.isfinite(te) or te<=0 or not np.isfinite(k) or k<=0 or not np.isfinite(m) or m<=0:
-        raise ValueError("density, temperature, wavenumber and mass must be positive and finite")
-    if not np.isfinite(kap) or kap<=1.5:
+    if kap <= 1.5:
         raise ValueError("kappa must be greater than 3/2")
-    theta2=(2*kap-3)*E*te/(kap*m)
-    a2=kap*theta2
-    logn=gammaln(kap)-0.5*np.log(np.pi*a2)-gammaln(kap-0.5)
-    pdf=np.exp(logn-kap*np.log1p(v*v/a2))
-    out=generalized_landau_integral(v,pdf,phase_velocity_m_s,pole_imaginary_part_m_s=pole_imaginary_part_m_s)
-    wp2=ne*E**2/(EPS0*m)
-    out.update({"electron_susceptibility":complex(-wp2/k**2*out["integral"]),
-        "plasma_frequency_squared_s_minus2":float(wp2),"wavenumber_m_inverse":k,
-        "distribution_model":"exact_1D_marginal_of_isotropic_3D_Kappa","kappa":kap,
-        "theta_m_s":float(np.sqrt(theta2)),"second_moment_m2_s2":float(E*te/m),
-        "finite_velocity_grid_truncation":True,
-        "limitations":["Collisionless unmagnetized longitudinal response only.",
-        "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
-        "A 1-D marginal is not a reconstruction of the full 3-D EVDF."]})
-    return out
+    if isinstance(phase_velocity_m_s, (bool, np.bool_)) or not isinstance(
+        phase_velocity_m_s, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError("phase_velocity_m_s must be a finite real scalar")
+    phase_velocity = float(phase_velocity_m_s)
+    if not np.isfinite(phase_velocity):
+        raise ValueError("phase_velocity_m_s must be a finite real scalar")
+    if pole_imaginary_part_m_s is not None:
+        _positive_real_scalar(pole_imaginary_part_m_s, "pole_imaginary_part_m_s")
+
+    # For an isotropic 3-D Kappa, integrating over the two perpendicular
+    # velocity coordinates gives f_1D(v) proportional to
+    # [1 + v^2/(kappa theta^2)]^(-kappa), with
+    # theta^2 = (2 kappa - 3) k_B T / (kappa m).
+    theta_squared = (2.0 * kap - 3.0) * E * te / (kap * mass)
+    scale_squared = kap * theta_squared
+    log_normalization = (
+        gammaln(kap) - 0.5 * np.log(np.pi * scale_squared)
+        - gammaln(kap - 0.5)
+    )
+    log_pdf = log_normalization - kap * np.log1p(
+        velocity * velocity / scale_squared
+    )
+    pdf = np.exp(log_pdf)
+    response = generalized_landau_integral(
+        velocity,
+        pdf,
+        phase_velocity,
+        pole_imaginary_part_m_s=pole_imaginary_part_m_s,
+    )
+    plasma_frequency_squared = ne * E**2 / (EPS0 * mass)
+    response.update({
+        "electron_susceptibility": complex(
+            -plasma_frequency_squared / wave_number**2 * response["integral"]
+        ),
+        "plasma_frequency_squared_s_minus2": float(plasma_frequency_squared),
+        "wavenumber_m_inverse": wave_number,
+        "distribution_model": "exact_1D_marginal_of_isotropic_3D_Kappa",
+        "kappa": kap,
+        "theta_m_s": float(np.sqrt(theta_squared)),
+        "second_moment_m2_s2": float(E * te / mass),
+        "finite_velocity_grid_truncation": True,
+        "limitations": [
+            "Collisionless unmagnetized longitudinal response only.",
+            "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
+            "A 1-D marginal is not a reconstruction of the full 3-D EVDF.",
+            "The result is non-relativistic; relativistic Kappa response is not implemented.",
+            "Finite velocity support and positive Landau-pole displacement affect numerical accuracy.",
+        ],
+    })
+    return response
