@@ -66,6 +66,7 @@ EXAMPLES = {
         "instrument_response_matrix": np.eye(81).tolist(),
         "background_signal": np.full(81, 2.0).tolist(),
         "velocity_grid_m_s": np.linspace(-80000.0, 80000.0, 81).tolist(),
+        "model_discrepancy_covariance": None,
         "include_compton_recoil": False,
         "maximum_recoil_correction_fraction": 0.01,
         "incident_polarization": [0.0, 0.0, 1.0],
