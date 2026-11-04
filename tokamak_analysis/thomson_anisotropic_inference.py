@@ -37,6 +37,29 @@ def _bin_widths(axis):
     return widths
 
 
+def _apply_response_in_bin_integrated_space(response_matrix, spectral_density, wavelength_nm):
+    """Apply a measured bin-probability response while conserving spectral power.
+
+    Response columns map true wavelength-bin probabilities to measured bins.
+    Therefore the operator acts on bin-integrated spectral power, not directly
+    on spectral-density samples. This distinction is essential on nonuniform
+    wavelength grids.
+    """
+    wavelength = _real_array(wavelength_nm, "wavelength_nm", 1)
+    density = _real_array(spectral_density, "spectral_density", 1)
+    response = _real_array(response_matrix, "response_matrix", 2)
+    if wavelength.size < 2 or density.shape != wavelength.shape:
+        raise ValueError("wavelength_nm and spectral_density must be paired 1-D arrays")
+    if np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must be strictly increasing")
+    if response.shape != (wavelength.size, wavelength.size) or np.any(response < 0.0):
+        raise ValueError("response_matrix must be a non-negative square matrix on the wavelength grid")
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("response_matrix columns must sum to one")
+    widths = _bin_widths(wavelength)
+    return (response @ (density * widths)) / widths
+
+
 def fit_gyrotropic_bi_maxwellian_thomson(
     wavelength_nm, measured_spectra, *, laser_wavelength_nm,
     scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
@@ -180,7 +203,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
                 raise ValueError("predicted Thomson spectral width is numerically zero")
             intrinsic = np.exp(-0.5 * ((wavelength - center) / sigma_lambda) ** 2)
             intrinsic /= np.sqrt(2.0 * np.pi) * sigma_lambda
-            detector = response[i] @ intrinsic
+            detector = _apply_response_in_bin_integrated_space(response[i], intrinsic, wavelength)
             predictions[i] = np.exp(log_amp) * detector + offset + slope * (wavelength - laser)
         return predictions, directional
 
