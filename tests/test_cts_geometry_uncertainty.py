@@ -256,3 +256,41 @@ def test_full_em_geometry_ensemble_is_exposed_by_dashboard():
     assert "cts_full_geometry_mc_samples" in app
     assert "propagate_full_em_cts_ray_geometry_uncertainty" in app
     assert "_sample_precomputed_geometry" in app
+
+
+def test_ray_geometry_uncertainty_updates_parameter_identifiability_provenance():
+    from tokamak_analysis.cts_geometry_uncertainty import _update_ray_geometry_identifiability
+
+    output = {"parameter_identifiability": {"conditional": []}}
+    _update_ray_geometry_identifiability(
+        output, propagated=False, requested_samples=20, successful_samples=4
+    )
+    item = output["parameter_identifiability"]["conditional"][-1]
+    assert item["parameter"] == "ray_geometry_uncertainty_contribution"
+    assert item["status"] == (
+        "requested_but_not_propagated_insufficient_successful_geometry_refits"
+    )
+    assert item["propagated"] is False
+
+    _update_ray_geometry_identifiability(
+        output, propagated=True, requested_samples=20, successful_samples=18
+    )
+    item = output["parameter_identifiability"]["conditional"][-1]
+    assert item["status"] == (
+        "propagated_by_complete_ray_equilibrium_beam_geometry_refits"
+    )
+    assert item["propagated"] is True
+    assert len([
+        item for item in output["parameter_identifiability"]["conditional"]
+        if item["parameter"] == "ray_geometry_uncertainty_contribution"
+    ]) == 1
+
+
+def test_geometry_refit_updates_identifiability_on_both_success_and_failure_paths():
+    import inspect
+    from tokamak_analysis.cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty
+
+    source = inspect.getsource(propagate_full_em_cts_ray_geometry_uncertainty)
+    assert "propagated=False" in source
+    assert "propagated=True" in source
+    assert "successful_samples=len(draws)" in source
