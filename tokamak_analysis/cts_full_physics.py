@@ -572,6 +572,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = infer_gyrotropic_bi_maxwellian_temperatures
     elif model == "gyrotropic_bi_maxwellian_spectral_fit":
         solver = fit_gyrotropic_bi_maxwellian_thomson
+    elif model == "gyrotropic_bi_kappa_spectral_fit":
+        solver = fit_gyrotropic_bi_kappa_thomson
     elif model == "thomson_three_dimensional_flow":
         solver = infer_three_dimensional_flow_from_thomson_projections
     elif model == "plasma_charge_state_moments":
