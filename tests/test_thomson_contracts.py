@@ -60,6 +60,24 @@ def test_profile_bounds_and_regularization_are_never_implicit():
     )
     assert result["regularization_strength"] == {"ne": 0.02, "Te": 0.04}
 
+    # An explicitly unregularized profile is valid when another fitted profile
+    # carries the declared smoothness prior; zero is not silently substituted.
+    mixed = validate_profile_inversion_contract(
+        (0.1, 2.0), {"ne": 0.0, "Te": 0.04}, ["ne", "Te"],
+        regularization_scope="second_difference_of_log_relative_profiles",
+    )
+    assert mixed["regularization_strength"] == {"ne": 0.0, "Te": 0.04}
+    with pytest.raises(ValueError, match="at least one active profile"):
+        validate_profile_inversion_contract(
+            (0.1, 2.0), {"ne": 0.0, "Te": 0.0}, ["ne", "Te"],
+            regularization_scope="second_difference_of_log_relative_profiles",
+        )
+    with pytest.raises(ValueError, match=">= 0"):
+        validate_profile_inversion_contract(
+            (0.1, 2.0), {"ne": -0.01}, ["ne"],
+            regularization_scope="second_difference_of_log_relative_profiles",
+        )
+
 
 def test_local_identifiability_reports_null_directions_and_zero_sensitivity():
     j = np.array([[1.0, 2.0, 0.0], [0.0, 0.0, 0.0], [1.0, 2.0, 0.0]])
