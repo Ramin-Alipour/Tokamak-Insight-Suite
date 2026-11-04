@@ -182,3 +182,36 @@ def test_mode_resolved_lte_ece_emissivity_is_kirchhoff_consistent():
 def test_lte_ece_emissivity_rejects_unphysical_or_mismatched_absorption(alpha):
     with pytest.raises(ValueError):
         ece_lte_emissivity_si(np.array([90e9, 100e9]), alpha, 1000.0)
+
+
+
+def test_uniform_lte_ece_slab_matches_formal_solution_of_radiative_transfer():
+    from tokamak_analysis.cts_em_background import planck_spectral_radiance
+
+    frequency = np.array([90e9, 100e9, 110e9])
+    temperature_eV = 2200.0
+    alpha = np.array([[0.02, 0.05, 0.08]])
+    path = np.array([0.7])
+    incident = np.array([1e-18, 2e-18, 3e-18])
+    result = integrate_thermal_microwave_background(
+        frequency_Hz=frequency,
+        path_length_m=path,
+        electron_temperature_eV=np.array([temperature_eV]),
+        electron_density_m3=np.array([1e19]),
+        ion_densities_m3=np.array([[1e19]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=alpha,
+        ece_lte=True,
+        incident_radiance_W_m2_sr_Hz=incident,
+    )
+    source = planck_spectral_radiance(
+        frequency, temperature_eV * 1.602176634e-19 / 1.380649e-23
+    )
+    # The integrated output is the exact formal solution I=I0 exp(-tau)+B(1-exp(-tau)).
+    # Free-free opacity is also present in this plasma, so compare against the
+    # returned total optical depth and the same LTE source function.
+    tau = result["total_optical_depth"]
+    expected = incident * np.exp(-tau) + source * (1.0 - np.exp(-tau))
+    np.testing.assert_allclose(
+        result["spectral_radiance_W_m2_sr_Hz"], expected, rtol=2e-12, atol=1e-30
+    )
