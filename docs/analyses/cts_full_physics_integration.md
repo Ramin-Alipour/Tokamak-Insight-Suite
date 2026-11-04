@@ -3,6 +3,7 @@
 The `tokamak_analysis.cts_full_physics` module provides public orchestration
 entry points for the advanced physics kernels:
 
+- `kappa_electrostatic_susceptibility`: exposes the collisionless, unmagnetized longitudinal susceptibility of the exact 1-D marginal of an isotropic 3-D Kappa distribution. This is a response kernel only; it does not supply a Kappa fluctuation/noise closure or a complete CTS spectrum.
 - `analyze_landau_fdt_cts`: assembles the conservative multispecies
   linearized Landau operator, derives the matching classical Langevin source
   covariance from the same discrete operator, and connects the screened
