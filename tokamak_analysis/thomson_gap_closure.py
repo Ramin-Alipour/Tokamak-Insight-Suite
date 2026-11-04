@@ -394,7 +394,18 @@ def reconstruct_relativistic_projected_thomson_evdf(
     ) * velocity_weights[None,:] / widths[:,None]
     design = whiten(forward)
     target = whiten(y-b)
-    d2 = np.diff(np.eye(v.size), n=2, axis=0) / float(dv[0])**2
+
+    # Non-uniform-grid second derivative. The usual [1,-2,1]/dv**2 stencil
+    # is only valid for equally spaced velocities; silently applying it to a
+    # non-uniform grid biases both the regularized EVDF and the GCV choice.
+    # This three-point formula is the local quadratic-interpolation estimate
+    # of d²f/dv² at each interior velocity node.
+    h_left, h_right = dv[:-1], dv[1:]
+    d2 = np.zeros((v.size - 2, v.size), dtype=float)
+    row = np.arange(v.size - 2)
+    d2[row, row] = 2.0 / (h_left * (h_left + h_right))
+    d2[row, row + 1] = -2.0 / (h_left * h_right)
+    d2[row, row + 2] = 2.0 / (h_right * (h_left + h_right))
     scale = np.linalg.norm(design, ord="fro") / max(np.linalg.norm(d2, ord="fro"), np.finfo(float).tiny)
     candidates = np.logspace(-8, 4, 13) if regularization_strength is None else np.asarray([float(regularization_strength)])
     if np.any(~np.isfinite(candidates)) or np.any(candidates <= 0):
@@ -423,8 +434,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
         raise ValueError("relativistic projected EVDF inversion failed for all regularization candidates")
     idx = int(np.argmin(scores))
     coeff = np.maximum(fits[idx].x,0.0)
-    integral_weights = np.ones(v.size); integral_weights[[0,-1]] = 0.5
-    norm = float(np.sum(coeff*integral_weights)*float(dv[0]))
+    # Use the same non-uniform trapezoidal measure as the forward model.
+    # This keeps f(v) normalized to integral f(v) dv = 1 on irregular grids.
+    norm = float(np.dot(coeff, velocity_weights))
     if norm <= np.finfo(float).tiny:
         raise ValueError("reconstructed projected EVDF has zero integral")
     evdf = coeff/norm
@@ -437,7 +449,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
         rr = target-design@coeff
         cov_active *= float(rr@rr/max(1,target.size-np.count_nonzero(active)))
     cov_coeff[np.ix_(np.flatnonzero(active),np.flatnonzero(active))] = cov_active
-    jac_norm = (np.eye(v.size)*norm - np.outer(coeff, integral_weights*float(dv[0])))/norm**2
+    jac_norm = (
+        np.eye(v.size) * norm - np.outer(coeff, velocity_weights)
+    ) / norm**2
     cov_evdf = jac_norm@cov_coeff@jac_norm.T
     singular = np.linalg.svd(design, compute_uv=False)
     tol = np.finfo(float).eps*max(design.shape)*(singular[0] if singular.size else 0)
@@ -482,8 +496,10 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "data_only_jacobian_condition_number": condition,
         "data_only_parameter_count": int(v.size),
         "velocity_grid_points": int(v.size),
-        "velocity_quadrature": "trapezoidal_integral_over_velocity_in_forward_operator",
+        "velocity_quadrature": "nonuniform_trapezoidal_integral_over_velocity_in_forward_operator_and_EVDF_normalization",
         "velocity_quadrature_weights_m_s": velocity_weights.copy(),
+        "regularization_operator": "nonuniform_three_point_second_derivative_on_interior_velocity_nodes",
+        "velocity_grid_spacing_uniform": bool(np.allclose(dv, dv[0], rtol=1e-8, atol=1e-12 * max(abs(float(dv[0])), 1.0))),
         "noise_model": noise_status,
         "measurement_covariance": (
             None if measurement_covariance is None else measurement_covariance.copy()
@@ -498,7 +514,11 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "covariance_components_independent": True,
         "absolute_density_inferred": False,
         "assumptions": [
-            "symmetric incident/scattered geometry about the scattering-vector bisector",
+            (
+                "symmetric incident/scattered geometry constructed from scattering_angle_rad"
+                if kinematics["geometry_source"] == "symmetric_scattering_plane_from_scattering_angle"
+                else "researcher-supplied arbitrary 3-D incident and scattered ray directions"
+            ),
             "one-dimensional velocity marginal represented by velocities parallel to the scattering vector",
             (
                 "exact Compton four-momentum conservation and polarized Klein-Nishina "
