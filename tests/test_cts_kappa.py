@@ -83,9 +83,7 @@ def test_kappa_susceptibility_is_reachable_through_public_advanced_physics_dispa
 def test_analytic_kappa_tail_does_not_receive_artificial_zero_extension_edge_jumps():
     result = kappa_electron_susceptibility(**args())
     assert result["finite_support_boundary_terms_included"] is False
-    assert result["finite_support_extension"] == (
-        "finite_interval_truncation_of_an_analytic_nonzero_tail; endpoint_jumps_omitted"
-    )
+    assert result["finite_support_extension"] == "analytic_Kappa_tail_integrated_to_infinity"
     assert result["finite_support_boundary_integral"] == 0.0j
     assert result["tail_model"].startswith("analytic_isotropic_Kappa_marginal")
 
