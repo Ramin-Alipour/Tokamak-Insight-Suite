@@ -425,3 +425,21 @@ def test_zero_electron_density_rejects_nonzero_ece_emissivity():
                 ece_emissivity_W_m3_sr_Hz=np.ones((2, 3)),
             )
         )
+
+
+
+def test_effective_mode_optical_depth_uses_logsumexp_for_extreme_mode_contrast():
+    result = integrate_thermal_microwave_background(
+        frequency_Hz=np.array([100e9]),
+        path_length_m=np.array([1.0]),
+        electron_temperature_eV=np.array([1000.0]),
+        electron_density_m3=np.array([1.0e-20]),
+        ion_densities_m3=np.array([[1.0e-20]]),
+        ion_charge_states=np.array([1.0]),
+        ece_absorption_coefficient_m_inverse=np.array([[[0.0, 1000.0]]]),
+        ece_mode_weights=np.array([1.0e-300, 1.0]),
+        ece_emissivity_W_m3_sr_Hz=np.zeros((1, 1, 2)),
+        incident_radiance_W_m2_sr_Hz=np.array([1.0]),
+    )
+    expected = -np.log(1.0e-300 + np.exp(-1000.0))
+    assert result["total_optical_depth"][0] == pytest.approx(expected, rel=2e-14)
