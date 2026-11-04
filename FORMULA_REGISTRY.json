@@ -6546,6 +6546,11 @@
             -8,
             8
           ]
+        },
+        {
+          "name": "spatial_mixing_covariance",
+          "unit": "positive-semidefinite covariance of row-major PSF/mixing-matrix elements",
+          "required": false
         }
       ],
       "output_specs": [
@@ -6576,18 +6581,27 @@
         {
           "name": "data_only_rank",
           "unit": "rank of whitened measured PSF/mixing operator"
+        },
+        {
+          "name": "psf_operator_covariance_contribution",
+          "unit": "latent-profile covariance contribution propagated from supplied PSF/mixing covariance"
+        },
+        {
+          "name": "profile_covariance_with_psf_uncertainty",
+          "unit": "combined local profile covariance; only when data-only identifiable"
         }
       ],
       "prerequisites": [
         "Supplied spatial PSF/mixing operator on the latent profile grid",
         "Calibrated channel measurements"
       ],
-      "uncertainty_model": "Local covariance conditional on selected regularization and fixed PSF; excludes PSF uncertainty and is not a posterior interval.",
+      "uncertainty_model": "Local covariance conditional on selected regularization plus first-order PSF/mixing-operator covariance propagation when supplied; assumes operator and measurement errors are independent, excludes their cross-covariance and higher-order effects.",
       "limitations": [
         "GCV selects regularization, not the spatial grid or PSF.",
         "Data-only null-space modes remain non-identifiable regardless of regularization.",
         "Non-negative active-set GCV is an approximate effective-degrees-of-freedom criterion.",
-        "PSF/mixing-operator uncertainty is not propagated by this function."
+        "PSF covariance propagation is first-order and requires the full covariance of row-major mixing-matrix elements.",
+        "Cross-covariance between measured data and PSF/mixing operator is not propagated."
       ],
       "test_links": [
         "tests/test_thomson_gap_closure.py::test_psf_aware_profile_selects_regularization_by_gcv_when_omitted",
@@ -6608,7 +6622,9 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_gap_closure.py::test_psf_aware_profile_selects_regularization_by_gcv_when_omitted",
-        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes"
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_gcv_does_not_promote_rank_deficient_modes",
+        "tests/test_thomson_gap_closure.py::test_psf_profile_propagates_supplied_mixing_operator_covariance",
+        "tests/test_thomson_gap_closure.py::test_psf_profile_rejects_non_psd_operator_covariance"
       ]
     }
   }
