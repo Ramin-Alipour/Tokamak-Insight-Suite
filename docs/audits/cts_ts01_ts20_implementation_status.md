@@ -173,3 +173,8 @@ checks positive Brillouin energy and agreement of energy and group velocity
 for a parallel magnetoionic branch. The new relation strengthens the local
 3-D propagation physics but does not close the spatial ray-tracing or mode
 conversion requirements.
+
+
+TS-10 finite-support Landau-integral correction (2026-11-04): `generalized_landau_integral` now includes the distributional endpoint terms for a tabulated projected VDF interpreted as zero outside its finite velocity interval:
+`f(v_min)/(v_min-ζ)^p - f(v_max)/(v_max-ζ)^p`.
+The returned result separates the interior piecewise-linear derivative integral from the finite-support boundary contribution and declares the zero-extension convention. A constant top-hat regression case verifies that the complete derivative response is non-zero and equals the analytic endpoint expression. This corrects the finite-support susceptibility primitive; it does not close TS-10's missing conserving collision, fluctuation/noise, magnetized, relativistic-Kappa or Full-EM response models. The test is committed but has not been executed here; CI on the final main SHA remains required.
