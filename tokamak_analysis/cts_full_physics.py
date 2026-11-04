@@ -19,7 +19,7 @@ from .ece_kinetic import (
     relativistic_kinetic_ece_absorption_coefficient,
     solve_relativistic_kinetic_ece_profile,
 )
-from .cts_em_background import integrate_thermal_microwave_background
+from .cts_em_background import (\n    integrate_thermal_microwave_background,\n    plasma_charge_state_moments,\n)
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from .cts_stokes_transfer import (
@@ -430,7 +430,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, plasma_charge_state_moments; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
