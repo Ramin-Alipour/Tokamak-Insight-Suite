@@ -92,3 +92,14 @@ def test_cold_plasma_modes_are_reachable_through_advanced_physics_dispatcher():
     assert result["automatic_model_substitution"] is False
     assert len(result["modes"]) == 2
     assert result["mode_conversion_performed"] is False
+
+
+
+def test_magnetoionic_mode_solver_does_not_mutate_wave_normal_input():
+    direction = np.array([2.0, 0.0, 0.0])
+    original = direction.copy()
+    cold_plasma_magnetoionic_modes(
+        100e9, [0.0, 0.0, 2.0], _electron_only(),
+        wave_normal_direction=direction,
+    )
+    np.testing.assert_array_equal(direction, original)
