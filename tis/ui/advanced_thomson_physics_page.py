@@ -28,6 +28,15 @@ def _example_gaussian_bin_density(wavelength_nm, centre_nm, sigma_nm):
     return np.diff(ndtr((edges - centre_nm) / sigma_nm)) / np.diff(edges)
 
 
+def _example_bimaxwellian_spectrum(wavelength_nm, laser_nm, scattering_angle_rad,
+                                   temperature_eV, flow_m_s=0.0):
+    q_factor = 2.0 * np.sin(scattering_angle_rad / 2.0)
+    sigma_v = np.sqrt(1.602176634e-19 * temperature_eV / 9.1093837015e-31)
+    centre = laser_nm * (1.0 - q_factor * flow_m_s / 299792458.0)
+    sigma_lambda = laser_nm * q_factor * sigma_v / 299792458.0
+    return _example_gaussian_bin_density(wavelength_nm, centre, sigma_lambda)
+
+
 def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
                                temperature_eV, kappa):
     edges = _example_wavelength_edges(wavelength_nm)
@@ -215,17 +224,17 @@ EXAMPLES = {
         "magnetic_pitch_cosine_covariance": [[0.0001, 0.0, 0.0], [0.0, 0.0001, 0.0], [0.0, 0.0, 0.0001]]
     },
     "gyrotropic_bi_maxwellian_spectral_fit": {
-        "wavelength_nm": np.linspace(499.7, 500.3, 121).tolist(),
+        "wavelength_nm": np.linspace(412.0, 652.0, 181).tolist(),
         "measured_spectra": [
-            (0.02 + 0.8*_example_gaussian_bin_density(np.linspace(499.7, 500.3, 121), 500.0, 0.035)).tolist(),
-            (0.02 + 0.8*_example_gaussian_bin_density(np.linspace(499.7, 500.3, 121), 500.0, 0.028)).tolist(),
-            (0.02 + 0.8*_example_gaussian_bin_density(np.linspace(499.7, 500.3, 121), 500.0, 0.020)).tolist()
+            (0.02 + 0.8*_example_bimaxwellian_spectrum(np.linspace(412.0, 652.0, 181), 532.0, np.pi/2.0, 800.0)).tolist(),
+            (0.02 + 0.8*_example_bimaxwellian_spectrum(np.linspace(412.0, 652.0, 181), 532.0, np.pi/2.0, 425.0)).tolist(),
+            (0.02 + 0.8*_example_bimaxwellian_spectrum(np.linspace(412.0, 652.0, 181), 532.0, np.pi/2.0, 300.0)).tolist()
         ],
-        "laser_wavelength_nm": 500.0,
+        "laser_wavelength_nm": 532.0,
         "scattering_angle_rad": 1.5707963267948966,
         "magnetic_field_unit": [0.0, 0.0, 1.0],
         "scattering_vector_unit": [[0.0, 0.0, 1.0], [0.8660254038, 0.0, 0.5], [1.0, 0.0, 0.0]],
-        "instrument_response_matrix": np.eye(121).tolist(),
+        "instrument_response_matrix": np.eye(181).tolist(),
         "initial_temperature_parallel_eV": 800.0,
         "initial_temperature_perpendicular_eV": 300.0,
         "temperature_bounds_eV": [10.0, 5000.0],
@@ -233,17 +242,17 @@ EXAMPLES = {
         "maximum_projected_rms_beta": 0.1
     },
     "gyrotropic_bi_kappa_spectral_fit": {
-        "wavelength_nm": np.linspace(499.65, 500.35, 141).tolist(),
+        "wavelength_nm": np.linspace(412.0, 652.0, 181).tolist(),
         "measured_spectra": [
-            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(499.65, 500.35, 141), 500.0, 2.0*np.sin(np.pi/4.0), 0.0, 800.0, 4.0)).tolist(),
-            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(499.65, 500.35, 141), 500.0, 2.0*np.sin(np.pi/4.0), 0.0, 575.0, 4.0)).tolist(),
-            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(499.65, 500.35, 141), 500.0, 2.0*np.sin(np.pi/4.0), 0.0, 350.0, 4.0)).tolist()
+            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(412.0, 652.0, 181), 532.0, 2.0*np.sin(np.pi/4.0), 0.0, 800.0, 4.0)).tolist(),
+            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(412.0, 652.0, 181), 532.0, 2.0*np.sin(np.pi/4.0), 0.0, 425.0, 4.0)).tolist(),
+            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(412.0, 652.0, 181), 532.0, 2.0*np.sin(np.pi/4.0), 0.0, 300.0, 4.0)).tolist()
         ],
-        "laser_wavelength_nm": 500.0,
+        "laser_wavelength_nm": 532.0,
         "scattering_angle_rad": 1.5707963267948966,
         "magnetic_field_unit": [0.0, 0.0, 1.0],
         "scattering_vector_unit": [[0.0, 0.0, 1.0], [0.8660254038, 0.0, 0.5], [1.0, 0.0, 0.0]],
-        "instrument_response_matrix": np.eye(141).tolist(),
+        "instrument_response_matrix": np.eye(181).tolist(),
         "initial_temperature_parallel_eV": 800.0,
         "initial_temperature_perpendicular_eV": 350.0,
         "initial_kappa": 4.0,
