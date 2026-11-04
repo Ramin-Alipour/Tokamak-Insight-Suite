@@ -865,6 +865,13 @@ def full_em_cts_spectral_density(
             "normalized_scattered_flux_S_s": form_factors["normalized_scattered_flux_S_s"],
             "transfer_contributions": transfer["transfer_contributions"],
             "total_three_wave_receiver_projection": total_projected,
+            "bulk_electron_nonlinear_source_model": (
+                "relativistic_gyrotropic_second_order_vlasov"
+                if electron_distribution is not None
+                else "bindslev_low_temperature"
+            ),
+            "bindslev_electron_source_used_in_spectrum": electron_distribution is None,
+            "bindslev_electron_diagnostics_are_reference_only": electron_distribution is not None,
         })
         harmonic_counts.append(int(harmonic_order))
     return {
@@ -889,6 +896,22 @@ def full_em_cts_spectral_density(
         "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
         "fast_ion_kinetic_diagnostics": fast_ion_kinetic_diagnostics,
+        "bindslev_bulk_electron_source_used": electron_distribution is None,
+        "bindslev_source_operator_role": (
+            "active_bulk_electron_nonlinear_source"
+            if electron_distribution is None
+            else "reference_diagnostic_only_not_used_in_spectrum"
+        ),
+        "relativistic_bulk_electron_vertex_used": (
+            electron_distribution is not None
+            and any(
+                item.get("population_role") in {
+                    "relativistic Maxwell-Juttner electron", "non-Maxwellian electron"
+                }
+                for frequency_items in relativistic_three_wave_vertex_diagnostics
+                for item in frequency_items
+            )
+        ),
         "three_wave_coupling": (
             "Relativistic second-order gyrotropic Vlasov vertices for supplied relativistic electrons/fast ions; Maxwellian bulk-electron Bindslev vertex replaced"
             if electron_distribution is not None
