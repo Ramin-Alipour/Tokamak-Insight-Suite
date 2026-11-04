@@ -6822,64 +6822,8 @@
   {
     "name": "Finite-bin non-collective Maxwellian optical Thomson inference",
     "equation": "S̄_i=A σ_λ√(2π)/Δλ_i [Φ((λ_i^+−λ_c)/σ_λ)−Φ((λ_i^-−λ_c)/σ_λ)]; λ_c=λ_0(1−q u_q/c); σ_λ=λ_0 q√(eT_e/m_e)/c",
-    "inputs": [
-      {
-        "name": "wavelength_nm",
-        "unit": "nm; strictly increasing calibrated bin centres",
-        "required": true
-      },
-      {
-        "name": "signal",
-        "unit": "calibrated spectral density per wavelength",
-        "required": true
-      },
-      {
-        "name": "laser_wavelength_nm",
-        "unit": "nm",
-        "required": true
-      },
-      {
-        "name": "scattering_angle_rad",
-        "unit": "rad; 0 < angle < pi",
-        "required": true
-      },
-      {
-        "name": "instrument_response",
-        "unit": "measured wavelength-bin probability operator",
-        "required": true
-      },
-      {
-        "name": "signal_uncertainty_or_spectral_covariance",
-        "unit": "spectral-density uncertainty or full within-channel covariance",
-        "required": false
-      }
-    ],
-    "output": [
-      {
-        "name": "electron_temperature_eV",
-        "unit": "eV; inferred only within declared non-relativistic screen"
-      },
-      {
-        "name": "electron_velocity_projection_m_s",
-        "unit": "m s^-1; q-parallel projection"
-      },
-      {
-        "name": "captured_spectral_probability",
-        "unit": "dimensionless; exact Gaussian probability in recorded wavelength bins"
-      },
-      {
-        "name": "spectral_bin_integration",
-        "unit": "exact normal-CDF finite-volume integration"
-      },
-      {
-        "name": "fitted_spectrum",
-        "unit": "calibrated spectral density after measured response"
-      },
-      {
-        "name": "residual",
-        "unit": "calibrated spectral density"
-      }
-    ],
+    "inputs": "wavelength_nm [nm; strictly increasing calibrated bin centres] (required); signal [calibrated spectral density per wavelength] (required); laser_wavelength_nm [nm] (required); scattering_angle_rad [rad; 0 < angle < pi] (required); instrument_response [measured wavelength-bin probability operator] (required); signal_uncertainty_or_spectral_covariance [spectral-density uncertainty or full within-channel covariance]",
+    "output": "electron_temperature_eV [eV; inferred only within declared non-relativistic screen]; electron_velocity_projection_m_s [m s^-1; q-parallel projection]; captured_spectral_probability [dimensionless; exact Gaussian probability in recorded wavelength bins]; spectral_bin_integration [exact normal-CDF finite-volume integration]; fitted_spectrum [calibrated spectral density after measured response]; residual [calibrated spectral density]",
     "assumptions": "Isotropic Maxwellian electrons; single-scattering non-collective optical Thomson regime; non-relativistic Doppler mapping; detector background is a separately fitted nuisance basis. Each bin is the exact Gaussian probability integrated over its midpoint-defined wavelength edges, divided by bin width; the measured response acts on bin-integrated spectral power.",
     "status": "D",
     "category": "Optical Thomson scattering",
@@ -6961,7 +6905,14 @@
         "tests/test_thomson_inference.py::test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius",
         "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs"
       ],
-      "note": "The primary optical Maxwellian model now evaluates exact normal-CDF probability in every finite wavelength bin before response convolution. The recorded-window probability is reported without tail renormalization."
+      "note": "The primary optical Maxwellian model now evaluates exact normal-CDF probability in every finite wavelength bin before response convolution. The recorded-window probability is reported without tail renormalization.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
+      "input_data_level": "measured_calibrated_spectrum",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; the function consumes calibrated measured spectra.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson finite-bin spectral inference"
     },
     "references": [
       {
@@ -6991,7 +6942,7 @@
       "function_link": "tokamak_analysis.thomson_inference._fit_noncollective",
       "function_links": [
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_inference._fit_noncollective"
+        null
       ],
       "formula_key": "optical_thomson_noncollective_maxwellian_finite_bin",
       "implementation_link_status": "mapped",
@@ -7004,68 +6955,8 @@
   {
     "name": "Finite-bin non-collective isotropic-Kappa optical Thomson inference",
     "equation": "S̄_i=A I_κ/Δλ_i [F_t(z_i^+;ν)−F_t(z_i^-;ν)]; ν=2κ−1; s=σ_λ√((ν−2)/ν); I_κ=s√(νπ)Γ(κ−1/2)/Γ(κ); z_i^±=(λ_i^±−λ_c)/s",
-    "inputs": [
-      {
-        "name": "wavelength_nm",
-        "unit": "nm; strictly increasing calibrated bin centres",
-        "required": true
-      },
-      {
-        "name": "signal",
-        "unit": "calibrated spectral density per wavelength",
-        "required": true
-      },
-      {
-        "name": "laser_wavelength_nm",
-        "unit": "nm",
-        "required": true
-      },
-      {
-        "name": "scattering_angle_rad",
-        "unit": "rad; 0 < angle < pi",
-        "required": true
-      },
-      {
-        "name": "instrument_response",
-        "unit": "measured wavelength-bin probability operator",
-        "required": true
-      },
-      {
-        "name": "kappa_bounds",
-        "unit": "dimensionless; finite-variance domain kappa > 3/2",
-        "required": false
-      }
-    ],
-    "output": [
-      {
-        "name": "electron_temperature_eV",
-        "unit": "eV; second-moment temperature"
-      },
-      {
-        "name": "kappa_index",
-        "unit": "dimensionless; only when response-convolved spectral Jacobian identifies it"
-      },
-      {
-        "name": "integrated_scattered_power_W",
-        "unit": "full fitted model area; shape normalization includes Gamma(kappa-1/2)/Gamma(kappa)"
-      },
-      {
-        "name": "captured_spectral_probability",
-        "unit": "dimensionless; exact Student-t probability inside recorded wavelength bins"
-      },
-      {
-        "name": "spectral_bin_integration",
-        "unit": "exact Student-t CDF finite-volume integration"
-      },
-      {
-        "name": "kappa_index_identifiability",
-        "unit": "structured response-convolved Jacobian and nuisance-projected sensitivity diagnostics"
-      },
-      {
-        "name": "kappa_profile_likelihood",
-        "unit": "conditional profile likelihood with nuisance re-optimization"
-      }
-    ],
+    "inputs": "wavelength_nm [nm; strictly increasing calibrated bin centres] (required); signal [calibrated spectral density per wavelength] (required); laser_wavelength_nm [nm] (required); scattering_angle_rad [rad; 0 < angle < pi] (required); instrument_response [measured wavelength-bin probability operator] (required); kappa_bounds [dimensionless; finite-variance domain kappa > 3/2]",
+    "output": "electron_temperature_eV [eV; second-moment temperature]; kappa_index [dimensionless; only when response-convolved spectral Jacobian identifies it]; integrated_scattered_power_W [full fitted model area; shape normalization includes Gamma(kappa-1/2)/Gamma(kappa)]; captured_spectral_probability [dimensionless; exact Student-t probability inside recorded wavelength bins]; spectral_bin_integration [exact Student-t CDF finite-volume integration]; kappa_index_identifiability [structured response-convolved Jacobian and nuisance-projected sensitivity diagnostics]; kappa_profile_likelihood [conditional profile likelihood with nuisance re-optimization]",
     "assumptions": "Isotropic finite-variance Kappa electron distribution with kappa > 3/2; non-collective single scattering; non-relativistic Doppler mapping; the projected wavelength shape is Student-t with nu=2kappa-1 and scale s=sigma_lambda*sqrt((nu-2)/nu). Bin probability is integrated exactly by the Student-t CDF; the measured response acts on bin-integrated power. The full shape integral is I_kappa=s*sqrt(nu*pi)*Gamma(kappa-1/2)/Gamma(kappa).",
     "status": "D",
     "category": "Optical Thomson scattering",
@@ -7154,7 +7045,14 @@
         "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
         "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
       ],
-      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges."
+      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
+      "input_data_level": "measured_calibrated_spectrum",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; the function consumes calibrated measured spectra.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson finite-bin spectral inference"
     },
     "references": [
       {
@@ -7193,7 +7091,7 @@
       "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
       "function_links": [
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_inference._fit_kappa"
+        null
       ],
       "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
       "implementation_link_status": "mapped",
