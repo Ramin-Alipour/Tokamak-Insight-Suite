@@ -135,3 +135,91 @@ def integrate_kinetic_ece_radiative_transfer(
             "No polarization conversion or transverse beam evolution in this scalar transfer step.",
         ],
     }
+
+
+
+def solve_kinetic_ece_profile(
+    frequency_Hz, segment_length_m, *,
+    wavevector_rad_m, magnetic_field_T, polarization,
+    electron_density_m3, electron_temperature_eV,
+    incident_brightness_temperature_K=0.0,
+    harmonic_order=8, quadrature_order=48, damping_rate_rad_s=0.0,
+):
+    """Solve local kinetic absorption and scalar transfer along a supplied ray.
+
+    The caller supplies the local EM eigenmode wavevector and polarization in
+    each segment. These must be mutually consistent with the local dielectric
+    and propagation direction; this routine does not invent a mode or infer
+    missing geometry. The magnetic field may be constant per segment or
+    frequency dependent. Gain (negative alpha) is reported as unsupported by
+    the LTE scalar transfer step and is never clipped to zero.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    if f.ndim == 0:
+        f = f.reshape(1)
+    if f.ndim != 1 or f.size == 0 or np.any(~np.isfinite(f)) or np.any(f <= 0):
+        raise ValueError("frequency_Hz must be a positive finite scalar or 1-D array")
+    lengths = np.asarray(segment_length_m, dtype=float)
+    if lengths.ndim != 1 or lengths.size == 0 or np.any(~np.isfinite(lengths)) or np.any(lengths <= 0):
+        raise ValueError("segment_length_m must be a non-empty positive finite vector")
+    ns, nf = lengths.size, f.size
+
+    def mode_stack(value, name):
+        array = np.asarray(value, dtype=complex if name == "polarization" else float)
+        if array.shape == (ns, 3):
+            array = np.broadcast_to(array[None, :, :], (nf, ns, 3))
+        if array.shape != (nf, ns, 3) or np.any(~np.isfinite(array)):
+            raise ValueError(f"{name} must have shape (n_segment,3) or (n_frequency,n_segment,3)")
+        return array
+
+    k_stack = mode_stack(wavevector_rad_m, "wavevector_rad_m")
+    b_stack = mode_stack(magnetic_field_T, "magnetic_field_T")
+    e_stack = mode_stack(polarization, "polarization")
+    ne = np.asarray(electron_density_m3, dtype=float)
+    te = np.asarray(electron_temperature_eV, dtype=float)
+    if ne.shape != (ns,) or np.any(~np.isfinite(ne)) or np.any(ne <= 0):
+        raise ValueError("electron_density_m3 must contain one positive finite value per segment")
+    if te.shape != (ns,) or np.any(~np.isfinite(te)) or np.any(te <= 0):
+        raise ValueError("electron_temperature_eV must contain one positive finite value per segment")
+
+    alpha = np.empty((nf, ns), dtype=float)
+    mode_results = []
+    for i in range(nf):
+        row = []
+        for j in range(ns):
+            local = kinetic_ece_absorption_coefficient(
+                f[i], k_stack[i, j], b_stack[i, j],
+                electron_density_m3=ne[j],
+                electron_temperature_eV=te[j],
+                polarization=e_stack[i, j],
+                harmonic_order=harmonic_order,
+                quadrature_order=quadrature_order,
+                damping_rate_rad_s=damping_rate_rad_s,
+            )
+            alpha[i, j] = local["absorption_coefficient_m_inverse"]
+            row.append(local)
+        mode_results.append(row)
+    if np.any(alpha < 0):
+        indices = np.argwhere(alpha < 0).tolist()
+        raise ValueError(
+            "kinetic ECE produced net gain at frequency/segment indices "
+            f"{indices}; the LTE passive scalar transfer solver cannot represent gain"
+        )
+    transfer = integrate_kinetic_ece_radiative_transfer(
+        f, lengths, alpha, te,
+        incident_brightness_temperature_K=incident_brightness_temperature_K,
+    )
+    return {
+        **transfer,
+        "absorption_coefficient_m_inverse": alpha,
+        "local_mode_absorption": mode_results,
+        "mode_geometry_source": "explicit_user_supplied_local_EM_eigenmode",
+        "profile_solver": "segmentwise_magnetized_kinetic_Vlasov_absorption_plus_formal_transfer",
+        "limitations": [
+            "Requires a supplied local wavevector and polarization for every segment and frequency.",
+            "Does not solve the eigenmode, ray trajectory or mode conversion; use the full-vector solver for stratified polarization coupling.",
+            "Non-relativistic Maxwellian electrons and user-specified damping only.",
+            "Scalar LTE Rayleigh-Jeans transfer; not a polarized or non-LTE transfer solver.",
+            "Negative absorption is rejected as gain rather than clipped or treated as passive emission.",
+        ],
+    }
