@@ -25,7 +25,7 @@
 | TS-17 | Model-discrepancy uncertainty | Additive PSD model-discrepancy covariance is propagated in selected CTS and Thomson GLS inversions. | PARTIAL: universal propagation to all subanalyses remains |
 | TS-18 | Multi-parameter identifiability | Scaled-Jacobian SVD/rank diagnostics exist; profile covariance is withheld when data-only rank is deficient. | PARTIAL: profile likelihood/posterior and practical-identifiability coverage remain |
 | TS-19 | Documentation consistency | The scope note and this ledger are synchronized to distinguish implemented kernels from full end-to-end capabilities. | PARTIAL: legacy documentation and all dashboard/registry claims still require a repository-wide pass |
-| TS-20 | CI on exact final commit | GitHub Actions runs are triggered by pushes to `main`; success must be checked against the exact resulting SHA. | NOT VERIFIED until runs complete |
+| TS-20 | Cross-subanalysis contract and regression matrix | `tests/test_thomson_analysis1_cross_contracts.py` now checks all four Analysis-1 routes (optical TS, CTS, profile reconstruction, descriptive spectral distribution), distinct executable registry routes, family/diagnostic registry parity, dashboard wiring, public CTS dispatcher shape, and identifiability/covariance output declarations and producers. The registry now declares `parameter_identifiability` for all four routes. | IMPLEMENTED IN TESTS; CI on the exact resulting SHA remains unverified |
 
 ## Implementation and release rules
 
@@ -56,3 +56,6 @@ This improves API integration only: it remains an unmagnetized, zero-flow,
 common-temperature Maxwellian constitutive kernel, not a magnetized Full-EM
 CTS three-wave vertex or end-to-end measured-spectrum inference. TS-01 remains
 PARTIAL until those physical and inference layers are implemented and tested.
+
+
+TS-20 cross-subanalysis matrix update (2026-11-04): the Analysis-1 registry previously omitted the runtime `parameter_identifiability` output from the optical parent, CTS and descriptive spectral-distribution output contracts (the profile route already declared it). The output is now declared consistently for IDs 1, 30, 46 and 81. Regression coverage checks the four family entry IDs, callable/module-function wiring, unique input/output names, the diagnostic registry's four corresponding records, CTS public dispatcher signature and covariance/identifiability outputs, runtime producers of identifiability metadata, and the Dashboard's CTS selector and descriptive-spectrum display. This is a software-contract correction, not a claim that the descriptive distribution estimates plasma parameters or that any open physical model is complete. The final CI result must still be checked against the exact main SHA.
