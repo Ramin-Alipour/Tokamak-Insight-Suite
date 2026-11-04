@@ -69,11 +69,20 @@ def cold_plasma_dielectric_tensor(
             raise ValueError(f"species[{index}].charge_C must be non-zero")
         wp2 = density * charge**2 / (EPS0 * mass)
         gyro = charge * bnorm / mass
-        plus = omega * (omega + gyro)
-        minus = omega * (omega - gyro)
-        scale = max(omega**2, abs(omega * gyro), np.finfo(float).tiny)
-        if abs(plus) <= 1e-14 * scale or abs(minus) <= 1e-14 * scale:
-            raise ValueError("frequency lies on a cold-plasma cyclotron pole; supply a kinetic/collisional dielectric model")
+        collision = _real_scalar(
+            item.get("collision_frequency_rad_s", 0.0),
+            f"species[{index}].collision_frequency_rad_s",
+            nonnegative=True,
+        )
+        # exp(-i*omega*t): cold-fluid momentum drag gives omega -> omega+i*nu.
+        complex_frequency = omega + 1j * collision
+        plus = omega * (complex_frequency + gyro)
+        minus = omega * (complex_frequency - gyro)
+        scale = max(omega**2, abs(omega * gyro), omega * collision, np.finfo(float).tiny)
+        if collision == 0.0 and (
+            abs(plus) <= 1e-14 * scale or abs(minus) <= 1e-14 * scale
+        ):
+            raise ValueError("frequency lies on a collisionless cold-plasma cyclotron pole; supply finite collisions or a kinetic dielectric model")
         wp2_total += wp2
         r_sum -= wp2 / plus
         l_sum -= wp2 / minus
@@ -82,8 +91,14 @@ def cold_plasma_dielectric_tensor(
             "mass_kg": mass, "charge_C": charge, "density_m3": density,
             "plasma_frequency_squared_s_minus2": float(wp2),
             "signed_gyrofrequency_rad_s": float(gyro),
+            "collision_frequency_rad_s": float(collision),
         })
-    p_value = 1.0 - wp2_total / omega**2
+    longitudinal_correction = sum(
+        item["plasma_frequency_squared_s_minus2"]
+        / (omega * (omega + 1j * item["collision_frequency_rad_s"]))
+        for item in parsed
+    )
+    p_value = 1.0 - longitudinal_correction
     s_value = 0.5 * (r_sum + l_sum)
     d_value = 0.5 * (r_sum - l_sum)
     tensor_b = np.array([
@@ -120,7 +135,7 @@ def cold_plasma_dielectric_tensor(
             "homogeneous_collisionless_cold_multispecies_magnetized_plasma"
         ),
         "limitations": [
-            "No finite-temperature/Landau damping or collisional broadening.",
+            "No finite-temperature/Landau damping; collisional response is cold-fluid Drude only.",
             "No relativistic response, finite-Larmor-radius correction or kinetic CTS vertex.",
             "Local homogeneous tensor only; no ray tracing, interfaces or mode conversion.",
             "At cyclotron/plasma resonances a cold-fluid tensor is singular or inadequate; no artificial damping is inserted.",
