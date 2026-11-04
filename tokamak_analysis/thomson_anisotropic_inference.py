@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.special import gammaln
+from scipy.special import gammaln, ndtr, stdtr
 
 
 _C = 299792458.0
@@ -36,6 +36,60 @@ def _bin_widths(axis):
     if np.any(widths <= 0.0):
         raise ValueError("wavelength_nm must define positive finite-volume bins")
     return widths
+
+def _bin_edges(axis):
+    """Return finite-volume edges implied by calibrated wavelength centres."""
+    wavelength = _real_array(axis, "wavelength_nm", 1)
+    if wavelength.size < 2 or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least two strictly increasing centres")
+    edges = np.empty(wavelength.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    return edges
+
+
+def _gaussian_bin_average(wavelength_nm, centre_nm, sigma_nm):
+    """Exact Gaussian probability per finite wavelength bin, divided by bin width."""
+    edges = _bin_edges(wavelength_nm)
+    sigma = float(sigma_nm)
+    centre = float(centre_nm)
+    if not np.isfinite(sigma) or sigma <= 0.0 or not np.isfinite(centre):
+        raise ValueError("Gaussian centre must be finite and sigma must be positive")
+    probability = np.diff(ndtr((edges - centre) / sigma))
+    widths = np.diff(edges)
+    return probability / widths, probability
+
+
+def _kappa_bin_average(wavelength_nm, laser_wavelength_nm, scattering_q_factor,
+                       flow_m_s, theta_m_s, kappa):
+    """Exact finite-bin probability for the projected 1-D Kappa/Student-t marginal.
+
+    The projected Kappa marginal is Student-t with nu=2*kappa-1 degrees of
+    freedom and scale s²=kappa*theta²/(2*kappa-1). The wavelength-to-velocity
+    map is the declared non-relativistic elastic-Thomson map.
+    """
+    edges = _bin_edges(wavelength_nm)
+    laser = float(laser_wavelength_nm)
+    q_factor = float(scattering_q_factor)
+    flow = float(flow_m_s)
+    theta = float(theta_m_s)
+    kappa_value = float(kappa)
+    if (not np.all(np.isfinite([laser, q_factor, flow, theta, kappa_value]))
+            or laser <= 0.0 or q_factor <= 0.0 or theta <= 0.0
+            or kappa_value <= 1.5):
+        raise ValueError("Kappa bin integration requires positive laser/q/theta and kappa > 3/2")
+    velocity_edges = (_C / q_factor) * (1.0 - edges / laser) - flow
+    degrees_of_freedom = 2.0 * kappa_value - 1.0
+    student_scale = theta * np.sqrt(kappa_value / degrees_of_freedom)
+    # Wavelength edges map in descending velocity order.
+    probability = (
+        stdtr(degrees_of_freedom, velocity_edges[:-1] / student_scale)
+        - stdtr(degrees_of_freedom, velocity_edges[1:] / student_scale)
+    )
+    widths = np.diff(edges)
+    probability = np.maximum(probability, 0.0)
+    return probability / widths, probability
 
 
 def _apply_response_in_bin_integrated_space(response_matrix, spectral_density, wavelength_nm):
@@ -70,6 +124,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     initial_temperature_perpendicular_eV=1000.0,
     temperature_bounds_eV=(1.0e-3, 1.0e7),
     flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
+    maximum_projected_rms_beta=0.1,
     max_nfev=4000,
 ):
     """Jointly infer T_parallel, T_perpendicular and per-view q-flow projections.
@@ -170,6 +225,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     flow_lo, flow_hi = map(float, flow_bounds_m_s)
     if not np.isfinite(flow_lo + flow_hi) or flow_lo >= flow_hi or flow_lo <= -_C or flow_hi >= _C:
         raise ValueError("flow_bounds_m_s must be ordered and strictly subluminal")
+    beta_limit = float(maximum_projected_rms_beta)
+    if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
+        raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
     if isinstance(max_nfev, (bool, np.bool_)) or int(max_nfev) < 1:
         raise ValueError("max_nfev must be a positive integer")
     qmag_factor = 2.0 * np.sin(angle / 2.0)
@@ -193,6 +251,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         tpar, tperp = np.exp(parameters[:2])
         predictions = np.empty_like(spectra)
         directional = tperp + (tpar - tperp) * mu2
+        captured_probability = np.empty(n_view, dtype=float)
         if np.any(directional <= 0.0):
             raise ValueError("directional bi-Maxwellian temperature became non-positive")
         for i in range(n_view):
@@ -202,11 +261,13 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             sigma_lambda = laser * qmag_factor * sigma_v / _C
             if sigma_lambda <= np.finfo(float).tiny:
                 raise ValueError("predicted Thomson spectral width is numerically zero")
-            intrinsic = np.exp(-0.5 * ((wavelength - center) / sigma_lambda) ** 2)
-            intrinsic /= np.sqrt(2.0 * np.pi) * sigma_lambda
+            intrinsic, bin_probability = _gaussian_bin_average(
+                wavelength, center, sigma_lambda
+            )
+            captured_probability[i] = float(np.sum(bin_probability))
             detector = _apply_response_in_bin_integrated_space(response[i], intrinsic, wavelength)
             predictions[i] = np.exp(log_amp) * detector + offset + slope * (wavelength - laser)
-        return predictions, directional
+        return predictions, directional, captured_probability
 
     def residual(parameters):
         return whiten(predict(parameters)[0] - spectra)
@@ -215,7 +276,14 @@ def fit_gyrotropic_bi_maxwellian_thomson(
                         x_scale="jac", max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"gyrotropic bi-Maxwellian Thomson fit failed: {fit.message}")
-    fitted, directional = predict(fit.x)
+    fitted, directional, captured_probability = predict(fit.x)
+    projected_rms_beta = np.sqrt(_E * directional / _ME) / _C
+    fitted_flow_beta = np.abs(fit.x[2::4]) / _C
+    if np.max(projected_rms_beta) >= beta_limit or np.max(fitted_flow_beta) >= 0.1:
+        raise ValueError(
+            "Fitted thermal or bulk-flow speed exceeds the declared non-relativistic "
+            "validity screen; use a relativistic forward model."
+        )
     singular = np.linalg.svd(fit.jac, compute_uv=False)
     tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
     full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
@@ -239,11 +307,25 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "kinematics": "non-relativistic elastic Thomson mapping lambda_s/lambda_0 ~= 1 - q_hat.v/c",
             "distribution": "gyrotropic bi-Maxwellian with zero heat flux",
             "relativistic_corrections": False,
+            "finite_bin_treatment": "exact Gaussian CDF integration over midpoint-defined wavelength-bin edges before measured response convolution",
             "validity_note": "Use a relativistic forward model when thermal or bulk electron speeds make the small-beta approximation inadequate.",
         },
         "electron_temperature_parallel_eV": tpar,
         "electron_temperature_perpendicular_eV": tperp,
         "directional_temperature_eV": directional,
+        "captured_spectral_probability": captured_probability,
+        "spectral_window_coverage_warning": (
+            "The measured wavelength window truncates more than one percent of the fitted Maxwellian feature in at least one view."
+            if np.any(captured_probability < 0.99) else None
+        ),
+        "validity_screening": {
+            "maximum_projected_rms_beta": beta_limit,
+            "maximum_fitted_projected_rms_beta": float(np.max(projected_rms_beta)),
+            "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
+            "status": "within_declared_nonrelativistic_screen",
+            "interpretation": "Conservative software screening threshold, not a universal physical boundary."
+        },
+        "spectral_bin_integration": "exact_Gaussian_CDF_probability_per_finite_wavelength_bin",
         "magnetic_pitch_cosine": mu,
         "magnetic_pitch_cosine_squared": mu2,
         "geometry_design_rank": geometry_rank,
@@ -426,8 +508,10 @@ def fit_gyrotropic_bi_kappa_thomson(
             velocity_order = np.argsort(velocity)
             projected_velocity_grid[i] = velocity[velocity_order]
             projected_velocity_pdf[i] = pdf_velocity[velocity_order]
-            intrinsic = pdf_velocity * (_C/(laser*qmag))
-            captured_probability[i] = float(np.sum(intrinsic * widths))
+            intrinsic, bin_probability = _kappa_bin_average(
+                wavelength, laser, qmag, flow, theta, kappa
+            )
+            captured_probability[i] = float(np.sum(bin_probability))
             detector = _apply_response_in_bin_integrated_space(response[i], intrinsic, wavelength)
             predictions[i] = np.exp(log_amp)*detector + offset + slope*(wavelength-laser)
         return predictions, directional, kappa, captured_probability, projected_velocity_grid, projected_velocity_pdf
@@ -474,6 +558,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         "kappa_finite_variance_domain": bool(kappa > 1.5),
         "directional_temperature_eV": directional,
         "captured_spectral_probability": captured_probability,
+        "spectral_bin_integration": "exact_Student_t_CDF_probability_per_finite_wavelength_bin",
         "projected_velocity_grid_m_s": projected_velocity_grid,
         "projected_velocity_distribution_m_s_inverse": projected_velocity_pdf,
         "spectral_window_coverage_warning": (
