@@ -5376,5 +5376,110 @@
     "input_data_level": "local_plasma_parameters_and_supplied_coulomb_logarithm",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Microwave collective Thomson scattering — optional collisional correction"
+  },
+  {
+    "name": "Gyrotropic bi-Maxwellian temperature anisotropy from multi-pitch Thomson projections",
+    "equation": "T_q(μ)=T_⊥(1−μ²)+T_∥μ²;  μ=b̂·q̂;  θ̂=(XᵀC_T⁻¹X)⁻¹XᵀC_T⁻¹T_q,  X=[1−μ², μ²]",
+    "inputs": "Directional projected electron temperatures T_q [eV], magnetic pitch cosines μ, full positive-definite covariance C_T [eV²]",
+    "output": "T_perpendicular [eV], T_parallel [eV], 2×2 covariance [eV²]; non-identifiable if the squared pitch cosines do not span rank 2",
+    "assumptions": "Gyrotropic bi-Maxwellian with zero heat flux and common magnetic-field axis; directional temperatures must already be inferred from calibrated Thomson spectra; pitch-angle uncertainty is not included in this GLS covariance.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.infer_gyrotropic_bi_maxwellian_temperatures",
+      "formula_key": "thomson_gyrotropic_bimaxwellian_anisotropy",
+      "input_specs": [
+        {
+          "name": "projected_temperature_eV",
+          "unit": "eV; one measured-spectrum-derived directional temperature per view",
+          "required": true
+        },
+        {
+          "name": "magnetic_pitch_cosine",
+          "unit": "dimensionless; b_hat dot q_hat per view",
+          "required": true
+        },
+        {
+          "name": "projected_temperature_covariance_eV2",
+          "unit": "eV²; full positive-definite covariance",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; withheld when rank deficient or GLS estimate is non-positive"
+        },
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; withheld when rank deficient or GLS estimate is non-positive"
+        },
+        {
+          "name": "temperature_covariance_eV2",
+          "unit": "eV²; 2×2 GLS covariance; withheld when not reportable"
+        },
+        {
+          "name": "identifiability",
+          "unit": "identifiable or non_identifiable"
+        },
+        {
+          "name": "chi_square",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "At least two distinct squared magnetic pitch cosines.",
+        "Directional temperatures inferred from independent calibrated optical Thomson spectra.",
+        "Gyrotropic bi-Maxwellian closure; not a general anisotropic EVDF."
+      ],
+      "uncertainty_model": "Generalized least squares with the supplied full directional-temperature covariance. Magnetic pitch-angle/geometry covariance is not propagated by this callable.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_multi_pitch_gls_recovers_parallel_and_perpendicular_temperatures",
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_single_pitch_does_not_invent_anisotropy",
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance"
+      ],
+      "note": "Physical GLS inversion of the gyrotropic pressure/temperature tensor projection. This is a constrained two-temperature model, not a general anisotropic distribution reconstruction."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook",
+        "scope": "Thomson scattering geometry and projected electron-velocity distributions."
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Recent optical Thomson spectral forward modelling; not the source of the gyrotropic tensor projection identity."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "directional_physical_parameters_extracted_from_measured_calibrated_spectra",
+    "execution_scope": "conditional_multi_view_gyrotropic_anisotropy_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — gyrotropic anisotropic temperature inversion",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_models.infer_gyrotropic_bi_maxwellian_temperatures",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_models.infer_gyrotropic_bi_maxwellian_temperatures"
+      ],
+      "formula_key": "thomson_gyrotropic_bimaxwellian_anisotropy",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_multi_pitch_gls_recovers_parallel_and_perpendicular_temperatures",
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_single_pitch_does_not_invent_anisotropy",
+        "tests/test_thomson_kinetic_models.py::test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance"
+      ]
+    }
   }
 ]
