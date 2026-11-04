@@ -25,22 +25,6 @@ MODEL_LABELS = {
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
-}
-
-MODEL_PHYSICS_NOTES = {
-    "gyrotropic_bi_maxwellian_spectral_fit": (
-        "Physical forward model: exact Gaussian-CDF integration over each finite wavelength bin, "
-        "followed by the measured response acting on bin-integrated spectral power. "
-        "The result reports captured spectral probability without renormalizing truncated tails. "
-        "A declared projected thermal-rms beta screen and a 0.1 bulk-flow beta screen guard the "
-        "non-relativistic approximation."
-    ),
-    "gyrotropic_bi_kappa_spectral_fit": (
-        "Physical forward model: the projected bi-Kappa marginal is integrated exactly using "
-        "its Student-t CDF (nu = 2*kappa - 1) over each finite wavelength bin, before measured "
-        "response convolution. Wavelength-window tails are not renormalized."
-    ),
-}
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
@@ -60,6 +44,21 @@ MODEL_PHYSICS_NOTES = {
     "cold_plasma_mode_radiative_coefficients": "CTS — modal attenuation and explicitly selected LTE Kirchhoff emissivity",
     "cold_plasma_mode_group_velocity": "CTS — collisionless cold-plasma group velocity and wave-normal walk-off",
     "plasma_charge_state_moments": "CTS — quasineutrality, effective charge and multispecies charge moments",
+}
+
+MODEL_PHYSICS_NOTES = {
+    "gyrotropic_bi_maxwellian_spectral_fit": (
+        "Physical forward model: exact Gaussian-CDF integration over each finite wavelength bin, "
+        "followed by the measured response acting on bin-integrated spectral power. "
+        "The result reports captured spectral probability without renormalizing truncated tails. "
+        "A declared projected thermal-rms beta screen and a 0.1 bulk-flow beta screen guard the "
+        "non-relativistic approximation."
+    ),
+    "gyrotropic_bi_kappa_spectral_fit": (
+        "Physical forward model: the projected bi-Kappa marginal is integrated exactly using "
+        "its Student-t CDF (nu = 2*kappa - 1) over each finite wavelength bin, before measured "
+        "response convolution. Wavelength-window tails are not renormalized."
+    ),
 }
 
 EXAMPLES = {
