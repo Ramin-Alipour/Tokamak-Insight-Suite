@@ -414,7 +414,8 @@ def run_advanced_thomson_physics(model, **kwargs):
       - cold_plasma_mode_group_velocity: local 3-D group/ray velocity and
         wave-normal walk-off from the Hellmann-Feynman derivative of the
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
-      - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.\n      - thomson_three_dimensional_flow: GLS inversion of measured flow projections from three or more independent scattering-vector directions.
+      - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.
+      - thomson_three_dimensional_flow: GLS inversion of measured flow projections from three or more independent scattering-vector directions.
       - plasma_charge_state_moments: Zeff, ion charge balance and net charge
         density from explicit multispecies densities and charge states.
 
