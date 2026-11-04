@@ -306,3 +306,17 @@ def test_charge_state_moments_has_undefined_zeff_for_vacuum():
     result = plasma_charge_state_moments(0.0, [0.0], [1.0])
     assert result["effective_charge_Zeff"] is None
     assert result["quasineutrality_relative_residual"] == 0.0
+
+
+
+def test_charge_state_moments_are_reachable_through_advanced_physics_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "plasma_charge_state_moments",
+        electron_density_m3=1.4e19,
+        ion_densities_m3=[1.0e19, 2.0e18],
+        ion_charge_states=[1.0, 2.0],
+    )
+    assert result["public_physics_entrypoint"] == "plasma_charge_state_moments"
+    assert result["effective_charge_Zeff"] == pytest.approx(1.8e19 / 1.4e19)
