@@ -3,6 +3,7 @@ import pytest
 
 from tokamak_analysis.thomson_anisotropic_inference import (
     fit_gyrotropic_bi_maxwellian_thomson,
+    _apply_response_in_bin_integrated_space,
 )
 
 
@@ -82,3 +83,25 @@ def test_anisotropic_fit_rejects_non_normalized_response_and_bad_geometry():
             scattering_angle_rad=np.pi/2, magnetic_field_unit=[0, 0, 2],
             scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
         )
+
+
+def test_nonuniform_response_operator_conserves_bin_integrated_spectral_power():
+    wavelength = np.array([500.0, 500.2, 500.7, 501.5, 502.8])
+    widths = np.diff(np.r_[wavelength[0] - 0.5*(wavelength[1]-wavelength[0]),
+                           0.5*(wavelength[:-1] + wavelength[1:]),
+                           wavelength[-1] + 0.5*(wavelength[-1]-wavelength[-2])])
+    intrinsic = np.array([0.2, 1.1, 2.7, 0.8, 0.1])
+    response = np.array([
+        [0.8, 0.1, 0.0, 0.0, 0.0],
+        [0.2, 0.7, 0.1, 0.0, 0.0],
+        [0.0, 0.2, 0.7, 0.1, 0.0],
+        [0.0, 0.0, 0.2, 0.7, 0.1],
+        [0.0, 0.0, 0.0, 0.2, 0.9],
+    ])
+    measured_density = _apply_response_in_bin_integrated_space(
+        response, intrinsic, wavelength
+    )
+    assert np.sum(measured_density * widths) == pytest.approx(
+        np.sum(intrinsic * widths), rel=1e-12
+    )
+    assert not np.allclose(measured_density, response @ intrinsic)
