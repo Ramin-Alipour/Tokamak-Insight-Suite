@@ -6155,7 +6155,8 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
-        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
+        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
+        "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins"
       ]
     }
   },
@@ -6674,7 +6675,8 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle"
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
+        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities"
       ]
     }
   },
