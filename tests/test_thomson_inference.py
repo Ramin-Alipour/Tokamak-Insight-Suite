@@ -1603,7 +1603,7 @@ def test_canonical_relativistic_thomson_workflow_runs_compton_projected_evdf_inv
     )
 
 
-def test_primary_optical_kappa_fit_propagates_additive_systematic_covariance():
+def test_primary_optical_fit_propagates_additive_systematic_covariance():
     wavelength, measured, _ = _spectral_case(120.0, n=241)
     systematic = np.eye(wavelength.size) * 0.01**2
     result = analyze_thomson_spectra(
