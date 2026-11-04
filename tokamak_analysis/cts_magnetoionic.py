@@ -199,6 +199,74 @@ def cold_plasma_absorbed_power_density(
     }
 
 
+
+def cold_plasma_mode_radiative_coefficients(
+    frequency_Hz, magnetic_field_T, species, electric_field_V_m, *,
+    mode_poynting_flux_W_m2, electron_temperature_eV, assume_lte=False,
+):
+    """Return mode absorption and, only under explicit LTE, thermal emissivity.
+
+    The supplied complex E field and positive modal Poynting flux must describe
+    the same propagating eigenmode and normalization. The local attenuation
+    coefficient follows energy conservation, alpha_m = <P_abs>/S_m, where
+    <P_abs> = (eps0*omega/2) E^dagger Im_H(epsilon_r) E. Under an explicit
+    local-thermodynamic-equilibrium assumption, Kirchhoff's law gives
+    j_nu,m = alpha_nu,m B_nu(T_e).
+
+    This supplies a magnetized, species-resolved *cold-fluid collisional*
+    free-free/radiative closure. It is not a relativistic or warm-kinetic
+    bremsstrahlung kernel; collision frequencies remain externally supplied
+    momentum-transfer rates. No emissivity is inferred when assume_lte=False.
+    """
+    flux = _real_scalar(
+        mode_poynting_flux_W_m2, "mode_poynting_flux_W_m2", positive=True
+    )
+    temperature = _real_scalar(
+        electron_temperature_eV, "electron_temperature_eV", positive=True
+    )
+    if not isinstance(assume_lte, (bool, np.bool_)):
+        raise ValueError("assume_lte must be an explicit boolean")
+    absorption = cold_plasma_absorbed_power_density(
+        frequency_Hz, magnetic_field_T, species, electric_field_V_m
+    )
+    alpha = absorption["absorbed_power_density_W_m3"] / flux
+    emissivity = None
+    source = None
+    if assume_lte:
+        from .cts_em_background import planck_spectral_radiance
+        source = float(planck_spectral_radiance(
+            np.asarray([_real_scalar(frequency_Hz, "frequency_Hz", positive=True)]),
+            temperature * 1.602176634e-19 / 1.380649e-23,
+        )[0])
+        emissivity = alpha * source
+    return {
+        **absorption,
+        "mode_poynting_flux_W_m2": flux,
+        "absorption_coefficient_m_inverse": float(alpha),
+        "electron_temperature_eV": temperature,
+        "lte_assumed": bool(assume_lte),
+        "planck_source_radiance_W_m2_sr_Hz": source,
+        "thermal_emissivity_W_m3_sr_Hz": (
+            None if emissivity is None else float(emissivity)
+        ),
+        "absorption_relation": "alpha_mode = time_averaged_absorbed_power_density / modal_Poynting_flux",
+        "emissivity_relation": (
+            "j_nu_mode = alpha_mode * B_nu(T_e), explicit_LTE_Kirchhoff_closure"
+            if assume_lte else "not_evaluated_without_explicit_LTE_assumption"
+        ),
+        "model_scope": (
+            "magnetized_multispecies_cold_fluid_collisional_mode_absorption_"
+            + ("and_LTE_thermal_emissivity" if assume_lte else "only")
+        ),
+        "limitations": [
+            "The E-field amplitude and modal Poynting flux must use the same eigenmode and normalization.",
+            "Cold-fluid momentum-transfer absorption; no finite-temperature Landau/cyclotron resonance or relativistic correction.",
+            "LTE emissivity is returned only when assume_lte=True; non-LTE source functions require independent emissivity data.",
+            "This local mode closure does not include ray evolution, mode conversion or coherent cross-mode coupling.",
+        ],
+    }
+
+
 def cold_plasma_magnetoionic_modes(
     frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
     wave_normal_direction=(0.0, 0.0, 1.0),
