@@ -170,7 +170,7 @@ def thermal_bremsstrahlung_absorption_si(
         raise ValueError("ion_charge_states must be positive integer ionic charge states")
     if ne == 0.0 and np.any(ni != 0.0):
         raise ValueError("zero electron density requires zero positive-ion densities in this quasineutral plasma model")
-    if np.any(g <= 0.0):
+    if np.any(~np.isfinite(g)) or np.any(g <= 0.0):
         raise ValueError("gaunt_factor must be positive and finite")
     try:
         g = np.broadcast_to(g, nu.shape)
