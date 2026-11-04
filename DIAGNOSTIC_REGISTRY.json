@@ -34,7 +34,8 @@
       "tokamak_analysis.thomson_model_comparison.compare_thomson_forward_models",
       "tokamak_analysis.thomson_joint_uncertainty",
       "tokamak_analysis.thomson_identifiability.optical_model_validity",
-      "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson"
+      "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+      "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags. A multi-view 3-D EVDF inverse is available when per-view physical spectral kernels are supplied; rank-deficient systems return conditional candidates only. A separate calibrated forward-model comparison helper evaluates two or more completed predictions on identical measured wavelength bins under a common Gaussian likelihood and reports AIC/AICc/BIC; it does not refit parameters or automatically select physical truth. No raw-count Poisson likelihood is part of the Analysis 1 public input contract. Joint covariance/reference-ensemble utility functions are exported from the package and covered by dedicated unit tests; they are not silently injected into existing fitters.",
     "execution_contract": {
@@ -301,6 +302,33 @@
           "unit": "covariance of geometry/beam parameter vector",
           "required": false,
           "description": "Optional full correlated covariance propagated through a supplied geometry-dependent forward operator."
+        },
+        {
+          "name": "initial_kappa",
+          "unit": "dimensionless; > 3/2",
+          "required": false,
+          "default": 4
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless; strictly within (3/2,infinity)",
+          "required": false,
+          "default": [
+            1.5001,
+            200
+          ]
+        },
+        {
+          "name": "initial_temperature_parallel_eV",
+          "unit": "eV; positive optimizer seed",
+          "required": false,
+          "default": 1000
+        },
+        {
+          "name": "initial_temperature_perpendicular_eV",
+          "unit": "eV; positive optimizer seed",
+          "required": false,
+          "default": 1000
         }
       ],
       "output_specs": [
@@ -591,6 +619,26 @@
           "name": "momentum_tail_renormalization_performed",
           "unit": "boolean",
           "description": "False; a missing Maxwell-Juttner momentum tail is never silently renormalized into the represented distribution."
+        },
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; gyrotropic bi-Kappa second-moment temperature, only when identifiable"
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; gyrotropic bi-Kappa second-moment temperature, only when identifiable"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; finite-variance domain kappa > 3/2"
+        },
+        {
+          "name": "directional_temperature_eV",
+          "unit": "eV; per-view second-moment temperature"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "full covariance in declared parameter_order"
         }
       ],
       "assumptions": [
@@ -600,7 +648,9 @@
         "Relativistic Maxwell-Juttner model uses an isotropic rest-frame distribution and a bulk velocity parallel to the scattering vector.",
         "Relativistic optical inference defaults to elastic Thomson scattering; the user may explicitly enable single-scattering Compton recoil with polarized Klein-Nishina weighting.",
         "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
-        "Path-integrated density inference treats all supplied path-dependent optical and geometric factors as already characterized and reports only the identifiable weighted path average."
+        "Path-integrated density inference treats all supplied path-dependent optical and geometric factors as already characterized and reports only the identifiable weighted path average.",
+        "Optional gyrotropic bi-Kappa spectral inference uses f3 proportional to [1+v_parallel^2/(kappa*theta_parallel^2)+v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1)); its exact q-projected marginal is Student-t shaped.",
+        "Bi-Kappa temperatures are defined by the second moments, with theta_q^2=((2*kappa-3)/kappa)*(2*k_B*T_q/m_e); finite variance requires kappa>3/2."
       ],
       "preprocessing": [
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
@@ -630,7 +680,9 @@
         "Full-EM CTS per-sample relative density/temperature factors are fixed external spatial profiles, not independently inferred profiles; their cross-sample covariance is not propagated.",
         "The generic joint ne/Te/Ti radial inversion requires a caller-supplied channel-resolved physical forward model and does not itself establish ion-temperature identifiability; data-only Jacobian rank controls Primary versus regularized non-identifiable status.",
         "The generic joint profile routine does not propagate equilibrium, ray geometry, PSF or spatial cross-talk uncertainty; use explicit forward-input sampling and the dedicated geometry propagation contracts where applicable.",
-        "Channel-wise non-collective Maxwellian and Kappa inference jointly fit the selected detector-space constant, linear, polynomial, cubic-spline or researcher-supplied template background with the physical Thomson forward spectrum. The Kappa profile-likelihood interval is computed only for the linear-background parameterization; structured bases use the joint fit covariance and Jacobian identifiability diagnostics. Relativistic Maxwell-Juttner channel-wise fitting retains its linear baseline contract."
+        "Channel-wise non-collective Maxwellian and Kappa inference jointly fit the selected detector-space constant, linear, polynomial, cubic-spline or researcher-supplied template background with the physical Thomson forward spectrum. The Kappa profile-likelihood interval is computed only for the linear-background parameterization; structured bases use the joint fit covariance and Jacobian identifiability diagnostics. Relativistic Maxwell-Juttner channel-wise fitting retains its linear baseline contract.",
+        "Gyrotropic bi-Kappa optical fitting uses non-relativistic elastic-Thomson Doppler mapping; it does not include relativistic cross-section/recoil corrections or unrestricted 3-D EVDF inversion.",
+        "Kappa index and separate parallel/perpendicular temperatures are reported only when the spectral Jacobian and multi-view pitch-angle geometry identify them."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -647,7 +699,8 @@
         "tokamak_analysis.thomson_joint_inference.fit_multichannel_joint_gls",
         "tokamak_analysis.thomson_joint_inference.reconstruct_profiles_regularization_sensitivity",
         "tokamak_analysis.thomson_joint_inference.sample_reference_basis_uncertainty",
-        "tokamak_analysis.thomson_joint_inference.propagate_geometry_ensemble"
+        "tokamak_analysis.thomson_joint_inference.propagate_geometry_ensemble",
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected. Joint covariance, profile-regularization sensitivity, reference-library PCA uncertainty and correlated geometry-ensemble operators are exposed by tokamak_analysis.thomson_joint_inference.",
@@ -732,7 +785,11 @@
         "tests/test_thomson_inference.py::test_relativistic_maxwell_juttner_accepts_full_within_channel_spectral_covariance",
         "tests/test_thomson_gap_closure.py::test_psf_aware_profile_recovers_full_rank_latent_profile",
         "tests/test_thomson_gap_closure.py::test_relativistic_projected_evdf_normalizes_and_reports_model_scope",
-        "tests/test_thomson_inference.py::test_kappa_channel_fit_supports_joint_polynomial_detector_background"
+        "tests/test_thomson_inference.py::test_kappa_channel_fit_supports_joint_polynomial_detector_background",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain",
+        "tests/test_advanced_thomson_physics_page.py::test_dashboard_exposes_and_executes_gyrotropic_anisotropic_kappa_fit"
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
@@ -1151,6 +1208,16 @@
         "input_contract": "Joint calibrated optical Thomson spectra from multiple views, measured response matrix, per-view magnetic-field and scattering-vector unit directions, and optional full channel-major measurement/model-discrepancy covariance.",
         "identifiability": "T_parallel and T_perpendicular are reported only when the squared-pitch-angle design has rank two and the complete spectral Jacobian is full rank; one pitch angle returns directional temperature only.",
         "scope": "End-to-end non-relativistic elastic-Thomson spectral inference for a gyrotropic bi-Maxwellian with zero heat flux; no general anisotropic EVDF, geometry inference, or relativistic correction."
+      },
+      {
+        "name": "gyrotropic_anisotropic_bi_kappa",
+        "function": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "scope": "Joint calibrated multi-view optical Thomson fit of the exact 1-D marginal of an anisotropic 3-D gyrotropic Kappa ansatz; second-moment T_parallel/T_perp and kappa>3/2 are reported only when identifiable.",
+        "limitations": [
+          "Non-relativistic elastic-Thomson kinematics",
+          "Gyrotropic zero-heat-flux parametric closure",
+          "Requires multiple independent magnetic pitch angles for separate temperatures"
+        ]
       }
     ]
   },
