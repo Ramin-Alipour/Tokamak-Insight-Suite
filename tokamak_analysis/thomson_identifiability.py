@@ -105,7 +105,35 @@ def cts_electrostatic_identifiability(*, fast_ion_model: str | None = None) -> d
     }
 
 
-def cts_full_em_identifiability(species_names: list[str]) -> dict:
+def cts_full_em_identifiability(
+    species_names: list[str],
+    *,
+    external_input_covariance_supplied: bool = False,
+    external_input_covariance_propagated: bool = False,
+    instrument_response_uncertainty_supplied: bool = False,
+    instrument_response_uncertainty_propagated: bool = False,
+) -> dict:
+    """Classify Full-EM CTS parameters and report actual uncertainty provenance.
+
+    The fitted plasma parameters remain conditional on supplied composition,
+    magnetic field, geometry and polarization. Their *uncertainties*, however,
+    can include refit-based propagation of supplied external-input and measured
+    response covariance. The status must reflect the actual inversion result,
+    not a static claim that those sources are never propagated.
+    """
+    for name, value in (
+        ("external_input_covariance_supplied", external_input_covariance_supplied),
+        ("external_input_covariance_propagated", external_input_covariance_propagated),
+        ("instrument_response_uncertainty_supplied", instrument_response_uncertainty_supplied),
+        ("instrument_response_uncertainty_propagated", instrument_response_uncertainty_propagated),
+    ):
+        if not isinstance(value, bool):
+            raise ValueError(f"{name} must be boolean")
+    if external_input_covariance_propagated and not external_input_covariance_supplied:
+        raise ValueError("external-input covariance cannot be propagated unless it was supplied")
+    if instrument_response_uncertainty_propagated and not instrument_response_uncertainty_supplied:
+        raise ValueError("response uncertainty cannot be propagated unless it was supplied")
+
     primary = [
         {"parameter": "electron_density_m3", "unit": "m^-3", "basis": "fitted from the measured Full-EM CTS spectrum"},
         {"parameter": "electron_temperature_eV", "unit": "eV", "basis": "fitted from the measured Full-EM CTS spectrum"},
@@ -116,23 +144,38 @@ def cts_full_em_identifiability(species_names: list[str]) -> dict:
             {"parameter": f"ion_temperature_eV:{name}", "unit": "eV", "basis": "species-resolved fitted ion feature"},
             {"parameter": f"ion_flow_projection_m_s:{name}", "unit": "m s^-1", "basis": "species-resolved fitted projection along the local scattering wavevector"},
         ])
+
+    if external_input_covariance_propagated:
+        external_status = "propagated_by_joint_external_input_perturbation_and_full_spectrum_refitting"
+    elif external_input_covariance_supplied:
+        external_status = "supplied_but_not_propagated_insufficient_successful_refits"
+    else:
+        external_status = "not_supplied_external_inputs_held_fixed"
+    if instrument_response_uncertainty_propagated:
+        response_status = "propagated_by_measured_response_perturbation_and_full_spectrum_refitting"
+    elif instrument_response_uncertainty_supplied:
+        response_status = "supplied_but_not_propagated_insufficient_successful_refits"
+    else:
+        response_status = "not_supplied_response_held_fixed"
+
     return {
-        "classification_version": "1.0",
+        "classification_version": "1.1",
         "primary": primary,
         "conditional": [
             {"parameter": "fast_ion_population_parameters", "status": "only_where_explicit_fast_ion_population_model_is_supplied_and_identifiable"},
             {"parameter": "electron_non_maxwellian_distribution", "status": "forward_model_only_for_current_spectrum_inversion; drifted relativistic VDF fit is not implemented"},
-            {"parameter": "external_input_uncertainty_contribution", "status": "not_propagated_by_current_full_EM_inversion"},
+            {"parameter": "external_input_uncertainty_contribution", "status": external_status, "covariance_supplied": external_input_covariance_supplied, "covariance_propagated": external_input_covariance_propagated},
+            {"parameter": "instrument_response_uncertainty_contribution", "status": response_status, "uncertainty_supplied": instrument_response_uncertainty_supplied, "uncertainty_propagated": instrument_response_uncertainty_propagated},
         ],
         "non_identifiable": [
             {"parameter": "three_dimensional_electron_and_ion_flow_vectors", "reason": "A single geometry identifies only local scattering-wavevector projections."},
             {"parameter": "ion_species_and_charge_fractions", "reason": "Composition is supplied and held fixed."},
-            {"parameter": "magnetic_field_and_mode_polarization", "reason": "These are fixed external inputs in the current inversion."},
+            {"parameter": "magnetic_field_and_mode_polarization", "reason": "These remain supplied external physical inputs; propagating their covariance does not infer their values from the CTS spectrum."},
             {"parameter": "absolute_transmitter_receiver_coupling", "reason": "The spectral amplitude is profiled as a nuisance parameter, not absolutely inverted."},
         ],
         "model": "magnetized_full_electromagnetic_CTS",
         "species_order": list(species_names),
-        "uncertainty_scope": "local fit covariance conditional on fixed external inputs; no external-field/composition/geometry/polarization covariance is included",
+        "uncertainty_scope": "local fit covariance conditional on nominal external inputs, augmented only by explicitly supplied and successfully propagated response/external-input covariance components",
     }
 
 
