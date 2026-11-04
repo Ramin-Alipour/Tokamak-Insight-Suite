@@ -280,6 +280,12 @@
           "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
+          "name": "systematic_covariance",
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
+          "required": false,
+          "description": "Researcher-supplied additive systematic spectral covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. Positive-semidefinite systematic covariance is added once to measurement and model-discrepancy covariance before GLS; the combined covariance must be positive definite. Full channel-major input retains supplied cross-channel blocks."
+        },
+        {
           "name": "joint_profile_measurement_covariance",
           "unit": "full channel-major spectral covariance",
           "required": false,
