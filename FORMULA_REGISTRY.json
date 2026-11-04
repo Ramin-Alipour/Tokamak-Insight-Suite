@@ -5802,6 +5802,10 @@
         {
           "name": "kinematics",
           "unit": "model identifier"
+        },
+        {
+          "name": "relative_lab_thomson_differential_scattering_weight",
+          "unit": "dimensionless; optional polarized elastic Thomson differential weight with lab flux and aberration Jacobians"
         }
       ],
       "prerequisites": [
