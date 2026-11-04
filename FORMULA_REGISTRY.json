@@ -5506,10 +5506,10 @@
   },
   {
     "name": "Three-dimensional electron flow from multi-view Thomson projections",
-    "equation": "v_q,i = q_hat_i · v_e;  v̂_e = (Qᵀ C_v⁻¹ Q)⁻¹ Qᵀ C_v⁻¹ v_q",
-    "inputs": "Measured directional flow projections [m s^-1], unit scattering-vector directions [1], full positive-definite projection covariance [m² s^-2]",
+    "equation": "v_q,i=q̂_i·v_e; C_eff=C_v+J_Q C_Q J_Qᵀ, (J_Q)_i=v_eᵀ(I−q̂_iq̂_iᵀ); v̂_e=(QᵀC_eff⁻¹Q)⁻¹QᵀC_eff⁻¹v_q, iterated when C_Q is supplied",
+    "inputs": "Measured directional flow projections [m s^-1], unit scattering-vector directions [1], full positive-definite projection covariance [m² s^-2]; optional full Cartesian scattering-vector covariance C_Q [dimensionless²; 3N×3N]",
     "output": "Three-component electron flow vector [m s^-1] and 3×3 covariance [m² s^-2]; non-identifiable unless Q has rank 3",
-    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known scattering-vector directions; geometry uncertainty excluded from supplied projection covariance.",
+    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional small direction perturbations represented by full covariance and projected onto each direction's tangent plane.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5532,6 +5532,12 @@
           "name": "projection_covariance_m2_s2",
           "unit": "m² s⁻²; full positive-definite covariance",
           "required": true
+        },
+        {
+          "name": "scattering_vector_covariance",
+          "unit": "dimensionless²; full (3*n_views)×(3*n_views) positive-semidefinite covariance of Cartesian direction components",
+          "description": "Optional covariance of all scattering-vector direction components, including cross-view correlations; radial components are projected out to enforce unit-vector geometry.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -5550,6 +5556,18 @@
         {
           "name": "chi_square",
           "unit": "dimensionless"
+        },
+        {
+          "name": "effective_projection_covariance_m2_s2",
+          "unit": "m² s⁻²; measurement plus first-order geometry covariance used in GLS"
+        },
+        {
+          "name": "geometry_uncertainty_included",
+          "unit": "boolean; true only when scattering-vector covariance is supplied"
+        },
+        {
+          "name": "geometry_covariance_iterations",
+          "unit": "count; iterative GLS updates when geometry covariance is supplied"
         }
       ],
       "prerequisites": [
@@ -5557,10 +5575,12 @@
         "All views must sample a common flow vector or a physically justified shared-volume model.",
         "Projection covariance and calibrated spectra are supplied; scattering geometry is known."
       ],
-      "uncertainty_model": "Generalized least squares with the supplied full projection covariance. Scattering-vector/geometry uncertainty is not included.",
+      "uncertainty_model": "GLS with supplied full projection covariance; optional full scattering-vector covariance is propagated by first-order iterative errors-in-variables GLS using ∂v_q,i/∂q_i=(I−q_i q_iᵀ)v_e. Direction perturbations are restricted to the unit-vector tangent plane.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views",
+        "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_inversion_propagates_tangent_plane_geometry_covariance",
+        "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance"
       ],
       "note": "A vector is reported only when the measured projection geometry spans three dimensions and the inferred speed is subluminal. A single scattering view identifies only one projection."
     },
