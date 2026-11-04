@@ -56,7 +56,10 @@ def planck_spectral_radiance(frequency_Hz, temperature_K):
     nu = _positive_array(frequency_Hz, "frequency_Hz")
     temp = _positive_array(temperature_K, "temperature_K")
     x = H * nu / (K_B * temp)
-    return (2.0 * H * nu**3 / C**2) / np.expm1(np.minimum(x, 700.0))
+    # exp(-x)/[1-exp(-x)] is stable in both the Rayleigh-Jeans
+    # limit (use expm1) and the Wien tail (natural underflow to zero).
+    occupation = np.exp(-x) / (-np.expm1(-x))
+    return (2.0 * H * nu**3 / C**2) * occupation
 
 
 def thermal_bremsstrahlung_emissivity_si(
@@ -98,7 +101,7 @@ def thermal_bremsstrahlung_emissivity_si(
     charge_weighted_ions = float(np.sum(z**2 * ni))
     x = H * nu / (K_B * temp_K)
     coefficient_si = 6.8e-38 * 0.1 / (4.0 * np.pi)
-    return coefficient_si * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-np.minimum(x, 700.0)) * g
+    return coefficient_si * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-x) * g
 
 
 
@@ -108,19 +111,41 @@ def thermal_bremsstrahlung_absorption_si(
 ):
     """Thermal free-free absorption coefficient alpha_nu [m^-1].
 
-    Kirchhoff's law in LTE gives alpha_nu = j_nu / B_nu(T), where j_nu
-    is the angle-resolved emissivity and B_nu is the exact Planck radiance.
-    This includes stimulated emission through the Planck denominator; using
-    the Rayleigh-Jeans source function here would be inaccurate when h nu~kT.
+    Kirchhoff's law gives alpha_nu=j_nu/B_nu(T).  Evaluating that ratio
+    algebraically cancels exp(-h nu/kT) before floating-point evaluation:
+      alpha_nu = C_ff n_e sum(Z_i^2 n_i) T_K^-1/2 g_ff
+                 [1-exp(-x)] / [2 h nu^3/c^2], x=h nu/(kT).
+    This avoids a 0/0 underflow in the Wien tail while retaining stimulated
+    emission and the exact Planck source function.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
+    ne = _real_scalar(electron_density_m3, "electron_density_m3", nonnegative=True)
     te = _real_scalar(electron_temperature_eV, "electron_temperature_eV", positive=True)
-    emissivity = thermal_bremsstrahlung_emissivity_si(
-        nu, electron_density_m3, ion_densities_m3, ion_charge_states,
-        te, gaunt_factor=gaunt_factor,
+    ni = _real_array(ion_densities_m3, "ion_densities_m3")
+    z = _real_array(ion_charge_states, "ion_charge_states")
+    g = _real_array(gaunt_factor, "gaunt_factor")
+    if ni.ndim != 1 or z.shape != ni.shape or ni.size == 0 or np.any(ni < 0.0) or np.any(z <= 0.0):
+        raise ValueError("ion densities and charge states must be matching finite vectors with n_i>=0 and Z_i>0")
+    if np.any(z != np.floor(z)):
+        raise ValueError("ion_charge_states must be positive integer ionic charge states")
+    if ne == 0.0 and np.any(ni != 0.0):
+        raise ValueError("zero electron density requires zero positive-ion densities in this quasineutral plasma model")
+    if np.any(g <= 0.0):
+        raise ValueError("gaunt_factor must be positive and finite")
+    try:
+        g = np.broadcast_to(g, nu.shape)
+    except ValueError as exc:
+        raise ValueError("gaunt_factor must be scalar or broadcastable to frequency_Hz") from exc
+    temperature_K = te * E_CHARGE / K_B
+    x = H * nu / (K_B * temperature_K)
+    charge_weighted_ions = float(np.sum(z**2 * ni))
+    coefficient_si = 6.8e-38 * 0.1 / (4.0 * np.pi)
+    emissivity_prefactor = (
+        coefficient_si * ne * charge_weighted_ions
+        * temperature_K**-0.5 * g
     )
-    source = planck_spectral_radiance(nu, te * E_CHARGE / K_B)
-    return emissivity / source
+    planck_prefactor = 2.0 * H * nu**3 / C**2
+    return emissivity_prefactor * (-np.expm1(-x)) / planck_prefactor
 
 
 def ece_lte_emissivity_si(
