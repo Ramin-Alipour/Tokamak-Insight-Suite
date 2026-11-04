@@ -77,3 +77,34 @@ def test_line_integrated_density_reference():
 ])
 def test_invalid_formula_inputs_raise_value_error(call):
     with pytest.raises(ValueError): call()
+
+
+from tokamak_analysis.formula_library import thomson_velocity_projection_relativistic_exact
+
+
+def test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty():
+    c = 299792458.0
+    laser = 532.0
+    angle = 1.2
+    beta = 0.12
+    sine = math.sin(angle / 2.0)
+    ratio = (1.0 - beta * sine) / (1.0 + beta * sine)
+    result = thomson_velocity_projection_relativistic_exact(
+        laser * ratio, laser, angle,
+        sigma_fitted_center_nm=1e-5,
+        sigma_laser_wavelength_nm=2e-6,
+        sigma_scattering_angle_rad=1e-5,
+    )
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(beta * c, rel=1e-13)
+    assert result["beta_parallel"] == pytest.approx(beta, rel=1e-13)
+    assert result["uncertainty_electron_velocity_projection_m_s"] > 0.0
+    assert result["identifiability"] == "one_projected_velocity_only"
+
+
+@pytest.mark.parametrize("center, angle", [
+    (0.0, 1.0), (500.0, 0.0), (500.0, math.pi),
+    (1000.0, 1.0),
+])
+def test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs(center, angle):
+    with pytest.raises(ValueError):
+        thomson_velocity_projection_relativistic_exact(center, 500.0, angle)
