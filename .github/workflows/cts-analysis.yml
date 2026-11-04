@@ -5,6 +5,17 @@ on:
     branches: [main]
     paths:
       - "tokamak_analysis/**"
+      - "tis/contracts.py"
+      - "tis/data/ANALYSIS_FAMILIES.json"
+      - "tis/data/DIAGNOSTIC_REGISTRY.json"
+      - "tis/data/FORMULA_REGISTRY.json"
+      - "tis/ui/**"
+      - "ANALYSIS_FAMILIES.json"
+      - "DIAGNOSTIC_REGISTRY.json"
+      - "FORMULA_REGISTRY.json"
+      - "tests/test_analysis_registry.py"
+      - "tests/test_formula_*.py"
+      - "tests/test_advanced_thomson_physics_page.py"
       - "tests/test_cts_*.py"
       - "tests/test_ece_*.py"
       - "tests/test_thomson_*.py"
@@ -42,3 +53,6 @@ jobs:
           tests/test_cts_*.py
           tests/test_ece_*.py
           tests/test_thomson_*.py
+          tests/test_analysis_registry.py
+          tests/test_formula_*.py
+          tests/test_advanced_thomson_physics_page.py
