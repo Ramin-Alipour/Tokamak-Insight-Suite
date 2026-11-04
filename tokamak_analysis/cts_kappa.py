@@ -171,14 +171,14 @@ def kappa_electron_susceptibility(
         "finite_grid_normalization_bias_prevented": True,
         "susceptibility_uses_complete_analytic_kappa_tail": True,
         "finite_support_boundary_terms_included": False,
-        "tail_model": "analytic_isotropic_Kappa_marginal_truncated_only_for_numerical_quadrature; no artificial zero-extension edge jumps",
+        "tail_model": "exact_analytic_isotropic_Kappa_marginal_integrated_over_full_velocity_axis; finite_grid_used_only_for_probability_coverage_gate",
 
         "limitations": [
             "Collisionless unmagnetized longitudinal response only.",
             "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
             "A 1-D marginal is not a reconstruction of the full 3-D EVDF.",
             "The result is non-relativistic; relativistic Kappa response is not implemented.",
-            "Finite velocity support and positive Landau-pole displacement affect numerical accuracy.",
+            "The positive Landau-pole displacement and adaptive quadrature tolerances control numerical accuracy; the finite grid affects only the explicit coverage gate.",
         ],
     })
     return response
