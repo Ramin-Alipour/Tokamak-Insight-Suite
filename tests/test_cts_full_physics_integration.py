@@ -70,3 +70,36 @@ def test_stratified_nonparaxial_vector_beam_rejects_nonphysical_geometry():
         propagate_stratified_nonparaxial_vector_field(
             [0.0, 1.0, 2.0, 4.0], y, field, z, eps, 1e9
         )
+
+
+def test_polarized_kinetic_ece_wrapper_returns_full_wave_jones_conversion():
+    from tokamak_analysis.cts_full_physics import (
+        solve_polarized_kinetic_ece_with_mode_conversion,
+    )
+    from scipy.constants import mu_0, epsilon_0
+
+    frequency = np.array([45e9])
+    omega = 2*np.pi*frequency[0]
+    k0 = omega/299792458.0
+    impedance = np.sqrt(mu_0/epsilon_0)
+    unit_flux = np.sqrt(2.0*impedance)
+    basis = np.array([[unit_flux, 0.0], [0.0, unit_flux], [0.0, 0.0]], dtype=complex)
+    eps = np.repeat(np.eye(3, dtype=complex)[None, :, :], 2, axis=0)
+    result = solve_polarized_kinetic_ece_with_mode_conversion(
+        frequency, [1e-3],
+        wavevector_rad_m=[[0.0, 0.0, k0]],
+        magnetic_field_T=[[0.0, 0.0, 2.0]],
+        electron_density_m3=[1e19],
+        electron_temperature_eV=[1000.0],
+        mode_electric_field_unit_flux=basis[None, ...],
+        dielectric_z_m=[0.0, 1e-3],
+        dielectric_tensor_r=eps,
+        harmonic_order=2, quadrature_order=16,
+        damping_rate_rad_s=2e7,
+    )
+    assert result["absorption_matrix_m_inverse"].shape == (1, 1, 2, 2)
+    assert len(result["stratified_full_wave_mode_conversion"]) == 1
+    np.testing.assert_allclose(
+        result["stratified_full_wave_mode_conversion"][0]["transmitted_jones_matrix"],
+        np.eye(2), atol=1e-6,
+    )
