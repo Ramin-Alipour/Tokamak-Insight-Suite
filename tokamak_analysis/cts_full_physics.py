@@ -14,6 +14,7 @@ from scipy.fft import fft2, ifft2, fftfreq
 from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
+from .cts_em_background import integrate_thermal_microwave_background
 
 
 def analyze_landau_fdt_cts(
@@ -248,6 +249,47 @@ def solve_polarized_kinetic_ece_with_mode_conversion(
     }
 
 
+
+def analyze_cts_microwave_background(
+    frequency_Hz,
+    path_length_m,
+    electron_temperature_eV,
+    *,
+    electron_density_m3,
+    ion_densities_m3,
+    ion_charge_states,
+    ece_absorption_coefficient_m_inverse=None,
+    ece_mode_weights=None,
+    gaunt_factor=1.0,
+    incident_radiance_W_m2_sr_Hz=0.0,
+):
+    """Evaluate the physical CTS microwave-background radiance on a ray path.
+
+    This public route connects the free-free/ECE radiative-transfer kernel to
+    the advanced Analysis-1 dispatcher. ECE opacity, Gaunt factors, mode
+    weights and incident radiance remain explicit inputs; this routine does
+    not infer missing dielectric or relativistic corrections.
+    """
+    result = integrate_thermal_microwave_background(
+        frequency_Hz,
+        path_length_m,
+        electron_temperature_eV,
+        electron_density_m3=electron_density_m3,
+        ion_densities_m3=ion_densities_m3,
+        ion_charge_states=ion_charge_states,
+        ece_absorption_coefficient_m_inverse=ece_absorption_coefficient_m_inverse,
+        ece_mode_weights=ece_mode_weights,
+        gaunt_factor=gaunt_factor,
+        incident_radiance_W_m2_sr_Hz=incident_radiance_W_m2_sr_Hz,
+    )
+    return {
+        **result,
+        "public_physics_entrypoint": "microwave_background",
+        "background_inputs_are_explicit": True,
+        "automatic_model_substitution": False,
+    }
+
+
 def run_advanced_thomson_physics(model, **kwargs):
     """Public, explicit dispatcher for the four advanced Analysis-1 physics solvers.
 
@@ -268,7 +310,7 @@ def run_advanced_thomson_physics(model, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "landau_fdt_cts":
+    if model == "microwave_background":\n        solver = analyze_cts_microwave_background\n    elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
     elif model == "polarized_kinetic_ece":
         solver = solve_polarized_kinetic_ece_with_mode_conversion
@@ -278,7 +320,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = solve_stratified_mode_conversion
     else:
         raise ValueError(
-            "model must be one of: landau_fdt_cts, polarized_kinetic_ece, "
+            "model must be one of: microwave_background, landau_fdt_cts, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion; "
             "no automatic model substitution is performed"
         )
