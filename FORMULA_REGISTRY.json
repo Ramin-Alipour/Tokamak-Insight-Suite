@@ -3185,9 +3185,9 @@
   {
     "name": "Microwave collective Thomson spectral density",
     "equation": "S(k,ω)=(2π/k){|1−χ_e/ε|² f_e(ω/k)+Σ_j[Z_j² n_j/n_e]|χ_j/ε|² f_j(ω/k)}; ε=1+χ_e+Σ_jχ_j",
-    "inputs": "Frequency shift [Hz], probe frequency [Hz], scattering geometry, candidate electron density/temperature, common ion temperature, ion species/fractions and electron/ion projected flow.",
+    "inputs": "Frequency shift [Hz], probe frequency [Hz], scattering geometry, candidate electron density/temperature, per-species ion temperature, ion species/fractions, electron projected flow, and either common ion flow or one projected ion flow per species (ordered vector or exact species-name mapping).",
     "output": "One model spectral-density array with the same number of samples as the input frequency-shift axis.",
-    "assumptions": "Unmagnetized electrostatic longitudinal dielectric response; Maxwellian bulk species; quasi-neutrality; fixed ion composition",
+    "assumptions": "Unmagnetized electrostatic longitudinal dielectric response; Maxwellian bulk species; quasi-neutrality; fixed ion composition. Scalar ion flow retains the legacy common-flow assumption; species-resolved flows enter each ion susceptibility through its own Doppler shift ω−k u_j.",
     "status": "D",
     "category": "Microwave collective Thomson scattering",
     "execution_contract": {
@@ -3238,8 +3238,9 @@
         },
         {
           "name": "ion_velocity_projection_m_s",
-          "unit": "m s^-1; scalar projection along scattering wavevector",
-          "required": true
+          "unit": "m s^-1; scalar common flow, species-ordered vector, or exact species-name mapping",
+          "required": true,
+          "description": "Projected ion flow. A scalar applies the legacy common-flow assumption; a vector or exact species-name mapping supplies independent ion-species projections."
         },
         {
           "name": "electron_velocity_projection_m_s",
@@ -3267,7 +3268,7 @@
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive"
       ],
-      "note": "This entry describes only the unmagnetized electrostatic longitudinal CTS forward model. The separate analyze_cts_spectrum entry point fits physical parameters from measured calibrated CTS spectra and reports covariance/uncertainty outputs. Full-EM CTS is a distinct model and has its own formula contract.",
+      "note": "The Maxwellian ion susceptibility is evaluated with species-specific Doppler-shifted resonance arguments when independent ion flow projections are supplied. This is a forward-model capability; independent species flows are not automatically inferred by the current scalar-flow optimizer.",
       "function_links": [
         "tokamak_analysis.cts_analysis.cts_spectral_density"
       ],
