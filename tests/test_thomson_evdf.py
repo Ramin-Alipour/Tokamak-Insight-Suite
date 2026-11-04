@@ -334,3 +334,19 @@ def test_evdf_wavelength_bin_widths_reject_nonmonotonic_axis():
 
     with pytest.raises(ValueError, match="strictly increasing"):
         _wavelength_bin_widths(np.array([500.0, 500.1, 500.05]))
+
+
+def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "thomson_projected_evdf"
+    assert model in MODEL_LABELS
+    configuration = EXAMPLES[model]
+    result = run_advanced_thomson_physics(model, **configuration)
+    assert result["public_physics_entrypoint"] == model
+    assert result["automatic_model_substitution"] is False
+    assert result["scattering_vector_projection_only"] is True
+    assert result["absolute_density_identified"] is False
+    assert result["evdf_parallel_s_per_m"].shape == result["velocity_parallel_m_s"].shape
+    assert np.trapz(result["evdf_parallel_s_per_m"], result["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
