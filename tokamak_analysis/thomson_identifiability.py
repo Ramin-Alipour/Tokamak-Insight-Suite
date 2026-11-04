@@ -221,3 +221,100 @@ def spatial_profile_identifiability() -> dict:
         ],
         "model": "measured_spectra_to_channel_physics_then_spatial_representation",
     }
+
+
+
+def optical_model_validity(
+    model: str, *, electron_temperature_eV: float | None,
+    electron_velocity_projection_m_s: float | None,
+    kappa_index: float | None = None,
+) -> dict:
+    """Return explicit, machine-readable asymptotic/model-domain diagnostics.
+
+    The numerical screens are conservative software diagnostics, not universal
+    physical boundaries. Exceeding one never silently changes the selected
+    model or converts a fit into a validated measurement.
+    """
+    import math
+
+    c = 299_792_458.0
+    electron_rest_energy_eV = 510_998.95069
+    theta_limit = 0.01
+    beta_limit = 0.1
+    if model not in {
+        "non_collective_maxwellian",
+        "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+    }:
+        return {
+            "model": model,
+            "status": "not_applicable_to_optical_noncollective_model",
+            "checks": [],
+            "automatic_model_switch": False,
+        }
+
+    checks = []
+    if electron_temperature_eV is None or not math.isfinite(float(electron_temperature_eV)):
+        checks.append({
+            "name": "thermal_relativistic_parameter",
+            "status": "unavailable_no_finite_fitted_temperature",
+        })
+    else:
+        theta = float(electron_temperature_eV) / electron_rest_energy_eV
+        checks.append({
+            "name": "thermal_relativistic_parameter",
+            "value": theta,
+            "screen": theta_limit,
+            "status": "within_asymptotic_screen" if theta <= theta_limit else "screen_exceeded",
+            "interpretation": "theta_e=kT_e/(m_e c^2); leading thermal relativistic corrections are O(theta_e)",
+        })
+    if electron_velocity_projection_m_s is None or not math.isfinite(float(electron_velocity_projection_m_s)):
+        checks.append({
+            "name": "bulk_flow_beta",
+            "status": "unavailable_no_finite_fitted_projection",
+        })
+    else:
+        beta = abs(float(electron_velocity_projection_m_s)) / c
+        checks.append({
+            "name": "bulk_flow_beta",
+            "value": beta,
+            "screen": beta_limit,
+            "status": "within_asymptotic_screen" if beta <= beta_limit else "screen_exceeded",
+            "interpretation": "absolute scattering-vector flow projection divided by c; leading kinematic corrections are O(beta^2)",
+        })
+    if model == "non_collective_kappa":
+        if kappa_index is None or not math.isfinite(float(kappa_index)):
+            checks.append({
+                "name": "finite_variance_kappa_domain",
+                "status": "unavailable_no_finite_fitted_kappa_index",
+            })
+        else:
+            finite_variance = float(kappa_index) > 1.5
+            checks.append({
+                "name": "finite_variance_kappa_domain",
+                "value": float(kappa_index),
+                "required": "> 3/2",
+                "status": "within_declared_domain" if finite_variance else "outside_declared_domain",
+                "interpretation": "The selected isotropic Student-t projected family is restricted to finite variance.",
+            })
+    asymptotic_exceeded = any(
+        item.get("status") == "screen_exceeded" for item in checks
+    )
+    hard_domain_failure = any(
+        item.get("status") == "outside_declared_domain" for item in checks
+    )
+    return {
+        "model": model,
+        "status": (
+            "outside_declared_model_domain" if hard_domain_failure else
+            "asymptotic_screen_exceeded" if asymptotic_exceeded else
+            "within_declared_screen" if all(
+                item.get("status") in {"within_asymptotic_screen", "within_declared_domain"}
+                for item in checks
+            ) else "incomplete_domain_diagnostics"
+        ),
+        "checks": checks,
+        "screens_are_universal_physical_boundaries": False,
+        "automatic_model_switch": False,
+        "reporting_rule": "A screen exceedance is reported as a model-scope warning; it is not repaired by silently selecting another model.",
+    }

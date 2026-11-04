@@ -3521,6 +3521,17 @@ def analyze_thomson_spectra(
             channel_result["integrated_spectral_signal_unit"] = "input spectral-intensity unit × nm"
             channel_result["absolute_scattered_power_available"] = False
     from .thomson_identifiability import optical_thomson_identifiability
+    from .thomson_identifiability import optical_model_validity
+    for channel_result in results:
+        channel_result["model_validity"] = optical_model_validity(
+            model,
+            electron_temperature_eV=channel_result.get("electron_temperature_eV"),
+            electron_velocity_projection_m_s=channel_result.get("electron_velocity_projection_m_s"),
+            kappa_index=channel_result.get("kappa_index"),
+        )
+    output["model_validity"] = [
+        channel_result["model_validity"] for channel_result in results
+    ]
     output["parameter_identifiability"] = optical_thomson_identifiability(
         model,
         absolute_density_available=any(
