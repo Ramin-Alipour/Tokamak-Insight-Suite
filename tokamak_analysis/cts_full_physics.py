@@ -12,7 +12,10 @@ import numpy as np
 from scipy.fft import fft2, ifft2, fftfreq
 
 from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
-from .cts_fdt import quantum_fdt_dynamic_structure_factor
+from .cts_fdt import (
+    quantum_fdt_dynamic_structure_factor,
+    quantum_unsymmetrized_dynamic_structure_factor,
+)
 from .cts_landau_em import landau_full_em_current_response
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
@@ -381,8 +384,9 @@ def run_advanced_thomson_physics(model, **kwargs):
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
       - landau_fdt_cts: multispecies electrostatic CTS with the discrete
         Landau operator, matching Langevin source and Poisson screening.
-      - quantum_fdt: symmetrized quantum FDT prefactor applied to a supplied
-        causal retarded response; it does not quantum-correct the susceptibility.
+      - quantum_fdt: symmetrized quantum FDT applied to a supplied causal response.
+      - quantum_fdt_unsymmetrized: quantum S-greater spectrum with KMS detailed balance.
+        Neither FDT route quantum-corrects the supplied susceptibility.
       - polarized_kinetic_ece: magnetized kinetic ECE opacity projected onto
         two unit-flux modes, polarized LTE transfer and Berreman conversion.
       - stratified_nonparaxial_vector: 2-D vector-beam propagation through a
@@ -425,6 +429,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = analyze_landau_fdt_cts
     elif model == "quantum_fdt":
         solver = quantum_fdt_dynamic_structure_factor
+    elif model == "quantum_fdt_unsymmetrized":
+        solver = quantum_unsymmetrized_dynamic_structure_factor
     elif model == "landau_fdt_full_em_response":
         solver = landau_full_em_current_response
     elif model == "landau_fdt_full_em_constitutive":
@@ -452,7 +458,7 @@ def run_advanced_thomson_physics(model, **kwargs):
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
-            "quantum_fdt, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
+            "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
             "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, plasma_charge_state_moments; "
             "no automatic model substitution is performed"
         )
@@ -469,6 +475,7 @@ def run_advanced_thomson_physics(model, **kwargs):
 __all__ = [
     "kappa_electron_susceptibility",
     "quantum_fdt_dynamic_structure_factor",
+    "quantum_unsymmetrized_dynamic_structure_factor",
     "analyze_cts_microwave_background",
     "analyze_landau_fdt_cts",
     "analyze_landau_fdt_full_em_constitutive",
