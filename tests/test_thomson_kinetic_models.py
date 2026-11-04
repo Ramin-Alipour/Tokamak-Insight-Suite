@@ -361,3 +361,21 @@ def test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_view
     assert result["reportable_as_inferred_parameter"] is False
     assert result["electron_velocity_vector_m_s"] is None
     assert result["electron_velocity_covariance_m2_s2"] is None
+
+
+def test_relativistic_maxwell_juttner_reports_analytic_momentum_tail_coverage():
+    wavelength = np.linspace(800.0, 1328.0, 801)
+    result = relativistic_maxwell_juttner_spectrum(
+        wavelength, 1064.0, np.pi/2.0, 500.0,
+        flow_projection_m_s=1.0e6, incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=16, angular_order=8,
+    )
+    assert result["momentum_probability_coverage"] >= 0.999
+    assert result["momentum_probability_coverage"] <= 1.0
+    assert result["momentum_tail_renormalization_performed"] is False
+    assert result["analytic_momentum_normalization"] > 0.0
+    assert result["quadrature_momentum_normalization"] > 0.0
+    assert result["quadrature_to_analytic_normalization_ratio"] == pytest.approx(
+        result["quadrature_momentum_normalization"]
+        / result["analytic_momentum_normalization"], rel=1e-13
+    )
