@@ -327,3 +327,94 @@ def test_magnetized_mode_radiative_closure_is_publicly_dispatched():
     assert result["public_physics_entrypoint"] == "cold_plasma_mode_radiative_coefficients"
     assert result["thermal_emissivity_W_m3_sr_Hz"] > 0.0
     assert result["automatic_model_substitution"] is False
+
+
+
+def test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_derivative():
+    from tokamak_analysis.cts_magnetoionic import cold_plasma_mode_group_velocity
+    from scipy.constants import c
+
+    frequency = 100.0e9
+    field = [0.0, 0.0, 2.0]
+    species = _electron_only(1.0e18)
+    result = cold_plasma_mode_group_velocity(
+        frequency, field, species, wave_normal_direction=[0.0, 0.0, 1.0],
+        mode_index=0,
+    )
+    omega = 2.0 * np.pi * frequency
+    omega_p2 = species[0]["density_m3"] * E**2 / (EPS0 * ME)
+    n2 = result["refractive_index"]**2
+    # For parallel propagation each circular branch obeys
+    # n^2 = 1 - omega_p^2/[omega*(omega +/- Omega_e)].
+    gyro = -E * np.linalg.norm(field) / ME
+    denominator = omega * (omega + gyro if result["mode_index"] == 0 else omega - gyro)
+    # The branch order is the polynomial root order; independently verify
+    # the returned derivative against a finite-difference derivative of its
+    # own selected n(omega) branch rather than assuming R/L ordering.
+    def selected_k(freq):
+        from tokamak_analysis.cts_magnetoionic import cold_plasma_magnetoionic_modes
+        modes = cold_plasma_magnetoionic_modes(
+            freq, field, species, wave_normal_direction=[0.0, 0.0, 1.0]
+        )
+        root = modes["modes"][0]["refractive_index_squared"]
+        return np.sqrt(root.real) * 2.0 * np.pi * freq / c
+    delta = frequency * 1.0e-5
+    dk_domega = (selected_k(frequency + delta) - selected_k(frequency - delta)) / (
+        4.0 * np.pi * delta
+    )
+    expected = 1.0 / dk_domega
+    assert np.isfinite(denominator)
+    assert result["group_velocity_m_s"][2] == pytest.approx(expected, rel=3e-4)
+    assert result["group_velocity_m_s"][0] == pytest.approx(0.0, abs=1e-7)
+    assert result["group_velocity_m_s"][1] == pytest.approx(0.0, abs=1e-7)
+    assert result["wave_normal_to_ray_walkoff_angle_rad"] == pytest.approx(0.0, abs=1e-7)
+    assert 0.0 < result["group_speed_m_s"] < c
+
+
+def test_oblique_magnetoionic_group_velocity_reports_ray_walkoff():
+    from tokamak_analysis.cts_magnetoionic import cold_plasma_mode_group_velocity
+
+    result = cold_plasma_mode_group_velocity(
+        100.0e9, [0.0, 0.0, 2.0], _electron_only(1.0e18),
+        wave_normal_direction=[0.8, 0.0, 0.6], mode_index=0,
+    )
+    assert result["group_velocity_m_s"].shape == (3,)
+    assert np.all(np.isfinite(result["group_velocity_m_s"]))
+    assert result["ray_direction"].shape == (3,)
+    assert np.linalg.norm(result["ray_direction"]) == pytest.approx(1.0, rel=1e-12)
+    assert 0.0 <= result["wave_normal_to_ray_walkoff_angle_rad"] <= np.pi
+
+
+def test_group_velocity_rejects_collisional_and_degenerate_modes():
+    from tokamak_analysis.cts_magnetoionic import cold_plasma_mode_group_velocity
+
+    collisional = _electron_only()
+    collisional[0]["collision_frequency_rad_s"] = 1.0e7
+    with pytest.raises(ValueError, match="collisionless"):
+        cold_plasma_mode_group_velocity(
+            100.0e9, [0.0, 0.0, 2.0], collisional,
+            wave_normal_direction=[0.0, 0.0, 1.0],
+        )
+    # In an unmagnetized isotropic plasma the two transverse modes are
+    # exactly degenerate; a branch-specific derivative is not unique.
+    with pytest.raises(ValueError, match="degenerate"):
+        cold_plasma_mode_group_velocity(
+            100.0e9, [0.0, 0.0, 0.0], _electron_only(),
+            wave_normal_direction=[0.0, 0.0, 1.0],
+        )
+
+
+def test_group_velocity_is_publicly_dispatched():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "cold_plasma_mode_group_velocity",
+        frequency_Hz=100.0e9,
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        species=_electron_only(),
+        wave_normal_direction=[0.0, 0.0, 1.0],
+        mode_index=0,
+    )
+    assert result["public_physics_entrypoint"] == "cold_plasma_mode_group_velocity"
+    assert result["automatic_model_substitution"] is False
+    assert result["group_velocity_relation"].startswith("v_g,j")
