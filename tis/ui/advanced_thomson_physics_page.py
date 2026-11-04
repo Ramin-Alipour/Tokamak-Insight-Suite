@@ -14,6 +14,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
 
 MODEL_LABELS = {
+    "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
     "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
@@ -21,6 +22,11 @@ MODEL_LABELS = {
 }
 
 EXAMPLES = {
+    "gyrotropic_bi_maxwellian_anisotropy": {
+        "projected_temperature_eV": [180.0, 120.0, 80.0],
+        "magnetic_pitch_cosine": [1.0, 0.5, 0.0],
+        "projected_temperature_covariance_eV2": [[25.0, 0.0, 0.0], [0.0, 25.0, 0.0], [0.0, 0.0, 25.0]]
+    },
     "landau_fdt_cts": {
         "angular_frequency_rad_s": [1.0e5, 2.0e5],
         "normalized_velocity_x": [-4.0, 0.0, 4.0],
