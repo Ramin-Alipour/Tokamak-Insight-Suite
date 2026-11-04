@@ -177,3 +177,73 @@ def test_projected_compton_inverse_requires_incident_polarization():
             include_compton_recoil=True,
             regularization_strength=1e-3,
         )
+
+
+def test_compton_kinematics_is_rotation_covariant_for_arbitrary_3d_rays():
+    from tokamak_analysis.thomson_gap_closure import (
+        relativistic_projected_compton_kinematics,
+    )
+
+    velocity = np.linspace(-2.0e7, 2.0e7, 101)
+    angle = 1.13
+    sine, cosine = np.sin(angle / 2.0), np.cos(angle / 2.0)
+    incident = np.array([-sine, cosine, 0.0])
+    scattered = np.array([sine, cosine, 0.0])
+    polarization = np.array([0.0, 0.0, 1.0])
+    reference = relativistic_projected_compton_kinematics(
+        velocity, 532.0, angle, incident_polarization=polarization,
+    )
+
+    # A proper 3-D rotation moves both rays and the polarization vector while
+    # preserving all scalar Compton and polarized-KN observables.
+    azimuth, tilt = 0.71, -0.43
+    rz = np.array([
+        [np.cos(azimuth), -np.sin(azimuth), 0.0],
+        [np.sin(azimuth), np.cos(azimuth), 0.0],
+        [0.0, 0.0, 1.0],
+    ])
+    ry = np.array([
+        [np.cos(tilt), 0.0, np.sin(tilt)],
+        [0.0, 1.0, 0.0],
+        [-np.sin(tilt), 0.0, np.cos(tilt)],
+    ])
+    rotation = rz @ ry
+    rotated = relativistic_projected_compton_kinematics(
+        velocity, 532.0, angle,
+        incident_direction=rotation @ incident,
+        scattered_direction=rotation @ scattered,
+        incident_polarization=rotation @ polarization,
+    )
+    np.testing.assert_allclose(
+        rotated["compton_scattered_wavelength_nm"],
+        reference["compton_scattered_wavelength_nm"], rtol=2e-13, atol=0.0,
+    )
+    np.testing.assert_allclose(
+        rotated["relative_lab_differential_scattering_weight"],
+        reference["relative_lab_differential_scattering_weight"],
+        rtol=2e-12, atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        rotated["scattering_vector_unit"],
+        rotation @ reference["scattering_vector_unit"], rtol=1e-12, atol=1e-12,
+    )
+    assert rotated["geometry_source"].startswith("researcher_supplied")
+
+
+def test_compton_kinematics_rejects_inconsistent_arbitrary_ray_geometry():
+    from tokamak_analysis.thomson_gap_closure import (
+        relativistic_projected_compton_kinematics,
+    )
+
+    with pytest.raises(ValueError, match="must match"):
+        relativistic_projected_compton_kinematics(
+            np.linspace(-1e6, 1e6, 41), 532.0, np.pi / 2,
+            incident_direction=[0.0, 0.0, 1.0],
+            scattered_direction=[1.0, 0.0, 0.0],
+        )
+    with pytest.raises(ValueError, match="unit vectors"):
+        relativistic_projected_compton_kinematics(
+            np.linspace(-1e6, 1e6, 41), 532.0, np.pi / 2,
+            incident_direction=[0.0, 0.0, 2.0],
+            scattered_direction=[1.0, 0.0, 0.0],
+        )
