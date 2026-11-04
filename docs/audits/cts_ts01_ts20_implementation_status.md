@@ -99,3 +99,16 @@ inputs, and explicit cyclotron-pole rejection. This is a new cold, collisionless
 homogeneous local dispersion model. It is not warm kinetic dielectric response,
 a Full-EM CTS three-wave vertex, ray tracing, branch tracking through
 degeneracies, or distributed mode conversion. TS-04/05 remain PARTIAL.
+
+
+TS-03 background composition relations (2026-11-04): added
+`plasma_charge_state_moments` and included its path-resolved output in the
+CTS microwave-background result. For supplied ion populations it reports
+`n_{e,quasi}=Σ Z_i n_i`, `Z_eff=Σ Z_i² n_i/n_e`, and
+`ρ_q=e(Σ Z_i n_i-n_e)`, plus a dimensionless charge-balance residual.
+The calculation never forces quasineutrality or repairs supplied densities;
+`Z_eff` is explicitly unavailable at zero electron density. The helper is
+available through the advanced physics dispatcher and has neutral, non-neutral
+and vacuum regression cases. This improves mixture bookkeeping and exposes
+inconsistent inputs; it is not a relativistic/magnetized free-free emissivity
+or opacity correction. TS-03 remains OPEN for those kernels.
