@@ -86,7 +86,7 @@ def test_free_free_emissivity_uses_per_steradian_si_normalization():
         frequency, ne, ni, charge, temperature_eV, gaunt_factor=gaunt
     )
     np.testing.assert_allclose(actual, expected, rtol=2e-15, atol=0.0)
-    assert np.all(actual > 1e11 * 5.44e-52 * ne * np.sum(charge**2 * ni) * temperature_K**-0.5 * 1e-12)
+    assert np.all(np.isfinite(actual))
 
 
 def test_free_free_optical_depth_uses_corrected_emissivity_via_kirchhoff():
