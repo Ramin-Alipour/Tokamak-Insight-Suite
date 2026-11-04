@@ -49,3 +49,15 @@ def test_full_tail_kappa_cts_solver_is_exposed_in_dashboard_and_formula_registry
     matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
     assert len(matches) == 1
     assert formula == packaged
+
+
+def test_full_em_landau_fdt_constitutive_kernel_is_exposed_without_overclaiming():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+
+    model = "landau_fdt_full_em_constitutive"
+    assert model in MODEL_LABELS
+    assert "not a three-wave spectrum" in MODEL_LABELS[model]
+    config = EXAMPLES[model]
+    assert config["common_bulk_flow_m_s"] == [0.0, 0.0, 0.0]
+    assert len(config["species"]) == 2
+    assert config["common_temperature_J"] > 0.0
