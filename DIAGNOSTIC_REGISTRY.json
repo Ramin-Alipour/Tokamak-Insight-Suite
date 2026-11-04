@@ -664,7 +664,7 @@
         "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
         "Path-integrated density inference treats all supplied path-dependent optical and geometric factors as already characterized and reports only the identifiable weighted path average.",
         "Optional gyrotropic bi-Kappa spectral inference uses f3 proportional to [1+v_parallel^2/(kappa*theta_parallel^2)+v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1)); its exact q-projected marginal is Student-t shaped.",
-        "Bi-Kappa temperatures are defined by the second moments, with theta_q^2=((2*kappa-3)/kappa)*(k_B*T_q/m_e); finite variance requires kappa>3/2."
+        "Bi-Kappa temperatures are defined by the second moments, with theta_q^2=((2*kappa-3)/kappa)*(e*T_q/m_e); finite variance requires kappa>3/2."
       ],
       "preprocessing": [
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
