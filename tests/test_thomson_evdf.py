@@ -414,3 +414,12 @@ def test_evdf_rejects_indefinite_systematic_or_discrepancy_covariance():
         _run(wavelength, signal, background, systematic_covariance=invalid)
     with pytest.raises(ValueError, match="positive semidefinite"):
         _run(wavelength, signal, background, model_discrepancy_covariance=invalid)
+
+
+def test_evdf_covariance_psd_validation_is_scale_invariant_for_small_si_units():
+    wavelength, signal, background = _case()
+    invalid = np.zeros((signal.size, signal.size))
+    invalid[0, 0] = -1.0e-24
+    invalid[1, 1] = 1.0e-24
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        _run(wavelength, signal, background, systematic_covariance=invalid)
