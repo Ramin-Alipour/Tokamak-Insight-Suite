@@ -190,9 +190,27 @@ def integrate_thermal_microwave_background(
         background_status = "incident_radiance_only_no_plasma_background"
     else:
         background_status = "zero_background_exact_zero_radiance"
+    # Dimensionless diagnostics expose when the non-relativistic free-free
+    # kernel is being used outside its asymptotically non-relativistic regime.
+    # These are screening parameters, not a correction factor or an inferred
+    # relativistic emissivity.
+    electron_rest_energy_J = 9.1093837015e-31 * C**2
+    theta_e = (te * E_CHARGE) / electron_rest_energy_J
+    photon_recoil_parameter = (H * nu) / electron_rest_energy_J
     return {
         "spectral_radiance_W_m2_sr_Hz": intensity,
         "background_status": background_status,
+        "free_free_relativistic_screening": {
+            "electron_temperature_parameter_kT_over_mec2_by_path": theta_e.copy(),
+            "maximum_electron_temperature_parameter_kT_over_mec2": float(np.max(theta_e)),
+            "photon_recoil_parameter_hnu_over_mec2": photon_recoil_parameter.copy(),
+            "relativistic_corrections_applied": False,
+            "model_scope": "nonrelativistic_Maxwellian_free_free_only",
+            "interpretation": (
+                "Dimensionless regime diagnostics only; no threshold-based "
+                "model switch or relativistic correction is applied."
+            ),
+        },
         "zero_background": not (has_free_free or has_ece or has_incident),
         "spectral_radiance_by_mode_W_m2_sr_Hz": intensity_modes,
         "receiver_mode_weights": mode_weights.copy(),
