@@ -100,6 +100,7 @@ def test_generalized_landau_integral_includes_distributional_finite_support_edge
 
 
 def test_collective_tabulated_evdf_accepts_compact_support_and_includes_edge_terms():
+    from tokamak_analysis.thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
     wavelength = np.linspace(1060.0, 1068.0, 41)
     velocity = np.linspace(-8.0e6, 8.0e6, 1601)
     # A compact-support top-hat has finite non-zero endpoint values. Under
