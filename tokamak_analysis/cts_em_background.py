@@ -37,8 +37,11 @@ def thermal_bremsstrahlung_emissivity_si(
 ):
     """Unpolarized Maxwellian free-free emissivity j_nu in W m^-3 sr^-1 Hz^-1.
 
-    Uses j_nu = 5.44e-52 n_e sum_i(Z_i^2 n_i) T_K^-1/2
+    Uses the angle-resolved (per steradian) SI form
+    j_nu = 5.44e-40 n_e sum_i(Z_i^2 n_i) T_K^-1/2
     exp(-h nu/kT) g_ff, with densities in m^-3 and T in kelvin.
+    The coefficient is the cgs 6.8e-38 angle-integrated emissivity divided
+    by 4*pi and converted from erg cm^-3 to W m^-3 (factor 0.1).
     Relativistic corrections and magnetized-mode anisotropy are not included.
     """
     nu = _positive_array(frequency_Hz, "frequency_Hz")
@@ -64,7 +67,7 @@ def thermal_bremsstrahlung_emissivity_si(
     temp_K = te * E_CHARGE / K_B
     charge_weighted_ions = float(np.sum(z**2 * ni))
     x = H * nu / (K_B * temp_K)
-    return 5.44e-52 * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-np.minimum(x, 700.0)) * g
+    return 5.44e-40 * ne * charge_weighted_ions * temp_K**-0.5 * np.exp(-np.minimum(x, 700.0)) * g
 
 
 def integrate_thermal_microwave_background(
