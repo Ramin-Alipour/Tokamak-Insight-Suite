@@ -205,6 +205,10 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     ion_temperature_eV may be one shared positive scalar or one positive
     temperature per species. ion_fractions are charge-density fractions.
     Electron flow is explicit; pass 0.0 only to select stationary flow.
+    Ion flow may be a common scalar, a species-ordered vector, or an exact
+    species-name mapping; each ion susceptibility then uses its own Doppler
+    resonance omega-k*u_j. Independent flows are conditionally fitted by
+    fit_cts_ion_species_flows when all other plasma inputs are supplied.
     """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
