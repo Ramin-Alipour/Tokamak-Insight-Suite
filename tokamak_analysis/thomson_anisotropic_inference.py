@@ -167,6 +167,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     tlo, thi = map(float, temperature_bounds_eV)
     if not (np.isfinite(t0p) and np.isfinite(t0t) and 0.0 < tlo < thi and tlo <= t0p <= thi and tlo <= t0t <= thi):
         raise ValueError("positive initial temperatures must lie inside ordered temperature_bounds_eV")
+    beta_limit = float(maximum_projected_rms_beta)
+    if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
+        raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
     flow_lo, flow_hi = map(float, flow_bounds_m_s)
     if not np.isfinite(flow_lo + flow_hi) or flow_lo >= flow_hi or flow_lo <= -_C or flow_hi >= _C:
         raise ValueError("flow_bounds_m_s must be ordered and strictly subluminal")
@@ -288,6 +291,7 @@ def fit_gyrotropic_bi_kappa_thomson(
     initial_kappa=4.0, kappa_bounds=(1.5001, 200.0),
     temperature_bounds_eV=(1.0e-3, 1.0e7),
     flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
+    maximum_projected_rms_beta=0.1,
     max_nfev=6000,
 ):
     r"""Fit a gyrotropic anisotropic 3-D Kappa distribution to multi-view spectra.
@@ -407,6 +411,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         if np.any(directional <= 0.0):
             raise ValueError("directional bi-Kappa temperature became non-positive")
         predictions = np.empty_like(spectra)
+        captured_probability = np.empty(n_view, dtype=float)
         for i in range(n_view):
             flow, log_amp, offset, slope = parameters[3 + 4*i:7 + 4*i]
             theta2 = ((2.0*kappa - 3.0)/kappa) * (_E*directional[i]/_ME)
@@ -417,9 +422,10 @@ def fit_gyrotropic_bi_kappa_thomson(
             log_pdf = log_norm - kappa*np.log1p(velocity**2/(kappa*theta2))
             pdf_velocity = np.exp(log_pdf)
             intrinsic = pdf_velocity * (_C/(laser*qmag))
+            captured_probability[i] = float(np.sum(intrinsic * widths))
             detector = _apply_response_in_bin_integrated_space(response[i], intrinsic, wavelength)
             predictions[i] = np.exp(log_amp)*detector + offset + slope*(wavelength-laser)
-        return predictions, directional, kappa
+        return predictions, directional, kappa, captured_probability
 
     def residual(parameters):
         return whiten(predict(parameters)[0] - spectra)
@@ -428,7 +434,14 @@ def fit_gyrotropic_bi_kappa_thomson(
                         x_scale="jac", max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"gyrotropic bi-Kappa Thomson fit failed: {fit.message}")
-    fitted, directional, kappa = predict(fit.x)
+    fitted, directional, kappa, captured_probability = predict(fit.x)
+    projected_rms_beta = np.sqrt(_E*directional/_ME)/_C
+    fitted_flow_beta = np.abs(fit.x[3::4])/_C
+    if np.max(projected_rms_beta) >= beta_limit or np.max(fitted_flow_beta) >= 0.1:
+        raise ValueError(
+            "Fitted thermal or bulk-flow speed exceeds the declared non-relativistic "
+            "validity screen; use a relativistic forward model."
+        )
     singular = np.linalg.svd(fit.jac, compute_uv=False)
     tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
     full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
@@ -455,6 +468,18 @@ def fit_gyrotropic_bi_kappa_thomson(
         "kappa_index": float(kappa) if full_rank else None,
         "kappa_finite_variance_domain": bool(kappa > 1.5),
         "directional_temperature_eV": directional,
+        "captured_spectral_probability": captured_probability,
+        "spectral_window_coverage_warning": (
+            "The measured wavelength window truncates more than one percent of the fitted Kappa feature in at least one view."
+            if np.any(captured_probability < 0.99) else None
+        ),
+        "validity_screening": {
+            "maximum_projected_rms_beta": beta_limit,
+            "maximum_fitted_projected_rms_beta": float(np.max(projected_rms_beta)),
+            "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
+            "status": "within_declared_nonrelativistic_screen",
+            "interpretation": "Conservative software screening threshold, not a universal physical boundary."
+        },
         "magnetic_pitch_cosine": mu,
         "magnetic_pitch_cosine_squared": mu2,
         "geometry_design_rank": geometry_rank,
