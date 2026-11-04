@@ -1007,3 +1007,14 @@ with an independent numerical derivative of k(ω), check oblique walk-off,
 and verify rejection of collisions and degeneracies. This is a physical
 kernel addition, not completion of arbitrary-3-D inhomogeneous propagation,
 ray integration or mode conversion; TS-04/05 remain partial.
+
+
+The same local magnetoionic kernel additionally returns the Brillouin
+dispersive energy density
+`W=1/4[ε₀ E†∂(ωε_r)/∂ω E+μ₀ H†H]`, Poynting vector
+`S=1/2 Re(E×H*)`, and energy velocity `v_energy=S/W`. The relative
+difference between energy velocity and the group velocity is exposed as a
+consistency diagnostic and covered by a parallel-branch regression. These
+relations are evaluated only for transparent collisionless simple modes;
+they are not used to manufacture an energy velocity for dissipative or
+degenerate modes.
