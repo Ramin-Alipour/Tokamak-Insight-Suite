@@ -330,3 +330,158 @@ def cold_plasma_magnetoionic_modes(
         "mode_solver": "quadratic_cold_plasma_magnetoionic_dispersion",
         "mode_conversion_performed": False,
     }
+
+
+
+def cold_plasma_mode_group_velocity(
+    frequency_Hz, magnetic_field_T, species: Sequence[Mapping], *,
+    wave_normal_direction=(0.0, 0.0, 1.0), mode_index=0,
+    relative_frequency_step=2.0e-5,
+) -> dict:
+    """Return the 3-D group/ray velocity of a simple lossless cold-plasma mode.
+
+    The local dispersion matrix is
+        M(omega,k) = epsilon_r(omega) - (c^2/omega^2)(k^2 I - k k^T).
+    For a simple zero eigenvalue with electric eigenvector e, the
+    Hellmann--Feynman derivative gives
+        v_g,j = - (e^dagger (dM/dk_j) e) /
+                  (e^dagger (dM/domega) e).
+    The frequency derivative is evaluated by a symmetric finite difference;
+    the k derivative is analytic. This returns the energy/ray walk-off
+    direction for a transparent, homogeneous, cold-fluid mode. It is not a
+    ray integrator and is not valid for collisional/complex roots or a
+    degenerate mode crossing.
+    """
+    from scipy.constants import c
+
+    frequency = _real_scalar(frequency_Hz, "frequency_Hz", positive=True)
+    if (isinstance(mode_index, (bool, np.bool_))
+            or not isinstance(mode_index, (int, np.integer))
+            or int(mode_index) not in (0, 1)):
+        raise ValueError("mode_index must be integer 0 or 1")
+    step_fraction = _real_scalar(
+        relative_frequency_step, "relative_frequency_step", positive=True
+    )
+    if step_fraction >= 1.0e-2:
+        raise ValueError("relative_frequency_step must be less than 1e-2")
+
+    parsed_collisions = []
+    for index, item in enumerate(species):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"species[{index}] must be a mapping")
+        collision = _real_scalar(
+            item.get("collision_frequency_rad_s", 0.0),
+            f"species[{index}].collision_frequency_rad_s",
+            nonnegative=True,
+        )
+        parsed_collisions.append(collision)
+    if any(value != 0.0 for value in parsed_collisions):
+        raise ValueError(
+            "group velocity is restricted to collisionless transparent modes; "
+            "complex collisional branches require an energy-transport treatment"
+        )
+
+    modes = cold_plasma_magnetoionic_modes(
+        frequency, magnetic_field_T, species,
+        wave_normal_direction=wave_normal_direction,
+    )
+    selected = modes["modes"][int(mode_index)]
+    n2 = selected["refractive_index_squared"]
+    scale_n2 = max(1.0, abs(n2.real))
+    if abs(n2.imag) > 1.0e-10 * scale_n2 or n2.real <= 0.0:
+        raise ValueError("selected mode must have a positive real refractive-index squared")
+    n = float(np.sqrt(n2.real))
+    omega = 2.0 * np.pi * frequency
+    nhat = np.asarray(modes["wave_normal_direction"], dtype=float)
+    wavevector = (n * omega / c) * nhat
+    epsilon = np.asarray(modes["dielectric_tensor_lab"], dtype=complex)
+    polarization = np.asarray(selected["electric_polarization_unit"], dtype=complex)
+    polarization /= np.linalg.norm(polarization)
+
+    identity = np.eye(3, dtype=complex)
+
+    def dispersion_matrix(omega_value, k_value, epsilon_value):
+        return epsilon_value - (c**2 / omega_value**2) * (
+            np.dot(k_value, k_value) * identity - np.outer(k_value, k_value)
+        )
+
+    matrix = dispersion_matrix(omega, wavevector, epsilon)
+    singular_values = np.linalg.svd(matrix, compute_uv=False)
+    spectral_scale = max(float(singular_values[0]), 1.0)
+    if singular_values[-1] > 1.0e-8 * spectral_scale:
+        raise ArithmeticError(
+            "selected refractive root does not satisfy the Maxwell dispersion matrix"
+        )
+    if singular_values[-2] <= 1.0e-8 * spectral_scale:
+        raise ValueError(
+            "group velocity is undefined at a degenerate/near-degenerate mode crossing"
+        )
+
+    delta_omega = max(omega * step_fraction, 1.0)
+    frequency_plus = (omega + delta_omega) / (2.0 * np.pi)
+    frequency_minus = (omega - delta_omega) / (2.0 * np.pi)
+    eps_plus = cold_plasma_dielectric_tensor(
+        frequency_plus, magnetic_field_T, species
+    )["dielectric_tensor_lab"]
+    eps_minus = cold_plasma_dielectric_tensor(
+        frequency_minus, magnetic_field_T, species
+    )["dielectric_tensor_lab"]
+    matrix_plus = dispersion_matrix(omega + delta_omega, wavevector, eps_plus)
+    matrix_minus = dispersion_matrix(omega - delta_omega, wavevector, eps_minus)
+    derivative_omega = (matrix_plus - matrix_minus) / (2.0 * delta_omega)
+    denominator = np.vdot(polarization, derivative_omega @ polarization)
+    denominator_scale = max(
+        float(np.linalg.norm(derivative_omega, ord=2)), np.finfo(float).tiny
+    )
+    if abs(denominator) <= 1.0e-12 * denominator_scale:
+        raise ValueError("dispersion frequency derivative is singular for the selected mode")
+
+    derivative_k = np.empty(3, dtype=float)
+    for axis in range(3):
+        unit = np.eye(3)[axis]
+        d_matrix = -(c**2 / omega**2) * (
+            2.0 * wavevector[axis] * identity
+            - np.outer(unit, wavevector)
+            - np.outer(wavevector, unit)
+        )
+        derivative_k[axis] = float(
+            np.real(np.vdot(polarization, d_matrix @ polarization))
+        )
+    group_velocity = -derivative_k / denominator
+    if np.max(np.abs(np.imag(group_velocity))) > 1.0e-8 * max(
+        1.0, float(np.max(np.abs(np.real(group_velocity))))
+    ):
+        raise ArithmeticError("lossless group-velocity derivative unexpectedly became complex")
+    group_velocity = np.real(group_velocity)
+    magnitude = float(np.linalg.norm(group_velocity))
+    if not np.isfinite(magnitude) or magnitude <= 0.0:
+        raise ArithmeticError("computed group velocity is not finite and positive")
+    ray_direction = group_velocity / magnitude
+    wave_normal = nhat.copy()
+    walkoff = float(np.arccos(np.clip(np.dot(ray_direction, wave_normal), -1.0, 1.0)))
+    return {
+        "frequency_Hz": frequency,
+        "mode_index": int(mode_index),
+        "refractive_index": n,
+        "wavevector_rad_m": wavevector,
+        "wave_normal_direction": wave_normal,
+        "electric_polarization_unit": polarization,
+        "group_velocity_m_s": group_velocity,
+        "group_speed_m_s": magnitude,
+        "ray_direction": ray_direction,
+        "wave_normal_to_ray_walkoff_angle_rad": walkoff,
+        "dispersion_relation": "det(epsilon_r - (c^2/omega^2)*(k^2*I-k*k^T)) = 0",
+        "group_velocity_relation": (
+            "v_g,j = -(e^dagger*dM/dk_j*e)/(e^dagger*dM/domega*e)"
+        ),
+        "frequency_derivative_method": "symmetric_finite_difference",
+        "wavevector_derivative_method": "analytic_Hellmann_Feynman",
+        "mode_is_simple": True,
+        "model_scope": "local_homogeneous_lossless_cold_multispecies_magnetoionic_mode",
+        "limitations": [
+            "No spatial ray integration or inhomogeneous equilibrium gradients.",
+            "No collisions, absorption, warm kinetic response or relativistic corrections.",
+            "No branch tracking or mode conversion through degeneracies.",
+            "The result is a local group velocity, not a full quasi-optical beam solution.",
+        ],
+    }
