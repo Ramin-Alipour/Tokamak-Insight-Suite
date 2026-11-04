@@ -288,3 +288,46 @@ def test_near_critical_kappa_landau_tail_matches_adaptive_infinite_domain_quadra
         distribution="kappa", kappa=kappa,
     )
     np.testing.assert_allclose(actual, expected, rtol=3e-7, atol=1e-14)
+
+
+def test_gyrotropic_bimaxwellian_multi_pitch_gls_recovers_parallel_and_perpendicular_temperatures():
+    from tokamak_analysis.thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
+
+    pitch = np.array([1.0, 0.5, 0.0, -0.7])
+    t_perp, t_parallel = 80.0, 180.0
+    projected = t_perp*(1.0-pitch**2)+t_parallel*pitch**2
+    covariance = np.diag([4.0, 9.0, 16.0, 25.0])*1e-2
+    result = infer_gyrotropic_bi_maxwellian_temperatures(
+        projected, pitch,
+        projected_temperature_covariance_eV2=covariance,
+    )
+    assert result["identifiability"] == "identifiable_under_gyrotropic_bi_maxwellian_assumption"
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["electron_temperature_perpendicular_eV"] == pytest.approx(t_perp)
+    assert result["electron_temperature_parallel_eV"] == pytest.approx(t_parallel)
+    assert result["temperature_covariance_eV2"].shape == (2, 2)
+    assert result["degrees_of_freedom"] == 2
+
+
+def test_gyrotropic_bimaxwellian_single_pitch_does_not_invent_anisotropy():
+    from tokamak_analysis.thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
+
+    result = infer_gyrotropic_bi_maxwellian_temperatures(
+        [125.0, 125.0], [0.5, -0.5],
+        projected_temperature_covariance_eV2=np.eye(2),
+    )
+    assert result["identifiability"] == "non_identifiable"
+    assert result["reportable_as_inferred_parameter"] is False
+    assert result["electron_temperature_parallel_eV"] is None
+    assert result["electron_temperature_perpendicular_eV"] is None
+    assert result["temperature_covariance_eV2"] is None
+
+
+def test_gyrotropic_bimaxwellian_gls_rejects_non_positive_definite_covariance():
+    from tokamak_analysis.thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
+
+    with pytest.raises(ValueError, match="positive definite"):
+        infer_gyrotropic_bi_maxwellian_temperatures(
+            [180.0, 80.0], [1.0, 0.0],
+            projected_temperature_covariance_eV2=np.array([[1.0, 1.0], [1.0, 1.0]]),
+        )
