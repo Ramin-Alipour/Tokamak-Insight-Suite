@@ -11,8 +11,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: tis-ci-${{ github.ref }}
-  cancel-in-progress: false
+  # Keep only the newest validation run for a branch; stale commits must not
+  # accumulate behind a long-running or delayed hosted-runner allocation.
+  group: tis-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   tests-and-dashboard:
