@@ -3061,7 +3061,7 @@
       "input_data_level": "model_parameters_or_derived_calibrated_quantities",
       "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
       "analysis_family": "Analysis 1 — Thomson scattering",
-      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
+      "subanalysis": "Optical Thomson — exact relativistic Doppler flow projection"
     },
     "references": [
       {
@@ -3087,14 +3087,16 @@
     "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection",
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection_relativistic_exact",
       "function_links": [],
-      "formula_key": "thomson_velocity_projection",
+      "formula_key": "thomson_velocity_projection_relativistic_exact",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty",
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs"
       ]
-    }
+    },
+    "subanalysis": "Optical Thomson — exact relativistic Doppler flow projection"
   },
   {
     "name": "Thomson electron density from calibrated scattered power",
