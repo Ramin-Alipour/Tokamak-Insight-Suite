@@ -278,14 +278,17 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
 def infer_three_dimensional_flow_from_thomson_projections(
     velocity_projection_m_s, scattering_vector_unit, *,
     projection_covariance_m2_s2,
+    scattering_vector_covariance=None,
 ):
     """Infer a 3-D bulk-flow vector from independent measured TS projections.
 
     Each view measures v_q = q_hat dot v_e.  The vector is identifiable only
     when the stacked scattering-vector directions span R^3.  A single view
     therefore returns a non-identifiable result rather than an invented
-    transverse velocity.  Geometry uncertainty is not included in the
-    supplied projection covariance.
+    transverse velocity. Optional full Cartesian covariance of all scattering
+    vectors is propagated by first-order iterative errors-in-variables GLS.
+    Direction perturbations are projected onto each vector's tangent plane,
+    because a normalized scattering direction has no radial degree of freedom.
     """
     projections = np.asarray(velocity_projection_m_s)
     directions = np.asarray(scattering_vector_unit)
@@ -314,6 +317,29 @@ def infer_three_dimensional_flow_from_thomson_projections(
     tolerance = np.finfo(float).eps*max(covariance.shape)*max(float(eigenvalues[-1]), np.finfo(float).tiny)
     if eigenvalues[0] <= tolerance:
         raise ValueError("projection_covariance_m2_s2 must be positive definite")
+    direction_covariance = None
+    tangent_projector = np.zeros((3*projections.size, 3*projections.size), dtype=float)
+    for view, direction in enumerate(directions):
+        tangent_projector[3*view:3*view+3, 3*view:3*view+3] = (
+            np.eye(3)-np.outer(direction, direction)
+        )
+    if scattering_vector_covariance is not None:
+        raw_direction_covariance = np.asarray(scattering_vector_covariance)
+        expected_shape = (3*projections.size, 3*projections.size)
+        if raw_direction_covariance.dtype.kind not in "iuf" or raw_direction_covariance.shape != expected_shape:
+            raise ValueError("scattering_vector_covariance must be a real (3*n_views) square covariance matrix")
+        direction_covariance = raw_direction_covariance.astype(float, copy=False)
+        if np.any(~np.isfinite(direction_covariance)):
+            raise ValueError("scattering_vector_covariance must be finite")
+        direction_scale = max(float(np.max(np.abs(direction_covariance))), np.finfo(float).tiny)
+        if not np.allclose(direction_covariance, direction_covariance.T, rtol=1e-10, atol=1e-12*direction_scale):
+            raise ValueError("scattering_vector_covariance must be symmetric")
+        direction_covariance = 0.5*(direction_covariance+direction_covariance.T)
+        direction_eigenvalues = np.linalg.eigvalsh(direction_covariance)
+        direction_tolerance = np.finfo(float).eps*max(direction_covariance.shape)*max(float(direction_eigenvalues[-1]), np.finfo(float).tiny)
+        if direction_eigenvalues[0] < -direction_tolerance:
+            raise ValueError("scattering_vector_covariance must be positive semidefinite")
+        direction_covariance = tangent_projector @ direction_covariance @ tangent_projector.T
     rank = int(np.linalg.matrix_rank(directions))
     result = {
         "model": "three_dimensional_electron_flow_from_multi_view_thomson_projections",
@@ -322,7 +348,12 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "design_rank": rank,
         "input_velocity_projection_m_s": projections.copy(),
         "input_projection_covariance_m2_s2": covariance.copy(),
-        "geometry_uncertainty_included": False,
+        "geometry_uncertainty_included": direction_covariance is not None,
+        "input_scattering_vector_covariance": None if direction_covariance is None else direction_covariance.copy(),
+        "geometry_covariance_method": (
+            "iterative_first_order_tangent_plane_errors_in_variables_GLS"
+            if direction_covariance is not None else "not_supplied"
+        ),
     }
     if rank < 3:
         return {
@@ -333,14 +364,38 @@ def infer_three_dimensional_flow_from_thomson_projections(
             "electron_velocity_covariance_m2_s2": None,
             "reason": "At least three linearly independent scattering-vector directions are required to identify all three velocity components.",
         }
-    chol = np.linalg.cholesky(covariance)
-    whitened_design = np.linalg.solve(chol, directions)
-    whitened_data = np.linalg.solve(chol, projections)
-    information = whitened_design.T @ whitened_design
-    parameter_covariance = np.linalg.inv(information)
-    velocity = parameter_covariance @ (whitened_design.T @ whitened_data)
+    def flow_gls_solve(data_covariance):
+        chol_local = np.linalg.cholesky(data_covariance)
+        whitened_design_local = np.linalg.solve(chol_local, directions)
+        whitened_data_local = np.linalg.solve(chol_local, projections)
+        information_local = whitened_design_local.T @ whitened_design_local
+        covariance_local = np.linalg.inv(information_local)
+        velocity_local = covariance_local @ (whitened_design_local.T @ whitened_data_local)
+        return velocity_local, covariance_local
+
+    effective_covariance = covariance.copy()
+    velocity, parameter_covariance = flow_gls_solve(effective_covariance)
+    geometry_iterations = 0
+    if direction_covariance is not None:
+        for geometry_iterations in range(1, 51):
+            jacobian_geometry = np.zeros((projections.size, 3*projections.size), dtype=float)
+            for view, direction in enumerate(directions):
+                tangent = np.eye(3)-np.outer(direction, direction)
+                jacobian_geometry[view, 3*view:3*view+3] = tangent @ velocity
+            effective_covariance = (
+                covariance + jacobian_geometry @ direction_covariance @ jacobian_geometry.T
+            )
+            updated_velocity, updated_covariance = flow_gls_solve(effective_covariance)
+            change = np.linalg.norm(updated_velocity-velocity) / max(
+                np.linalg.norm(velocity), 1.0
+            )
+            velocity, parameter_covariance = updated_velocity, updated_covariance
+            if change < 1e-10:
+                break
+        else:
+            raise ValueError("3-D flow geometry-covariance GLS did not converge in 50 iterations")
     residual = projections-directions@velocity
-    chi2 = float(residual @ np.linalg.solve(covariance, residual))
+    chi2 = float(residual @ np.linalg.solve(effective_covariance, residual))
     speed = float(np.linalg.norm(velocity))
     physical = bool(np.all(np.isfinite(velocity)) and speed < C)
     return {
@@ -349,6 +404,8 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "reportable_as_inferred_parameter": physical,
         "electron_velocity_vector_m_s": velocity if physical else None,
         "electron_velocity_covariance_m2_s2": parameter_covariance if physical else None,
+        "effective_projection_covariance_m2_s2": effective_covariance,
+        "geometry_covariance_iterations": geometry_iterations,
         "electron_speed_m_s": speed if physical else None,
         "fit_residual_projection_m_s": residual,
         "chi_square": chi2,
