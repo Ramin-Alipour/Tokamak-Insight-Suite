@@ -5113,5 +5113,118 @@
       ],
       "note": "Numerical integration of the single-scattering sightline kernel; the output is a weighted path-average density, not a reconstructed arbitrary spatial profile."
     }
+  },
+  {
+    "name": "Cold-plasma magnetoionic group velocity and ray walk-off",
+    "equation": "M(ω,k)=ε_r(ω)−(c²/ω²)(k²I−kkᵀ); v_g,j=−(e†(∂M/∂k_j)e)/(e†(∂M/∂ω)e)",
+    "inputs": "Frequency [Hz], magnetic-field vector [T], species mass/charge/density, wave-normal direction, local mode index",
+    "output": "Group-velocity vector [m/s], ray direction, wave-normal-to-ray walk-off angle [rad]",
+    "assumptions": "Homogeneous, collisionless, transparent, cold multispecies plasma; simple non-degenerate propagating mode; local Hellmann–Feynman derivative",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_magnetoionic.cold_plasma_mode_group_velocity",
+      "formula_key": "cold_plasma_magnetoionic_group_velocity",
+      "input_specs": [
+        {
+          "name": "frequency_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; 3-vector",
+          "required": true
+        },
+        {
+          "name": "species",
+          "unit": "list of mass_kg, charge_C and density_m3 records; optional collision_frequency_rad_s must be zero",
+          "required": true
+        },
+        {
+          "name": "wave_normal_direction",
+          "unit": "unit 3-vector",
+          "required": false
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer 0 or 1",
+          "required": false
+        },
+        {
+          "name": "relative_frequency_step",
+          "unit": "dimensionless finite-difference step",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "group_velocity_m_s",
+          "unit": "m s^-1; 3-vector"
+        },
+        {
+          "name": "group_speed_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "ray_direction",
+          "unit": "unit 3-vector"
+        },
+        {
+          "name": "wave_normal_to_ray_walkoff_angle_rad",
+          "unit": "rad"
+        },
+        {
+          "name": "electric_polarization_unit",
+          "unit": "complex unit 3-vector"
+        },
+        {
+          "name": "dispersion_relation",
+          "unit": "text"
+        },
+        {
+          "name": "group_velocity_relation",
+          "unit": "text"
+        }
+      ],
+      "prerequisites": [
+        "A positive real refractive-index root for the selected local magnetoionic branch.",
+        "Collisionless transparent medium and a simple isolated mode; degenerate crossings are rejected."
+      ],
+      "uncertainty_model": "No experimental covariance is inferred. The frequency derivative uses a symmetric numerical difference; sensitivity to relative_frequency_step must be checked as a numerical convergence control.",
+      "test_links": [
+        "tests/test_cts_magnetoionic.py::test_parallel_magnetoionic_group_velocity_matches_implicit_dispersion_derivative",
+        "tests/test_cts_magnetoionic.py::test_oblique_magnetoionic_group_velocity_reports_ray_walkoff",
+        "tests/test_cts_magnetoionic.py::test_group_velocity_rejects_collisional_and_degenerate_modes"
+      ],
+      "note": "Local 3-D group-velocity/ray-walk-off kernel. This does not implement spatial ray integration, mode conversion or warm/relativistic kinetic propagation."
+    },
+    "references": [
+      {
+        "title": "Waves in Plasmas",
+        "authors": "T. H. Stix",
+        "year": 1992,
+        "publisher": "American Institute of Physics",
+        "type": "textbook",
+        "scope": "Cold magnetoionic dispersion and group propagation."
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "J. L. Flocken, S. B. Korsholm, J. Rasmussen",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "article": "115845",
+        "doi": "10.1016/j.fusengdes.2026.115845",
+        "scope": "Recent CTS diagnostic integration context; not the source of the cold-plasma dispersion relation."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "execution_scope": "local_physical_forward_kernel_not_a_measured_spectrum_inversion",
+    "input_data_level": "local_plasma_parameters_and_wave_geometry",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Microwave collective Thomson scattering"
   }
 ]
