@@ -23,7 +23,7 @@ MODEL_LABELS = {
 
 EXAMPLES = {
     "gyrotropic_bi_maxwellian_anisotropy": {
-        "projected_temperature_eV": [180.0, 120.0, 80.0],
+        "projected_temperature_eV": [180.0, 105.0, 80.0],
         "magnetic_pitch_cosine": [1.0, 0.5, 0.0],
         "projected_temperature_covariance_eV2": [[25.0, 0.0, 0.0], [0.0, 25.0, 0.0], [0.0, 0.0, 25.0]]
     },
