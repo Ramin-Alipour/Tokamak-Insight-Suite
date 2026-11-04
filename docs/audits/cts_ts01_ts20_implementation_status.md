@@ -79,3 +79,23 @@ TS-06 / TS-10 scalar-input contract correction (2026-11-04): the collisionless i
 
 
 TS-02 kinetic-ECE physical-input contract hardening (2026-11-04): both non-relativistic Maxwellian and relativistic gyrotropic ECE absorption entry points now reject Boolean, string and complex coercion for frequency, density, temperature/resonance-width and real geometry vectors before numerical evaluation. Complex polarization remains supported as required for electromagnetic eigenmodes. Added parameterized regressions in `tests/test_ece_kinetic_input_contract.py`. This closes an input-contract defect only; it does not implement the still-open conserving collisional response, self-consistent mode/ray coupling or relativistic polarized transfer.
+
+
+
+TS-04 / TS-05 cold-plasma magnetoionic kernel (2026-11-04): added
+`cts_magnetoionic.py` with the multispecies Stix relations
+`R=1-Σω_ps²/[ω(ω+Ω_s)]`,
+`L=1-Σω_ps²/[ω(ω-Ω_s)]`,
+`S=(R+L)/2`, `D=(R-L)/2`, and
+`P=1-Σω_ps²/ω²`, using signed species gyrofrequencies
+`Ω_s=q_s|B|/m_s`. The field-aligned dielectric tensor is rotated into the
+laboratory basis defined by the supplied magnetic-field vector. The local
+magnetoionic solver obtains the two roots of
+`det[ε_r - n²(I- k_hat k_hatᵀ)]=0` and returns their complex refractive
+indices and electric polarization eigenvectors. Both functions are exposed
+through `run_advanced_thomson_physics`; tests cover the unmagnetized isotropic
+limit, parallel R/L branches, the perpendicular ordinary P branch, invalid
+inputs, and explicit cyclotron-pole rejection. This is a new cold, collisionless,
+homogeneous local dispersion model. It is not warm kinetic dielectric response,
+a Full-EM CTS three-wave vertex, ray tracing, branch tracking through
+degeneracies, or distributed mode conversion. TS-04/05 remain PARTIAL.
