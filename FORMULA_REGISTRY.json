@@ -6090,5 +6090,158 @@
       ],
       "note": "Conditional physical inference: density, temperatures, composition, electron flow, geometry and response are fixed supplied inputs. An optimizer success alone never upgrades a rank-deficient solution to a reportable measurement."
     }
+  },
+  {
+    "name": "CTS receiver-plane spectral power from radiance",
+    "equation": "P_nu = L_nu G eta; G = A Omega",
+    "inputs": "Spectral radiance L_nu [W m^-2 sr^-1 Hz^-1], measured receiver etendue G=A Omega [m^2 sr], end-to-end power efficiency eta [dimensionless]",
+    "output": "Receiver-plane spectral power P_nu [W Hz^-1]",
+    "assumptions": "Radiance and receiver etendue refer to the same ray bundle and reference plane; efficiency includes each downstream loss exactly once; geometric-optics radiometry.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_em_background.radiance_to_receiver_spectral_power",
+      "formula_key": "cts_receiver_spectral_power_from_radiance",
+      "input_specs": [
+        {
+          "name": "spectral_radiance_W_m2_sr_Hz",
+          "unit": "W m^-2 sr^-1 Hz^-1",
+          "required": true
+        },
+        {
+          "name": "receiver_etendue_m2_sr",
+          "unit": "m^2 sr",
+          "required": true
+        },
+        {
+          "name": "end_to_end_efficiency",
+          "unit": "dimensionless; (0,1]",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "receiver_spectral_power_W_Hz",
+          "unit": "W Hz^-1"
+        }
+      ],
+      "prerequisites": [
+        "Path-resolved plasma radiative transfer or measured calibrated radiance",
+        "Receiver etendue and end-to-end efficiency at a consistent reference plane"
+      ],
+      "uncertainty_model": "Deterministic multiplicative conversion; use the joint covariance formula when uncertainties and cross-correlations are supplied.",
+      "test_links": [
+        "tests/test_cts_em_background.py::test_receiver_spectral_power_uses_etendue_and_efficiency_once"
+      ],
+      "note": "Converts computed spectral radiance to receiver-plane spectral power. Do not apply etendue or efficiency a second time."
+    }
+  },
+  {
+    "name": "CTS receiver spectral-power covariance propagation",
+    "equation": "P_nu,i=L_nu,i G eta; C_P=J C_x J^T, J=[G eta I, eta L_nu, G L_nu]",
+    "inputs": "Joint covariance C_x for [all radiance bins, receiver etendue, end-to-end efficiency], including supplied cross-covariances",
+    "output": "Full receiver spectral-power covariance C_P [(W Hz^-1)^2] and per-bin 1-sigma uncertainty",
+    "assumptions": "First-order linear uncertainty propagation about the supplied radiance, etendue and efficiency; the complete input covariance is symmetric positive semidefinite.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_em_background.propagate_receiver_spectral_power_covariance",
+      "formula_key": "cts_receiver_spectral_power_joint_covariance",
+      "input_specs": [
+        {
+          "name": "spectral_radiance_W_m2_sr_Hz",
+          "unit": "W m^-2 sr^-1 Hz^-1",
+          "required": true
+        },
+        {
+          "name": "receiver_etendue_m2_sr",
+          "unit": "m^2 sr",
+          "required": true
+        },
+        {
+          "name": "end_to_end_efficiency",
+          "unit": "dimensionless",
+          "required": true
+        },
+        {
+          "name": "input_covariance",
+          "unit": "(n_frequency+2) x (n_frequency+2), order [radiance bins, etendue, efficiency]",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "receiver_spectral_power_covariance_W2_Hz2",
+          "unit": "(W Hz^-1)^2"
+        },
+        {
+          "name": "receiver_spectral_power_uncertainty_W_Hz",
+          "unit": "W Hz^-1"
+        }
+      ],
+      "prerequisites": [
+        "All radiance-bin, etendue and efficiency uncertainties and their cross-covariances are represented in input_covariance"
+      ],
+      "uncertainty_model": "Full first-order joint covariance propagation J C_x J^T; no missing cross-covariance is inferred.",
+      "test_links": [
+        "tests/test_cts_em_background.py::test_receiver_spectral_power_covariance_propagates_cross_correlations",
+        "tests/test_cts_em_background.py::test_receiver_spectral_power_covariance_rejects_non_psd_joint_input"
+      ],
+      "note": "Cross-correlations between spectral bins, etendue and efficiency are retained; covariance order is returned with the numerical result."
+    }
+  },
+  {
+    "name": "CTS band-integrated receiver power",
+    "equation": "P_band = integral P_nu dnu; Var(P_band)=w^T C_P w",
+    "inputs": "Strictly increasing measured frequency grid nu_i [Hz], receiver spectral power P_nu,i [W Hz^-1], optional full spectral-power covariance C_P",
+    "output": "Band-integrated receiver power [W] and optional propagated standard uncertainty [W]",
+    "assumptions": "Composite trapezoidal quadrature on the measured, potentially nonuniform frequency grid; covariance is conditional on the supplied spectral-power covariance.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_em_background.integrate_receiver_spectral_power",
+      "formula_key": "cts_band_integrated_receiver_power",
+      "input_specs": [
+        {
+          "name": "frequency_Hz",
+          "unit": "Hz; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "receiver_spectral_power_W_Hz",
+          "unit": "W Hz^-1",
+          "required": true
+        },
+        {
+          "name": "spectral_power_covariance_W2_Hz2",
+          "unit": "(W Hz^-1)^2; optional full covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "integrated_receiver_power_W",
+          "unit": "W"
+        },
+        {
+          "name": "integrated_receiver_power_uncertainty_W",
+          "unit": "W; returned only when covariance supplied"
+        }
+      ],
+      "prerequisites": [
+        "Receiver spectral-power density on the measured frequency grid"
+      ],
+      "uncertainty_model": "The quadrature is a linear functional with explicit trapezoidal weights; integrated variance is w^T C_P w.",
+      "test_links": [
+        "tests/test_cts_em_background.py::test_integrated_receiver_power_uses_nonuniform_frequency_quadrature_and_covariance"
+      ],
+      "note": "Nonuniform frequency spacing and off-diagonal spectral covariance are preserved."
+    }
   }
 ]
