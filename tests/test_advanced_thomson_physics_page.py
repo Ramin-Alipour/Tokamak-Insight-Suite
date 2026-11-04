@@ -90,6 +90,7 @@ def test_dashboard_exposes_all_json_callable_advanced_physics_routes():
         "thomson_relativistic_projected_evdf",
         "thomson_psf_profile_inverse",
         "gyrotropic_bi_maxwellian_anisotropy",
+        "gyrotropic_bi_maxwellian_spectral_fit",
         "thomson_three_dimensional_flow",
         "plasma_charge_state_moments",
     }
