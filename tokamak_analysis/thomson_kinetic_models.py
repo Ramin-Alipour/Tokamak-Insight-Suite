@@ -21,7 +21,7 @@ C = 299792458.0
 E_REST_EV = 510998.95069
 ELECTRON_CLASSICAL_RADIUS_M = 2.8179403262e-15
 _LANDAU_NODES, _LANDAU_WEIGHTS = leggauss(192)
-_FULL_AXIS_LANDAU_NODES, _FULL_AXIS_LANDAU_WEIGHTS = leggauss(384)
+_FULL_AXIS_LANDAU_QUADRATURE = {order: leggauss(order) for order in (384, 768, 1536)}
 
 
 def _trapezoid(y, x):
@@ -755,8 +755,19 @@ def _landau_susceptibility(phase_velocity, plasma_frequency_squared, wavenumber,
     # Map x in [0, infinity) to t in [0, 1): x=sigma*t/(1-t).
     # Gauss-Legendre quadrature resolves the resonant neighbourhood and the
     # slowly decaying algebraic tails without a finite velocity cutoff.
-    t = 0.5*(_FULL_AXIS_LANDAU_NODES+1.0)
-    wt = 0.5*_FULL_AXIS_LANDAU_WEIGHTS
+    # Kappa tails become exceptionally broad as kappa approaches 3/2.
+    # Increase quadrature order in that near-boundary regime; otherwise a
+    # finite-node rule can miss the remote algebraic tail and even corrupt the
+    # sign of the principal-value response.
+    if distribution == "kappa" and float(kappa) < 1.5002:
+        quadrature_order = 1536
+    elif distribution == "kappa" and float(kappa) < 1.501:
+        quadrature_order = 768
+    else:
+        quadrature_order = 384
+    nodes, weights = _FULL_AXIS_LANDAU_QUADRATURE[quadrature_order]
+    t = 0.5*(nodes+1.0)
+    wt = 0.5*weights
     one_minus_t = 1.0-t
     offset = sigma*t/one_minus_t
     jacobian = sigma/(one_minus_t*one_minus_t)
