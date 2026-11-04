@@ -9,7 +9,7 @@ def test_cold_plasma_mode_selection_tracks_rotating_eigenpolarization(monkeypatc
     def fake_modes(omega, direction, magnetic_field, species, *, mode_index):
         # A single physical branch rotates continuously from 0 to 80 degrees.
         # Its orthogonal companion remains separated by 90 degrees.
-        angle = np.deg2rad(40.0 * (omega - 1.0))
+        angle = np.deg2rad(16.0 * (omega - 1.0))
         branch_angle = angle + mode_index * np.pi / 2.0
         field = np.array(
             [np.cos(branch_angle), np.sin(branch_angle), 0.0],
@@ -32,7 +32,7 @@ def test_cold_plasma_mode_selection_tracks_rotating_eigenpolarization(monkeypatc
 
     previous = np.array([1.0, 0.0, 0.0], dtype=complex)
     selected_branches = []
-    for omega in (1.0, 2.0, 3.0):
+    for omega in (1.0, 2.0, 3.0, 4.0, 5.0, 6.0):
         _, field, diagnostics = _select_flux_normalized_cold_mode(
             omega, direction, magnetic_field, species, previous
         )
@@ -42,8 +42,8 @@ def test_cold_plasma_mode_selection_tracks_rotating_eigenpolarization(monkeypatc
     # The same fixed launch polarization would select branch 1 at the final
     # frequency; overlap continuation correctly remains on branch 0.
     _, _, fixed_seed_diagnostics = _select_flux_normalized_cold_mode(
-        3.0, direction, magnetic_field, species,
+        6.0, direction, magnetic_field, species,
         np.array([1.0, 0.0, 0.0], dtype=complex),
     )
-    assert selected_branches == [0, 0, 0]
+    assert selected_branches == [0, 0, 0, 0, 0, 0]
     assert fixed_seed_diagnostics["mode_index"] == 1
