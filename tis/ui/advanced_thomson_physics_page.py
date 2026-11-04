@@ -9,8 +9,39 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 import numpy as np
+from scipy.special import ndtr, stdtr
 
 from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+
+def _example_wavelength_edges(wavelength_nm):
+    wavelength = np.asarray(wavelength_nm, dtype=float)
+    edges = np.empty(wavelength.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    return edges
+
+
+def _example_gaussian_bin_density(wavelength_nm, centre_nm, sigma_nm):
+    edges = _example_wavelength_edges(wavelength_nm)
+    return np.diff(ndtr((edges - centre_nm) / sigma_nm)) / np.diff(edges)
+
+
+def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
+                               temperature_eV, kappa):
+    edges = _example_wavelength_edges(wavelength_nm)
+    e_charge, electron_mass, light_speed = 1.602176634e-19, 9.1093837015e-31, 299792458.0
+    theta2 = ((2.0 * kappa - 3.0) / kappa) * e_charge * temperature_eV / electron_mass
+    theta = np.sqrt(theta2)
+    dof = 2.0 * kappa - 1.0
+    scale = theta * np.sqrt(kappa / dof)
+    velocity_edges = (light_speed / q_factor) * (1.0 - edges / laser_nm) - flow_m_s
+    probability = (
+        stdtr(dof, velocity_edges[:-1] / scale)
+        - stdtr(dof, velocity_edges[1:] / scale)
+    )
+    return np.maximum(probability, 0.0) / np.diff(edges)
 
 
 MODEL_LABELS = {
@@ -186,9 +217,9 @@ EXAMPLES = {
     "gyrotropic_bi_maxwellian_spectral_fit": {
         "wavelength_nm": np.linspace(499.7, 500.3, 121).tolist(),
         "measured_spectra": [
-            (0.02 + 0.8*np.exp(-0.5*((np.linspace(499.7, 500.3, 121)-500.0)/0.035)**2)).tolist(),
-            (0.02 + 0.8*np.exp(-0.5*((np.linspace(499.7, 500.3, 121)-500.0)/0.028)**2)).tolist(),
-            (0.02 + 0.8*np.exp(-0.5*((np.linspace(499.7, 500.3, 121)-500.0)/0.020)**2)).tolist()
+            (0.02 + 0.8*_example_gaussian_bin_density(np.linspace(499.7, 500.3, 121), 500.0, 0.035)).tolist(),
+            (0.02 + 0.8*_example_gaussian_bin_density(np.linspace(499.7, 500.3, 121), 500.0, 0.028)).tolist(),
+            (0.02 + 0.8*_example_gaussian_bin_density(np.linspace(499.7, 500.3, 121), 500.0, 0.020)).tolist()
         ],
         "laser_wavelength_nm": 500.0,
         "scattering_angle_rad": 1.5707963267948966,
@@ -204,9 +235,9 @@ EXAMPLES = {
     "gyrotropic_bi_kappa_spectral_fit": {
         "wavelength_nm": np.linspace(499.65, 500.35, 141).tolist(),
         "measured_spectra": [
-            (3.0 + 0.55*np.exp(-0.5*((np.linspace(499.65, 500.35, 141)-500.0)/0.045)**2)).tolist(),
-            (3.0 + 0.55*np.exp(-0.5*((np.linspace(499.65, 500.35, 141)-500.0)/0.036)**2)).tolist(),
-            (3.0 + 0.55*np.exp(-0.5*((np.linspace(499.65, 500.35, 141)-500.0)/0.029)**2)).tolist()
+            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(499.65, 500.35, 141), 500.0, 2.0*np.sin(np.pi/4.0), 0.0, 800.0, 4.0)).tolist(),
+            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(499.65, 500.35, 141), 500.0, 2.0*np.sin(np.pi/4.0), 0.0, 575.0, 4.0)).tolist(),
+            (3.0 + 2.5e3*_example_kappa_bin_density(np.linspace(499.65, 500.35, 141), 500.0, 2.0*np.sin(np.pi/4.0), 0.0, 350.0, 4.0)).tolist()
         ],
         "laser_wavelength_nm": 500.0,
         "scattering_angle_rad": 1.5707963267948966,
