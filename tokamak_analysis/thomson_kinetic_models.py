@@ -159,7 +159,7 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         raise ValueError("projected temperatures must be positive, pitch cosines in [-1,1], and covariance finite")
     cov = 0.5*(cov+cov.T)
     eigenvalues = np.linalg.eigvalsh(cov)
-    tolerance = np.finfo(float).eps*max(cov.shape)*max(float(eigenvalues[-1]), 1.0)
+    tolerance = np.finfo(float).eps*max(cov.shape)*max(float(eigenvalues[-1]), np.finfo(float).tiny)
     if eigenvalues[0] <= tolerance:
         raise ValueError("projected_temperature_covariance_eV2 must be positive definite")
     mu2 = mu*mu
