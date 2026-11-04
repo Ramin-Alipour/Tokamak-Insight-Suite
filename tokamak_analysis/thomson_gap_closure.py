@@ -34,13 +34,15 @@ def _bin_widths(axis):
     return widths
 
 def _trapezoid_quadrature_weights(axis, name):
-    """Return integration weights for a strictly increasing, uniform 1-D grid."""
+    """Return composite-trapezoid weights for any strictly increasing 1-D grid."""
     values = _real_vector(axis, name, minimum=2)
     steps = np.diff(values)
-    if np.any(steps <= 0) or not np.allclose(steps, steps[0], rtol=1e-6, atol=1e-12):
-        raise ValueError(f"{name} must be strictly increasing and uniform")
-    weights = np.full(values.size, float(steps[0]), dtype=float)
-    weights[[0, -1]] *= 0.5
+    if np.any(steps <= 0):
+        raise ValueError(f"{name} must be strictly increasing")
+    weights = np.empty(values.size, dtype=float)
+    weights[0], weights[-1] = 0.5 * steps[0], 0.5 * steps[-1]
+    if values.size > 2:
+        weights[1:-1] = 0.5 * (steps[:-1] + steps[1:])
     return weights
 
 
@@ -406,6 +408,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
     d2[row, row] = 2.0 / (h_left * (h_left + h_right))
     d2[row, row + 1] = -2.0 / (h_left * h_right)
     d2[row, row + 2] = 2.0 / (h_right * (h_left + h_right))
+    # Approximate integral |f''(v)|^2 dv with dual-cell quadrature so densely
+    # sampled velocity intervals do not dominate the penalty by point count.
+    d2 *= np.sqrt(0.5 * (h_left + h_right))[:, None]
     scale = np.linalg.norm(design, ord="fro") / max(np.linalg.norm(d2, ord="fro"), np.finfo(float).tiny)
     candidates = np.logspace(-8, 4, 13) if regularization_strength is None else np.asarray([float(regularization_strength)])
     if np.any(~np.isfinite(candidates)) or np.any(candidates <= 0):
@@ -498,6 +503,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "velocity_grid_points": int(v.size),
         "velocity_quadrature": "nonuniform_trapezoidal_integral_over_velocity_in_forward_operator_and_EVDF_normalization",
         "velocity_quadrature_weights_m_s": velocity_weights.copy(),
+        "regularization_discretization": "nonuniform_quadratic_second_derivative_with_dual_cell_quadrature",
+        "velocity_grid_spacing_m_s": dv.copy(),
         "regularization_operator": "nonuniform_three_point_second_derivative_on_interior_velocity_nodes",
         "velocity_grid_spacing_uniform": bool(np.allclose(dv, dv[0], rtol=1e-8, atol=1e-12 * max(abs(float(dv[0])), 1.0))),
         "noise_model": noise_status,
