@@ -67,17 +67,18 @@ def _whitener(n, uncertainty=None, covariance=None):
 
 def relativistic_projected_compton_kinematics(
     velocity_grid_m_s, laser_wavelength_nm, scattering_angle_rad, *,
-    incident_polarization=None,
+    incident_polarization=None, incident_direction=None, scattered_direction=None,
 ):
-    """Exact single-electron Compton kinematics for the symmetric 1-D q projection.
+    """Exact single-electron Compton kinematics for a 1-D q-projected EVDF.
 
-    The electron velocity is parallel to q=k_s-k_i. Photon energy is transformed
-    to the electron rest frame, the Compton energy relation is applied there,
-    and the scattered photon is transformed back to the laboratory frame.
-    When an incident polarization is supplied, the polarized Klein-Nishina
-    differential weight (including incident-flux and outgoing-solid-angle
-    Jacobians) is returned. The weight is relative to r_e^2 and is suitable
-    for a normalized projected-velocity mixture; it is not an absolute density.
+    The electron velocity is parallel to q_hat = (n_s - n_i)/|n_s - n_i|.
+    Arbitrary non-collinear laboratory incident/scattered unit directions are
+    supported; omitting them selects the historical symmetric geometry.
+    Photon energies and directions are Lorentz transformed to the electron rest
+    frame, the Compton relation and polarized Klein-Nishina cross-section are
+    evaluated there, and the scattered photon is transformed back to the lab.
+    The returned differential weight includes the incident-flux and solid-angle
+    Jacobians and is relative to r_e**2 (not an absolute density calibration).
     """
     velocity = _real_vector(velocity_grid_m_s, "velocity_grid_m_s", minimum=2)
     laser = float(laser_wavelength_nm)
@@ -90,36 +91,62 @@ def relativistic_projected_compton_kinematics(
         raise ValueError("velocity_grid_m_s must be strictly increasing")
     if np.any(np.abs(velocity) >= _C):
         raise ValueError("every represented electron velocity must be strictly subluminal")
+    if (incident_direction is None) != (scattered_direction is None):
+        raise ValueError("incident_direction and scattered_direction must be supplied together")
+    if incident_direction is None:
+        sine, cosine = float(np.sin(angle / 2.0)), float(np.cos(angle / 2.0))
+        n_i = np.array([-sine, cosine, 0.0])
+        n_s = np.array([sine, cosine, 0.0])
+        geometry_source = "symmetric_scattering_plane_from_scattering_angle"
+    else:
+        n_i = np.asarray(incident_direction)
+        n_s = np.asarray(scattered_direction)
+        if n_i.dtype.kind not in "iuf" or n_s.dtype.kind not in "iuf":
+            raise ValueError("incident_direction and scattered_direction must be real numeric vectors")
+        n_i, n_s = n_i.astype(float, copy=False), n_s.astype(float, copy=False)
+        if (n_i.shape != (3,) or n_s.shape != (3,)
+                or not np.all(np.isfinite(n_i)) or not np.all(np.isfinite(n_s))):
+            raise ValueError("incident_direction and scattered_direction must be finite 3-vectors")
+        if (not np.isclose(np.linalg.norm(n_i), 1.0, rtol=1e-8, atol=1e-10)
+                or not np.isclose(np.linalg.norm(n_s), 1.0, rtol=1e-8, atol=1e-10)):
+            raise ValueError("incident_direction and scattered_direction must be unit vectors")
+        measured_angle = float(np.arccos(np.clip(np.dot(n_i, n_s), -1.0, 1.0)))
+        if not 0.0 < measured_angle < np.pi:
+            raise ValueError("incident and scattered directions must be non-collinear")
+        if not np.isclose(measured_angle, angle, rtol=1e-8, atol=1e-10):
+            raise ValueError("scattering_angle_rad must match the supplied ray directions")
+        geometry_source = "researcher_supplied_arbitrary_3d_incident_and_scattered_directions"
+    q = n_s - n_i
+    q_norm = float(np.linalg.norm(q))
+    if not np.isfinite(q_norm) or q_norm <= 0.0:
+        raise ValueError("scattering vector is degenerate")
+    q_hat = q / q_norm
 
     beta = velocity / _C
     gamma = 1.0 / np.sqrt(1.0 - beta * beta)
-    sine = float(np.sin(angle / 2.0))
-    cosine = float(np.cos(angle / 2.0))
-    mu_i = -sine
-    mu_s = sine
+    mu_i = float(np.dot(n_i, q_hat))
+    mu_s = float(np.dot(n_s, q_hat))
     denominator_i = 1.0 - beta * mu_i
     denominator_s = 1.0 - beta * mu_s
-
-    # Aberration into the electron rest frame. Both photons share the same
-    # transverse direction in the chosen scattering plane.
     mu_i_rest = (mu_i - beta) / denominator_i
     mu_s_rest = (mu_s - beta) / denominator_s
-    transverse_i_rest = cosine / (gamma * denominator_i)
-    transverse_s_rest = cosine / (gamma * denominator_s)
+    transverse_i = n_i - mu_i * q_hat
+    transverse_s = n_s - mu_s * q_hat
+    incident_rest = (
+        transverse_i[None, :] / (gamma * denominator_i)[:, None]
+        + mu_i_rest[:, None] * q_hat[None, :]
+    )
+    scattered_rest = (
+        transverse_s[None, :] / (gamma * denominator_s)[:, None]
+        + mu_s_rest[:, None] * q_hat[None, :]
+    )
     cosine_rest = np.clip(
-        mu_i_rest * mu_s_rest
-        + transverse_i_rest * transverse_s_rest,
-        -1.0, 1.0,
+        np.einsum("ij,ij->i", incident_rest, scattered_rest), -1.0, 1.0
     )
 
-    # epsilon_i' = h nu_i'/(m_e c^2), and
-    # nu_s'/nu_i' = [1 + epsilon_i'(1-cos(theta'))]^-1.
     electron_rest_energy_eV = 510_998.95069
     photon_energy_eV = 1239.8419843320026 / laser
-    epsilon_i_rest = (
-        photon_energy_eV / electron_rest_energy_eV
-        * gamma * denominator_i
-    )
+    epsilon_i_rest = photon_energy_eV / electron_rest_energy_eV * gamma * denominator_i
     energy_ratio_rest = 1.0 / (
         1.0 + epsilon_i_rest * (1.0 - cosine_rest)
     )
@@ -138,24 +165,10 @@ def relativistic_projected_compton_kinematics(
                 or np.linalg.norm(polarization) <= 0.0):
             raise ValueError("incident_polarization must be a finite non-zero 3-vector")
         polarization = polarization / np.linalg.norm(polarization)
-        incident_direction = np.array([-sine, cosine, 0.0])
-        scattered_direction = np.array([sine, cosine, 0.0])
-        if abs(float(polarization @ incident_direction)) > 1e-6:
+        if abs(float(polarization @ n_i)) > 1e-6:
             raise ValueError("incident_polarization must be transverse to the incident direction")
-
-        beta_vector = np.zeros((velocity.size, 3), dtype=float)
-        beta_vector[:, 0] = beta
-        incident_rest = np.column_stack((
-            mu_i_rest,
-            transverse_i_rest,
-            np.zeros(velocity.size),
-        ))
-        scattered_rest = np.column_stack((
-            mu_s_rest,
-            transverse_s_rest,
-            np.zeros(velocity.size),
-        ))
-        magnetic_direction_cross_e = np.cross(incident_direction, polarization)
+        beta_vector = beta[:, None] * q_hat[None, :]
+        magnetic_direction_cross_e = np.cross(n_i, polarization)
         e_rest = (
             gamma[:, None] * (
                 polarization[None, :]
@@ -176,22 +189,14 @@ def relativistic_projected_compton_kinematics(
         polarization_projection_squared = np.square(
             np.einsum("ij,ij->i", scattered_rest, e_rest)
         )
-        sin_squared_rest = np.maximum(0.0, 1.0 - cosine_rest * cosine_rest)
-        # d sigma'/d Omega' divided by r_e^2. This is the polarized
-        # Klein-Nishina expression and tends to 1-(e'.n_s')^2 in the
-        # zero-recoil Thomson limit.
         differential_rest = 0.5 * energy_ratio_rest**2 * (
             1.0 / energy_ratio_rest + energy_ratio_rest
             - 2.0 * polarization_projection_squared
         )
-        kn_weight = (
-            denominator_i * np.maximum(differential_rest, 0.0)
-            / (gamma**2 * denominator_s**2)
-        )
-        thomson_differential_rest = 1.0 - polarization_projection_squared
-        thomson_weight = (
-            denominator_i * np.maximum(thomson_differential_rest, 0.0)
-            / (gamma**2 * denominator_s**2)
+        jacobian = denominator_i / (gamma**2 * denominator_s**2)
+        kn_weight = jacobian * np.maximum(differential_rest, 0.0)
+        thomson_weight = jacobian * np.maximum(
+            1.0 - polarization_projection_squared, 0.0
         )
 
     return {
@@ -204,6 +209,12 @@ def relativistic_projected_compton_kinematics(
         "relative_lab_thomson_differential_scattering_weight": thomson_weight,
         "cross_section_weight_reference": "classical_electron_radius_squared",
         "kinematics": "exact_single_electron_Compton_four_momentum_conservation",
+        "geometry_source": geometry_source,
+        "incident_direction": n_i.copy(),
+        "scattered_direction": n_s.copy(),
+        "scattering_vector_unit": q_hat.copy(),
+        "electron_velocity_axis": "parallel_to_scattering_vector_q",
+        "dimensionality_limit": "one_dimensional_projected_EVDF_only",
     }
 
 def reconstruct_relativistic_projected_thomson_evdf(
@@ -212,15 +223,17 @@ def reconstruct_relativistic_projected_thomson_evdf(
     signal_uncertainty=None, signal_covariance=None,
     background_uncertainty=None, background_covariance=None,
     include_compton_recoil=False, incident_polarization=None,
+    incident_direction=None, scattered_direction=None,
     maximum_recoil_correction_fraction=0.01,
     regularization_strength=None, max_iter=3000,
 ):
     """Invert a relativistic 1-D q-marginal with Thomson or Compton scattering.
 
     The Compton route uses exact single-electron four-momentum kinematics and
-    the polarized Klein-Nishina differential cross-section for the supplied
-    incident polarization. Electrons remain restricted to velocities parallel
-    to q in symmetric scattering geometry; this is not a general 3-D EVDF.
+    the polarized Klein-Nishina differential cross-section. Arbitrary supplied
+    non-collinear incident/scattered unit directions are supported; otherwise
+    symmetric geometry is constructed from scattering_angle_rad. Electrons
+    remain restricted to the 1-D marginal parallel to q; this is not a 3-D EVDF.
     In the default Thomson route, the maximum recoil correction is screened
     against maximum_recoil_correction_fraction. If polarization is supplied,
     the elastic Thomson differential weight is also applied.
@@ -275,6 +288,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
         raise ValueError("maximum_recoil_correction_fraction must be finite and lie in (0, 1)")
     kinematics = relativistic_projected_compton_kinematics(
         v, laser, angle, incident_polarization=incident_polarization,
+        incident_direction=incident_direction, scattered_direction=scattered_direction,
     )
     maximum_recoil = kinematics["maximum_recoil_correction_fraction"]
     if not include_compton_recoil and maximum_recoil > recoil_limit:
