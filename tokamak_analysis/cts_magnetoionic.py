@@ -49,9 +49,9 @@ def cold_plasma_dielectric_tensor(
         raise ValueError("magnetic_field_T must be a finite real 3-vector")
     b = b.astype(float, copy=False)
     bnorm = float(np.linalg.norm(b))
-    if bnorm <= 0.0:
-        raise ValueError("magnetic_field_T must be non-zero")
-    direction = b / bnorm
+    # The zero-field limit is a valid isotropic plasma; choose +z only as
+    # an arbitrary coordinate axis because no magnetic-field direction exists.
+    direction = b / bnorm if bnorm > 0.0 else np.array([0.0, 0.0, 1.0])
     if not isinstance(species, Sequence) or isinstance(species, (str, bytes)) or not species:
         raise ValueError("species must be a non-empty sequence of species mappings")
     omega = 2.0 * np.pi * f
@@ -106,7 +106,7 @@ def cold_plasma_dielectric_tensor(
         "frequency_Hz": f,
         "angular_frequency_rad_s": omega,
         "magnetic_field_magnitude_T": bnorm,
-        "magnetic_field_direction": direction,
+        "magnetic_field_direction": (direction.copy() if bnorm > 0.0 else None),
         "species": parsed,
         "stix_R": complex(r_sum), "stix_L": complex(l_sum),
         "stix_S": complex(s_value), "stix_D": complex(d_value),
@@ -114,7 +114,11 @@ def cold_plasma_dielectric_tensor(
         "dielectric_tensor_field_aligned": tensor_b,
         "dielectric_tensor_lab": tensor_lab,
         "dielectric_convention": "exp(-i*omega*t); Stix R/L/S/D/P",
-        "model_scope": "homogeneous_collisionless_cold_multispecies_plasma",
+        "model_scope": (
+            "homogeneous_collisionless_cold_multispecies_unmagnetized_plasma"
+            if bnorm == 0.0 else
+            "homogeneous_collisionless_cold_multispecies_magnetized_plasma"
+        ),
         "limitations": [
             "No finite-temperature/Landau damping or collisional broadening.",
             "No relativistic response, finite-Larmor-radius correction or kinetic CTS vertex.",
