@@ -100,3 +100,39 @@ def test_free_free_optical_depth_uses_corrected_emissivity_via_kirchhoff():
     assert np.all(result["thermal_bremsstrahlung_optical_depth"] > 0.0)
     assert np.all(result["spectral_radiance_W_m2_sr_Hz"] > 0.0)
     assert result["background_status"] == "plasma_emission_or_absorption_present"
+
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        (True, np.array([1.0]), np.array([1.0]), 100.0),
+        (1.0e19, np.array([1.0]), np.array([1.5]), 100.0),
+        (1.0e19, np.array([True]), np.array([1.0]), 100.0),
+        (1.0e19, np.array([1.0]), np.array([True]), 100.0),
+    ],
+)
+def test_free_free_rejects_boolean_or_non_integer_physical_inputs(arguments):
+    ne, ni, charge, temperature = arguments
+    with pytest.raises(ValueError):
+        thermal_bremsstrahlung_emissivity_si(
+            np.array([100e9]), ne, ni, charge, temperature
+        )
+
+
+def test_free_free_rejects_string_scalar_and_boolean_gaunt_factor():
+    with pytest.raises(ValueError, match="electron_temperature_eV must be a real numeric scalar"):
+        thermal_bremsstrahlung_emissivity_si(
+            np.array([100e9]), 1e19, np.array([1e19]), np.array([1.0]), "1000"
+        )
+    with pytest.raises(ValueError, match="gaunt_factor must contain real numeric values"):
+        thermal_bremsstrahlung_emissivity_si(
+            np.array([100e9]), 1e19, np.array([1e19]), np.array([1.0]), 1000.0,
+            gaunt_factor=True,
+        )
+
+
+def test_background_transfer_rejects_boolean_physical_arrays():
+    case = _vacuum_case(electron_density_m3=np.array([False, False]))
+    with pytest.raises(ValueError, match="electron_density_m3 must contain real numeric values"):
+        integrate_thermal_microwave_background(**case)
