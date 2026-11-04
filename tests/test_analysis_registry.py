@@ -1,15 +1,15 @@
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_80_unique_ordered_analysis_ids_after_retiring_id_7():
+def test_registry_contains_81_unique_ordered_analysis_ids_after_retiring_id_7():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 80
-    assert ids == [entry_id for entry_id in range(1, 82) if entry_id != 7]
+    assert len(ANALYSES) == 81
+    assert ids == [entry_id for entry_id in range(1, 83) if entry_id != 7]
 
 
-def test_registry_uses_distinct_entry_points_for_all_80_registered_analyses():
+def test_registry_uses_distinct_entry_points_for_all_81_registered_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 80
+    assert len(set(pairs)) == 81
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -202,7 +202,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     assert (profile["module"], profile["function"]) == (
         "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
-    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81]
+    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82]
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
         get_analysis(7)
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
@@ -538,3 +538,20 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
     )
     assert any("external_input_covariance" in item for item in json_mode["inputs"])
     assert any("external_input_parameter_covariance" in item for item in json_mode["outputs"])
+
+
+def test_gyrotropic_anisotropic_thomson_is_registered_and_dashboard_resolvable():
+    entry = get_analysis(82)
+    assert entry["name"] == "Gyrotropic anisotropic optical Thomson inference"
+    assert (entry["module"], entry["function"]) == (
+        "thomson_anisotropic_inference",
+        "fit_gyrotropic_bi_maxwellian_thomson",
+    )
+    contract = entry["execution_contract"]
+    assert contract["raw_data_to_physics"] is True
+    assert {"wavelength_nm", "measured_spectra", "magnetic_field_unit",
+            "scattering_vector_unit", "instrument_response_matrix"} <= {
+        item["name"] for item in contract["input_specs"]
+    }
+    assert "T_q = T_perp + (T_parallel - T_perp)" in contract["algorithm"]
+    assert callable(resolve_analysis(82))
