@@ -23,6 +23,25 @@ def kinetic_ece_absorption_matrix(
         raise ValueError("wavevector and magnetic field must be finite 3-vectors")
     if np.linalg.norm(k) == 0 or np.linalg.norm(b) == 0:
         raise ValueError("wavevector and magnetic field must be non-zero")
+    omega = 2.0*np.pi*f
+    khat = k/np.linalg.norm(k)
+    h_basis = np.cross(k[None, :], basis.T)/(1.25663706212e-6*omega)
+    flux_gram = np.empty((2, 2), dtype=complex)
+    for row in range(2):
+        for column in range(2):
+            forward = np.dot(
+                khat, np.cross(basis[:, column], np.conj(h_basis[row]))
+            )
+            reverse = np.dot(
+                khat, np.cross(basis[:, row], np.conj(h_basis[column]))
+            )
+            flux_gram[row, column] = 0.25*(forward+np.conj(reverse))
+    if not np.allclose(flux_gram, np.eye(2), rtol=2e-5, atol=1e-8):
+        raise ValueError(
+            "mode_electric_field_unit_flux must be an orthogonal two-mode basis "
+            "with unit normal Poynting flux for each mode; supplied flux Gram "
+            "matrix does not equal identity"
+        )
     if not all(np.isfinite(x) and x > 0 for x in (f, ne, te)):
         raise ValueError("frequency, density and temperature must be positive and finite")
     damping = float(damping_rate_rad_s)
