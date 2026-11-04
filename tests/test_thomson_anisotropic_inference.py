@@ -150,6 +150,8 @@ def test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa()
     assert result["parameter_covariance"].shape[0] == len(result["parameter_order"])
     assert np.all((result["captured_spectral_probability"] > 0.0) & (result["captured_spectral_probability"] <= 1.0))
     assert result["validity_screening"]["status"] == "within_declared_nonrelativistic_screen"
+    recovered_probability = np.trapz(result["projected_velocity_distribution_m_s_inverse"], result["projected_velocity_grid_m_s"], axis=1)
+    np.testing.assert_allclose(recovered_probability, result["captured_spectral_probability"], rtol=2e-3, atol=2e-4)
 
 
 def test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle():
