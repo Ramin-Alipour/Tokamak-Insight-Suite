@@ -178,7 +178,20 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
             pv=quad(lambda v: float(derivative(v)),float(velocity_grid[0]),float(velocity_grid[-1]),
                     weight="cauchy",wvar=resonance,limit=150)[0]
             f_res=max(float(interpolator(resonance)),0.0)
-        landau_integral=pv+1j*np.pi*float(derivative(resonance)) if velocity_grid[0]<resonance<velocity_grid[-1] else pv
+        # The tabulated VDF is interpreted as zero outside its finite support.
+        # Its distributional derivative therefore contains endpoint jumps:
+        # +f(v_min)*delta(v-v_min) - f(v_max)*delta(v-v_max).  Include both
+        # terms in integral f'(v)/(v-zeta) dv; omitting them biases the
+        # susceptibility whenever a supplied finite-grid endpoint is nonzero.
+        boundary_terms = (
+            float(pdf[0]) / (float(velocity_grid[0]) - resonance)
+            - float(pdf[-1]) / (float(velocity_grid[-1]) - resonance)
+        )
+        landau_integral=(
+            pv + boundary_terms + 1j*np.pi*float(derivative(resonance))
+            if velocity_grid[0]<resonance<velocity_grid[-1]
+            else pv + boundary_terms
+        )
         susceptibility[index]=-(plasma_frequency_squared/(k*k))*landau_integral
         resonant_density[index]=f_res
     return susceptibility,resonant_density
