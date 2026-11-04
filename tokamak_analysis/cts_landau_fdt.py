@@ -314,7 +314,10 @@ def landau_cts_dynamic_structure_factor(
     normalization.
     """
     from scipy.constants import epsilon_0
-    from .cts_fdt import classical_fdt_dynamic_structure_factor
+    from .cts_fdt import (
+        classical_fdt_dynamic_structure_factor,
+        quantum_fdt_dynamic_structure_factor,
+    )
 
     temperature = _positive(common_temperature_J, "common_temperature_J")
     assembled_temperature = system.metadata.get("common_temperature_J")
@@ -417,6 +420,10 @@ def landau_cts_dynamic_structure_factor(
         omega, screened_response, temperature_J=temperature
     )
     fdt_spectrum = fdt["dynamic_structure_factor_m3_s"]
+    quantum_fdt = quantum_fdt_dynamic_structure_factor(
+        omega, screened_response, temperature_J=temperature
+    )
+    quantum_fdt_spectrum = quantum_fdt["dynamic_structure_factor_m3_s"]
     scale = np.maximum(
         np.linalg.norm(fdt_spectrum, axis=(1, 2)),
         np.finfo(float).tiny,
@@ -430,6 +437,8 @@ def landau_cts_dynamic_structure_factor(
         "dielectric_matrix": dielectric,
         "coulomb_interaction_matrix_J_m3": coulomb,
         "dynamic_structure_factor_m3_s": fdt_spectrum,
+        "quantum_symmetrized_dynamic_structure_factor_m3_s": quantum_fdt_spectrum,
+        "quantum_fdt_closure": quantum_fdt["closure"],
         "landau_langevin_spectral_matrix_m3_s": screened_noise,
         "landau_fdt_relative_consistency_residual": discrepancy,
         "angular_frequency_rad_s": omega.copy(),
@@ -442,7 +451,7 @@ def landau_cts_dynamic_structure_factor(
         "positive_semidefinite_fdt": fdt["positive_semidefinite"],
         "limitations": list(system.metadata["limitations"]) + [
             "Electrostatic longitudinal response only; magnetized Full-EM CTS requires the electromagnetic current vertex and mode coupling.",
-            "Classical FDT only; quantum detailed balance is not included.",
+            "The Langevin-noise consistency residual is classical; the separately returned quantum spectrum is symmetrized and does not quantum-correct the classical Landau susceptibility.",
             "The finite-box Landau reference operator must pass velocity-domain and grid convergence before quantitative interpretation.",
             "Absolute scattered power still requires supplied calibrated optical/receiver geometry and Thomson normalization.",
         ],
