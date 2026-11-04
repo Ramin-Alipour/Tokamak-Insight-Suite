@@ -103,3 +103,7 @@ def test_kappa_landau_susceptibility_integrates_the_analytic_tail_not_the_finite
     )
     assert first["landau_integral_real_absolute_error"] >= 0.0
     assert first["landau_integral_imag_absolute_error"] >= 0.0
+    # A positive phase velocity samples the negative Kappa slope; the
+    # retarded-pole imaginary part must resolve that resonant damping term.
+    assert first["integral"].imag < 0.0
+    assert abs(first["integral"].imag) > first["landau_integral_imag_absolute_error"]
