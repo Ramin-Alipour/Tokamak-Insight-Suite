@@ -329,6 +329,12 @@
           "unit": "eV; positive optimizer seed",
           "required": false,
           "default": 1000
+        },
+        {
+          "name": "maximum_projected_rms_beta",
+          "unit": "dimensionless; conservative non-relativistic rms speed screen in (0,1)",
+          "required": false,
+          "default": 0.1
         }
       ],
       "output_specs": [
@@ -639,6 +645,14 @@
         {
           "name": "parameter_covariance",
           "unit": "full covariance in declared parameter_order"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; fitted Kappa feature probability inside measured wavelength window per view"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "structured; projected thermal rms beta and fitted flow beta"
         }
       ],
       "assumptions": [
@@ -682,7 +696,8 @@
         "The generic joint profile routine does not propagate equilibrium, ray geometry, PSF or spatial cross-talk uncertainty; use explicit forward-input sampling and the dedicated geometry propagation contracts where applicable.",
         "Channel-wise non-collective Maxwellian and Kappa inference jointly fit the selected detector-space constant, linear, polynomial, cubic-spline or researcher-supplied template background with the physical Thomson forward spectrum. The Kappa profile-likelihood interval is computed only for the linear-background parameterization; structured bases use the joint fit covariance and Jacobian identifiability diagnostics. Relativistic Maxwell-Juttner channel-wise fitting retains its linear baseline contract.",
         "Gyrotropic bi-Kappa optical fitting uses non-relativistic elastic-Thomson Doppler mapping; it does not include relativistic cross-section/recoil corrections or unrestricted 3-D EVDF inversion.",
-        "Kappa index and separate parallel/perpendicular temperatures are reported only when the spectral Jacobian and multi-view pitch-angle geometry identify them."
+        "Kappa index and separate parallel/perpendicular temperatures are reported only when the spectral Jacobian and multi-view pitch-angle geometry identify them.",
+        "The anisotropic bi-Kappa fitter screens projected thermal rms beta and bulk-flow beta before reporting a non-relativistic fit; the configurable threshold is a conservative software error-budget screen, not a universal physical validity boundary."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
