@@ -33,6 +33,7 @@ from .cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
 )
+from .thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
 from .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
@@ -410,6 +411,7 @@ def run_advanced_thomson_physics(model, **kwargs):
       - cold_plasma_mode_group_velocity: local 3-D group/ray velocity and
         wave-normal walk-off from the Hellmann-Feynman derivative of the
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
+      - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.
       - plasma_charge_state_moments: Zeff, ion charge balance and net charge
         density from explicit multispecies densities and charge states.
 
@@ -459,6 +461,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_mode_radiative_coefficients
     elif model == "cold_plasma_mode_group_velocity":
         solver = cold_plasma_mode_group_velocity
+    elif model == "gyrotropic_bi_maxwellian_anisotropy":
+        solver = infer_gyrotropic_bi_maxwellian_temperatures
     elif model == "plasma_charge_state_moments":
         solver = plasma_charge_state_moments
     else:
