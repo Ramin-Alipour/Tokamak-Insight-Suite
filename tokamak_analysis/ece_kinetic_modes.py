@@ -142,3 +142,104 @@ def integrate_mode_coupled_kinetic_ece_transfer(
             "Relativistic/collisional emissivity and arbitrary 3-D ray/interface coupling are not included.",
         ],
     }
+
+
+
+def solve_two_mode_kinetic_ece_profile(
+    frequency_Hz,
+    segment_length_m,
+    *,
+    wavevector_rad_m,
+    magnetic_field_T,
+    electron_density_m3,
+    electron_temperature_eV,
+    mode_electric_field_unit_flux,
+    mode_coupling_matrix_rad_m=None,
+    incident_coherency_K=None,
+    harmonic_order=8,
+    quadrature_order=48,
+    damping_rate_rad_s=0.0,
+):
+    """Connect local kinetic absorption to coherent two-mode ECE transfer.
+
+    Every segment/frequency receives a supplied local wavevector, magnetic
+    field and two-column unit-normal-flux eigenmode basis. The magnetized
+    Maxwellian conductivity is projected to a Hermitian 2x2 opacity matrix;
+    the ordered matrix transfer then retains cross-polarization coherence
+    and an optional Hermitian mode-coupling generator.
+
+    Geometry/eigenmodes are explicit inputs: this routine does not fabricate
+    a ray, infer a mode through a cutoff, or replace the Berreman boundary
+    solver. The local kinetic kernel remains non-relativistic Maxwellian.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    if f.ndim == 0:
+        f = f.reshape(1)
+    if f.ndim != 1 or f.size == 0 or np.any(~np.isfinite(f)) or np.any(f <= 0):
+        raise ValueError("frequency_Hz must be a positive finite scalar or vector")
+    lengths = np.asarray(segment_length_m, dtype=float)
+    if lengths.ndim != 1 or lengths.size == 0 or np.any(~np.isfinite(lengths)) or np.any(lengths <= 0):
+        raise ValueError("segment_length_m must be a non-empty positive finite vector")
+    nseg, nf = lengths.size, f.size
+
+    def vector_stack(value, name):
+        a = np.asarray(value, dtype=float)
+        if a.shape == (nseg, 3):
+            a = np.broadcast_to(a[None, :, :], (nf, nseg, 3))
+        if a.shape != (nf, nseg, 3) or np.any(~np.isfinite(a)):
+            raise ValueError(f"{name} must have shape (n_segment,3) or (n_frequency,n_segment,3)")
+        return a
+
+    def mode_stack(value):
+        a = np.asarray(value, dtype=complex)
+        if a.shape == (nseg, 3, 2):
+            a = np.broadcast_to(a[None, :, :, :], (nf, nseg, 3, 2))
+        if a.shape != (nf, nseg, 3, 2) or np.any(~np.isfinite(a.real)) or np.any(~np.isfinite(a.imag)):
+            raise ValueError("mode_electric_field_unit_flux must have shape (n_segment,3,2) or (n_frequency,n_segment,3,2)")
+        return a
+
+    kstack = vector_stack(wavevector_rad_m, "wavevector_rad_m")
+    bstack = vector_stack(magnetic_field_T, "magnetic_field_T")
+    basis = mode_stack(mode_electric_field_unit_flux)
+    ne = np.asarray(electron_density_m3, dtype=float)
+    te = np.asarray(electron_temperature_eV, dtype=float)
+    if ne.shape != (nseg,) or np.any(~np.isfinite(ne)) or np.any(ne <= 0):
+        raise ValueError("electron_density_m3 must contain one positive finite value per segment")
+    if te.shape != (nseg,) or np.any(~np.isfinite(te)) or np.any(te <= 0):
+        raise ValueError("electron_temperature_eV must contain one positive finite value per segment")
+
+    opacity = np.empty((nf, nseg, 2, 2), dtype=complex)
+    local = []
+    for i in range(nf):
+        row = []
+        for j in range(nseg):
+            result = kinetic_ece_absorption_matrix(
+                f[i], kstack[i, j], bstack[i, j],
+                electron_density_m3=ne[j],
+                electron_temperature_eV=te[j],
+                mode_electric_field_unit_flux=basis[i, j],
+                harmonic_order=harmonic_order,
+                quadrature_order=quadrature_order,
+                damping_rate_rad_s=damping_rate_rad_s,
+            )
+            opacity[i, j] = result["absorption_matrix_m_inverse"]
+            row.append(result)
+        local.append(row)
+    transfer = integrate_mode_coupled_kinetic_ece_transfer(
+        f, lengths, opacity, te,
+        mode_coupling_matrix_rad_m=mode_coupling_matrix_rad_m,
+        incident_coherency_K=incident_coherency_K,
+    )
+    return {
+        **transfer,
+        "local_kinetic_absorption": local,
+        "mode_electric_field_unit_flux": basis,
+        "profile_solver": "magnetized_kinetic_Maxwellian_opacity_plus_coherent_two_mode_LTE_transfer",
+        "geometry_source": "explicit_user_supplied_local_wavevectors_and_unit_flux_eigenmodes",
+        "limitations": [
+            "Local mode basis must be computed consistently with the supplied dielectric and normalized to unit normal power flux.",
+            "Ray trajectory and mode basis are not automatically derived; use the oblique Berreman solver for 1-D stratified interfaces.",
+            "Non-relativistic Maxwellian response and classical LTE transfer only.",
+            "No arbitrary 3-D anisotropic mode conversion or collisional Landau dielectric is included.",
+        ],
+    }

@@ -213,8 +213,8 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
     n = system.operator_s_inverse.shape[0]
     if obs.ndim != 2 or obs.shape[1] != n or np.any(~np.isfinite(obs)):
         raise ValueError("density_observation must have shape (n_observable,n_dof)")
-    drive = np.eye(n) if forcing is None else np.asarray(forcing, dtype=float)
-    if drive.ndim != 2 or drive.shape[0] != n or np.any(~np.isfinite(drive)):
+    drive = np.eye(n, dtype=complex) if forcing is None else np.asarray(forcing, dtype=complex)
+    if drive.ndim != 2 or drive.shape[0] != n or np.any(~np.isfinite(drive.real)) or np.any(~np.isfinite(drive.imag)):
         raise ValueError("forcing must have shape (n_dof,n_input)")
     wave_number = float(wave_number_m_inverse)
     direction = np.asarray(propagation_direction, dtype=float)
@@ -241,3 +241,121 @@ def landau_density_response(system: LandauFDTSystem, angular_frequency_rad_s,
                 "Self-consistent electrostatic screening and CTS scattering normalization are not applied.",
                 "Streaming is represented by the supplied Fourier wave number and direction; the velocity grid remains finite."
             ]}
+
+
+
+def landau_cts_dynamic_structure_factor(
+    system: LandauFDTSystem,
+    angular_frequency_rad_s,
+    species: Sequence[Mapping],
+    *,
+    common_temperature_J,
+    wave_number_m_inverse,
+    propagation_direction=(1.0, 0.0, 0.0),
+) -> dict:
+    """Build a screened multispecies CTS density spectrum from Landau--FDT.
+
+    The bare density response is driven by the Fourier-space force associated
+    with a species potential energy, U_s=q_s*phi. A self-consistent
+    electrostatic Poisson closure is then applied with
+    V_ab=q_a*q_b/(epsilon_0*k^2). The same Landau operator supplies the
+    velocity-space Langevin covariance; its spectrum is screened by the same
+    dielectric resolvent. The classical matrix FDT is evaluated independently
+    as a passivity/consistency check.
+
+    This is the electrostatic longitudinal CTS branch. It is not the
+    magnetized Full-EM three-wave scattering vertex or optical absolute-power
+    normalization.
+    """
+    from scipy.constants import epsilon_0
+    from .cts_fdt import classical_fdt_dynamic_structure_factor
+
+    temperature = _positive(common_temperature_J, "common_temperature_J")
+    k = _positive(wave_number_m_inverse, "wave_number_m_inverse")
+    omega = np.asarray(angular_frequency_rad_s, dtype=float)
+    if omega.ndim != 1 or omega.size == 0 or np.any(~np.isfinite(omega)):
+        raise ValueError("angular_frequency_rad_s must be a finite non-empty vector")
+    if np.any(omega == 0.0):
+        raise ValueError("zero frequency requires a separately converged static-limit extrapolation")
+    if not isinstance(species, Sequence) or isinstance(species, (str, bytes)):
+        raise ValueError("species must be a sequence of species mappings")
+    if len(species) != len(system.species_slices) or not species:
+        raise ValueError("species must match the species used to assemble the Landau system")
+    charges = np.asarray([float(item["charge_C"]) for item in species], dtype=float)
+    if np.any(~np.isfinite(charges)) or np.any(charges == 0.0):
+        raise ValueError("every species charge_C must be finite and non-zero")
+    direction = np.asarray(propagation_direction, dtype=float)
+    if direction.shape != (3,) or np.any(~np.isfinite(direction)) or np.linalg.norm(direction) == 0:
+        raise ValueError("propagation_direction must be a finite non-zero 3-vector")
+    direction = direction / np.linalg.norm(direction)
+
+    ndof = system.operator_s_inverse.shape[0]
+    ns = len(system.species_slices)
+    observation = np.zeros((ns, ndof), dtype=float)
+    forcing = np.zeros((ndof, ns), dtype=complex)
+    for s, sl in enumerate(system.species_slices):
+        observation[s, sl] = system.equilibrium_weights[sl]
+        projected_velocity = system.velocity_grid_m_s[s] @ direction
+        # Linearized Vlasov force term for exp(i*k*x-i*omega*t), h=delta f/F.
+        forcing[sl, s] = -1j * k * projected_velocity / temperature
+
+    bare = landau_density_response(
+        system, omega, observation, forcing=forcing,
+        wave_number_m_inverse=k, propagation_direction=direction,
+    )
+    chi0 = np.asarray(bare["response"], dtype=complex)
+    noise0 = np.asarray(bare["fluctuation_spectral_matrix"], dtype=complex)
+    coulomb = np.outer(charges, charges) / (epsilon_0 * k * k)
+    identity = np.eye(ns, dtype=complex)
+    screened_response = np.empty_like(chi0)
+    screened_noise = np.empty_like(noise0)
+    dielectric = np.empty_like(chi0)
+    for index in range(omega.size):
+        dielectric[index] = identity - chi0[index] @ coulomb
+        condition = np.linalg.cond(dielectric[index])
+        if not np.isfinite(condition) or condition > 1e14:
+            raise ValueError(
+                "self-consistent CTS dielectric matrix is singular or ill-conditioned; "
+                "increase velocity-grid resolution or inspect the requested frequency"
+            )
+        screening = np.linalg.solve(dielectric[index], identity)
+        screened_response[index] = screening @ chi0[index]
+        screened_noise[index] = screening @ noise0[index] @ screening.conj().T
+        screened_noise[index] = 0.5 * (
+            screened_noise[index] + screened_noise[index].conj().T
+        )
+
+    fdt = classical_fdt_dynamic_structure_factor(
+        omega, screened_response, temperature_J=temperature
+    )
+    fdt_spectrum = fdt["dynamic_structure_factor_m3_s"]
+    scale = np.maximum(
+        np.linalg.norm(fdt_spectrum, axis=(1, 2)),
+        np.finfo(float).tiny,
+    )
+    discrepancy = np.linalg.norm(
+        screened_noise - fdt_spectrum, axis=(1, 2)
+    ) / scale
+    return {
+        "bare_density_response_m3_per_J": chi0,
+        "screened_density_response_m3_per_J": screened_response,
+        "dielectric_matrix": dielectric,
+        "coulomb_interaction_matrix_J_m3": coulomb,
+        "dynamic_structure_factor_m3_s": fdt_spectrum,
+        "landau_langevin_spectral_matrix_m3_s": screened_noise,
+        "landau_fdt_relative_consistency_residual": discrepancy,
+        "angular_frequency_rad_s": omega.copy(),
+        "wave_number_m_inverse": k,
+        "propagation_direction": direction,
+        "collision_operator": system.metadata["operator"],
+        "fdt_closure": fdt["closure"],
+        "screening_model": "self_consistent_multispecies_electrostatic_Poisson_RPA",
+        "cts_model": "electrostatic_longitudinal_multispecies_linearized_Landau_FDT",
+        "positive_semidefinite_fdt": fdt["positive_semidefinite"],
+        "limitations": list(system.metadata["limitations"]) + [
+            "Electrostatic longitudinal response only; magnetized Full-EM CTS requires the electromagnetic current vertex and mode coupling.",
+            "Classical FDT only; quantum detailed balance is not included.",
+            "The finite-box Landau reference operator must pass velocity-domain and grid convergence before quantitative interpretation.",
+            "Absolute scattered power still requires supplied calibrated optical/receiver geometry and Thomson normalization.",
+        ],
+    }
