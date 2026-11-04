@@ -126,51 +126,57 @@ def kappa_electron_susceptibility(
         )*pdf_value
         return derivative/(complex(real_velocity, 0.0)-zeta)
 
-    # Resolve the narrow resonant Lorentzian explicitly.  Direct adaptive
-    # integration on (-inf,+inf) can miss it when eta is many orders smaller
-    # than the thermal speed.  Split at v_phi +/- 50 eta and integrate the
-    # central interval in t=(v-v_phi)/eta, where the pole is O(1) wide.
-    pole_half_width = 50.0*eta
-    def derivative_of_pdf(real_velocity):
-        pdf_value = np.exp(
-            log_normalization - kap*np.log1p(real_velocity**2/scale_squared)
+    # Work in thermal-speed units x=v/sqrt(a_kappa), so the integrand is
+    # O(1) rather than O(1/a_kappa).  This avoids impossible absolute
+    # tolerances for SI-scale velocities and resolves the narrow resonance.
+    thermal_speed = float(np.sqrt(scale_squared))
+    phase_velocity_scaled = phase_velocity/thermal_speed
+    eta_scaled = eta/thermal_speed
+    zeta_scaled = complex(phase_velocity_scaled, eta_scaled)
+    log_dimensionless_normalization = (
+        gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi)
+    )
+
+    def dimensionless_pdf_derivative(scaled_velocity):
+        pdf_scaled = np.exp(
+            log_dimensionless_normalization
+            -kap*np.log1p(scaled_velocity**2)
         )
         return (
-            -2.0*kap*real_velocity/(scale_squared+real_velocity**2)
-        )*pdf_value
+            -2.0*kap*scaled_velocity/(1.0+scaled_velocity**2)
+        )*pdf_scaled
 
-    def outer_integrand(real_velocity):
-        return derivative_of_pdf(real_velocity)/(
-            complex(real_velocity, 0.0)-zeta
+    def outer_integrand(scaled_velocity):
+        return dimensionless_pdf_derivative(scaled_velocity)/(
+            complex(scaled_velocity, 0.0)-zeta_scaled
         )
 
     def central_integrand(scaled_offset):
-        real_velocity = phase_velocity + eta*scaled_offset
-        # The Jacobian dv=eta dt cancels the eta in v-zeta=eta(t-i).
-        return derivative_of_pdf(real_velocity)/(complex(scaled_offset, -1.0))
+        scaled_velocity = phase_velocity_scaled+eta_scaled*scaled_offset
+        # The Jacobian dx=eta_scaled dt cancels the pole denominator
+        # eta_scaled*(t-i), leaving g'(x_phi+eta_scaled*t)/(t-i).
+        return dimensionless_pdf_derivative(scaled_velocity)/complex(
+            scaled_offset, -1.0
+        )
 
-    quadrature_absolute_tolerance = max(
-        np.finfo(float).tiny, 1.0e-12/scale_squared
-    )
     def integrate_component(component):
         central_value, central_error = quad(
             lambda offset: float(component(central_integrand(offset))),
-            -50.0, 50.0, epsabs=quadrature_absolute_tolerance,
-            epsrel=2e-8, limit=500,
+            -50.0, 50.0, epsabs=1e-12, epsrel=2e-8, limit=500,
         )
         left_value, left_error = quad(
             lambda value: float(component(outer_integrand(value))),
-            -np.inf, phase_velocity-pole_half_width,
-            epsabs=quadrature_absolute_tolerance, epsrel=2e-8, limit=500,
+            -np.inf, phase_velocity_scaled-50.0*eta_scaled,
+            epsabs=1e-12, epsrel=2e-8, limit=500,
         )
         right_value, right_error = quad(
             lambda value: float(component(outer_integrand(value))),
-            phase_velocity+pole_half_width, np.inf,
-            epsabs=quadrature_absolute_tolerance, epsrel=2e-8, limit=500,
+            phase_velocity_scaled+50.0*eta_scaled, np.inf,
+            epsabs=1e-12, epsrel=2e-8, limit=500,
         )
         return (
-            central_value+left_value+right_value,
-            central_error+left_error+right_error,
+            (central_value+left_value+right_value)/scale_squared,
+            (central_error+left_error+right_error)/scale_squared,
         )
 
     integral_real, real_error = integrate_component(lambda value: np.real(value))
