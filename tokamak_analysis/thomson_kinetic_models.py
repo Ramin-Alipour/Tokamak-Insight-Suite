@@ -729,25 +729,45 @@ def _maxwellian_pdf_and_derivatives(velocity, standard_deviation):
 
 def _landau_susceptibility(phase_velocity, plasma_frequency_squared, wavenumber,
                            standard_deviation, distribution="maxwellian", kappa=None):
+    """Longitudinal susceptibility with the Landau contour on the full velocity axis.
+
+    The real principal value is evaluated symmetrically:
+      PV int f'(v)/(v-v_phi) dv
+        = int_0^inf [f'(v_phi+x)-f'(v_phi-x)]/x dx.
+    This removes the pole analytically and avoids truncating algebraic Kappa
+    tails at an arbitrary number of thermal speeds. The retarded contour adds
+    +i*pi*f'(v_phi), consistent with exp(-i omega t).
+    """
     if distribution == "kappa":
         pdf_fn = lambda v: _kappa_pdf_and_derivatives(v, standard_deviation, kappa)
-    else:
+    elif distribution == "maxwellian":
         pdf_fn = lambda v: _maxwellian_pdf_and_derivatives(v, standard_deviation)
+    else:
+        raise ValueError("distribution must be 'maxwellian' or 'kappa'")
+    sigma = _positive(standard_deviation, "standard_deviation")
     vphi = float(phase_velocity)
-    span = max(30.0*standard_deviation, 2.0*abs(vphi)+20.0*standard_deviation)
-    velocity = span*_LANDAU_NODES
-    _, derivative, _ = pdf_fn(velocity)
-    _, derivative_at, second_at = pdf_fn(np.asarray(vphi))
-    denominator = velocity-vphi
-    regular = np.divide(
-        derivative-derivative_at, denominator,
-        out=np.full_like(velocity, float(second_at)),
-        where=np.abs(denominator) > 1e-10*max(span, standard_deviation),
-    )
-    principal = span*float(np.sum(_LANDAU_WEIGHTS*regular))
-    principal += float(derivative_at)*np.log(abs((span-vphi)/(span+vphi)))
+    if not np.isfinite(vphi):
+        raise ValueError("phase_velocity must be finite")
+    omega_p2 = _positive(plasma_frequency_squared, "plasma_frequency_squared")
+    k_wave = _positive(wavenumber, "wavenumber")
+
+    # Map x in [0, infinity) to t in [0, 1): x=sigma*t/(1-t).
+    # Gauss-Legendre quadrature resolves the resonant neighbourhood and the
+    # slowly decaying algebraic tails without a finite velocity cutoff.
+    nodes, weights = leggauss(384)
+    t = 0.5*(nodes+1.0)
+    wt = 0.5*weights
+    one_minus_t = 1.0-t
+    offset = sigma*t/one_minus_t
+    jacobian = sigma/(one_minus_t*one_minus_t)
+    _, derivative_plus, _ = pdf_fn(vphi+offset)
+    _, derivative_minus, _ = pdf_fn(vphi-offset)
+    principal = float(np.sum(
+        wt*jacobian*(derivative_plus-derivative_minus)/offset
+    ))
+    _, derivative_at, _ = pdf_fn(np.asarray(vphi))
     landau_integral = principal+1j*np.pi*float(derivative_at)
-    return -(plasma_frequency_squared/(wavenumber*wavenumber))*landau_integral
+    return -(omega_p2/(k_wave*k_wave))*landau_integral
 
 
 def _resolve_ion_species(ion_species):
