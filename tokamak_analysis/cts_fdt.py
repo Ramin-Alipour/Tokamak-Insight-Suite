@@ -268,3 +268,78 @@ def quantum_unsymmetrized_dynamic_structure_factor(
             "Zero frequency requires a separately converged static-limit extrapolation.",
         ],
     }
+
+
+def density_fluctuation_spectral_matrix(
+    retarded_density_response_m3_per_J,
+    angular_frequency_rad_s,
+    temperature_J,
+    *,
+    zero_frequency_imaginary_slope=None,
+    psd_relative_tolerance=1e-8,
+):
+    """Compatibility wrapper for the legacy density-fluctuation FDT API.
+
+    Unlike the strict classical_fdt_dynamic_structure_factor entry point,
+    this wrapper permits omega=0 only when the caller supplies the converged
+    matrix slope d(Im_H chi)/d omega at zero. The zero-frequency value is then
+    the analytic limit -2*T*d(Im_H chi)/d omega, never an arbitrary epsilon.
+    """
+    omega = np.asarray(angular_frequency_rad_s, dtype=float)
+    chi = np.asarray(retarded_density_response_m3_per_J, dtype=complex)
+    temperature = float(temperature_J)
+    tolerance = float(psd_relative_tolerance)
+    if omega.ndim != 1 or omega.size == 0 or np.any(~np.isfinite(omega)):
+        raise ValueError("angular_frequency_rad_s must be a finite non-empty vector")
+    if (chi.ndim != 3 or chi.shape[0] != omega.size
+            or chi.shape[1] != chi.shape[2] or chi.shape[1] == 0
+            or np.any(~np.isfinite(chi.real)) or np.any(~np.isfinite(chi.imag))):
+        raise ValueError("response shape must match the frequency vector")
+    if not np.isfinite(temperature) or temperature <= 0.0:
+        raise ValueError("temperature_J must be positive and finite")
+    if not np.isfinite(tolerance) or tolerance <= 0.0:
+        raise ValueError("psd_relative_tolerance must be positive and finite")
+
+    imaginary = (chi - np.swapaxes(chi.conj(), 1, 2)) / (2j)
+    spectrum = np.empty_like(imaginary, dtype=complex)
+    nonzero = omega != 0.0
+    spectrum[nonzero] = (
+        -2.0 * temperature / omega[nonzero, None, None]
+    ) * imaginary[nonzero]
+    zero = ~nonzero
+    if np.any(zero):
+        if zero_frequency_imaginary_slope is None:
+            raise ValueError(
+                "zero-frequency requires an explicit converged zero-frequency imaginary slope"
+            )
+        slope = np.asarray(zero_frequency_imaginary_slope, dtype=complex)
+        expected = chi.shape[1:]
+        if (slope.shape != expected or np.any(~np.isfinite(slope.real))
+                or np.any(~np.isfinite(slope.imag))):
+            raise ValueError(
+                "zero_frequency_imaginary_slope must be a finite (n_species,n_species) matrix"
+            )
+        slope = 0.5 * (slope + slope.conj().T)
+        spectrum[zero] = -2.0 * temperature * slope
+    spectrum = 0.5 * (spectrum + np.swapaxes(spectrum.conj(), 1, 2))
+    minimum = np.empty(omega.size)
+    for index, matrix in enumerate(spectrum):
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        minimum[index] = float(eigenvalues[0])
+        if eigenvalues[0] < -tolerance * scale:
+            raise ValueError("FDT spectrum is not positive semidefinite")
+        if eigenvalues[0] < 0.0:
+            values, vectors = np.linalg.eigh(matrix)
+            spectrum[index] = (vectors * np.maximum(values, 0.0)) @ vectors.conj().T
+    return {
+        "density_fluctuation_spectral_matrix_m3_s": spectrum,
+        "angular_frequency_rad_s": omega.copy(),
+        "temperature_J": temperature,
+        "minimum_eigenvalue_before_roundoff_projection": minimum,
+        "positive_semidefinite": True,
+        "zero_frequency_limit": (
+            "explicit_analytic_slope" if np.any(zero) else "not_requested"
+        ),
+        "closure": "classical_matrix_fluctuation_dissipation_theorem",
+    }
