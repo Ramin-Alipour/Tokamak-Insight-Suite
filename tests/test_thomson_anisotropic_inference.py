@@ -148,6 +148,8 @@ def test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa()
     assert result["kappa_index"] == pytest.approx(4.2, rel=2e-3)
     assert result["model_validity"]["distribution"].startswith("gyrotropic bi-Kappa")
     assert result["parameter_covariance"].shape[0] == len(result["parameter_order"])
+    assert np.all((result["captured_spectral_probability"] > 0.0) & (result["captured_spectral_probability"] <= 1.0))
+    assert result["validity_screening"]["status"] == "within_declared_nonrelativistic_screen"
 
 
 def test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle():
@@ -174,4 +176,17 @@ def test_gyrotropic_bi_kappa_rejects_infinite_variance_domain():
             scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
             scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
             initial_kappa=1.4,
+        )
+
+
+def test_gyrotropic_bi_kappa_rejects_fit_outside_nonrelativistic_speed_screen():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    with pytest.raises(ValueError, match="non-relativistic validity screen"):
+        fit_gyrotropic_bi_kappa_thomson(
+            wavelength, spectra, laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+            scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
+            maximum_projected_rms_beta=0.01,
         )
