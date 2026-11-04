@@ -16,6 +16,7 @@ def _case():
         "ion_charge_states": np.array([1.0]),
         "gaunt_factor": 1.1,
         "ece_absorption_coefficient_m_inverse": np.full((2, shifts.size), 2.0e-4),
+        "ece_lte": True,
         "incident_radiance_W_m2_sr_Hz": 0.0,
         "receiver_etendue_m2_sr": 2.0e-5,
         "end_to_end_efficiency": 0.4,
