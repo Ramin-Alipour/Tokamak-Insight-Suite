@@ -33,6 +33,7 @@ from .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
     cold_plasma_absorbed_power_density,
+    cold_plasma_mode_radiative_coefficients,
 )
 
 
@@ -395,6 +396,9 @@ def run_advanced_thomson_physics(model, **kwargs):
         and electric polarization eigenvectors for a supplied wave-normal.
       - cold_plasma_absorbed_power_density: local time-averaged collisional
         wave absorption from the Hermitian dissipative dielectric part.
+      - cold_plasma_mode_radiative_coefficients: modal attenuation from
+        absorbed power divided by modal Poynting flux, with optional explicit-LTE
+        Kirchhoff emissivity j_nu,m=alpha_nu,m B_nu(T_e).
       - plasma_charge_state_moments: Zeff, ion charge balance and net charge
         density from explicit multispecies densities and charge states.
 
@@ -436,13 +440,15 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_magnetoionic_modes
     elif model == "cold_plasma_absorbed_power_density":
         solver = cold_plasma_absorbed_power_density
+    elif model == "cold_plasma_mode_radiative_coefficients":
+        solver = cold_plasma_mode_radiative_coefficients
     elif model == "plasma_charge_state_moments":
         solver = plasma_charge_state_moments
     else:
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, plasma_charge_state_moments; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, plasma_charge_state_moments; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
@@ -467,6 +473,7 @@ __all__ = [
     "cold_plasma_dielectric_tensor",
     "cold_plasma_magnetoionic_modes",
     "cold_plasma_absorbed_power_density",
+    "cold_plasma_mode_radiative_coefficients",
     "plasma_charge_state_moments",
     "run_advanced_thomson_physics",
 ]
