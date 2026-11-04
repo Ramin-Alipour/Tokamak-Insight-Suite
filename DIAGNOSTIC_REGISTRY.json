@@ -5782,6 +5782,31 @@
           "name": "regularization_contributed_to_identifiability",
           "unit": "boolean",
           "description": "True when regularization increases augmented rank above the data-only rank; profile covariance remains withheld if the data-only rank is deficient."
+        },
+        {
+          "name": "background_state",
+          "unit": "text status",
+          "description": "Full-EM distinguishes omitted physical background from an explicit input; the profiled constant offset remains a separate nuisance."
+        },
+        {
+          "name": "background_state_is_explicit",
+          "unit": "boolean",
+          "description": "True only when a receiver-grid physical background or path-resolved radiative-transfer model was supplied."
+        },
+        {
+          "name": "background_zero_assumption",
+          "unit": "boolean; always false",
+          "description": "Full-EM never assumes physical background zero when the input is omitted."
+        },
+        {
+          "name": "background_state_provenance",
+          "unit": "text",
+          "description": "Provenance for omitted/unknown versus explicitly supplied/modelled physical background."
+        },
+        {
+          "name": "physical_background_zero",
+          "unit": "boolean or null",
+          "description": "True/false only when physical background is supplied or modelled; null when omitted."
         }
       ],
       "assumptions": [
@@ -5938,7 +5963,12 @@
             "physical_background_transfer_diagnostics",
             "physical_background_covariance_W2_per_Hz2",
             "physical_background_covariance_used_in_gls",
-            "relativistic kinetic response and three-wave coupling evaluated from the Lorentz-boosted electron VDF"
+            "relativistic kinetic response and three-wave coupling evaluated from the Lorentz-boosted electron VDF",
+            "background_state",
+            "background_state_is_explicit",
+            "background_zero_assumption",
+            "background_state_provenance",
+            "physical_background_zero"
           ],
           "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. A separate nonlinear gyrotropic VDF-shape inverse now exists conditional on fixed bulk plasma, geometry, response and population density; the standard bulk-fit API remains distinct. Explicit stationary and Lorentz-boosted drifted relativistic Maxwell-Juttner electron distributions are accepted by the forward model; this does not imply that their drift is inferred from a single spectrum."
         },
