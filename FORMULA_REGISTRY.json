@@ -3266,7 +3266,9 @@
       ],
       "uncertainty_model": "The forward spectral-density function is deterministic and returns no covariance. Parameter fitting, measurement-noise weighting, local Jacobian covariance, response/external Monte Carlo and optional fast-ion VDF uncertainty are handled by the separate analyze_cts_spectrum inversion function.",
       "test_links": [
-        "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive"
+        "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive",
+        "tests/test_cts_analysis.py::test_cts_multi_ion_flow_inference_recovers_species_resolved_projections",
+        "tests/test_cts_analysis.py::test_cts_differential_multi_ion_flow_changes_physical_spectrum"
       ],
       "note": "The Maxwellian ion susceptibility is evaluated with species-specific Doppler-shifted resonance arguments when independent ion flow projections are supplied. This is a forward-model capability; independent species flows are not automatically inferred by the current scalar-flow optimizer.",
       "function_links": [
