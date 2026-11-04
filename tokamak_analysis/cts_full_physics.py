@@ -39,6 +39,8 @@ from .cts_stokes_transfer import (
     propagate_stratified_polarized_lte_stokes,
 )
 from .thomson_evdf import reconstruct_thomson_evdf
+from .formula_library import thomson_velocity_projection_relativistic_exact
+
 from .advanced_inference import reconstruct_multiview_3d_evdf
 from .thomson_anisotropic_inference import (
     fit_gyrotropic_bi_maxwellian_thomson,
@@ -565,6 +567,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = cold_plasma_mode_group_velocity
     elif model == "thomson_multiview_3d_evdf":
         solver = reconstruct_multiview_3d_evdf
+    elif model == "thomson_relativistic_exact_flow_projection":
+        solver = thomson_velocity_projection_relativistic_exact
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
     elif model == "thomson_relativistic_projected_evdf":
