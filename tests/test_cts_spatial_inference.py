@@ -346,3 +346,25 @@ def test_spatial_profile_regularization_mapping_must_cover_each_active_profile()
                 "ion_temperature_relative": 0.1,
             }
         )
+
+
+@pytest.mark.parametrize("bounds", [(True, 20.0), ("0.05", 20.0), [0.05, 20.0, 30.0]])
+def test_spatial_profile_bounds_reject_boolean_string_and_wrong_shape(bounds):
+    with pytest.raises(ValueError, match="profile_bounds_relative must be a real numeric"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            np.linspace(-1.0, 1.0, 8), np.ones(8), probe_frequency_Hz=140e9,
+            scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+            signal_uncertainty=np.ones(8), background_mode="zero",
+            regularization_strength=0.1, profile_bounds_relative=bounds,
+        )
+
+
+@pytest.mark.parametrize("strength", [True, "0.1", np.nan, -0.1])
+def test_spatial_regularization_strength_rejects_non_numeric_or_invalid_values(strength):
+    with pytest.raises(ValueError, match="regularization strength"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            np.linspace(-1.0, 1.0, 8), np.ones(8), probe_frequency_Hz=140e9,
+            scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
+            signal_uncertainty=np.ones(8), background_mode="zero",
+            regularization_strength=strength, profile_bounds_relative=(0.05, 20.0),
+        )

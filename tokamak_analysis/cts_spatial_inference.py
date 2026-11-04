@@ -162,8 +162,11 @@ def analyze_full_em_cts_spatial_profiles(
         raise ValueError(f"missing required Full-EM inputs: {missing}")
     if profile_bounds_relative is None:
         raise ValueError("profile_bounds_relative must be supplied explicitly; no scientific profile range is assumed")
-    lower, upper = map(float, profile_bounds_relative)
-    if not np.isfinite(lower + upper) or lower <= 0 or upper <= lower:
+    raw_bounds = np.asarray(profile_bounds_relative)
+    if raw_bounds.dtype.kind not in "iuf" or raw_bounds.shape != (2,):
+        raise ValueError("profile_bounds_relative must be a real numeric (lower, upper) pair; booleans and strings are invalid")
+    lower, upper = raw_bounds.astype(float, copy=False)
+    if not np.isfinite(lower) or not np.isfinite(upper) or lower <= 0 or upper <= lower:
         raise ValueError("profile bounds must be finite positive (lower, upper)")
     if regularization_strength is None:
         raise ValueError("regularization_strength must be supplied explicitly; no default smoothness prior is assumed")
@@ -180,10 +183,24 @@ def analyze_full_em_cts_spatial_profiles(
                 "regularization_strength mapping contains profiles that are not fitted: "
                 f"{extra_lambdas}"
             )
-        lambdas = {name: float(regularization_strength[name]) for name in active}
+        raw_lambdas = {name: regularization_strength[name] for name in active}
     else:
-        lambdas = {name: float(regularization_strength) for name in active}
-    if any(not np.isfinite(v) or v < 0 for v in lambdas.values()) or not any(v > 0 for v in lambdas.values()):
+        raw_lambdas = {name: regularization_strength for name in active}
+    lambdas = {}
+    for name, raw_value in raw_lambdas.items():
+        if isinstance(raw_value, (bool, np.bool_)) or not isinstance(
+            raw_value, (int, float, np.integer, np.floating)
+        ):
+            raise ValueError(
+                f"regularization strength for {name} must be a real numeric scalar; booleans and strings are invalid"
+            )
+        value = float(raw_value)
+        if not np.isfinite(value) or value < 0:
+            raise ValueError(
+                f"regularization strength for {name} must be finite and non-negative"
+            )
+        lambdas[name] = value
+    if not any(value > 0 for value in lambdas.values()):
         raise ValueError("regularization strengths must be finite, non-negative, and at least one positive")
     penalty = _second_difference(n_nodes) if regularization_matrix is None else np.asarray(regularization_matrix, dtype=float)
     if penalty.ndim != 2 or penalty.shape[1] != n_nodes or not np.all(np.isfinite(penalty)):
