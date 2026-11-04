@@ -14,6 +14,7 @@ from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
 
 MODEL_LABELS = {
+    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
@@ -23,6 +24,16 @@ MODEL_LABELS = {
 }
 
 EXAMPLES = {
+    "kappa_electrostatic_susceptibility": {
+        "v": Array.from(__import__("numpy").linspace(-5.0e7, 5.0e7, 2001)),
+        "phase_velocity_m_s": 1.0e6,
+        "electron_density_m3": 2.0e18,
+        "electron_temperature_eV": 250.0,
+        "kappa": 4.0,
+        "wavenumber_m_inverse": 120.0,
+        "pole_imaginary_part_m_s": 2.0e3,
+        "minimum_velocity_grid_probability_coverage": 0.999
+    },
     "thomson_three_dimensional_flow": {
         "velocity_projection_m_s": [100000.0, 200000.0, 300000.0],
         "scattering_vector_unit": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
