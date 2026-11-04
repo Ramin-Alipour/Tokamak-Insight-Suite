@@ -51,7 +51,14 @@ def _whitener(n, uncertainty=None, covariance=None):
         sigma = _real_vector(uncertainty, "uncertainty", minimum=n)
         if sigma.shape != (n,) or np.any(sigma <= 0):
             raise ValueError("uncertainty must be positive and match the data")
-        return lambda z: np.asarray(z, dtype=float) / sigma, "supplied_pointwise_measurement_uncertainty"
+
+        def whiten_pointwise(values):
+            array = np.asarray(values, dtype=float)
+            if array.ndim == 0 or array.shape[0] != n:
+                raise ValueError("whitened values must have the measurement axis as their first dimension")
+            return array / sigma.reshape((n,) + (1,) * (array.ndim - 1))
+
+        return whiten_pointwise, "supplied_pointwise_measurement_uncertainty"
     if covariance is not None:
         cov = np.asarray(covariance, dtype=float)
         if cov.shape != (n, n) or not np.all(np.isfinite(cov)) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-13):
