@@ -209,6 +209,13 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     species-name mapping; each ion susceptibility then uses its own Doppler
     resonance omega-k*u_j. Independent flows are conditionally fitted by
     fit_cts_ion_species_flows when all other plasma inputs are supplied.
+
+    fast_ion.fraction is the fraction of the selected ion species number
+    density transferred from its thermal Maxwellian component to the explicit
+    fast population; it is not an electron charge-density fraction. For a
+    tabulated_1d fast-ion VDF, the supplied velocity grid is in the species
+    rest frame and the selected species flow shifts the Landau resonance
+    through omega/k-u_j in both the principal-value and resonant terms.
     """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
@@ -275,8 +282,8 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         idx=int(idx)
         if "fraction" not in fast_ion:
             raise ValueError("fast_ion.fraction must be supplied explicitly when a fast-ion population is selected")
-        hf=float(fast_ion["fraction"])
-        if not np.isfinite(hf) or not 0<=hf<1: raise ValueError("fast-ion fraction must lie in [0,1)")
+        hf=_nonnegative_real(fast_ion["fraction"], "fast_ion.fraction")
+        if hf >= 1.0: raise ValueError("fast-ion fraction must lie in [0,1)")
         kind=fast_ion.get("kind")
         if kind not in {"maxwellian","tabulated_1d"}:
             raise ValueError("cts_spectral_density requires explicit fast_ion.kind='maxwellian' or 'tabulated_1d'")
