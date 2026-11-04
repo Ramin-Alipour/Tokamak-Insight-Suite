@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Avoid building a backlog of identical full-suite runs on rapid commits.
+  group: test-suite-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
