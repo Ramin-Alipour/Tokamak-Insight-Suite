@@ -331,8 +331,12 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert channel["effective_differential_cross_section_m2_sr"] > 0.0
     assert channel["effective_differential_cross_section_uncertainty_m2_sr"] > 0.0
     evdf = channel["electron_velocity_distribution"]
-    assert evdf["analysis_status"] == "unavailable_for_selected_physical_model"
-    assert "non-relativistic" in evdf["reason"]
+    assert evdf["analysis_status"] in {"completed", "conditional_regularized_candidate"}
+    assert evdf["recoil_included"] is False
+    assert evdf["scattering_cross_section_model"] == (
+        "polarized_single_scattering_Thomson_in_electron_rest_frame"
+    )
+    assert evdf["forward_model_recoil_included"] is False
     expected_density = channel["integrated_scattered_power_W"] / (
         2.0 * 0.1 * channel["effective_differential_cross_section_m2_sr"] * 0.01 * 0.5
     )
@@ -1556,3 +1560,44 @@ def test_full_channel_major_model_discrepancy_covariance_rejects_indefinite_inpu
             model_discrepancy_covariance=discrepancy,
         )
 
+
+
+def test_canonical_relativistic_thomson_workflow_runs_compton_projected_evdf_inverse():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(500.0, 564.0, 81)
+    laser = 532.0
+    polarization = [0.0, 0.0, 1.0]
+    physical = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, np.pi / 2.0, 100.0,
+        flow_projection_m_s=0.0,
+        incident_polarization=polarization,
+        radial_order=12, angular_order=8,
+        include_compton_recoil=True,
+    )
+    measured = 1000.0 * physical["spectral_density_per_nm"] + 2.0
+    result = analyze_thomson_spectra(
+        wavelength, measured[None, :], [0.1],
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full(wavelength.size, 0.01),
+        model="non_collective_relativistic_maxwell_juttner",
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        incident_polarization=polarization,
+        include_compton_recoil=True,
+        enable_evdf_reconstruction=True,
+        evdf_velocity_points=81,
+    )
+    evdf = result["channels"][0]["electron_velocity_distribution"]
+    assert evdf["analysis_status"] in {"completed", "conditional_regularized_candidate"}
+    assert evdf["recoil_included"] is True
+    assert evdf["forward_model_recoil_included"] is True
+    assert evdf["scattering_cross_section_model"] == (
+        "polarized_single_scattering_Klein_Nishina_in_electron_rest_frame"
+    )
+    assert evdf["absolute_density_inferred"] is False
+    assert evdf["projected_evdf_s_m"] is None or np.all(
+        np.isfinite(evdf["projected_evdf_s_m"])
+    )
