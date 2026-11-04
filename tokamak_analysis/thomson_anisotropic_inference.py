@@ -122,6 +122,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         cov = np.diag(sigma.ravel() ** 2)
     else:
         cov = np.eye(size)
+    measurement_covariance_only = cov.copy()
     if model_discrepancy_covariance is not None:
         discrepancy = _real_array(model_discrepancy_covariance, "model_discrepancy_covariance", 2)
         if discrepancy.shape != (size, size) or not np.allclose(discrepancy, discrepancy.T, rtol=1e-10, atol=1e-12 * max(np.max(np.abs(discrepancy)), 1e-300)):
@@ -228,7 +229,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         "electron_velocity_projection_m_s": fit.x[2::4].copy(),
         "fitted_spectra": fitted,
         "residual_spectra": spectra - fitted,
-        "measurement_covariance": cov,
+        "measurement_covariance": measurement_covariance_only,
         "model_discrepancy_covariance": None if model_discrepancy_covariance is None else discrepancy,
         "effective_covariance": cov,
         "parameter_covariance": parameter_covariance,
@@ -243,8 +244,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
                       "nfev": int(fit.nfev), "cost": float(fit.cost)},
         "covariance_provenance": {
             "measurement": "supplied_full_channel_major" if measurement_covariance is not None else (
-                "supplied_pointwise_diagonal" if signal_uncertainty is not None else "identity_unweighted"
+                "supplied_pointwise_diagonal" if signal_uncertainty is not None else "unweighted_identity_for_fit"
             ),
+            "parameter_covariance_scale": covariance_scale_method,
             "model_discrepancy_supplied": model_discrepancy_covariance is not None,
             "combination": "C_effective = C_measurement + C_model_discrepancy; added once",
         },
