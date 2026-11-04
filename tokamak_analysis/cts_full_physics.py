@@ -14,6 +14,7 @@ from scipy.fft import fft2, ifft2, fftfreq
 from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
+from .ece_kinetic import relativistic_kinetic_ece_absorption_coefficient
 from .cts_em_background import integrate_thermal_microwave_background
 
 
@@ -310,7 +311,9 @@ def run_advanced_thomson_physics(model, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "microwave_background":
+    if model == "relativistic_kinetic_ece":
+        solver = relativistic_kinetic_ece_absorption_coefficient
+    elif model == "microwave_background":
         solver = analyze_cts_microwave_background
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
@@ -322,7 +325,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = solve_stratified_mode_conversion
     else:
         raise ValueError(
-            "model must be one of: microwave_background, landau_fdt_cts, polarized_kinetic_ece, "
+            "model must be one of: relativistic_kinetic_ece, microwave_background, landau_fdt_cts, polarized_kinetic_ece, "
             "stratified_nonparaxial_vector, stratified_mode_conversion; "
             "no automatic model substitution is performed"
         )

@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.constants import c, epsilon_0, mu_0
 from .cts_full_em import _species_conductivity, ME, E_CHARGE
+from .cts_relativistic import relativistic_gyrotropic_species_response
 
 
 def kinetic_ece_absorption_coefficient(
@@ -73,6 +74,81 @@ def kinetic_ece_absorption_coefficient(
             "No self-consistent ray tracing or mode conversion; supply the local mode wavevector and polarization.",
             "Damping is user-specified; this routine does not implement a conserving collisional Landau operator.",
             "The plane-wave flux normalization assumes a homogeneous local mode and does not include beam-envelope energy transport.",
+        ],
+    }
+
+
+
+def relativistic_kinetic_ece_absorption_coefficient(
+    frequency_Hz, wavevector_rad_m, magnetic_field_T, *,
+    electron_density_m3, electron_distribution,
+    polarization, quadrature_order=8, gyrophase_points=32,
+    resonance_width_rad_s=1e6,
+):
+    """Relativistic magnetized ECE absorption for an explicit gyrotropic EVDF.
+
+    The relativistic momentum-space Vlasov conductivity is projected onto the
+    supplied local EM eigenmode. Signed absorption follows Poynting's theorem;
+    negative values indicate kinetic gain and are not clipped. The EVDF is an
+    explicit physical input, not inferred from electron temperature.
+    """
+    f = float(frequency_Hz)
+    ne = float(electron_density_m3)
+    k = np.asarray(wavevector_rad_m, dtype=float)
+    b = np.asarray(magnetic_field_T, dtype=float)
+    e = np.asarray(polarization, dtype=complex)
+    width = float(resonance_width_rad_s)
+    if not np.isfinite(f) or f <= 0 or not np.isfinite(ne) or ne <= 0:
+        raise ValueError("frequency_Hz and electron_density_m3 must be positive and finite")
+    if (k.shape != (3,) or b.shape != (3,) or e.shape != (3,)
+            or any(np.any(~np.isfinite(v)) for v in (k, b, e))):
+        raise ValueError("wavevector_rad_m, magnetic_field_T and polarization must be finite 3-vectors")
+    if np.linalg.norm(k) == 0 or np.linalg.norm(b) == 0 or np.linalg.norm(e) == 0:
+        raise ValueError("wavevector, magnetic field and polarization must be non-zero")
+    if not np.isfinite(width) or width <= 0:
+        raise ValueError("resonance_width_rad_s must be positive and finite")
+    if (isinstance(quadrature_order, (bool, np.bool_))
+            or int(quadrature_order) != quadrature_order or quadrature_order < 4):
+        raise ValueError("quadrature_order must be an integer >= 4")
+    if (isinstance(gyrophase_points, (bool, np.bool_))
+            or int(gyrophase_points) != gyrophase_points
+            or gyrophase_points < 16 or gyrophase_points % 2):
+        raise ValueError("gyrophase_points must be an even integer >= 16")
+
+    omega = 2.0 * np.pi * f
+    response = relativistic_gyrotropic_species_response(
+        omega, k, b, density_m3=ne, mass_kg=ME, charge_C=-E_CHARGE,
+        distribution=electron_distribution,
+        quadrature_order=int(quadrature_order),
+        gyrophase_points=int(gyrophase_points),
+        resonance_width_rad_s=width,
+    )
+    e_unit = e / np.linalg.norm(e)
+    sigma = np.asarray(response["conductivity_S_m"], dtype=complex)
+    dissipated = float(np.real(np.vdot(e_unit, sigma @ e_unit)))
+    h = np.cross(k, e_unit) / (mu_0 * omega)
+    khat = k / np.linalg.norm(k)
+    flux = 0.5 * float(np.real(np.dot(np.cross(e_unit, np.conj(h)), khat)))
+    if not np.isfinite(flux) or flux <= 0:
+        raise ValueError("supplied polarization/wavevector has non-positive normal Poynting flux")
+    alpha = 0.5 * dissipated / flux
+    return {
+        **response,
+        "absorption_coefficient_m_inverse": float(alpha),
+        "dissipative_conductivity_S_m": dissipated,
+        "incident_normal_poynting_flux_W_m2_per_V2_m2": flux,
+        "polarization_unit": e_unit,
+        "frequency_Hz": f,
+        "model": "relativistic_gyrotropic_linear_Vlasov_ECE",
+        "absorption_normalization": "Poynting_theorem_actual_supplied_plane_wave_mode",
+        "distribution_is_external": True,
+        "noise_model_used_for_absorption": False,
+        "limitations": [
+            "Collisionless relativistic gyrotropic response; no conserving collisional Landau operator is included.",
+            "The EVDF is supplied explicitly and is not inferred by this forward absorption calculation.",
+            "The local wavevector and polarization must be a mutually consistent eigenmode of the local dielectric.",
+            "No self-consistent ray tracing, mode conversion, polarized transfer, or experimental validation is performed.",
+            "Finite resonance width and momentum/gyrophase quadrature require convergence studies.",
         ],
     }
 
