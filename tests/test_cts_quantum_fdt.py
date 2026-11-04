@@ -88,3 +88,34 @@ def test_quantum_fdt_is_available_from_analysis1_physics_dispatcher():
     assert result["public_physics_entrypoint"] == "quantum_fdt"
     assert result["closure"] == "symmetrized_quantum_matrix_fluctuation_dissipation_theorem"
     assert result["automatic_model_substitution"] is False
+
+
+def test_unsymmetrized_quantum_fdt_obeys_kms_detailed_balance_and_symmetrizes():
+    temperature = 2.0e-21
+    omega = np.array([-3.0e12, 3.0e12])
+    response = _passive_response(omega)
+    greater = quantum_unsymmetrized_dynamic_structure_factor(
+        omega, response, temperature_J=temperature
+    )["dynamic_structure_factor_m3_s"][:, 0, 0].real
+    sym = quantum_fdt_dynamic_structure_factor(
+        omega, response, temperature_J=temperature
+    )["dynamic_structure_factor_m3_s"][:, 0, 0].real
+    x = hbar * omega[1] / temperature
+    assert greater[0] == pytest.approx(np.exp(-x) * greater[1], rel=2e-13)
+    assert 0.5 * (greater[0] + greater[1]) == pytest.approx(sym[1], rel=2e-13)
+    assert np.all(greater >= 0.0)
+
+
+def test_unsymmetrized_quantum_fdt_is_exposed_by_analysis1_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    omega = np.array([-1.0e12, 1.0e12])
+    result = run_advanced_thomson_physics(
+        "quantum_fdt_unsymmetrized",
+        angular_frequency_rad_s=omega,
+        retarded_density_response_m3_per_J=_passive_response(omega),
+        temperature_J=1.0e-20,
+    )
+    assert result["public_physics_entrypoint"] == "quantum_fdt_unsymmetrized"
+    assert "KMS" in result["closure"] or "quantum" in result["closure"]
+    assert result["automatic_model_substitution"] is False
