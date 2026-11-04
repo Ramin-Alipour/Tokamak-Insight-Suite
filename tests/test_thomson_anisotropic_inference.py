@@ -105,3 +105,73 @@ def test_nonuniform_response_operator_conserves_bin_integrated_spectral_power():
         np.sum(intrinsic * widths), rel=1e-12
     )
     assert not np.allclose(measured_density, response @ intrinsic)
+
+
+def _synthetic_bi_kappa_spectra():
+    from scipy.special import gammaln
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    wavelength = np.linspace(499.65, 500.35, 281)
+    laser, angle, kappa = 500.0, np.pi/2, 4.2
+    qmag = 2.0*np.sin(angle/2.0)
+    b = np.array([0.0, 0.0, 1.0])
+    pitch = np.array([0.0, 0.5, 1.0])
+    q = np.column_stack((np.sqrt(1.0-pitch), np.zeros(3), np.sqrt(pitch)))
+    tpar, tperp = 900.0, 320.0
+    directional = tperp + (tpar-tperp)*pitch
+    spectra = []
+    for i, (temp, flow) in enumerate(zip(directional, [1.2e5, -0.7e5, 0.4e5])):
+        theta2 = ((2.0*kappa-3.0)/kappa)*(2.0*e*temp/me)
+        theta = np.sqrt(theta2)
+        velocity = (c/qmag)*(1.0-wavelength/laser)-flow
+        log_pdf = (gammaln(kappa)-0.5*np.log(np.pi*kappa)
+                   -gammaln(kappa-0.5)-np.log(theta)
+                   -kappa*np.log1p(velocity**2/(kappa*theta2)))
+        feature = np.exp(log_pdf)*(c/(laser*qmag))
+        spectra.append(2.5e3*feature + 3.0 + 0.2*(wavelength-laser))
+    return wavelength, np.asarray(spectra), b, q
+
+
+def test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    result = fit_gyrotropic_bi_kappa_thomson(
+        wavelength, spectra, laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
+        initial_temperature_parallel_eV=750.0,
+        initial_temperature_perpendicular_eV=400.0, initial_kappa=5.0,
+    )
+    assert result["reportable_as_inferred_parameter"]
+    assert result["electron_temperature_parallel_eV"] == pytest.approx(900.0, rel=2e-3)
+    assert result["electron_temperature_perpendicular_eV"] == pytest.approx(320.0, rel=2e-3)
+    assert result["kappa_index"] == pytest.approx(4.2, rel=2e-3)
+    assert result["model_validity"]["distribution"].startswith("gyrotropic bi-Kappa")
+    assert result["parameter_covariance"].shape[0] == len(result["parameter_order"])
+
+
+def test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    result = fit_gyrotropic_bi_kappa_thomson(
+        wavelength, spectra[:1], laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q[:1], instrument_response_matrix=np.eye(wavelength.size),
+    )
+    assert result["anisotropy_identifiability"] == "non_identifiable"
+    assert result["electron_temperature_parallel_eV"] is None
+    assert result["electron_temperature_perpendicular_eV"] is None
+
+
+def test_gyrotropic_bi_kappa_rejects_infinite_variance_domain():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    with pytest.raises(ValueError, match="kappa_bounds"):
+        fit_gyrotropic_bi_kappa_thomson(
+            wavelength, spectra, laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+            scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
+            initial_kappa=1.4,
+        )
