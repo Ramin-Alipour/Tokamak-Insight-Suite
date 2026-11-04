@@ -6243,5 +6243,53 @@
       ],
       "note": "Nonuniform frequency spacing and off-diagonal spectral covariance are preserved."
     }
+  },
+  {
+    "name": "CTS Planck and Rayleigh-Jeans brightness temperature",
+    "equation": "T_b,Planck = (h nu/k_B)/ln(1 + 2 h nu^3/(c^2 L_nu)); T_b,RJ = c^2 L_nu/(2 k_B nu^2)",
+    "inputs": "Spectral radiance L_nu [W m^-2 sr^-1 Hz^-1] and frequency nu [Hz]",
+    "output": "Equivalent Planck and Rayleigh-Jeans brightness temperatures [K]",
+    "assumptions": "Planck inversion is an equivalent blackbody radiance temperature; Rayleigh-Jeans is the low-h nu/(k_B T) approximation. Neither is the plasma electron temperature.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_em_background.brightness_temperature_from_radiance",
+      "formula_key": "cts_radiometric_brightness_temperature",
+      "input_specs": [
+        {
+          "name": "frequency_Hz",
+          "unit": "Hz; positive vector",
+          "required": true
+        },
+        {
+          "name": "spectral_radiance_W_m2_sr_Hz",
+          "unit": "W m^-2 sr^-1 Hz^-1; non-negative vector",
+          "required": true
+        },
+        {
+          "name": "convention",
+          "unit": "planck or rayleigh_jeans",
+          "required": false,
+          "default": "planck"
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "brightness_temperature_K",
+          "unit": "K; equivalent radiometric brightness temperature"
+        }
+      ],
+      "prerequisites": [
+        "Spectral radiance at the same frequency samples"
+      ],
+      "uncertainty_model": "Deterministic nonlinear Planck inversion or linear Rayleigh-Jeans conversion; uncertainty propagation is not included in this helper.",
+      "test_links": [
+        "tests/test_cts_em_background.py::test_planck_brightness_temperature_inverts_planck_radiance",
+        "tests/test_cts_em_background.py::test_rayleigh_jeans_brightness_temperature_uses_radiance_relation"
+      ],
+      "note": "Brightness temperature characterizes radiance and must not be reported as the local electron temperature."
+    }
   }
 ]
