@@ -184,3 +184,31 @@ discrepancy covariance and effective covariance separately, preserving their
 provenance. The covariance remains conditional on the selected 1-D projected
 EVDF, fixed response and fixed background; it is not a posterior uncertainty
 or a correction to the physical scattering kernel.
+
+
+## 2026-11-04 — joint nuisance covariance for structured-background Kappa/MJ fits
+
+The dedicated Kappa/relativistic Maxwell–Jüttner measured-spectrum workflow now
+accepts additive model_discrepancy_covariance and systematic_covariance
+alongside either pointwise measurement uncertainty or a full measurement
+covariance. Each additional covariance must be finite, symmetric and positive
+semidefinite; the total covariance used for GLS whitening must be positive
+definite. The inputs are added once, and the result records which components
+were supplied. No missing covariance or cross-channel correlation is invented.
+
+The fit now returns the local joint covariance ordered as
+[Te, v_q, kappa (Kappa only), amplitude, background coefficients], including
+the physical/background cross block and the background-coefficient covariance.
+The profiled physical Jacobian and the complete physical-plus-nuisance Jacobian
+are both checked for rank and conditioning. A deficient joint rank rejects the
+fit rather than reporting a Kappa value that is degenerate with the selected
+background basis. With no covariance inputs, the returned joint covariance is
+residual-scaled and explicitly not measurement-noise uncertainty. The
+covariance remains local and conditional on the fixed measured response and
+selected background basis; absolute density is not inferred.
+
+The canonical Dashboard subanalysis exposes uploads for model-discrepancy and
+systematic covariance and forwards them to the same numerical entry point.
+This closes the structured-background covariance gap for this dedicated
+Kappa/MJ route only. It does not imply universal background parity in the
+primary channel-wise Maxwellian/Kappa/MJ workflow or across CTS.
