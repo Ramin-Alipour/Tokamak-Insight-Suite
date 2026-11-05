@@ -7428,7 +7428,7 @@
         },
         {
           "name": "distribution_model",
-          "unit": "bi_kappa",
+          "unit": "bi_maxwellian or bi_kappa",
           "required": false,
           "default": "bi_maxwellian",
           "description": "Select bi_kappa through the registered workflow dispatcher; default remains bi_maxwellian."
@@ -7508,21 +7508,19 @@
         "tests/test_thomson_workflow.py::test_registered_gyrotropic_workflow_dispatches_bimaxwellian_and_bikappa_without_fallback",
         "tests/test_thomson_workflow.py::test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback"
       ],
-      "note": "The registered dispatcher selects the exact gyrotropic bi-Kappa fitter only when distribution_model='bi_kappa'; the default bi-Maxwellian path remains backward compatible. The Kappa model is non-relativistic and is not a general anisotropic relativistic EVDF."
+      "note": "The distribution family and finite-variance domain follow the published additive bi-Kappa formulation. The registered optical Thomson implementation fits its exact projected 1-D marginal and is not a magnetized kinetic dispersion solver."
     },
     "references": [
       {
-        "title": "Plasma Scattering of Electromagnetic Radiation",
-        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "title": "Instability of the parallel electromagnetic modes in Kappa distributed plasmas – I. Electron whistler-cyclotron modes",
+        "authors": "M. Lazar, S. Poedts, R. Schlickeiser",
+        "journal": "Monthly Notices of the Royal Astronomical Society",
+        "volume": "410",
+        "issue": "1",
+        "pages": "663–670",
         "year": 2011,
-        "publisher": "Academic Press",
-        "type": "textbook"
-      },
-      {
-        "title": "Gyrotropic anisotropic Kappa projected Thomson marginal",
-        "authors": "Tokamak Insight Suite implementation; model equations documented in the source contract",
-        "year": 2026,
-        "type": "implementation_reference"
+        "doi": "10.1111/j.1365-2966.2010.17472.x",
+        "type": "journal_article"
       }
     ],
     "implementation_trace": {
