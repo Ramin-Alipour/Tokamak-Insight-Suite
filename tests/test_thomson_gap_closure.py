@@ -477,3 +477,53 @@ def test_projected_evdf_rejects_inconsistent_signal_background_cross_covariance(
             regularization_strength=1e-3,
         )
 
+
+
+def test_psf_profile_inverse_propagates_measurement_operator_cross_covariance():
+    from tokamak_analysis.thomson_gap_closure import reconstruct_psf_aware_thomson_profile
+
+    mixing = np.array([
+        [0.8, 0.2, 0.0],
+        [0.2, 0.6, 0.2],
+        [0.0, 0.2, 0.8],
+    ])
+    truth = np.array([2.0, 3.0, 2.5])
+    measured = mixing @ truth
+    measurement_covariance = np.eye(3) * 0.04
+    operator_covariance = np.eye(mixing.size) * 0.01
+    cross_covariance = np.zeros((3, mixing.size))
+    cross_covariance[0, 0] = 0.002
+    cross_covariance[1, 4] = 0.002
+    cross_covariance[2, 8] = 0.002
+    result = reconstruct_psf_aware_thomson_profile(
+        measured, mixing, regularization_strength=1e-5,
+        measurement_covariance=measurement_covariance,
+        spatial_mixing_covariance=operator_covariance,
+        measurement_spatial_mixing_cross_covariance=cross_covariance,
+        positive=False,
+    )
+    assert result["measurement_psf_cross_covariance_propagated"] is True
+    assert result["profile_covariance_with_joint_measurement_psf_uncertainty"] is not None
+    assert np.linalg.norm(result["measurement_psf_cross_covariance_contribution"]) > 0.0
+    expected = (
+        result["profile_covariance_with_psf_uncertainty"]
+        + result["measurement_psf_cross_covariance_contribution"]
+    )
+    np.testing.assert_allclose(
+        result["profile_covariance_with_joint_measurement_psf_uncertainty"], expected
+    )
+
+
+def test_psf_profile_inverse_rejects_non_psd_joint_measurement_operator_covariance():
+    from tokamak_analysis.thomson_gap_closure import reconstruct_psf_aware_thomson_profile
+
+    mixing = np.eye(3)
+    measured = np.array([1.0, 2.0, 1.5])
+    with pytest.raises(ValueError, match="joint measurement/PSF covariance block"):
+        reconstruct_psf_aware_thomson_profile(
+            measured, mixing, regularization_strength=1e-5,
+            measurement_covariance=np.eye(3) * 1e-4,
+            spatial_mixing_covariance=np.eye(9) * 1e-4,
+            measurement_spatial_mixing_cross_covariance=np.ones((3, 9)) * 1e-3,
+            positive=False,
+        )
