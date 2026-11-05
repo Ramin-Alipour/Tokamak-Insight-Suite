@@ -236,3 +236,35 @@ for the declared isotropic Maxwell–Jüttner single-scattering model only; it
 does not extend the 1-D q-projection to a general 3-D EVDF or model multiple
 scattering. The new regression checks that every source wavelength is evaluated
 by the physical kernel and that the source quadrature is normalized.
+
+## Multi-population electrostatic CTS input covariance
+
+The electrostatic electrostatic_kappa fit accepts an optional
+electron_population_parameter_covariance when electron_populations is
+supplied. Its parameter order is population-major, with four parameters per
+population:
+
+1. density_fraction
+2. temperature_ratio
+3. kappa
+4. flow_projection_m_s
+
+The covariance must be finite, symmetric and positive semidefinite, with shape
+(4 N_population, 4 N_population). Fraction covariance must preserve the
+normalization constraint: every accepted realization has strictly positive
+fractions summing to one. population_mc_samples (minimum 20) and
+population_mc_seed control reproducible Monte Carlo sampling. Each accepted
+draw is passed through a complete measured-spectrum CTS refit. Nonphysical
+draws and failed fits are rejected; fractions are never renormalized and
+physical parameters are never clipped. At least 70% of the requested refits,
+and at least 20, must succeed or the uncertainty propagation fails explicitly.
+
+fit_covariance_conditional_on_population_inputs preserves the original local
+spectral-fit covariance conditional on fixed population parameters.
+population_joint_fit_input_covariance reports the joint covariance of fitted
+[n_e, T_e, kappa] and all population inputs, including their cross-covariance;
+its fitted-parameter block adds the conditional fit covariance to the
+Monte-Carlo population-sensitivity covariance. These are conditional
+uncertainties under the supplied Gaussian input covariance and accepted-draw
+policy, not a posterior or experimental validation. If no population
+covariance is supplied, the prior fixed-input behavior is unchanged.
