@@ -75,7 +75,7 @@ def kappa_electron_susceptibility(
     marginal variance is k_B T / m. The analytic Kappa CDF quantifies the mass
     represented by the finite grid. Grids truncating too much of the heavy tail
     are rejected rather than silently renormalized into an artificially narrow
-    distribution. The retarded Landau contour uses a positive imaginary pole.
+    distribution. The default retarded Landau contour is the exact eta-to-zero Sokhotski-Plemelj limit; a finite positive pole displacement is optional and explicit.
     """
     raw_v = np.asarray(v)
     if raw_v.dtype.kind not in "iuf":
@@ -241,7 +241,7 @@ def kappa_electron_susceptibility(
             "A 1-D marginal is not a reconstruction of the full 3-D EVDF.",
             "The result is non-relativistic; relativistic Kappa response is not implemented.",
             "The default response is the exact retarded eta-to-zero Landau limit; an explicitly supplied positive pole displacement selects a finite-pole regularized response.",
-            "The phase-velocity derivative is evaluated from the differentiated retarded Landau kernel at fixed positive pole displacement.",
+            "The phase-velocity derivative is analytic in both contour modes; the exact Landau mode includes the i*pi*f'' resonant residue.",
         ],
     })
     return response
