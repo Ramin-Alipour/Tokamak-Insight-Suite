@@ -123,6 +123,34 @@ def _maximum_geometry_wave_number(scattering_geometry, probe_frequency_Hz):
         return float(max(wave_numbers))
     return float(_geometry(scattering_geometry, f0)[0])
 
+
+def _frequency_resolved_scattering_wave_numbers(frequency_shift_Hz, probe_frequency_Hz, scattering_geometry):
+    """Return the physical |k_s-k_i| for every measured frequency bin.
+
+    For frequency-resolved viewing geometry, each bin has its own incident
+    and scattered ray directions. Reusing a representative (middle-bin)
+    scattering angle biases alpha=k*lambda_D and optimizer flow support when
+    the view direction changes across the spectral window.
+    """
+    shift = _array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
+        entries = scattering_geometry["frequency_resolved_geometry"]
+        if (not isinstance(entries, Sequence) or isinstance(entries, (str, bytes))
+                or len(entries) != shift.size):
+            raise ValueError("frequency_resolved_geometry must contain exactly one geometry mapping per frequency-shift sample")
+        values = []
+        for index, (frequency, entry) in enumerate(zip(shift, entries)):
+            if not isinstance(entry, Mapping) or "frequency_resolved_geometry" in entry:
+                raise ValueError(f"frequency_resolved_geometry[{index}] must be a single-frequency geometry mapping")
+            angle = _geometry(entry, f0)[2]
+            values.append(float(_frequency_dependent_scattering_wave_number(
+                np.asarray([frequency]), f0, angle
+            )[0]))
+        return np.asarray(values, dtype=float)
+    _, _, angle = _geometry(scattering_geometry, f0)
+    return _frequency_dependent_scattering_wave_number(shift, f0, angle)
+
 def _species(species,fractions):
     if not isinstance(species,Sequence) or isinstance(species,(str,bytes)) or not species: raise ValueError("ion_species must be a non-empty sequence")
     frac=_array(fractions,"ion_fractions",1)
@@ -721,7 +749,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         for key in species_bound_keys
     ]
     physical_flow_limit=float(np.nextafter(C,0.0))
-    q_fit = _frequency_dependent_scattering_wave_number(f, f0, _geometry(scattering_geometry, f0)[2])
+    q_fit = _frequency_resolved_scattering_wave_numbers(f, f0, scattering_geometry)
     spectral_flow_limit = min(physical_flow_limit, float(np.max(2.0*np.pi*np.abs(f)/q_fit)))
     eub=tuple(map(float,b.get("electron_velocity_projection_m_s",(-spectral_flow_limit,spectral_flow_limit))))
     if len(eub)!=2 or not np.all(np.isfinite(eub)) or eub[0]>=eub[1] or max(map(abs,eub))>=C:
@@ -1142,7 +1170,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if fast and fast["kind"]=="maxwellian":
         trans[fast_offset+1,fast_offset+1]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
-    q_spectral=_frequency_dependent_scattering_wave_number(f,f0,angle)
+    q_spectral=_frequency_resolved_scattering_wave_numbers(f,f0,scattering_geometry)
     debye_length=np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2))
     alpha=1/(q*debye_length)
     alpha_spectral=1/(q_spectral*debye_length)
