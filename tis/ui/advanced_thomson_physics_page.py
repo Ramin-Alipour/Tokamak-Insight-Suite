@@ -60,7 +60,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
-    "cts_collective_kappa_spectrum": "CTS — collective Kappa-electron / multispecies Maxwellian-ion dynamic structure spectrum",
+    "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
@@ -117,9 +117,10 @@ MODEL_PHYSICS_NOTES = {
         "Collisionless, unmagnetized, longitudinal electrostatic CTS forward model. "
         "Electrons use the exact 1-D marginal of an isotropic 3-D Kappa distribution "
         "with finite-variance convention kappa > 3/2 and full Landau-contour susceptibility. "
-        "Maxwellian ion species, fractions, temperatures and flow vectors are explicit. "
-        "Dielectric screening combines electron and ion fluctuation terms into S(k,omega). "
-        "Not magnetized, collisional, relativistic, Full-EM, or an inverse fit."
+        "Each electron population may independently use a finite-variance Kappa or Maxwellian 1-D marginal; density fractions, temperature ratios and projected flows are explicit. "
+        "Each ion species may independently use a Maxwellian or finite-variance Kappa distribution with its own projected flow; species charge neutrality and ion plasma-frequency weighting are retained. "
+        "The longitudinal Landau-contour susceptibilities are summed before dielectric screening, and electron/ion fluctuation terms form S(k,omega). "
+        "This remains collisionless, unmagnetized and electrostatic; it is not a collisional, relativistic or Full-EM closure."
     ),
     "cts_tabulated_evdf_landau": (
         "Forward model: evaluates the first-order Landau susceptibility from an explicitly "
@@ -320,6 +321,11 @@ EXAMPLES = {
         "ion_temperature_eV": [200.0],
         "electron_velocity_m_s": [0.0, 0.0, 0.0],
         "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "electron_populations": [
+            {"density_fraction": 0.8, "temperature_ratio": 0.8, "kappa": 4.0, "distribution": "kappa", "flow_projection_m_s": 0.0},
+            {"density_fraction": 0.2, "temperature_ratio": 3.0, "distribution": "maxwellian", "flow_projection_m_s": 0.0}
+        ],
+        "ion_populations": [{"distribution": "kappa", "kappa": 3.0, "flow_projection_m_s": 0.0}],
         "incident_direction": [1.0, 0.0, 0.0],
         "scattered_direction": [0.0, 1.0, 0.0]
     },
