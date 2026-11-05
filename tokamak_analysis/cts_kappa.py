@@ -260,16 +260,21 @@ def maxwellian_electron_susceptibility(
     omega_pe2 = ne * E**2 / (EPS0 * mass)
     zeta = phase / thermal_speed
     plasma_dispersion = 1j * np.sqrt(np.pi) * wofz(zeta)
-    susceptibility = (
-        omega_pe2 / (wave_number**2 * thermal_speed**2)
-        * (1.0 + zeta * plasma_dispersion)
+    susceptibility_scale = omega_pe2 / (wave_number**2 * sigma2)
+    susceptibility = susceptibility_scale * (1.0 + zeta * plasma_dispersion)
+    # Fried-Conte identity: Z'(zeta) = -2 [1 + zeta Z(zeta)].
+    # This is the analytic phase-velocity sensitivity, not a finite difference.
+    plasma_dispersion_derivative = -2.0 * (1.0 + zeta * plasma_dispersion)
+    susceptibility_phase_derivative = (
+        susceptibility_scale / thermal_speed
+        * (plasma_dispersion + zeta * plasma_dispersion_derivative)
     )
     if np.any(~np.isfinite(susceptibility.real)) or np.any(~np.isfinite(susceptibility.imag)):
         raise FloatingPointError("analytic Maxwellian susceptibility is non-finite")
     scalar_input = raw_phase.ndim == 0
     return {
         "electron_susceptibility": complex(susceptibility) if scalar_input else susceptibility,
-        "plasma_dispersion_function": complex(plasma_dispersion) if scalar_input else plasma_dispersion,
+        "plasma_dispersion_function": complex(plasma_dispersion) if scalar_input else plasma_dispersion,\n        "plasma_dispersion_function_derivative": complex(plasma_dispersion_derivative) if scalar_input else plasma_dispersion_derivative,\n        "susceptibility_phase_velocity_derivative_s_m": complex(susceptibility_phase_derivative) if scalar_input else susceptibility_phase_derivative,
         "normalized_phase_velocity": float(zeta) if scalar_input else zeta,
         "thermal_speed_m_s": thermal_speed,
         "one_dimensional_velocity_variance_m2_s2": float(sigma2),

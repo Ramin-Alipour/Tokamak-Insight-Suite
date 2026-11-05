@@ -7733,7 +7733,7 @@
   },
   {
     "name": "Analytic Maxwellian longitudinal susceptibility (Fried–Conte)",
-    "equation": "χ_e(ζ) = (1/(k² λ_De²))[1 + ζ Z(ζ)],  Z(ζ)=i√π w(ζ),  ζ=v_phase/(√2 σ_e),  σ_e²=e T_e/m_e,  λ_De²=ε₀ e T_e/(n_e e²)",
+    "equation": "χ_e(ζ) = (1/(k² λ_De²))[1 + ζ Z(ζ)],  Z(ζ)=i√π w(ζ),  ζ=v_phase/(√2 σ_e),  σ_e²=e T_e/m_e,  λ_De²=ε₀ e T_e/(n_e e²),  dχ_e/dv_phase = [1/(√2 σ_e k² λ_De²)] [Z(ζ) − 2ζ(1+ζZ(ζ))]",
     "inputs": "Real phase velocity [m/s], electron density [m^-3], electron temperature [eV], wavenumber [m^-1]",
     "output": "Dimensionless complex longitudinal electron susceptibility",
     "assumptions": "Collisionless, unmagnetized, non-relativistic isotropic Maxwellian electrons; retarded Landau contour; SI units; electron-only susceptibility (no ion term or FDT fluctuation spectrum).",
@@ -7791,6 +7791,14 @@
         {
           "name": "plasma_frequency_squared_s_minus2",
           "unit": "s^-2"
+        },
+        {
+          "name": "susceptibility_phase_velocity_derivative_s_m",
+          "unit": "s/m; complex analytic derivative"
+        },
+        {
+          "name": "plasma_dispersion_function_derivative",
+          "unit": "dimensionless complex"
         }
       ],
       "prerequisites": [
@@ -7804,7 +7812,8 @@
       ],
       "test_links": [
         "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference",
-        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits"
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits",
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_derivative_matches_central_difference"
       ],
       "note": "Analytic Fried–Conte response evaluated with the Faddeeva function; independently compared with the full-axis Landau quadrature and cold high-phase-velocity limit. Not experimental validation.",
       "raw_data_to_physics": false,
@@ -7837,7 +7846,8 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference",
-        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits"
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits",
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_derivative_matches_central_difference"
       ]
     }
   }

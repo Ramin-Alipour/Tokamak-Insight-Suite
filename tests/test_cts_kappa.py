@@ -259,3 +259,26 @@ def test_analytic_maxwellian_susceptibility_is_available_through_public_dispatch
     assert np.asarray(result["electron_susceptibility"]).shape == (2,)
     dashboard = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "advanced_thomson_physics_page.py").read_text()
     assert "maxwellian_electrostatic_susceptibility" in dashboard
+
+
+
+def test_analytic_maxwellian_susceptibility_derivative_matches_central_difference():
+    from tokamak_analysis.cts_kappa import maxwellian_electron_susceptibility
+
+    args = dict(
+        electron_density_m3=1.2e19,
+        electron_temperature_eV=720.0,
+        wavenumber_m_inverse=350.0,
+    )
+    phase = 0.83 * np.sqrt(
+        2.0 * 1.602176634e-19 * args["electron_temperature_eV"]
+        / 9.1093837015e-31
+    )
+    result = maxwellian_electron_susceptibility(phase, **args)
+    step = 1.0e-5 * result["thermal_speed_m_s"]
+    plus = maxwellian_electron_susceptibility(phase + step, **args)["electron_susceptibility"]
+    minus = maxwellian_electron_susceptibility(phase - step, **args)["electron_susceptibility"]
+    finite_difference = (plus - minus) / (2.0 * step)
+    assert result["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(
+        finite_difference, rel=2e-8, abs=1e-14
+    )
