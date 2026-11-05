@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tokamak_analysis.thomson_inference_closure import (
     compton_recoil_contract,
