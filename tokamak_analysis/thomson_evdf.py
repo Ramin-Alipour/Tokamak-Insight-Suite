@@ -7,6 +7,7 @@ the marginal along the scattering vector, never an unrestricted 3-D EVDF.
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import trapezoid
 from scipy.optimize import lsq_linear, least_squares
 
 
@@ -376,7 +377,7 @@ def reconstruct_thomson_evdf(
     distribution, normalization_jacobian = _normalize_evdf_coefficients(
         coefficients, velocity
     )
-    norm = float(np.trapz(distribution, velocity))
+    norm = float(trapezoid(distribution, velocity))
     if not np.isfinite(norm) or not np.isclose(norm, 1.0, rtol=1e-10, atol=1e-12):
         raise ValueError("EVDF inversion failed trapezoidal probability normalization")
 
@@ -414,7 +415,7 @@ def reconstruct_thomson_evdf(
 
     fitted = forward @ coefficients
     residual = residual_data - fitted
-    integral = lambda values: float(np.trapz(values, velocity))
+    integral = lambda values: float(trapezoid(values, velocity))
     mean_v = integral(velocity * distribution)
     centred = velocity - mean_v
     variance = integral(centred**2 * distribution)
@@ -437,7 +438,7 @@ def reconstruct_thomson_evdf(
             np.asarray(candidate_fit.x, dtype=float), 0.0
         )
         candidate_distribution = candidate_coefficients / spacing
-        candidate_norm = float(np.trapz(candidate_distribution, velocity))
+        candidate_norm = float(trapezoid(candidate_distribution, velocity))
         if not np.isfinite(candidate_norm) or candidate_norm <= np.finfo(float).tiny:
             continue
         candidate_distribution = candidate_distribution / candidate_norm
@@ -467,7 +468,7 @@ def reconstruct_thomson_evdf(
             "skewness": float(candidate_skewness),
             "excess_kurtosis": float(candidate_excess_kurtosis),
             "total_variation_distance_from_selected": float(
-                0.5 * np.trapz(
+                0.5 * trapezoid(
                     np.abs(candidate_distribution - distribution), velocity
                 )
             ),
@@ -527,7 +528,7 @@ def reconstruct_thomson_evdf(
         else:
             exponent = float(parameters[2])
             raw_pdf = np.exp(-np.abs(z) ** exponent)
-        area_pdf = float(np.trapz(raw_pdf, velocity))
+        area_pdf = float(trapezoid(raw_pdf, velocity))
         if not np.isfinite(area_pdf) or area_pdf <= 0:
             return np.zeros_like(velocity)
         return raw_pdf / area_pdf

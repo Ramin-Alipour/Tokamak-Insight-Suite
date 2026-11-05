@@ -9,6 +9,7 @@ fitters until their UI contracts are migrated.
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import trapezoid
 from scipy.special import stdtr
 
 _C = 299_792_458.0
@@ -151,7 +152,7 @@ def fit_noncollective_kinetic_thomson_with_background(
         source_y = _real_vector(laser_spectrum_density_per_nm, "laser_spectrum_density_per_nm", minimum=3)
         if source_y.shape != source_x.shape or np.any(np.diff(source_x) <= 0) or np.any(source_x <= 0) or np.any(source_y < 0):
             raise ValueError("laser source profile must be paired, positive-wavelength, increasing and non-negative")
-        source_area = float(np.trapz(source_y, source_x))
+        source_area = float(trapezoid(source_y, source_x))
         if not np.isfinite(source_area) or source_area <= 0:
             raise ValueError("laser source profile must have positive finite integrated spectral power")
         order = int(laser_spectrum_quadrature_order)
@@ -541,7 +542,7 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         source_y = _real_vector(source_profile_power, "laser_spectrum_density_per_nm", minimum=3)
         if source_y.shape != source_x.shape or np.any(np.diff(source_x) <= 0) or np.any(source_x <= 0) or np.any(source_y < 0):
             raise ValueError("laser source profile must be paired, positive-wavelength, increasing and non-negative")
-        if not np.isfinite(np.trapz(source_y, source_x)) or np.trapz(source_y, source_x) <= 0:
+        if not np.isfinite(trapezoid(source_y, source_x)) or trapezoid(source_y, source_x) <= 0:
             raise ValueError("laser source profile must have positive finite integrated spectral power")
         order = int(source_quadrature_order)
         if isinstance(source_quadrature_order, (bool, np.bool_)) or order != source_quadrature_order or order < 3 or order > 31:

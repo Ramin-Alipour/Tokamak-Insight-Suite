@@ -8,6 +8,7 @@ electron-density or electron-temperature profile samples.
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import trapezoid
 
 def _covariance_is_positive_semidefinite(covariance, *, rtol=1e-10):
     """Check PSD after scaling to a dimensionless correlation matrix.
@@ -395,7 +396,7 @@ def infer_thomson_path_averaged_density(
     kernel = pi * dsigma * omega * eta
     integrate = getattr(np, "trapezoid", None)
     if integrate is None:  # NumPy < 2.0
-        integrate = np.trapz
+        integrate = trapezoid
     denominator = float(integrate(kernel, s))
     if not np.isfinite(denominator) or denominator <= 0:
         raise ValueError("path-integrated optical sensitivity must be positive and finite")

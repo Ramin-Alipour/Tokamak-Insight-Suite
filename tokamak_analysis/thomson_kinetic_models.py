@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import least_squares, lsq_linear
+from scipy.integrate import trapezoid
 from scipy.special import gammaln, ndtr, stdtr, kve
 from numpy.polynomial.legendre import leggauss
 
@@ -26,9 +27,7 @@ _FULL_AXIS_LANDAU_QUADRATURE = {order: leggauss(order) for order in (384, 768, 1
 
 def _trapezoid(y, x):
     """NumPy-version-independent trapezoidal integration."""
-    integrate = getattr(np, "trapezoid", None)
-    if integrate is None:  # NumPy < 2.0
-        integrate = np.trapz
+    integrate = trapezoid
     return float(integrate(y, x))
 
 

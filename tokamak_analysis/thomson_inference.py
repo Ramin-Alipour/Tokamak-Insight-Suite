@@ -6,6 +6,7 @@ This module does not calibrate detectors or repair/prepare measurements.
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import trapezoid
 from scipy.optimize import brentq, curve_fit, least_squares
 from scipy.special import gammaln, ndtr, stdtr
 
@@ -200,7 +201,7 @@ def _laser_source_response(wavelength_nm, laser_wavelength_nm,
         raise ValueError("laser_spectrum_wavelength_nm must be positive and strictly increasing")
     if np.any(source_y < 0):
         raise ValueError("laser_spectrum_density_per_nm must be non-negative")
-    area = float(np.trapz(source_y, source_x))
+    area = float(trapezoid(source_y, source_x))
     if not np.isfinite(area) or area <= 0:
         raise ValueError("The measured laser spectral profile must have positive finite integrated area")
     normalized = source_y / area
@@ -236,9 +237,9 @@ def _laser_source_response(wavelength_nm, laser_wavelength_nm,
     # window, not an instrumental efficiency correction.
     return operator, {
         "normalization_area": area,
-        "centroid_nm": float(np.trapz(source_x * normalized, source_x)),
-        "rms_width_nm": float(np.sqrt(max(np.trapz(
-            (source_x - np.trapz(source_x * normalized, source_x))**2
+        "centroid_nm": float(trapezoid(source_x * normalized, source_x)),
+        "rms_width_nm": float(np.sqrt(max(trapezoid(
+            (source_x - trapezoid(source_x * normalized, source_x))**2
             * normalized, source_x), 0.0))),
         "source_profile_samples": int(source_x.size),
         "source_operator_column_sums_min": float(np.min(operator.sum(axis=0))),
@@ -1730,7 +1731,7 @@ def analyze_thomson_spectra(
                     response, np.asarray(physical["spectral_density_per_nm"], dtype=float), xi
                 )
                 return (
-                    float(parameters[2]) * float(np.trapz(convolved_shape, xi)),
+                    float(parameters[2]) * float(trapezoid(convolved_shape, xi)),
                     float(physical["effective_differential_cross_section_m2_sr"]),
                 )
             power_point = np.r_[physical_parameters, fitted_amplitude]
@@ -3691,11 +3692,11 @@ def analyze_thomson_spectra(
                 if laser_spectrum_wavelength_nm is not None:
                     source_axis = np.asarray(laser_spectrum_wavelength_nm, dtype=float)
                     source_density = np.asarray(laser_spectrum_density_per_nm, dtype=float)
-                    source_area = float(np.trapz(source_density, source_axis))
+                    source_area = float(trapezoid(source_density, source_axis))
                     if not np.isfinite(source_area) or source_area <= 0.0:
                         raise ValueError("measured laser spectrum must have positive integrated area")
                     source_reference_wavelength_nm = float(
-                        np.trapz(source_axis * source_density, source_axis) / source_area
+                        trapezoid(source_axis * source_density, source_axis) / source_area
                     )
 
                 def mapped_wavelength_for_velocity(velocity_m_s):
