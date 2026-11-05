@@ -631,3 +631,55 @@ def test_kinetic_physical_fit_rejects_duplicate_top_level_and_nested_uncertainty
                 "measurement_uncertainty": np.full(x.size, 0.5),
             },
         )
+
+
+
+def test_maxwellian_geometry_cross_covariance_is_propagated_into_physical_covariance():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    laser = 532.0
+    angle = np.pi / 2.0
+    q = 2.0 * np.sin(angle / 2.0)
+    temperature = 120.0
+    sigma = laser * q * np.sqrt(temperature / 510998.95069)
+    center = laser * (1.0 - q * 2.0e4 / 299792458.0)
+    signal = 5.0 * np.exp(-0.5 * ((wavelength - center) / sigma) ** 2) + 0.2
+    common = dict(
+        wavelength_nm=wavelength,
+        signal=signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.2),
+        signal_uncertainty=np.full(wavelength.size, 0.01),
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        laser_wavelength_uncertainty_nm=0.01,
+        scattering_angle_uncertainty_rad=0.01,
+    )
+    independent = analyze_thomson_spectral_distribution(**common)
+    correlated = analyze_thomson_spectral_distribution(
+        **common, laser_angle_covariance_nm_rad=5.0e-5
+    )
+    assert independent["physical_inference"]["parameter_covariance"] is not None
+    assert correlated["physical_inference"]["parameter_covariance"] is not None
+    assert not np.allclose(
+        independent["physical_inference"]["parameter_covariance"],
+        correlated["physical_inference"]["parameter_covariance"],
+        rtol=1e-8, atol=1e-14,
+    )
+
+
+def test_maxwellian_geometry_cross_covariance_must_be_positive_semidefinite():
+    wavelength = np.linspace(520.0, 544.0, 121)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 0.1
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.1),
+            physical_model="non_collective_maxwellian",
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            laser_wavelength_uncertainty_nm=0.01,
+            scattering_angle_uncertainty_rad=0.01,
+            laser_angle_covariance_nm_rad=2.0e-4,
+        )
