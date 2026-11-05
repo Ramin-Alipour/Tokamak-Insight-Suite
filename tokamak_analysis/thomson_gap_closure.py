@@ -231,6 +231,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
     instrument_response_matrix, background_signal, velocity_grid_m_s,
     signal_uncertainty=None, signal_covariance=None,
     background_uncertainty=None, background_covariance=None,
+    signal_background_cross_covariance=None,
     model_discrepancy_covariance=None,
     include_compton_recoil=False, incident_polarization=None,
     incident_direction=None, scattered_direction=None,
@@ -246,7 +247,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
     remain restricted to the 1-D marginal parallel to q; this is not a 3-D EVDF.
     In the default Thomson route, the maximum recoil correction is screened
     against maximum_recoil_correction_fraction. If polarization is supplied,
-    the elastic Thomson differential weight is also applied.
+    the elastic Thomson differential weight is also applied. Correlated
+    signal/background errors are propagated using Cov(signal-background) =
+    C_signal + C_background - C_signal,background - C_signal,background.T.
     """
     x = _real_vector(wavelength_nm, "wavelength_nm", minimum=9)
     y = _real_vector(signal, "signal", minimum=9)
@@ -286,10 +289,41 @@ def reconstruct_relativistic_projected_thomson_evdf(
         raise ValueError("signal covariance must be finite, symmetric, and wavelength-sized")
     if bc is not None and (bc.shape != (n,n) or not np.all(np.isfinite(bc)) or not np.allclose(bc,bc.T,rtol=1e-10,atol=1e-13)):
         raise ValueError("background covariance must be finite, symmetric, and wavelength-sized")
+    # For the background-subtracted spectrum d = signal - background,
+    # Cov(d) = C_signal + C_background - C_signal,background
+    #                         - C_signal,background.T.
+    # The cross term matters when signal and background share detector,
+    # calibration, or common-mode fluctuations.
+    cross_covariance = None
+    if signal_background_cross_covariance is not None:
+        raw_cross = np.asarray(signal_background_cross_covariance)
+        if (raw_cross.dtype.kind not in "iuf" or raw_cross.shape != (n, n)
+                or not np.all(np.isfinite(raw_cross))):
+            raise ValueError(
+                "signal_background_cross_covariance must be a finite real wavelength-sized square matrix"
+            )
+        cross_covariance = raw_cross.astype(float, copy=False)
+        joint_covariance = np.block([
+            [np.zeros((n, n)) if sc is None else sc, cross_covariance],
+            [cross_covariance.T, np.zeros((n, n)) if bc is None else bc],
+        ])
+        joint_scale = max(float(np.max(np.abs(joint_covariance))), np.finfo(float).tiny)
+        if float(np.linalg.eigvalsh(0.5 * (joint_covariance + joint_covariance.T))[0]) < -1e-10 * joint_scale:
+            raise ValueError(
+                "joint signal/background covariance must be positive semidefinite; "
+                "supply both marginal covariances consistent with the cross covariance"
+            )
     measurement_covariance = (
         (np.zeros((n, n), dtype=float) if sc is None else sc)
         + (np.zeros((n, n), dtype=float) if bc is None else bc)
-    ) if sc is not None or bc is not None else None
+        - (np.zeros((n, n), dtype=float) if cross_covariance is None else cross_covariance)
+        - (np.zeros((n, n), dtype=float) if cross_covariance is None else cross_covariance.T)
+    ) if sc is not None or bc is not None or cross_covariance is not None else None
+    if measurement_covariance is not None:
+        measurement_covariance = 0.5 * (measurement_covariance + measurement_covariance.T)
+        measurement_scale = max(float(np.max(np.abs(measurement_covariance))), np.finfo(float).tiny)
+        if float(np.linalg.eigvalsh(measurement_covariance)[0]) < -1e-10 * measurement_scale:
+            raise ValueError("background-subtracted measurement covariance must be positive semidefinite")
     discrepancy_covariance = None
     if model_discrepancy_covariance is not None:
         raw_discrepancy = np.asarray(model_discrepancy_covariance)
@@ -511,6 +545,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "regularization_operator": "nonuniform_three_point_second_derivative_on_interior_velocity_nodes",
         "velocity_grid_spacing_uniform": bool(np.allclose(dv, dv[0], rtol=1e-8, atol=1e-12 * max(abs(float(dv[0])), 1.0))),
         "noise_model": noise_status,
+        "signal_background_cross_covariance": (
+            None if cross_covariance is None else cross_covariance.copy()
+        ),
         "measurement_covariance": (
             None if measurement_covariance is None else measurement_covariance.copy()
         ),
