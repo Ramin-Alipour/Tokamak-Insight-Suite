@@ -44,6 +44,7 @@ from .cts_stokes_transfer import (
     propagate_stratified_polarized_lte_stokes,
 )
 from .thomson_evdf import reconstruct_thomson_evdf
+from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
 from .formula_library import thomson_velocity_projection_relativistic_exact
 
 from .advanced_inference import reconstruct_multiview_3d_evdf
@@ -535,6 +536,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         inversion in the Thomson limit, or exact Compton four-momentum
         kinematics with polarized Klein-Nishina weighting when recoil is enabled.
       - thomson_psf_profile_inverse: explicit PSF/mixing-aware regularized spatial inversion.
+      - thomson_joint_spatial_spectra: joint wavelength-resolved inversion of measured channel spectra through a supplied spatial mixing operator, with shared physical profiles and joint covariance.
       - thomson_normalized_poloidal_flux: equilibrium-supplied mapping of Thomson channel fluxes to rho_pol with full joint flux/axis/separatrix covariance propagation.
       - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.
       - thomson_three_dimensional_flow: GLS inversion of measured flow projections from three or more independent scattering-vector directions.
@@ -620,6 +622,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = reconstruct_relativistic_projected_thomson_evdf
     elif model == "thomson_psf_profile_inverse":
         solver = reconstruct_psf_aware_thomson_profile
+    elif model == "thomson_joint_spatial_spectra":
+        solver = reconstruct_joint_thomson_spatial_spectra
     elif model == "thomson_normalized_poloidal_flux":
         solver = map_thomson_channels_to_normalized_poloidal_flux
     elif model == "gyrotropic_bi_maxwellian_anisotropy":
