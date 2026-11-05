@@ -59,7 +59,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
-    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility and analytic phase-velocity derivative",
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
@@ -97,6 +97,17 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "kappa_electrostatic_susceptibility": (
+        "Collisionless, unmagnetized, non-relativistic longitudinal electron response for the exact "
+        "1-D marginal of an isotropic 3-D finite-variance Kappa distribution (kappa > 3/2). "
+        "The solver integrates the analytic Kappa derivative over the complete velocity axis and "
+        "returns chi_e = -(omega_pe^2/k^2) integral f'_kappa(v)/(v-v_phase-i*eta) dv. "
+        "It also returns d chi_e/d v_phase = -(omega_pe^2/k^2) integral "
+        "f'_kappa(v)/(v-v_phase-i*eta)^2 dv at fixed positive eta, with separate real/imaginary "
+        "quadrature error estimates. The velocity grid is a tail-coverage gate, not a truncated-tail "
+        "approximation. This remains an electron-only electrostatic response, not collisional, "
+        "magnetized, relativistic, FDT or Full-EM CTS."
+    ),
     "maxwellian_electrostatic_susceptibility": (
         "Exact collisionless unmagnetized longitudinal Maxwellian response: chi_e = (2 omega_pe^2/(k^2 v_th^2)) [1 + zeta Z(zeta)], " 
         "with v_th=sqrt(2 e T_e/m_e), zeta=v_phase/v_th and Z=i sqrt(pi) wofz(zeta). This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."

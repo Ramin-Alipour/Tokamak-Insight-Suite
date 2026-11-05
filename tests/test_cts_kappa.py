@@ -299,3 +299,44 @@ def test_kappa_phase_derivative_formula_registry_is_synchronized_and_executable(
     assert "susceptibility_phase_velocity_derivative_s_m" in {
         item["name"] for item in matches[0]["execution_contract"]["output_specs"]
     }
+
+
+def test_kappa_susceptibility_phase_derivative_matches_central_finite_difference():
+    parameters = args(k=4.5)
+    parameters["phase_velocity_m_s"] = 0.73e6
+    result = kappa_electron_susceptibility(**parameters)
+    step = 2.0e-4 * np.sqrt(
+        1.602176634e-19 * parameters["electron_temperature_eV"]
+        / 9.1093837015e-31
+    )
+    plus = kappa_electron_susceptibility(
+        **{**parameters, "phase_velocity_m_s": parameters["phase_velocity_m_s"] + step}
+    )["electron_susceptibility"]
+    minus = kappa_electron_susceptibility(
+        **{**parameters, "phase_velocity_m_s": parameters["phase_velocity_m_s"] - step}
+    )["electron_susceptibility"]
+    finite_difference = (plus - minus) / (2.0 * step)
+    assert result["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(
+        finite_difference, rel=3e-4, abs=2e-10
+    )
+    assert np.isfinite(result["integral_phase_velocity_derivative_s3_m3"].real)
+    assert np.isfinite(result["integral_phase_velocity_derivative_s3_m3"].imag)
+    assert result["integral_phase_velocity_derivative_real_absolute_error"] >= 0.0
+    assert result["integral_phase_velocity_derivative_imag_absolute_error"] >= 0.0
+
+
+def test_kappa_phase_derivative_formula_registry_is_synchronized_and_executable():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "cts_kappa_landau_phase_velocity_derivative"
+    matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
+    assert len(matches) == 1
+    assert matches == [item for item in packaged if item.get("execution_contract", {}).get("formula_key") == key]
+    assert matches[0]["execution_contract"]["function_link"] == "tokamak_analysis.cts_kappa.kappa_electron_susceptibility"
+    assert "susceptibility_phase_velocity_derivative_s_m" in {
+        item["name"] for item in matches[0]["execution_contract"]["output_specs"]
+    }

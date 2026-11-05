@@ -7935,9 +7935,9 @@
         "Finite velocity grid is used only for the probability-coverage gate; the analytic Kappa tail is integrated over the complete real axis"
       ],
       "test_links": [
-        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_complex_step_scale_finite_difference"
+        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_central_finite_difference"
       ],
-      "note": "The derivative follows by differentiating the retarded Landau kernel with respect to real phase velocity at fixed positive pole displacement. It is returned by the existing public kappa_electrostatic_susceptibility dispatcher and advanced Thomson physics dashboard. Software limiting/finite-difference tests are not experimental validation.",
+      "note": "The derivative follows by differentiating the retarded Landau kernel with respect to real phase velocity at fixed positive pole displacement. It is returned by the existing public kappa_electrostatic_susceptibility dispatcher and advanced Thomson physics dashboard. Software tests are not experimental validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "physical_response_kernel",
@@ -7963,7 +7963,7 @@
       "formula_key": "cts_kappa_landau_phase_velocity_derivative",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_complex_step_scale_finite_difference"
+        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_central_finite_difference"
       ]
     }
   }
