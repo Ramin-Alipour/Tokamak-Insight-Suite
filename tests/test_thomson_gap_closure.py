@@ -457,7 +457,7 @@ def test_projected_evdf_propagates_correlated_signal_background_covariance():
     expected = signal_cov + background_cov - cross_cov - cross_cov.T
     np.testing.assert_allclose(result["measurement_covariance"], expected)
     np.testing.assert_allclose(result["signal_background_cross_covariance"], cross_cov)
-    assert result["noise_model"] == "full_covariance_whitening"
+    assert result["noise_model"] == "supplied_full_measurement_covariance"
 
 
 def test_projected_evdf_rejects_inconsistent_signal_background_cross_covariance():
