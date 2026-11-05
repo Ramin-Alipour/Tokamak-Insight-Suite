@@ -101,8 +101,8 @@ def test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flu
         include_compton_recoil=True,
     )
     measured = 2.0 * forward["spectral_density_per_nm"] + 0.03
-    source_wavelength = np.array([531.98, 532.0, 532.02])
-    source_power_density = np.array([0.0, 1.0, 0.0])
+    source_wavelength = np.array([531.9, 531.95, 532.0, 532.05, 532.1])
+    source_power_density = np.array([0.0, 0.0, 1.0, 0.0, 0.0])
     result = fit_noncollective_kinetic_thomson_with_background(
         wavelength, measured,
         physical_model="relativistic_maxwell_juttner",
@@ -122,6 +122,8 @@ def test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flu
     assert result["recoil_included"] is True
     assert result["laser_source_profile_used"] is True
     assert result["laser_source_quadrature_nodes"] == 3
+    assert min(result["laser_source_quadrature_wavelength_nm"]) >= 531.95
+    assert max(result["laser_source_quadrature_wavelength_nm"]) <= 532.05
     assert "photon_flux" in result["laser_source_profile_convolution"]
     assert "Klein_Nishina" in result["laser_source_profile_convolution"]
 
