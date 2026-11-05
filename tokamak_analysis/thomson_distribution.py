@@ -142,6 +142,7 @@ def analyze_thomson_spectral_distribution(
     scattering_angle_rad: float | None = None,
     laser_wavelength_uncertainty_nm: float | None = None,
     scattering_angle_uncertainty_rad: float | None = None,
+    laser_angle_covariance_nm_rad: float = 0.0,
     physical_fit_options: dict | None = None,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
@@ -633,6 +634,14 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
         if not np.isfinite(laser_unc) or laser_unc < 0.0 or not np.isfinite(angle_unc) or angle_unc < 0.0:
             raise ValueError("laser/angle uncertainties must be finite and non-negative")
+        geometry_cross_covariance = float(laser_angle_covariance_nm_rad)
+        if not np.isfinite(geometry_cross_covariance):
+            raise ValueError("laser_angle_covariance_nm_rad must be finite")
+        geometry_covariance = np.array([[laser_unc**2, geometry_cross_covariance], [geometry_cross_covariance, angle_unc**2]])
+        geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+        geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
+        if geometry_eigenvalues[0] < -1e-12 * geometry_scale:
+            raise ValueError("laser/angle calibration covariance must be positive semidefinite; require |covariance| <= laser_uncertainty * angle_uncertainty")
         q = 2.0 * np.sin(angle / 2.0)
         light_speed = 299792458.0
         electron_rest_energy_eV = 510998.95069
@@ -663,6 +672,8 @@ def analyze_thomson_spectral_distribution(
             input_covariance[:2, :2] = covariance[np.ix_([1, 2], [1, 2])]
             input_covariance[2, 2] = laser_unc**2
             input_covariance[3, 3] = angle_unc**2
+            input_covariance[2, 3] = geometry_cross_covariance
+            input_covariance[3, 2] = geometry_cross_covariance
             jacobian = np.vstack((grad_temperature, grad_flow))
             physical_covariance = jacobian @ input_covariance @ jacobian.T
             physical_covariance = 0.5 * (physical_covariance + physical_covariance.T)
@@ -690,6 +701,7 @@ def analyze_thomson_spectral_distribution(
                 "intrinsic Gaussian width from forward convolution with the supplied measured response matrix",
                 "non-relativistic elastic Thomson wavelength mapping",
                 "laser wavelength and scattering-angle calibration errors are independent of fitted spectral parameters",
+                "laser wavelength/scattering-angle calibration cross-covariance is included when supplied",
                 "no model-discrepancy or background-parameter cross-covariance is included in this conditional conversion",
             ],
             "limitations": [
