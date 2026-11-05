@@ -250,7 +250,10 @@ def reconstruct_relativistic_projected_thomson_evdf(
     remain restricted to the 1-D marginal parallel to q; this is not a 3-D EVDF.
     In the default Thomson route, the maximum recoil correction is screened
     against maximum_recoil_correction_fraction. If polarization is supplied,
-    the elastic Thomson differential weight is also applied. Correlated
+    the elastic Thomson differential weight is also applied. An optional measured
+    incident-laser spectral density is integrated through the exact single-electron
+    wavelength map and differential cross-section before the detector response;
+    it is not approximated by a post-fit Gaussian broadening. Correlated
     signal/background errors are propagated using Cov(signal-background) =
     C_signal + C_background - C_signal,background - C_signal,background.T.
     """
