@@ -3675,117 +3675,111 @@ def analyze_thomson_spectra(
                 "reason": "EVDF reconstruction was explicitly disabled.",
             }
         elif model == "non_collective_relativistic_maxwell_juttner":
-            if laser_spectrum_wavelength_nm is not None:
+            try:
+                from .thomson_gap_closure import (
+                    reconstruct_relativistic_projected_thomson_evdf,
+                    relativistic_projected_compton_kinematics,
+                )
+                wavelength_axis = np.asarray(xs[channel_index], dtype=float)
+                # Invert the same exact relativistic single-electron wavelength
+                # map used by the selected forward model to set the velocity
+                # support from the measured spectral-bin interior.
+                low_wavelength = float(
+                    wavelength_axis[0] + 0.5*(wavelength_axis[1]-wavelength_axis[0])
+                )
+                high_wavelength = float(
+                    wavelength_axis[-1] - 0.5*(wavelength_axis[-1]-wavelength_axis[-2])
+                )
+
+                source_reference_wavelength_nm = float(laser_wavelength_nm)
+                if laser_spectrum_wavelength_nm is not None:
+                    source_axis = np.asarray(laser_spectrum_wavelength_nm, dtype=float)
+                    source_density = np.asarray(laser_spectrum_density_per_nm, dtype=float)
+                    source_area = float(np.trapz(source_density, source_axis))
+                    if not np.isfinite(source_area) or source_area <= 0.0:
+                        raise ValueError("measured laser spectrum must have positive integrated area")
+                    source_reference_wavelength_nm = float(
+                        np.trapz(source_axis * source_density, source_axis) / source_area
+                    )
+
+                def mapped_wavelength_for_velocity(velocity_m_s):
+                    step = max(1.0, abs(float(velocity_m_s))*1e-10)
+                    probe = np.array([float(velocity_m_s), float(velocity_m_s)+step])
+                    mapped = relativistic_projected_compton_kinematics(
+                        probe, source_reference_wavelength_nm,
+                        float(scattering_angle_rad),
+                    )
+                    key = (
+                        "compton_scattered_wavelength_nm"
+                        if include_compton_recoil else
+                        "thomson_scattered_wavelength_nm"
+                    )
+                    return float(mapped[key][0])
+
+                velocity_bracket = (-0.99*C_M_S, 0.99*C_M_S)
+                velocity_low = brentq(
+                    lambda value: mapped_wavelength_for_velocity(value)-high_wavelength,
+                    *velocity_bracket, xtol=1e-3,
+                )
+                velocity_high = brentq(
+                    lambda value: mapped_wavelength_for_velocity(value)-low_wavelength,
+                    *velocity_bracket, xtol=1e-3,
+                )
+                if not velocity_high > velocity_low:
+                    raise ValueError(
+                        "Measured wavelength coverage does not map to an increasing projected-velocity interval."
+                    )
+                velocity_grid = np.linspace(
+                    velocity_low, velocity_high, int(evdf_velocity_points)
+                )
+                evdf = reconstruct_relativistic_projected_thomson_evdf(
+                    wavelength_axis,
+                    y[channel_index],
+                    laser_wavelength_nm=float(laser_wavelength_nm),
+                    scattering_angle_rad=float(scattering_angle_rad),
+                    instrument_response_matrix=channel_responses[channel_index],
+                    background_signal=fitted_background,
+                    velocity_grid_m_s=velocity_grid,
+                    signal_uncertainty=channel_uncertainty,
+                    signal_covariance=channel_covariance,
+                    include_compton_recoil=include_compton_recoil,
+                    incident_polarization=incident_polarization,
+                    maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                    regularization_strength=None,
+                    laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
+                    laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
+                )
+                evdf["laser_spectral_profile"]["source_profile_used"] = laser_spectrum_wavelength_nm is not None
+                evdf["analysis_status"] = (
+                    "completed"
+                    if evdf["primary_result_status"] == "identified_from_measurement"
+                    else "conditional_regularized_candidate"
+                )
+                evdf["forward_model_recoil_included"] = bool(include_compton_recoil)
+                evdf["background_source"] = (
+                    "full detector-space nuisance basis fitted by the selected relativistic Thomson physical forward model"
+                )
+                evdf["interpretation"] = (
+                    "A relativistically mapped, normalized one-dimensional electron-velocity marginal along "
+                    "the scattering vector. The Compton route uses the same recoil switch and incident "
+                    "polarization as the selected forward fit. A regularized candidate is not promoted to "
+                    "a primary measurement when the data-only inverse is rank deficient. A single view "
+                    "does not identify transverse velocity structure or an unrestricted 3-D EVDF."
+                )
+            except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
                 evdf = {
                     "analysis_status": "unavailable_for_this_channel",
-                    "reason": (
-                        "The relativistic projected inverse currently assumes a monochromatic "
-                        "incident laser; the supplied finite-bandwidth laser spectrum is not "
-                        "yet convolved in this inverse operator."
-                    ),
+                    "reason": str(exc),
                     "identifiability": {
                         "primary": [],
-                        "conditional": ["A source-spectrum-aware relativistic projected inverse."],
+                        "conditional": [
+                            "A stable relativistic projected EVDF requires adequate wavelength coverage, measured response, polarization for the Compton route, and sufficient spectral information."
+                        ],
                         "non_identifiable": [
                             "An unrestricted three-dimensional relativistic EVDF from one scattering geometry."
                         ],
                     },
                 }
-            else:
-                try:
-                    from .thomson_gap_closure import (
-                        reconstruct_relativistic_projected_thomson_evdf,
-                        relativistic_projected_compton_kinematics,
-                    )
-                    wavelength_axis = np.asarray(xs[channel_index], dtype=float)
-                    # Invert the same exact relativistic single-electron wavelength
-                    # map used by the selected forward model to set the velocity
-                    # support from the measured spectral-bin interior.
-                    low_wavelength = float(
-                        wavelength_axis[0] + 0.5*(wavelength_axis[1]-wavelength_axis[0])
-                    )
-                    high_wavelength = float(
-                        wavelength_axis[-1] - 0.5*(wavelength_axis[-1]-wavelength_axis[-2])
-                    )
-
-                    def mapped_wavelength_for_velocity(velocity_m_s):
-                        step = max(1.0, abs(float(velocity_m_s))*1e-10)
-                        probe = np.array([float(velocity_m_s), float(velocity_m_s)+step])
-                        mapped = relativistic_projected_compton_kinematics(
-                            probe, float(laser_wavelength_nm),
-                            float(scattering_angle_rad),
-                        )
-                        key = (
-                            "compton_scattered_wavelength_nm"
-                            if include_compton_recoil else
-                            "thomson_scattered_wavelength_nm"
-                        )
-                        return float(mapped[key][0])
-
-                    velocity_bracket = (-0.99*C_M_S, 0.99*C_M_S)
-                    velocity_low = brentq(
-                        lambda value: mapped_wavelength_for_velocity(value)-high_wavelength,
-                        *velocity_bracket, xtol=1e-3,
-                    )
-                    velocity_high = brentq(
-                        lambda value: mapped_wavelength_for_velocity(value)-low_wavelength,
-                        *velocity_bracket, xtol=1e-3,
-                    )
-                    if not velocity_high > velocity_low:
-                        raise ValueError(
-                            "Measured wavelength coverage does not map to an increasing projected-velocity interval."
-                        )
-                    velocity_grid = np.linspace(
-                        velocity_low, velocity_high, int(evdf_velocity_points)
-                    )
-                    evdf = reconstruct_relativistic_projected_thomson_evdf(
-                        wavelength_axis,
-                        y[channel_index],
-                        laser_wavelength_nm=float(laser_wavelength_nm),
-                        scattering_angle_rad=float(scattering_angle_rad),
-                        instrument_response_matrix=channel_responses[channel_index],
-                        background_signal=fitted_background,
-                        velocity_grid_m_s=velocity_grid,
-                        signal_uncertainty=channel_uncertainty,
-                        signal_covariance=channel_covariance,
-                        include_compton_recoil=include_compton_recoil,
-                        incident_polarization=incident_polarization,
-                        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
-                        regularization_strength=None,
-                    )
-                    evdf["laser_spectral_profile"] = {
-                        "assumption": "monochromatic_incident_laser",
-                    }
-                    evdf["analysis_status"] = (
-                        "completed"
-                        if evdf["primary_result_status"] == "identified_from_measurement"
-                        else "conditional_regularized_candidate"
-                    )
-                    evdf["forward_model_recoil_included"] = bool(include_compton_recoil)
-                    evdf["background_source"] = (
-                        "full detector-space nuisance basis fitted by the selected relativistic Thomson physical forward model"
-                    )
-                    evdf["interpretation"] = (
-                        "A relativistically mapped, normalized one-dimensional electron-velocity marginal along "
-                        "the scattering vector. The Compton route uses the same recoil switch and incident "
-                        "polarization as the selected forward fit. A regularized candidate is not promoted to "
-                        "a primary measurement when the data-only inverse is rank deficient. A single view "
-                        "does not identify transverse velocity structure or an unrestricted 3-D EVDF."
-                    )
-                except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
-                    evdf = {
-                        "analysis_status": "unavailable_for_this_channel",
-                        "reason": str(exc),
-                        "identifiability": {
-                            "primary": [],
-                            "conditional": [
-                                "A stable relativistic projected EVDF requires adequate wavelength coverage, measured response, polarization for the Compton route, and sufficient spectral information."
-                            ],
-                            "non_identifiable": [
-                                "An unrestricted three-dimensional relativistic EVDF from one scattering geometry."
-                            ],
-                        },
-                    }
         else:
             try:
                 q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
