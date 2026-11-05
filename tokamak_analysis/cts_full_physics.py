@@ -32,6 +32,7 @@ from .cts_em_background import (
     brightness_temperature_from_radiance,
 )
 from .cts_kappa import kappa_electron_susceptibility
+from .cts_kappa import maxwellian_electron_susceptibility
 from .thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
@@ -480,7 +481,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
         Maxwellian multispecies ions. This is a forward model, not a 3-D EVDF inverse.
-      - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
+      - maxwellian_electrostatic_susceptibility: exact Fried-Conte Maxwellian electron susceptibility using the Faddeeva function.\n      - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
       - cts_collective_kappa_spectrum: collisionless electrostatic dynamic-structure
@@ -630,7 +631,7 @@ def run_advanced_thomson_physics(model, **kwargs):
 
 
 __all__ = [
-    "kappa_electron_susceptibility",
+    "kappa_electron_susceptibility",\n    "maxwellian_electron_susceptibility",
     "collective_tabulated_electron_spectral_density",
     "quantum_fdt_dynamic_structure_factor",
     "quantum_unsymmetrized_dynamic_structure_factor",

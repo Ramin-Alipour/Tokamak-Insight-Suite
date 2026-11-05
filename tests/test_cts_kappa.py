@@ -198,3 +198,64 @@ def test_collective_kappa_dispatcher_passes_multi_population_contract_to_physica
     )
     assert result == {"ok": True}
     assert captured["electron_populations"] == populations
+
+
+
+def test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference():
+    from tokamak_analysis.cts_kappa import maxwellian_electron_susceptibility
+    from tokamak_analysis.thomson_kinetic_models import _landau_susceptibility
+
+    ne, te, wave_number = 2.0e19, 850.0, 420.0
+    sigma = np.sqrt(1.602176634e-19 * te / 9.1093837015e-31)
+    omega_pe2 = ne * 1.602176634e-19**2 / (8.8541878128e-12 * 9.1093837015e-31)
+    phase = np.array([-1.3, -0.4, 0.0, 0.7, 1.8]) * sigma
+    exact = maxwellian_electron_susceptibility(
+        phase, electron_density_m3=ne, electron_temperature_eV=te,
+        wavenumber_m_inverse=wave_number,
+    )["electron_susceptibility"]
+    reference = np.array([
+        _landau_susceptibility(v, omega_pe2, wave_number, sigma)
+        for v in phase
+    ])
+    np.testing.assert_allclose(exact, reference, rtol=3e-5, atol=2e-8)
+
+
+def test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits():
+    from tokamak_analysis.cts_kappa import maxwellian_electron_susceptibility
+
+    ne, te, k = 1.5e19, 500.0, 300.0
+    result = maxwellian_electron_susceptibility(
+        0.0, electron_density_m3=ne, electron_temperature_eV=te,
+        wavenumber_m_inverse=k,
+    )
+    omega_pe2 = result["plasma_frequency_squared_s_minus2"]
+    sigma2 = result["one_dimensional_velocity_variance_m2_s2"]
+    expected_zero = omega_pe2 / (2.0 * k**2 * sigma2)
+    assert result["electron_susceptibility"].real == pytest.approx(expected_zero, rel=1e-12)
+    assert result["electron_susceptibility"].imag == pytest.approx(0.0, abs=1e-14)
+
+    phase = 80.0 * result["thermal_speed_m_s"]
+    high = maxwellian_electron_susceptibility(
+        phase, electron_density_m3=ne, electron_temperature_eV=te,
+        wavenumber_m_inverse=k,
+    )["electron_susceptibility"]
+    cold_asymptote = -omega_pe2 / (k**2 * phase**2)
+    assert high.real == pytest.approx(cold_asymptote, rel=5e-4)
+    assert abs(high.imag) < abs(high.real) * 1e-10
+
+
+def test_analytic_maxwellian_susceptibility_is_available_through_public_dispatcher_and_dashboard():
+    from pathlib import Path
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "maxwellian_electrostatic_susceptibility",
+        phase_velocity_m_s=[0.0, 1.0e5],
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=100.0,
+        wavenumber_m_inverse=100.0,
+    )
+    assert result["public_physics_entrypoint"] == "maxwellian_electrostatic_susceptibility"
+    assert np.asarray(result["electron_susceptibility"]).shape == (2,)
+    dashboard = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "advanced_thomson_physics_page.py").read_text()
+    assert "maxwellian_electrostatic_susceptibility" in dashboard

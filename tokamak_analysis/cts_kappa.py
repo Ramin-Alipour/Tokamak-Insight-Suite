@@ -8,7 +8,7 @@ Kappa closure.
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import gammaln, betainc
+from scipy.special import gammaln, betainc, wofz
 from scipy.integrate import quad
 
 
@@ -229,3 +229,57 @@ def kappa_electron_susceptibility(
         ],
     })
     return response
+
+
+def maxwellian_electron_susceptibility(
+    phase_velocity_m_s, *, electron_density_m3, electron_temperature_eV,
+    wavenumber_m_inverse, mass_kg=ME,
+):
+    r"""Exact collisionless Maxwellian longitudinal susceptibility.
+
+    Uses the Fried-Conte plasma dispersion function
+    Z(zeta) = i*sqrt(pi)*wofz(zeta), with
+    zeta = v_phase/sqrt(2*k_B*T/m), and
+    chi_e = (omega_pe**2/(k**2*v_th**2)) * (1 + zeta*Z(zeta)).
+    The retarded Landau contour is selected by the Faddeeva function for
+    real phase velocity. This is an analytic Maxwellian reference kernel,
+    not a collisional, magnetized, or electromagnetic CTS model.
+    """
+    raw_phase = np.asarray(phase_velocity_m_s)
+    if raw_phase.dtype.kind not in "iuf" or raw_phase.ndim > 1:
+        raise ValueError("phase_velocity_m_s must be a real scalar or 1-D array")
+    phase = raw_phase.astype(float, copy=False)
+    if np.any(~np.isfinite(phase)):
+        raise ValueError("phase_velocity_m_s must be finite")
+    ne = _positive_real_scalar(electron_density_m3, "electron_density_m3")
+    te = _positive_real_scalar(electron_temperature_eV, "electron_temperature_eV")
+    wave_number = _positive_real_scalar(wavenumber_m_inverse, "wavenumber_m_inverse")
+    mass = _positive_real_scalar(mass_kg, "mass_kg")
+    sigma2 = E * te / mass
+    thermal_speed = float(np.sqrt(2.0 * sigma2))
+    omega_pe2 = ne * E**2 / (EPS0 * mass)
+    zeta = phase / thermal_speed
+    plasma_dispersion = 1j * np.sqrt(np.pi) * wofz(zeta)
+    susceptibility = (
+        omega_pe2 / (wave_number**2 * thermal_speed**2)
+        * (1.0 + zeta * plasma_dispersion)
+    )
+    if np.any(~np.isfinite(susceptibility.real)) or np.any(~np.isfinite(susceptibility.imag)):
+        raise FloatingPointError("analytic Maxwellian susceptibility is non-finite")
+    scalar_input = raw_phase.ndim == 0
+    return {
+        "electron_susceptibility": complex(susceptibility) if scalar_input else susceptibility,
+        "plasma_dispersion_function": complex(plasma_dispersion) if scalar_input else plasma_dispersion,
+        "normalized_phase_velocity": float(zeta) if scalar_input else zeta,
+        "thermal_speed_m_s": thermal_speed,
+        "one_dimensional_velocity_variance_m2_s2": float(sigma2),
+        "plasma_frequency_squared_s_minus2": float(omega_pe2),
+        "wavenumber_m_inverse": wave_number,
+        "distribution_model": "isotropic_nonrelativistic_Maxwellian",
+        "landau_contour": "retarded_Fried_Conte_Z_i_sqrt_pi_wofz",
+        "response_model": "collisionless_unmagnetized_longitudinal_electrostatic",
+        "limitations": [
+            "No collisional, magnetized, relativistic, or Full-EM response.",
+            "No ion contribution or fluctuation-dissipation spectrum; this is electron susceptibility only.",
+        ],
+    }
