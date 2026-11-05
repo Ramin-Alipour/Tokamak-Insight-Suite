@@ -1350,10 +1350,11 @@ def fit_collective_kappa(
     electron_velocity_m_s, ion_velocity_m_s,
     initial_density_m3, initial_temperature_eV, initial_kappa,
     density_bounds_m3=None, temperature_bounds_eV=None, kappa_bounds=None,
-    electron_populations=None, electron_population_parameter_covariance=None,
+    electron_populations=None, ion_populations=None,
+    electron_population_parameter_covariance=None,
     population_mc_samples=100, population_mc_seed=84623,
 ):
-    """Fit ne, Te and kappa from a collective spectrum; ion inputs remain fixed."""
+    """Fit ne, Te and electron Kappa while retaining explicit ion kinetic models."""
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(signal, dtype=float)
     if x.shape != y.shape or x.ndim != 1 or x.size < 12:
@@ -1412,7 +1413,7 @@ def fit_collective_kappa(
             electron_velocity_m_s=electron_velocity_m_s,
             ion_velocity_m_s=ion_velocity_m_s,
             incident_direction=incident_direction, scattered_direction=scattered_direction,
-            electron_populations=electron_populations,
+            electron_populations=electron_populations, ion_populations=ion_populations,
         )["spectral_density_per_nm"]
         return _apply_response(response, physical, x)
 
