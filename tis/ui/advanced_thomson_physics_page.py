@@ -59,6 +59,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
+    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from multiple independent measured scattering views",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility and analytic phase-velocity derivative",
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
@@ -99,6 +100,13 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_multiview_3d_evdf": (
+        "Non-negative 3-D velocity-space inversion from independently measured scattering views. "
+        "The stacked spectral kernel is assembled from the supplied view kernels; a data-only "
+        "rank/conditioning gate determines whether the 3-D distribution is identifiable. "
+        "Regularization can stabilize a conditional candidate but cannot create missing angular "
+        "information. Supply calibrated kernels and uncertainty for every view."
+    ),
     "kappa_electrostatic_susceptibility": (
         "Collisionless, unmagnetized, non-relativistic longitudinal electron response for the exact "
         "1-D marginal of an isotropic 3-D finite-variance Kappa distribution (kappa > 3/2). "
