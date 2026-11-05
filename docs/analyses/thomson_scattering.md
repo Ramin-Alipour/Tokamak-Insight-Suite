@@ -653,3 +653,34 @@ derived and converged static-Maxwell limit is not yet implemented.
 ### Spectral-distribution physical-model connection
 
 The descriptive spectral-distribution child analysis may optionally invoke the canonical optical Thomson physical fitter on the exact same calibrated measured spectrum. When `physical_model="non_collective_maxwellian"` and `physical_fit_options` includes the measured channel coordinate `radius_m`, the child forwards the original wavelength bins, spectrum, measured instrument-response operator, supplied spectral uncertainty/covariance, selected geometry and explicit detector-background controls to `analyze_thomson_spectra`. The Gaussian centroid and width remain independent shape diagnostics and are not used as the primary Maxwellian likelihood or promoted to a primary temperature measurement. The canonical fit's own identifiability classification controls whether its physical parameters are reportable. Kappa and relativistic Maxwell-Juttner continue to use their native finite-bin kinetic forward fit.
+
+
+### Multi-population Kappa electron response in electrostatic CTS
+
+The collisionless unmagnetized electrostatic Kappa CTS forward model now accepts
+an optional fixed mixture of projected electron populations. For population
+j, the density fraction is eta_j, the temperature is T_e,j = tau_j T_e,0,
+the Kappa index is kappa_j > 3/2, and the scattering-direction flow is u_j.
+The fractions must be positive and sum to one.
+
+The total electron susceptibility is evaluated as a sum of independent
+Landau-contour responses:
+
+chi_e(k,omega) = sum_j chi_e,j(k,omega),
+chi_e,j = -(omega_pe,j^2/k^2) integral_L [(df_j/dv)/(v-omega/k)] dv,
+omega_pe,j^2 = eta_j n_e e^2/(epsilon_0 m_e).
+
+The electron source term in the dynamic structure factor uses the matching
+density-weighted projected VDF, sum_j eta_j f_j(v). Thus the mixture enters
+both dielectric screening and the fluctuation source consistently. It is not
+a post-hoc sum of independently screened spectra.
+
+The public fit API accepts the same list through electron_populations, the
+CTS dispatcher forwards it, and the CTS Dashboard exposes a JSON editor.
+Each record contains density_fraction, temperature_ratio, kappa and
+flow_projection_m_s. Population fractions, temperature ratios, Kappa indices
+and projected flows are fixed external inputs; the current inverse still fits
+the reference electron density, reference temperature and global Kappa
+parameter. Their uncertainties and population-specific inverse
+identifiability are not yet propagated. This extension applies only to
+electrostatic Kappa CTS, not magnetized Full-EM CTS.
