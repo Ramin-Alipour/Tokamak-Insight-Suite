@@ -3823,6 +3823,7 @@ elif page=='Advanced Analysis':
                 kne=st.text_input('Initial electron density (m⁻³)',key='cts_kappa_ne')
                 kte=st.text_input('Initial electron temperature (eV)',key='cts_kappa_te')
                 kk=st.text_input('Initial electron Kappa index (> 3/2)',key='cts_kappa_index')
+                electron_populations_json=st.text_area('Optional multi-population electron model (JSON)',placeholder='[{"density_fraction":0.85,"temperature_ratio":0.7,"kappa":5.0,"flow_projection_m_s":-100000.0},{"density_fraction":0.15,"temperature_ratio":4.0,"kappa":2.5,"flow_projection_m_s":800000.0}]',key='cts_kappa_electron_populations',help='Each population contributes its own Landau susceptibility and projected VDF. Fractions must sum to one; temperature_ratio is relative to the fitted/base electron temperature.')
                 kti=st.text_input('Externally supplied common ion temperature (eV)',key='cts_kappa_ti')
                 kue=st.text_input('Externally supplied electron-flow projection along q (m/s)',key='cts_kappa_ue')
                 kui=st.text_input('Externally supplied common ion-flow projection along q (m/s)',key='cts_kappa_ui')
@@ -3861,7 +3862,13 @@ elif page=='Advanced Analysis':
                     if not names or not (len(names)==len(charges)==len(masses)==len(fractions)):
                         raise ValueError('Supply matching ion names, charge states, masses and charge-density fractions.')
                     species=[{'name':n,'charge_state':z,'mass_amu':m} for n,z,m in zip(names,charges,masses)]
+                    electron_populations=None
+                    if electron_populations_json.strip():
+                        electron_populations=json.loads(electron_populations_json)
+                        if not isinstance(electron_populations,list):
+                            raise ValueError('Electron populations must be a JSON list of population objects.')
                     kwargs_kappa={
+                        'electron_populations':electron_populations,
                         'frequency_shift_Hz':freq,'spectrum':power,
                         'probe_frequency_Hz':probe,
                         'scattering_geometry':{'scattering_angle_rad':angle},
