@@ -1206,7 +1206,8 @@ def collective_kappa_spectral_density(
     omega_pe2 = ne*E_CHARGE**2/(EPS0*ME)
     if electron_populations is None:
         populations = [{"density_fraction": 1.0, "temperature_ratio": 1.0,
-                        "kappa": kap, "flow_projection_m_s": ue}]
+                        "kappa": kap, "distribution": "kappa",
+                        "flow_projection_m_s": ue}]
     else:
         if not isinstance(electron_populations, Sequence) or isinstance(electron_populations, (str, bytes)) or len(electron_populations) < 1:
             raise ValueError("electron_populations must be a non-empty sequence of population mappings")
@@ -1339,7 +1340,7 @@ def collective_kappa_spectral_density(
         "electron_population_projected_vdfs_s_m": np.asarray(population_pdfs),
         "wavenumber_m_inverse": k,
         "phase_velocity_m_s": vphase,
-        "model": "unmagnetized collective Thomson scattering with kappa electrons and Maxwellian ions",
+        "model": "unmagnetized collective Thomson scattering with kinetic electron and ion mixtures",
     }
 
 
@@ -1529,6 +1530,7 @@ def fit_collective_kappa(
                     initial_density_m3=ne, initial_temperature_eV=te, initial_kappa=kap,
                     density_bounds_m3=density_bounds_m3, temperature_bounds_eV=temperature_bounds_eV,
                     kappa_bounds=kappa_bounds, electron_populations=sampled_populations,
+                    ion_populations=ion_populations,
                 )
             except (ValueError, FloatingPointError, np.linalg.LinAlgError):
                 continue
@@ -1601,8 +1603,10 @@ def fit_collective_kappa(
         "reduced_chi_square":float(np.sum((residual_signal/np.asarray(uncertainty,dtype=float))**2)/dof) if uncertainty is not None else None,
         "scattering_parameter_alpha":float(alpha),
         "scattering_regime":"collective" if alpha>1.0 else "non_collective_or_weakly_collective",
-        "model":"Plasma kinetic dielectric model with kappa electron VDF and Maxwellian ion species",
-        "distribution_model":"density-weighted multi-population projected kappa electron distribution when electron_populations is supplied; otherwise single projected kappa population; Maxwellian ions","electron_populations":None if electron_populations is None else [dict(item) for item in electron_populations],
+        "model":"Plasma kinetic dielectric model with configurable electron and ion Kappa/Maxwellian populations",
+        "distribution_model":"density-weighted electron populations and per-species ion populations; Maxwellian and finite-variance Kappa responses are supported; ion populations are fixed inputs during ne/Te/kappa inference",
+        "electron_populations":None if electron_populations is None else [dict(item) for item in electron_populations],
+        "ion_populations":None if ion_populations is None else [dict(item) for item in ion_populations],
     }
 
 
