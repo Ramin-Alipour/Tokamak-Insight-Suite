@@ -3832,20 +3832,13 @@ elif page=='Advanced Analysis':
                     probe=float(kf0); angle=float(ka)
                     if probe<=0 or not 0<angle<np.pi:
                         raise ValueError('Probe frequency must be positive and scattering angle must lie in (0, pi).')
-                    scattered_frequency=probe+freq
-                    if np.any(scattered_frequency<=0):
+                    if np.any(probe+freq<=0):
                         raise ValueError('Probe frequency plus every measured shift must remain positive.')
-                    wavelength_k=299792458.0/scattered_frequency*1e9
-                    order=np.argsort(wavelength_k)
-                    wavelength_k=wavelength_k[order]
-                    power_k=power[order]
-                    response_k=response_k[np.ix_(order,order)]
                     uncertainty_k=None
                     if ku_col!='<none>':
-                        uncertainty_raw=pd.to_numeric(df[ku_col],errors='coerce').to_numpy(dtype=float)
-                        if not np.all(np.isfinite(uncertainty_raw)) or np.any(uncertainty_raw<=0):
+                        uncertainty_k=pd.to_numeric(df[ku_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(uncertainty_k)) or np.any(uncertainty_k<=0):
                             raise ValueError('Spectral uncertainties must be finite and positive.')
-                        uncertainty_k=uncertainty_raw[order]
                     names=[v.strip() for v in knames.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in kcharges.split(',') if v.strip()]
                     masses=[float(v.strip()) for v in kmasses.split(',') if v.strip()]
@@ -3853,22 +3846,18 @@ elif page=='Advanced Analysis':
                     if not names or not (len(names)==len(charges)==len(masses)==len(fractions)):
                         raise ValueError('Supply matching ion names, charge states, masses and charge-density fractions.')
                     species=[{'name':n,'charge_state':z,'mass_amu':m} for n,z,m in zip(names,charges,masses)]
-                    incident=np.array([0.0,0.0,1.0])
-                    scattered=np.array([np.sin(angle),0.0,np.cos(angle)])
-                    qhat=scattered-incident
-                    qhat=qhat/np.linalg.norm(qhat)
                     kwargs_kappa={
-                        'wavelength_nm':wavelength_k,'signal':power_k,
-                        'laser_wavelength_nm':299792458.0/probe*1e9,
-                        'scattering_angle_rad':angle,'response':response_k,
-                        'uncertainty':uncertainty_k,'incident_direction':incident,
-                        'scattered_direction':scattered,'ion_species':species,
-                        'ion_fractions':fractions,
+                        'frequency_shift_Hz':freq,'spectrum':power,
+                        'probe_frequency_Hz':probe,
+                        'scattering_geometry':{'scattering_angle_rad':angle},
+                        'instrument_response':response_k,'signal_uncertainty':uncertainty_k,
+                        'ion_species':species,'ion_fractions':fractions,
                         'ion_temperature_eV':np.full(len(species),float(kti)),
-                        'electron_velocity_m_s':qhat*float(kue),
-                        'ion_velocity_m_s':np.tile(qhat*float(kui),(len(species),1)),
-                        'initial_density_m3':float(kne),
-                        'initial_temperature_eV':float(kte),'initial_kappa':float(kk),
+                        'electron_velocity_projection_m_s':float(kue),
+                        'ion_velocity_projection_m_s':float(kui),
+                        'electron_density_initial_m3':float(kne),
+                        'electron_temperature_initial_eV':float(kte),
+                        'initial_kappa':float(kk),
                     }
                     result_cts=analyze_cts_spectrum_model(model='electrostatic_kappa',**kwargs_kappa)
                     st.success('Kappa-electron CTS inversion completed within its declared collisionless electrostatic scope.')

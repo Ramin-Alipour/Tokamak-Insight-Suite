@@ -134,3 +134,32 @@ def test_collective_kappa_cts_inverse_is_exposed_by_cts_dispatcher(monkeypatch):
         initial_kappa=4.0,
     )
     assert result is sentinel
+
+
+def test_collective_kappa_dispatcher_converts_canonical_frequency_schema(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as kinetic
+    from tokamak_analysis.cts_analysis import analyze_cts_spectrum_model
+
+    captured = {}
+    def fake_fit(**kwargs):
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(kinetic, "fit_collective_kappa", fake_fit)
+    frequency = np.linspace(-2.0e6, 2.0e6, 12)
+    result = analyze_cts_spectrum_model(
+        model="electrostatic_kappa", frequency_shift_Hz=frequency,
+        spectrum=np.ones(12), probe_frequency_Hz=1.0e11,
+        scattering_geometry={"scattering_angle_rad": 1.0},
+        ion_species=[{"name": "D", "charge_state": 1, "mass_amu": 2.0}],
+        ion_fractions=[1.0], instrument_response=np.eye(12),
+        ion_temperature_eV=[20.0], electron_velocity_projection_m_s=1.0e4,
+        ion_velocity_projection_m_s=2.0e3, electron_density_initial_m3=1e19,
+        electron_temperature_initial_eV=100.0, initial_kappa=4.0,
+    )
+    assert result == {"ok": True}
+    assert np.all(np.diff(captured["wavelength_nm"]) > 0.0)
+    assert captured["signal"].shape == (12,)
+    assert captured["response"].shape == (12, 12)
+    assert captured["electron_velocity_m_s"].shape == (3,)
+    assert captured["ion_velocity_m_s"].shape == (1, 3)
