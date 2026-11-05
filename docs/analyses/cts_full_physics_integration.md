@@ -105,3 +105,10 @@ d chi_e/d omega=(1/k) d chi_e/d v_phi. The public CTS physics dispatcher and
 Dashboard expose this optional analytic derivative. It is computed by the
 second-order Landau kernel, not by finite differences; the supplied finite
 support and endpoint-jump convention remain explicit.
+
+
+The third central moment of a 1-D Kappa marginal is finite only for
+kappa > 2. Therefore mixture skewness is reported only when every Kappa
+component has kappa > 2. The variance threshold remains kappa > 3/2, and the
+fourth-moment/kurtosis threshold remains kappa > 5/2; these are distinct
+existence conditions and are enforced independently.

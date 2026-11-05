@@ -975,3 +975,31 @@ def test_collective_kappa_fit_reports_effective_mixture_temperature_and_static_a
     assert result["scattering_parameter_alpha"] == pytest.approx(
         result["electron_mixture_moments"]["scattering_parameter_alpha"], rel=1e-12
     )
+
+
+
+def test_collective_kappa_mixture_withholds_divergent_third_moment_below_kappa_two():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 21)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    result = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=200.0, kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        electron_populations=[
+            {"density_fraction": 0.8, "temperature_ratio": 1.0, "distribution": "kappa", "kappa": 1.8, "flow_projection_m_s": -1.0e5},
+            {"density_fraction": 0.2, "temperature_ratio": 2.0, "distribution": "maxwellian", "flow_projection_m_s": 2.0e5},
+        ],
+    )
+    moments = result["electron_mixture_moments"]
+    assert moments["third_moment_finite"] is False
+    assert moments["third_central_velocity_moment_m3_s3"] is None
+    assert moments["velocity_skewness"] is None
+    assert "1.5 < kappa <= 2.0" in moments["third_moment_status"]
+    assert moments["fourth_moment_finite"] is False

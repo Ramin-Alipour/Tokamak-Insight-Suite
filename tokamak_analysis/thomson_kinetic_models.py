@@ -1345,7 +1345,18 @@ def collective_kappa_spectral_density(
     drift_temperature = float(ME/E_CHARGE * (population_fractions @ (flow_offsets**2)))
     effective_temperature = thermal_temperature+drift_temperature
     mixture_variance = E_CHARGE*effective_temperature/ME
-    third_central_moment = float(np.sum(population_fractions*(3.0*flow_offsets*population_variances+flow_offsets**3)))
+    third_moment_finite = all(
+        item["distribution"] == "maxwellian" or item["kappa"] > 2.0
+        for item in populations
+    )
+    if third_moment_finite:
+        third_central_moment = float(np.sum(
+            population_fractions*(3.0*flow_offsets*population_variances+flow_offsets**3)
+        ))
+        mixture_skewness = third_central_moment/mixture_variance**1.5
+    else:
+        third_central_moment = None
+        mixture_skewness = None
     component_fourth_moments = []
     fourth_moment_finite = True
     for item, variance in zip(populations, population_variances):
@@ -1364,7 +1375,6 @@ def collective_kappa_spectral_density(
         fourth_central_moment = None
         mixture_kurtosis = None
         mixture_excess_kurtosis = None
-    mixture_skewness = third_central_moment/mixture_variance**1.5
     electron_mixture_moments = {
         "population_count": len(populations),
         "population_density_fractions": population_fractions.copy(),
@@ -1376,7 +1386,9 @@ def collective_kappa_spectral_density(
         "total_second_moment_temperature_eV": effective_temperature,
         "total_velocity_variance_m2_s2": mixture_variance,
         "third_central_velocity_moment_m3_s3": third_central_moment,
-        "velocity_skewness": float(mixture_skewness),
+        "velocity_skewness": None if mixture_skewness is None else float(mixture_skewness),
+        "third_moment_finite": third_moment_finite,
+        "third_moment_status": "finite_for_all_populations" if third_moment_finite else "undefined_because_at_least_one_Kappa_population_has_1.5 < kappa <= 2.0",
         "fourth_central_velocity_moment_m4_s4": fourth_central_moment,
         "velocity_kurtosis": None if mixture_kurtosis is None else float(mixture_kurtosis),
         "velocity_excess_kurtosis": None if mixture_excess_kurtosis is None else float(mixture_excess_kurtosis),
