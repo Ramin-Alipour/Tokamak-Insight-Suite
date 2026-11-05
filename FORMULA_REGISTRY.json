@@ -7604,5 +7604,101 @@
       ],
       "note": "This extends the collisionless unmagnetized electrostatic CTS branch. It is not a magnetized Full-EM multi-population model and does not independently identify all population parameters from one spectrum."
     }
+  },
+  {
+    "name": "Measured-laser-profile relativistic Compton Thomson spectral-power convolution",
+    "equation": "I_s(λ_s) ∝ ∫ dλ_i [P_i(λ_i) λ_i/(h c)] [dσ_KN(λ_i,T_e,u_q)/dΩ] [h c/λ_s] p_MJ(λ_s | λ_i,T_e,u_q);  m_j = Σ_k R_jk ∫_(Δλ_k) I_s(λ_s) dλ_s",
+    "inputs": "Measured non-negative incident spectral power density P_i(λ_i) [W nm^-1] on a strictly increasing wavelength grid [nm]; calibrated scattered spectral bins; measured instrument response; relativistic Maxwell-Juttner temperature and scattering-vector flow; scattering geometry and transverse incident polarization.",
+    "output": "Source-profile-convolved scattered spectral power shape after wavelength-resolved relativistic Compton recoil and polarized Klein-Nishina weighting, finite detector-bin integration and measured instrument-response convolution.",
+    "assumptions": "Single scattering; isotropic Maxwell-Juttner rest-frame electron distribution with bulk flow parallel to the scattering vector; source profile is piecewise-linear in incident spectral power density and integrated by Gauss-Legendre quadrature; incident photon flux is proportional to P_i(λ_i)λ_i/(hc); each incident wavelength uses its own Lorentz-transformed Compton recoil and polarized Klein-Nishina differential cross-section; scattered photon energy hc/λ_s weights detected spectral power; finite wavelength-window capture is retained rather than renormalized; detector response acts after source convolution. Source-profile uncertainty and joint spatial-spectral Compton source convolution are not yet propagated.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "formula_key": "thomson_measured_laser_profile_compton_power_convolution",
+      "input_specs": [
+        {
+          "name": "laser_spectrum_wavelength_nm",
+          "unit": "nm; strictly increasing measured incident-laser wavelength",
+          "required": true
+        },
+        {
+          "name": "laser_spectrum_density_per_nm",
+          "unit": "W nm^-1; measured incident spectral power density",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; fitted relativistic Maxwell-Juttner temperature",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; fitted subluminal scattering-vector flow",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "dimensionless transverse 3-vector",
+          "required": true
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean; must be true for this formula route",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin response matrix",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "laser_source_profile_used",
+          "unit": "boolean"
+        },
+        {
+          "name": "laser_source_profile_convolution",
+          "unit": "source photon-flux integration, wavelength-resolved Klein-Nishina cross-section and scattered-photon-energy weighting"
+        },
+        {
+          "name": "laser_source_quadrature_nodes",
+          "unit": "count"
+        }
+      ],
+      "prerequisites": [
+        "Canonical channel-wise relativistic Maxwell-Juttner optical Thomson inference.",
+        "Measured incident laser spectral power profile with at least three samples.",
+        "Explicit incident polarization and scattering geometry.",
+        "Measured instrument response."
+      ],
+      "uncertainty_model": "Local physical/background covariance conditional on the supplied measured source profile and selected finite-order source quadrature. Source-profile covariance is not propagated.",
+      "test_links": [
+        "tests/test_thomson_kinetic_background.py::test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space",
+        "tests/test_thomson_kinetic_background.py::test_relativistic_source_profile_requires_a_valid_positive_spectrum"
+      ],
+      "note": "This is a wavelength-resolved physical forward convolution, not the elastic wavelength-ratio source-response approximation. The measured source spectrum is integrated before the detector response."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_incident_spectral_power_density_and_calibrated_scattered_spectrum",
+    "execution_scope": "channel_wise_relativistic_maxwell_juttner_single_scattering_compton_spectral_power_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — relativistic Maxwell-Juttner Compton source-profile inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
+      ],
+      "formula_key": "thomson_measured_laser_profile_compton_power_convolution",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_kinetic_background.py::test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space"
+      ]
+    }
   }
 ]
