@@ -1571,6 +1571,12 @@ def fit_collective_kappa(
     if ion_v.shape==(3,) and len(ion_properties)==1:
         ion_v=ion_v.reshape(1,3)
     ui=ion_v@qhat
+    if ion_populations is not None:
+        ui=np.asarray(
+            [float(item.get("flow_projection_m_s", ui[index]))
+             for index, item in enumerate(ion_populations)],
+            dtype=float,
+        )
     k=4.0*np.pi*np.sin(float(scattering_angle_rad)/2.0)/(float(laser_wavelength_nm)*1e-9)
     debye=np.sqrt(EPS0*te/(ne*E_CHARGE))
     alpha=1.0/(k*debye)
