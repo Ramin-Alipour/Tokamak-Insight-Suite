@@ -114,3 +114,40 @@ def test_isotropic_kappa_electrostatic_susceptibility_is_publicly_dispatched():
     )
     assert dispatched["distribution_model"] == "exact_1D_marginal_of_isotropic_3D_Kappa"
     assert "No conserving collisions" in " ".join(dispatched["limitations"])
+
+
+def test_joint_spatial_spectral_inverse_is_reachable_through_dashboard_dispatcher():
+    from tokamak_analysis.thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+
+    wavelength = np.linspace(520.0, 544.0, 121)
+    radius = np.array([0.0, 0.5, 1.0])
+    mixing = np.eye(3)
+    temperature = np.array([80.0, 100.0, 120.0])
+    flow = np.array([-5.0e3, 0.0, 5.0e3])
+    sigma = 2.0 * 532.0 * np.sqrt(temperature / 510998.95069) * np.sin(np.pi / 4.0)
+    center = 532.0 * (1.0 - 2.0 * np.sin(np.pi / 4.0) * flow / 299792458.0)
+    spectra = np.exp(-0.5 * ((wavelength[None, :] - center[:, None]) / sigma[:, None]) ** 2) + 0.01
+    inputs = {
+        "wavelength_nm": wavelength,
+        "measured_spectra": spectra,
+        "radius_m": radius,
+        "spatial_mixing_matrix": mixing,
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": np.pi / 2.0,
+        "instrument_response": np.eye(wavelength.size),
+        "signal_uncertainty": np.full_like(spectra, 0.01),
+        "regularization_strength": 0.0,
+    }
+    direct = reconstruct_joint_thomson_spatial_spectra(**inputs)
+    dispatched = run_advanced_thomson_physics("thomson_joint_spatial_spectra", **inputs)
+    np.testing.assert_allclose(
+        dispatched["electron_temperature_profile_eV"],
+        direct["electron_temperature_profile_eV"],
+    )
+    np.testing.assert_allclose(
+        dispatched["electron_velocity_projection_profile_m_s"],
+        direct["electron_velocity_projection_profile_m_s"],
+    )
+    assert dispatched["public_physics_entrypoint"] == "thomson_joint_spatial_spectra"
+    assert dispatched["automatic_model_substitution"] is False
+    assert dispatched["analysis_status"] == "completed"
