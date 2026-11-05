@@ -1035,6 +1035,13 @@ def analyze_thomson_spectra(
         "non_collective_relativistic_maxwell_juttner",
     }:
         raise ValueError("A measured incident-laser spectral profile is currently supported for non-collective optical Thomson models; collective dielectric models require a source-frequency-resolved dielectric forward model.")
+    if (laser_spectrum_wavelength_nm is not None and include_compton_recoil
+            and joint_spatial_spectral):
+        raise ValueError(
+            "Wavelength-resolved Compton/Klein-Nishina source-profile convolution is "
+            "currently supported by the canonical channel-wise relativistic fit; "
+            "joint spatial-spectral Compton source convolution is not yet implemented."
+        )
     laser_wavelength_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
     scattering_angle_rad = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
     if scattering_angle_rad >= np.pi:
