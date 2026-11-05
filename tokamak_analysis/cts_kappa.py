@@ -185,6 +185,27 @@ def kappa_electron_susceptibility(
         quadrature="adaptive_complex_quadrature_of_exact_analytic_Kappa_derivative_over_minus_infinity_to_infinity"
         contour_method="finite_positive_imaginary_pole_regularization"
 
+    response = {
+        "integral": complex(integral),
+        "integral_phase_velocity_derivative_s3_m3": complex(integral_phase_derivative),
+        "integral_phase_velocity_derivative_real_absolute_error": float(derivative_real_error),
+        "integral_phase_velocity_derivative_imag_absolute_error": float(derivative_imag_error),
+        "interior_derivative_integral": complex(integral),
+        "finite_support_boundary_integral": 0.0j,
+        "normalized_probability_density_s_m": pdf.copy()/grid_coverage,
+        "analytic_kappa_pdf_s_m": pdf.copy(),
+        "pole": zeta,
+        "pole_imaginary_part_m_s": float(eta),
+        "pole_order": 1,
+        "quadrature": quadrature,
+        "landau_contour_method": contour_method,
+        "finite_pole_regularization_used": bool(pole_imaginary_part_m_s is not None),
+        "finite_support_extension": "analytic_Kappa_tail_integrated_to_infinity",
+        "finite_support_boundary_terms_included": False,
+        "landau_integral_real_absolute_error": float(real_error),
+        "landau_integral_imag_absolute_error": float(imag_error),
+        "landau_integral_tail_complete": True,
+    }
     plasma_frequency_squared = ne * E**2 / (EPS0 * mass)
     response.update({
         "electron_susceptibility": complex(
