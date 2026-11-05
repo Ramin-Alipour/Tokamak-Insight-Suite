@@ -545,6 +545,11 @@ def analyze_thomson_spectral_distribution(
         ],
     }
 
+    if physical_model not in {None, "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner"}:
+        raise ValueError("physical_model must be None, non_collective_maxwellian, kappa, or relativistic_maxwell_juttner")
+    if physical_fit_options is not None and physical_model not in {"kappa", "relativistic_maxwell_juttner"}:
+        raise ValueError("physical_fit_options is supported only for kappa or relativistic_maxwell_juttner")
+
     # Kappa and relativistic Maxwell-Juttner require their own physical
     # forward models. Never map a Gaussian width to these non-Gaussian models.
     if physical_model in {"kappa", "relativistic_maxwell_juttner"}:
@@ -583,8 +588,6 @@ def analyze_thomson_spectral_distribution(
     # forward-fit width to Te. The measured response is already included in
     # fit_model; no scalar instrument-width subtraction is performed.
     if physical_model == "non_collective_maxwellian":
-        if physical_model != "non_collective_maxwellian":
-            raise ValueError("physical_model must be None or 'non_collective_maxwellian'; a Gaussian shape fit cannot identify Kappa or arbitrary EVDF parameters")
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError("laser_wavelength_nm and scattering_angle_rad are required for Maxwellian physical interpretation")
         laser = float(laser_wavelength_nm)
