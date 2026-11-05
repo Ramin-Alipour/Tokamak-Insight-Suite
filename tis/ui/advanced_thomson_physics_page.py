@@ -212,7 +212,7 @@ MODEL_PHYSICS_NOTES = {
 
 EXAMPLES = {
     "bi_kappa_electrostatic_susceptibility": {
-        "v": np.linspace(-2.0e7, 2.0e7, 801).tolist(),
+        "v": np.linspace(-2.0e8, 2.0e8, 1601).tolist(),
         "phase_velocity_m_s": 1.0e6,
         "electron_density_m3": 2.0e19,
         "electron_temperature_parallel_eV": 1500.0,
