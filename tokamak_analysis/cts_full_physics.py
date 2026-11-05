@@ -484,9 +484,11 @@ def run_advanced_thomson_physics(model, **kwargs):
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
       - cts_collective_kappa_spectrum: collisionless electrostatic dynamic-structure
-        spectrum using Kappa electrons, Maxwellian multispecies ions and Landau response.
+        spectrum using independently selected Maxwellian/Kappa electron populations
+        and Maxwellian/Kappa multispecies ions with species-resolved Landau response.
       - cts_collective_kappa_inference: joint measured-spectrum fit of electron density,
-        second-moment temperature and Kappa index with fixed supplied ion state and response.
+        second-moment temperature and Kappa index with fixed supplied ion state, optional
+        per-species Maxwellian/Kappa ion models, and measured response.
       - landau_fdt_cts: multispecies electrostatic CTS with the discrete
         Landau operator, matching Langevin source and Poisson screening.
       - quantum_fdt: symmetrized quantum FDT applied to a supplied causal response.
