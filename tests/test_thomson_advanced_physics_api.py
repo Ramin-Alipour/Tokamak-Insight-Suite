@@ -124,3 +124,34 @@ def test_collective_kappa_cts_inference_is_exposed_through_public_dispatch(monke
     assert calls == [{"signal": [1.0, 2.0]}]
     assert result["electron_density_m3"] == 2.0e18
     assert result["public_physics_entrypoint"] == "cts_collective_kappa_inference"
+
+
+def test_collective_kappa_dispatch_forwards_mixed_kinetic_populations():
+    wavelength = np.linspace(1048.0, 1080.0, 41)
+    angle = np.pi / 2.0
+    result = physics.run_advanced_thomson_physics(
+        "cts_collective_kappa_spectrum",
+        wavelength_nm=wavelength,
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=angle,
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=150.0,
+        kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        electron_populations=[
+            {"density_fraction": 0.8, "temperature_ratio": 0.7, "kappa": 5.0},
+            {"density_fraction": 0.2, "temperature_ratio": 3.0, "distribution": "maxwellian"},
+        ],
+        ion_populations=[{"distribution": "kappa", "kappa": 3.0}],
+        incident_direction=[-np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0],
+        scattered_direction=[np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0],
+    )
+    assert result["public_physics_entrypoint"] == "cts_collective_kappa_spectrum"
+    assert result["electron_populations"][1]["distribution"] == "maxwellian"
+    assert result["ion_populations"][0]["distribution"] == "kappa"
+    assert result["spectral_density_per_nm"].shape == wavelength.shape
+    assert np.all(np.isfinite(result["dielectric_function"]))
