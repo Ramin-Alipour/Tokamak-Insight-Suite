@@ -68,6 +68,15 @@ def test_thomson_profile_and_spectral_distribution_remain_distinct_workflows():
     assert "scattering_angle_rad" not in distribution_inputs
     assert "electron_velocity_distribution" not in distribution_outputs
     assert "observed_sigma_nm" in distribution_outputs
+    distribution_inputs = {
+        item["name"] for item in distribution["execution_contract"]["input_specs"]
+    }
+    assert {
+        "physical_model", "physical_initial", "physical_fit_options",
+        "model_discrepancy_covariance", "systematic_covariance",
+        "incident_polarization", "include_compton_recoil",
+        "physical_background_model",
+    } <= distribution_inputs
 
 
 def test_analysis_1_declares_channelwise_background_basis_and_mj_joint_gls():

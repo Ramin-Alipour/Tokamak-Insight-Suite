@@ -434,10 +434,8 @@ def test_spectral_distribution_dispatches_kappa_to_native_physical_forward_fit(m
         physical_model="kappa",
         laser_wavelength_nm=1060.0,
         scattering_angle_rad=np.pi / 2,
-        physical_fit_options={
-            "physical_initial": [120.0, 0.0, 4.0],
-            "background_model": "linear",
-        },
+        physical_initial=[120.0, 0.0, 4.0],
+        physical_background_model="linear",
     )
 
     assert captured["physical_model"] == "kappa"
