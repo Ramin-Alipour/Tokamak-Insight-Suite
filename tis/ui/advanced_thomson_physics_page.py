@@ -77,7 +77,6 @@ MODEL_LABELS = {
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
-    "landau_fdt_full_em_response": "Full-EM CTS — public Landau–FDT Cartesian response and matching noise solver",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated non-negative 3-D EVDF inversion from multiple measured views",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
     "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
@@ -269,6 +268,15 @@ EXAMPLES = {
         "regularization_strength": None,
         "gcv_candidate_count": 31,
         "measurement_uncertainty": [0.1,0.1,0.1,0.1,0.1]
+    },
+    "thomson_multiview_3d_evdf": {
+        "spectral_kernels": [[[1.0, 0.2], [0.5, 0.8], [0.1, 1.0]], [[0.2, 1.0], [0.8, 0.4], [1.0, 0.1]]],
+        "measured_spectra": [[1.2, 1.3, 1.1], [1.2, 1.2, 1.1]],
+        "velocity_grid_m_s": [[-1.0e5, 0.0, 0.0], [1.0e5, 0.0, 0.0]],
+        "voxel_volume_m3_s3": [1.0, 1.0],
+        "regularization_matrix": [[1.0, -1.0]],
+        "measurement_uncertainty": [[0.1, 0.1, 0.1], [0.1, 0.1, 0.1]],
+        "regularization_strength": 0.01
     },
     "thomson_projected_evdf": {
         "wavelength_nm": np.linspace(499.98, 500.02, 41).tolist(),
