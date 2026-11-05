@@ -358,6 +358,10 @@
       ],
       "output_specs": [
         {
+          "name": "laser_source_quadrature_wavelength_nm",
+          "unit": "nm; fixed-order photon-flux quadrature nodes inside measured non-zero source support"
+        },
+        {
           "name": "electron_temperature_profile_eV",
           "unit": "eV"
         },
@@ -1118,7 +1122,8 @@
           "physical_background_cross_covariance",
           "identifiability diagnostics",
           "recoil/cross-section provenance",
-          "laser_source_profile_used and laser_source_profile_convolution"
+          "laser_source_profile_used and laser_source_profile_convolution",
+          "laser_source_quadrature_wavelength_nm"
         ],
         "scope": "Simultaneous nonlinear fit of finite-variance isotropic Kappa or relativistic Maxwell-Juttner optical Thomson forward spectra and detector-space nuisance background. Full local covariance includes physical/amplitude/background cross terms. Absolute density and unrestricted 3-D EVDF are not inferred. Kappa remains the analytic Student-t projection, not the generalized Skolar plasma-dispersion-function method. Optional relativistic Compton source profiles are integrated over incident photon flux with wavelength-dependent Klein-Nishina weighting and scattered photon energy before instrument response.",
         "background_models": [
