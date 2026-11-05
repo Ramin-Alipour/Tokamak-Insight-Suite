@@ -1536,6 +1536,79 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
         raise ValueError("Select an explicit CTS model; no default model is selected.")
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
+    if model == "electrostatic_kappa":
+        from .thomson_kinetic_models import fit_collective_kappa
+        args = dict(kwargs)
+        # Convert canonical frequency-domain CTS inputs to increasing wavelength
+        # bins by a coordinate permutation; no spectral deconvolution is applied.
+        if "wavelength_nm" not in args and "frequency_shift_Hz" in args:
+            frequency = _array(args.pop("frequency_shift_Hz"), "frequency_shift_Hz", 1)
+            probe = _positive(args.pop("probe_frequency_Hz"), "probe_frequency_Hz")
+            if np.any(probe + frequency <= 0.0) or np.any(np.diff(frequency) <= 0.0):
+                raise ValueError("CTS shifts must increase and keep scattered frequency positive")
+            wavelength = C / (probe + frequency) * 1e9
+            order = np.argsort(wavelength)
+            args["wavelength_nm"] = wavelength[order]
+            if "signal" not in args:
+                args["signal"] = _array(args.pop("spectrum"), "spectrum", 1)[order]
+            else:
+                args["signal"] = _array(args["signal"], "signal", 1)[order]
+            response = args.pop("response", None)
+            if response is None:
+                response = args.pop("instrument_response", None)
+            if response is None:
+                raise ValueError("electrostatic_kappa requires a measured instrument response")
+            args["response"] = _array(response, "instrument_response", 2)[np.ix_(order, order)]
+            uncertainty = args.pop("uncertainty", None)
+            if uncertainty is None:
+                uncertainty = args.pop("signal_uncertainty", None)
+            if uncertainty is not None:
+                args["uncertainty"] = _array(uncertainty, "signal_uncertainty", 1)[order]
+            args.setdefault("laser_wavelength_nm", C / probe * 1e9)
+            geometry = args.pop("scattering_geometry", {})
+            angle = args.pop("scattering_angle_rad", geometry.get("scattering_angle_rad"))
+            if angle is None:
+                raise ValueError("scattering_geometry must supply scattering_angle_rad")
+            args["scattering_angle_rad"] = float(angle)
+            args.setdefault("incident_direction", geometry.get("incident_direction", [0.0, 0.0, 1.0]))
+            args.setdefault("scattered_direction", geometry.get(
+                "scattered_direction", [np.sin(float(angle)), 0.0, np.cos(float(angle))]
+            ))
+            incident = np.asarray(args["incident_direction"], dtype=float)
+            scattered = np.asarray(args["scattered_direction"], dtype=float)
+            qhat = scattered/np.linalg.norm(scattered)-incident/np.linalg.norm(incident)
+            qhat = qhat/np.linalg.norm(qhat)
+            if "electron_velocity_m_s" not in args:
+                if "electron_velocity_projection_m_s" not in args:
+                    raise ValueError("electrostatic_kappa requires an explicit electron flow vector or projection")
+                args["electron_velocity_m_s"] = qhat*float(args.pop("electron_velocity_projection_m_s"))
+            if "ion_velocity_m_s" not in args:
+                if "ion_velocity_projection_m_s" not in args:
+                    raise ValueError("electrostatic_kappa requires explicit ion flow vectors or projections")
+                ion_flow = np.asarray(args.pop("ion_velocity_projection_m_s"), dtype=float)
+                if ion_flow.ndim == 0:
+                    ion_flow = np.full(len(args["ion_species"]), float(ion_flow))
+                if ion_flow.shape != (len(args["ion_species"]),):
+                    raise ValueError("ion_velocity_projection_m_s must be scalar or one value per ion species")
+                args["ion_velocity_m_s"] = ion_flow[:, None]*qhat[None, :]
+            if "ion_temperature_eV" not in args:
+                raise ValueError("electrostatic_kappa requires externally supplied ion_temperature_eV")
+            args["initial_density_m3"] = args.pop("electron_density_initial_m3", args.get("initial_density_m3"))
+            args["initial_temperature_eV"] = args.pop("electron_temperature_initial_eV", args.get("initial_temperature_eV"))
+        required = {"wavelength_nm", "signal", "laser_wavelength_nm", "scattering_angle_rad",
+                    "response", "incident_direction", "scattered_direction", "ion_species",
+                    "ion_fractions", "ion_temperature_eV", "electron_velocity_m_s",
+                    "ion_velocity_m_s", "initial_density_m3", "initial_temperature_eV",
+                    "initial_kappa"}
+        missing = sorted(name for name in required if args.get(name) is None)
+        if missing:
+            raise ValueError(f"electrostatic_kappa is missing required physical inputs: {missing}")
+        allowed = required | {"uncertainty", "density_bounds_m3", "temperature_bounds_eV",
+                              "kappa_bounds", "max_nfev"}
+        unexpected = sorted(set(args)-allowed)
+        if unexpected:
+            raise ValueError(f"unsupported electrostatic_kappa inputs: {unexpected}")
+        return fit_collective_kappa(**args)
     if model == "full_em_gyrotropic_vdf_shape":
         return fit_full_em_gyrotropic_population_shape(**kwargs)
     if model == "full_em_spatial_profiles":
@@ -1551,7 +1624,7 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
         if "spectrum" in kwargs:
             kwargs["measured_spectrum"] = kwargs.pop("spectrum")
         return analyze_full_em_cts_spectrum(**kwargs)
-    raise ValueError("model must be 'electrostatic', 'full_electromagnetic', 'full_em_spatial_profiles' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
+    raise ValueError("model must be 'electrostatic', 'electrostatic_kappa', 'full_electromagnetic', 'full_em_spatial_profiles' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
 
 
 def fit_cts_ion_species_flows(

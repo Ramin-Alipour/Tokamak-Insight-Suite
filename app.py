@@ -3790,12 +3790,97 @@ elif page=='Advanced Analysis':
     elif workflow=='Analysis 1 / Microwave CTS subanalysis':
         st.markdown('Analysis 1 subanalysis — microwave CTS: infer plasma and ion parameters from a measured, calibrated frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
-            'electrostatic','full_electromagnetic','full_em_spatial_profiles'
-        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else 'Magnetized full-electromagnetic CTS'),key='cts_physical_model')
+            'electrostatic','electrostatic_kappa','full_electromagnetic','full_em_spatial_profiles'
+        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons' if v=='electrostatic_kappa' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else 'Magnetized full-electromagnetic CTS')),key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
         elif cts_model is None:
             st.info('Select the CTS physical model explicitly. No model is selected automatically.')
+        elif cts_model=='electrostatic_kappa':
+            st.caption('Collisionless unmagnetized longitudinal CTS with an isotropic 3-D Kappa electron population and Maxwellian ions. The inverse fits n_e, T_e and kappa jointly; ion temperatures, species, composition, geometry and 3-D flows are externally supplied.')
+            c1,c2=st.columns(2)
+            with c1:
+                kf_col=col_select('Frequency shift (Hz)',numeric,'cts_kappa_frequency')
+                ky_col=col_select('Calibrated CTS power',[x for x in numeric if x!=kf_col] or numeric,'cts_kappa_signal')
+                ku_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {kf_col,ky_col}],key='cts_kappa_uncertainty')
+                kf0=st.text_input('Probe frequency (Hz)',key='cts_kappa_probe_frequency')
+                ka=st.text_input('Scattering angle (rad)',key='cts_kappa_angle')
+                kne=st.text_input('Initial electron density (m⁻³)',key='cts_kappa_ne')
+                kte=st.text_input('Initial electron temperature (eV)',key='cts_kappa_te')
+                kk=st.text_input('Initial electron Kappa index (> 3/2)',key='cts_kappa_index')
+                kti=st.text_input('Externally supplied common ion temperature (eV)',key='cts_kappa_ti')
+                kue=st.text_input('Externally supplied electron-flow projection along q (m/s)',key='cts_kappa_ue')
+                kui=st.text_input('Externally supplied common ion-flow projection along q (m/s)',key='cts_kappa_ui')
+                knames=st.text_input('Ion species names (comma-separated)',key='cts_kappa_species')
+                kcharges=st.text_input('Ion charge states (comma-separated)',key='cts_kappa_charges')
+                kmasses=st.text_input('Ion masses (amu; comma-separated)',key='cts_kappa_masses')
+                kfractions=st.text_input('Ion charge-density fractions (comma-separated; sum to 1)',key='cts_kappa_fractions')
+            with c2:
+                kr=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_kappa_response')
+                st.caption('The response matrix is reordered to the increasing wavelength grid without renormalization. A single-view CTS spectrum does not identify arbitrary 3-D electron velocity structure.')
+            if st.button('Run Kappa-electron CTS inversion',type='primary',key='run_cts_kappa'):
+                try:
+                    freq=pd.to_numeric(df[kf_col],errors='coerce').to_numpy(dtype=float)
+                    power=pd.to_numeric(df[ky_col],errors='coerce').to_numpy(dtype=float)
+                    if freq.ndim!=1 or power.shape!=freq.shape or not np.all(np.isfinite(freq)) or not np.all(np.isfinite(power)) or np.any(np.diff(freq)<=0):
+                        raise ValueError('Frequency and power must be finite vectors on a strictly increasing frequency grid.')
+                    if kr is None:
+                        raise ValueError('Upload the measured frequency-response matrix.')
+                    response_k=pd.read_csv(kr,header=None).to_numpy(dtype=float)
+                    if response_k.shape!=(freq.size,freq.size):
+                        raise ValueError('Frequency-response matrix must be square and match the measured frequency bins.')
+                    probe=float(kf0); angle=float(ka)
+                    if probe<=0 or not 0<angle<np.pi:
+                        raise ValueError('Probe frequency must be positive and scattering angle must lie in (0, pi).')
+                    scattered_frequency=probe+freq
+                    if np.any(scattered_frequency<=0):
+                        raise ValueError('Probe frequency plus every measured shift must remain positive.')
+                    wavelength_k=299792458.0/scattered_frequency*1e9
+                    order=np.argsort(wavelength_k)
+                    wavelength_k=wavelength_k[order]
+                    power_k=power[order]
+                    response_k=response_k[np.ix_(order,order)]
+                    uncertainty_k=None
+                    if ku_col!='<none>':
+                        uncertainty_raw=pd.to_numeric(df[ku_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(uncertainty_raw)) or np.any(uncertainty_raw<=0):
+                            raise ValueError('Spectral uncertainties must be finite and positive.')
+                        uncertainty_k=uncertainty_raw[order]
+                    names=[v.strip() for v in knames.split(',') if v.strip()]
+                    charges=[float(v.strip()) for v in kcharges.split(',') if v.strip()]
+                    masses=[float(v.strip()) for v in kmasses.split(',') if v.strip()]
+                    fractions=[float(v.strip()) for v in kfractions.split(',') if v.strip()]
+                    if not names or not (len(names)==len(charges)==len(masses)==len(fractions)):
+                        raise ValueError('Supply matching ion names, charge states, masses and charge-density fractions.')
+                    species=[{'name':n,'charge_state':z,'mass_amu':m} for n,z,m in zip(names,charges,masses)]
+                    incident=np.array([0.0,0.0,1.0])
+                    scattered=np.array([np.sin(angle),0.0,np.cos(angle)])
+                    qhat=scattered-incident
+                    qhat=qhat/np.linalg.norm(qhat)
+                    kwargs_kappa={
+                        'wavelength_nm':wavelength_k,'signal':power_k,
+                        'laser_wavelength_nm':299792458.0/probe*1e9,
+                        'scattering_angle_rad':angle,'response':response_k,
+                        'uncertainty':uncertainty_k,'incident_direction':incident,
+                        'scattered_direction':scattered,'ion_species':species,
+                        'ion_fractions':fractions,
+                        'ion_temperature_eV':np.full(len(species),float(kti)),
+                        'electron_velocity_m_s':qhat*float(kue),
+                        'ion_velocity_m_s':np.tile(qhat*float(kui),(len(species),1)),
+                        'initial_density_m3':float(kne),
+                        'initial_temperature_eV':float(kte),'initial_kappa':float(kk),
+                    }
+                    result_cts=analyze_cts_spectrum_model(model='electrostatic_kappa',**kwargs_kappa)
+                    st.success('Kappa-electron CTS inversion completed within its declared collisionless electrostatic scope.')
+                    st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
+                    st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
+                    st.metric('Electron Kappa index',f"{result_cts['kappa_index']:.5g}")
+                    st.json(result_cts)
+                    json_download('Export Kappa-electron CTS inversion',result_cts,'tis_cts_kappa_inversion.json')
+                    add_report_section('Kappa-electron CTS spectral inversion',result_cts)
+                except Exception as e:
+                    st.error(f'Kappa-electron CTS inversion failed: {e}')
+
         elif cts_model=='electrostatic':
             st.caption('This workflow uses the unmagnetized electrostatic longitudinal dielectric model. Electron-flow projection is fitted from the spectrum; the optional value below is only an optimizer seed. One common ion temperature and projected ion flow are fitted across supplied background species.')
             c1,c2=st.columns(2)

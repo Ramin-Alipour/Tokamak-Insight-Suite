@@ -107,3 +107,30 @@ def test_kappa_landau_susceptibility_integrates_the_analytic_tail_not_the_finite
     # retarded-pole imaginary part must resolve that resonant damping term.
     assert first["integral"].imag < 0.0
     assert abs(first["integral"].imag) > first["landau_integral_imag_absolute_error"]
+
+
+def test_collective_kappa_cts_inverse_is_exposed_by_cts_dispatcher(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as kinetic
+    from tokamak_analysis.cts_analysis import analyze_cts_spectrum_model
+
+    sentinel = {"model": "collective_kappa_test_route"}
+    def fake_fit(**kwargs):
+        assert kwargs["initial_kappa"] == 4.0
+        assert kwargs["ion_temperature_eV"] == [20.0]
+        return sentinel
+
+    monkeypatch.setattr(kinetic, "fit_collective_kappa", fake_fit)
+    result = analyze_cts_spectrum_model(
+        model="electrostatic_kappa",
+        wavelength_nm=np.linspace(500.0, 501.0, 12), signal=np.ones(12),
+        laser_wavelength_nm=500.0, scattering_angle_rad=1.0,
+        response=np.eye(12), incident_direction=[0.0, 0.0, 1.0],
+        scattered_direction=[np.sin(1.0), 0.0, np.cos(1.0)],
+        ion_species=[{"name": "D", "charge_state": 1, "mass_amu": 2.0}],
+        ion_fractions=[1.0], ion_temperature_eV=[20.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        initial_density_m3=1e19, initial_temperature_eV=100.0,
+        initial_kappa=4.0,
+    )
+    assert result is sentinel
