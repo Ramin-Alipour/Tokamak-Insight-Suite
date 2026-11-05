@@ -953,6 +953,13 @@ elif page=='Spectral Analysis':
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
+            channel_laser_profile_upload=None
+            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
+                channel_laser_profile_upload=st.file_uploader(
+                    'Optional measured incident laser spectrum CSV (incident_wavelength_nm, spectral_power_density_per_nm)',
+                    type=['csv','txt'],key='ts_infer_laser_profile',
+                    help='The measured source spectrum is convolved before the detector response. For relativistic Compton mode, the forward model resolves the recoil and polarized Klein-Nishina cross-section at each incident wavelength and weights by incident photon flux and scattered photon energy.',
+                )
             model_discrepancy_covariance_upload=st.file_uploader(
                 'Optional full channel-major model-discrepancy covariance CSV (Nchannel × Nλ square matrix)',
                 type=['csv','txt'],key='ts_infer_model_discrepancy_covariance',
@@ -1127,6 +1134,7 @@ elif page=='Spectral Analysis':
                 'response_upload': _ts_upload_digest(response_upload),
                 'channel_response_upload': _ts_upload_digest(response_channel_upload),
                 'response_uncertainty_upload': _ts_upload_digest(response_unc_upload),
+                'channel_laser_profile_upload': _ts_upload_digest(locals().get('channel_laser_profile_upload')),
                 'channel_response_uncertainty_upload': _ts_upload_digest(response_channel_unc_upload),
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
                 'model_discrepancy_covariance_upload': _ts_upload_digest(model_discrepancy_covariance_upload),
@@ -1268,6 +1276,16 @@ elif page=='Spectral Analysis':
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
+                    if not joint_spatial_spectral and channel_laser_profile_upload is not None:
+                        laser_profile_table=pd.read_csv(
+                            channel_laser_profile_upload,header=None
+                        ).to_numpy(dtype=float)
+                        if laser_profile_table.ndim!=2 or laser_profile_table.shape[1]!=2:
+                            raise ValueError('The incident laser spectrum CSV must contain exactly two columns: wavelength_nm and spectral_power_density_per_nm.')
+                        if laser_profile_table.shape[0]<3 or not np.all(np.isfinite(laser_profile_table)):
+                            raise ValueError('The incident laser spectrum must contain at least three finite wavelength-density rows.')
+                        kwargs['laser_spectrum_wavelength_nm']=laser_profile_table[:,0]
+                        kwargs['laser_spectrum_density_per_nm']=laser_profile_table[:,1]
                     if model_discrepancy_covariance is not None:
                         kwargs['model_discrepancy_covariance']=model_discrepancy_covariance
                     if systematic_covariance is not None:
