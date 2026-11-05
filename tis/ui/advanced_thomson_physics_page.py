@@ -92,6 +92,7 @@ MODEL_LABELS = {
     "cold_plasma_mode_radiative_coefficients": "CTS — modal attenuation and explicitly selected LTE Kirchhoff emissivity",
     "cold_plasma_mode_group_velocity": "CTS — collisionless cold-plasma group velocity and wave-normal walk-off",
     "plasma_charge_state_moments": "CTS — quasineutrality, effective charge and multispecies charge moments",
+    "thomson_normalized_poloidal_flux": "Optical Thomson — map channel positions to equilibrium-normalized poloidal flux rho_pol",
 }
 
 MODEL_PHYSICS_NOTES = {
@@ -151,7 +152,18 @@ MODEL_PHYSICS_NOTES = {
     ),
 }
 
+    "thomson_normalized_poloidal_flux": (
+        "Maps externally supplied channel poloidal flux to rho_pol = sqrt((psi_pol-psi_axis)/(psi_sep-psi_axis)). "
+        "Propagates the full joint covariance of channel fluxes, magnetic-axis flux and separatrix flux by the delta method. "
+        "This does not reconstruct equilibrium or infer flux from R,Z; do not confuse rho_pol with rho_tor."
+    ),
 EXAMPLES = {
+    "thomson_normalized_poloidal_flux": {
+        "poloidal_flux_wb": [0.11, 0.19, 0.34, 0.58],
+        "magnetic_axis_flux_wb": 0.10,
+        "separatrix_flux_wb": 0.60,
+        "joint_flux_covariance": null
+    },
     "thomson_kinetic_background_fit": {
         "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
         "measured_spectrum": (
