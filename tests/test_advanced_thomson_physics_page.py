@@ -248,3 +248,13 @@ def test_collective_kappa_inference_is_available_in_advanced_dashboard():
     assert "cts_collective_kappa_inference" in advanced.MODEL_LABELS
     assert "cts_collective_kappa_inference" in advanced.EXAMPLES
     assert "cts_collective_kappa_inference" in advanced.MODEL_PHYSICS_NOTES
+
+
+def test_full_em_landau_fdt_response_alias_is_selectable_in_dashboard():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+
+    alias = "landau_fdt_full_em_response"
+    canonical = "landau_fdt_full_em_constitutive"
+    assert alias in MODEL_LABELS
+    assert alias in EXAMPLES
+    assert EXAMPLES[alias] == EXAMPLES[canonical]
