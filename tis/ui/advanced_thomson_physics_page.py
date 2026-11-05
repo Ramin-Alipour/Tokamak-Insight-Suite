@@ -63,6 +63,7 @@ MODEL_LABELS = {
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
+    "cts_tabulated_evdf_susceptibility": "CTS — tabulated projected-EVDF susceptibility and analytic Landau phase derivative",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
@@ -146,6 +147,12 @@ MODEL_PHYSICS_NOTES = {
         "Each ion species may independently use a Maxwellian or finite-variance Kappa distribution with its own projected flow; species charge neutrality and ion plasma-frequency weighting are retained. "
         "The longitudinal Landau-contour susceptibilities are summed before dielectric screening, and electron/ion fluctuation terms form S(k,omega). "
         "This remains collisionless, unmagnetized and electrostatic; it is not a collisional, relativistic or Full-EM closure."
+    ),
+    "cts_tabulated_evdf_susceptibility": (
+        "Longitudinal susceptibility for a researcher-supplied projected 1-D electron VDF. "
+        "The optional phase-velocity derivative uses the second-order Landau pole with "
+        "the same positive retarded pole displacement; it is not a finite-difference estimate. "
+        "The distribution is piecewise-linear with the declared zero extension and endpoint jumps."
     ),
     "cts_tabulated_evdf_landau": (
         "Forward model: evaluates the first-order Landau susceptibility from an explicitly "
@@ -273,6 +280,15 @@ EXAMPLES = {
         "regularization_strength": 0.001,
         "velocity_limit_m_s": 8000.0,
         "velocity_points": 81
+    },
+    "cts_tabulated_evdf_susceptibility": {
+        "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
+        "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/1.0e6)**2).tolist(),
+        "phase_velocity_m_s": 4.0e5,
+        "electron_density_m3": 1.0e18,
+        "wavenumber_m_inverse": 120.0,
+        "pole_imaginary_part_m_s": 100.0,
+        "include_phase_velocity_derivative": True
     },
     "cts_multi_ion_flow_inference": {
         "frequency_shift_Hz": np.linspace(-6.0e9, 6.0e9, 41).tolist(),

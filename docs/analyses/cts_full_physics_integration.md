@@ -92,3 +92,16 @@ explicit status, rather than reusing the reference temperature in a misleading
 Maxwellian expression. The inverse also distinguishes the fitted reference
 temperature from the total mixture second-moment temperature and the
 density-weighted bulk electron flow.
+
+
+## Tabulated-EVDF Landau susceptibility derivative
+
+For the piecewise-linear projected VDF with its explicit zero extension, define
+I_p(v_phi)=integral_L f'(v)/(v-v_phi-i eta)^p dv. The longitudinal
+susceptibility is chi_e=-(omega_pe^2/k^2) I_1. Its phase-velocity derivative
+at fixed positive retarded displacement is
+d chi_e/d v_phi=-(omega_pe^2/k^2) I_2, and the angular-frequency derivative is
+d chi_e/d omega=(1/k) d chi_e/d v_phi. The public CTS physics dispatcher and
+Dashboard expose this optional analytic derivative. It is computed by the
+second-order Landau kernel, not by finite differences; the supplied finite
+support and endpoint-jump convention remain explicit.

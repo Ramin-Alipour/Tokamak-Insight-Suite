@@ -33,7 +33,10 @@ from .cts_em_background import (
 )
 from .cts_kappa import kappa_electron_susceptibility
 from .cts_kappa import maxwellian_electron_susceptibility
-from .thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
+from .thomson_generalized_dispersion import (
+    collective_tabulated_electron_spectral_density,
+    generalized_electron_susceptibility,
+)
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from .cts_stokes_transfer import (
@@ -559,6 +562,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = collective_kappa_spectral_density
     elif model == "cts_collective_kappa_inference":
         solver = fit_collective_kappa
+    elif model == "cts_tabulated_evdf_susceptibility":
+        solver = generalized_electron_susceptibility
     elif model == "cts_tabulated_evdf_landau":
         solver = collective_tabulated_electron_spectral_density
     elif model == "cts_electrostatic_measured_spectrum_inference":
@@ -621,7 +626,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = plasma_charge_state_moments
     else:
         raise ValueError(
-            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_collective_kappa_spectrum, cts_collective_kappa_inference, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
+            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_collective_kappa_spectrum, cts_collective_kappa_inference, cts_tabulated_evdf_susceptibility, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
             "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, thomson_normalized_poloidal_flux, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"

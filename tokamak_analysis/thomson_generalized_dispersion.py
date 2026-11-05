@@ -97,12 +97,20 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
 def generalized_electron_susceptibility(
     velocity_grid_m_s, probability_density_s_m, phase_velocity_m_s, *,
     electron_density_m3, wavenumber_m_inverse, pole_imaginary_part_m_s=None,
+    include_phase_velocity_derivative=False,
 ):
-    """Return longitudinal electron susceptibility for a tabulated 1-D VDF."""
+    """Return longitudinal susceptibility and optionally its analytic pole derivative.
+
+    The derivative is evaluated from the second-order Landau kernel at fixed
+    positive pole displacement: d chi/d v_phase = -(omega_pe^2/k^2)
+    integral f'(v)/(v-v_phase-i eta)^2 dv. It is not a finite difference.
+    """
     ne = float(electron_density_m3)
     k = float(wavenumber_m_inverse)
     if not np.isfinite(ne) or ne <= 0 or not np.isfinite(k) or k <= 0:
         raise ValueError("electron density and wavenumber must be positive and finite")
+    if not isinstance(include_phase_velocity_derivative, (bool, np.bool_)):
+        raise ValueError("include_phase_velocity_derivative must be boolean")
     response = generalized_landau_integral(
         velocity_grid_m_s, probability_density_s_m, phase_velocity_m_s,
         pole_imaginary_part_m_s=pole_imaginary_part_m_s,
@@ -112,6 +120,23 @@ def generalized_electron_susceptibility(
     response["electron_susceptibility"] = complex(chi)
     response["plasma_frequency_squared_s_minus2"] = float(omega_pe2)
     response["wavenumber_m_inverse"] = k
+    if include_phase_velocity_derivative:
+        derivative_response = generalized_landau_integral(
+            velocity_grid_m_s, probability_density_s_m,
+            phase_velocity_m_s,
+            pole_imaginary_part_m_s=response["pole_imaginary_part_m_s"],
+            pole_order=2,
+        )
+        derivative_integral = derivative_response["integral"]
+        susceptibility_derivative = -(omega_pe2/k**2)*derivative_integral
+        response["integral_phase_velocity_derivative_s3_m3"] = derivative_integral
+        response["susceptibility_phase_velocity_derivative_s_m"] = complex(susceptibility_derivative)
+        response["susceptibility_angular_frequency_derivative_s"] = complex(susceptibility_derivative/k)
+        response["phase_derivative_quadrature"] = derivative_response["quadrature"]
+        response["phase_derivative_uses_same_fixed_pole_displacement"] = True
+    else:
+        response["susceptibility_phase_velocity_derivative_s_m"] = None
+        response["susceptibility_angular_frequency_derivative_s"] = None
     return response
 
 

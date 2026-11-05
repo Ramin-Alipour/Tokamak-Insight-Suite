@@ -8026,5 +8026,117 @@
         "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_central_finite_difference"
       ]
     }
+  },
+  {
+    "name": "Tabulated projected-EVDF Landau susceptibility phase-velocity derivative",
+    "equation": "χ_e=−(ω_pe²/k²)I_1; ∂χ_e/∂v_φ=−(ω_pe²/k²)I_2; I_p=∫_L f'(v)/(v−v_φ−iη)^p dv; ∂χ_e/∂ω=(1/k)∂χ_e/∂v_φ",
+    "inputs": "Finite velocity grid, non-negative tabulated projected 1-D EVDF, phase velocity, electron density, wavenumber and positive retarded pole displacement",
+    "output": "Complex longitudinal susceptibility and optional analytic phase-velocity/angular-frequency derivatives",
+    "assumptions": "Piecewise-linear projected VDF, explicit zero extension outside finite support with distributional endpoint jumps, collisionless unmagnetized longitudinal response, fixed positive Landau-pole displacement.",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_generalized_dispersion.generalized_electron_susceptibility",
+      "formula_key": "cts_tabulated_evdf_landau_phase_derivative",
+      "input_specs": [
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "probability_density_s_m",
+          "unit": "s m^-1; non-negative 1-D projected VDF",
+          "required": true
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s^-1",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1",
+          "required": true
+        },
+        {
+          "name": "pole_imaginary_part_m_s",
+          "unit": "m s^-1; positive retarded contour displacement",
+          "required": false
+        },
+        {
+          "name": "include_phase_velocity_derivative",
+          "unit": "boolean",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "complex dimensionless"
+        },
+        {
+          "name": "susceptibility_phase_velocity_derivative_s_m",
+          "unit": "s m^-1 or null"
+        },
+        {
+          "name": "susceptibility_angular_frequency_derivative_s",
+          "unit": "s or null"
+        },
+        {
+          "name": "integral_phase_velocity_derivative_s3_m3",
+          "unit": "s^3 m^-3 or absent"
+        }
+      ],
+      "prerequisites": [
+        "Tabulated VDF is normalized internally for susceptibility; finite support is interpreted as zero outside the supplied interval.",
+        "Derivative is evaluated from the second-order Landau kernel at the same positive pole displacement as the susceptibility; no finite difference is used."
+      ],
+      "uncertainty_model": "No physical-parameter uncertainty is inferred. The derivative is evaluated by adaptive full-axis quadrature; separate real and imaginary quadrature error estimates are returned. The derivative is conditional on the supplied positive pole displacement.",
+      "limitations": [
+        "Collisionless, unmagnetized, non-relativistic longitudinal electron response only",
+        "No ion susceptibility, FDT spectrum, collisions, magnetization, relativistic response or Full-EM current vertex",
+        "Finite velocity grid is used only for the probability-coverage gate; the analytic Kappa tail is integrated over the complete real axis"
+      ],
+      "test_links": [
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_evdf_susceptibility_analytic_phase_derivative_matches_finite_difference"
+      ],
+      "note": "The second-order pole integral is the analytic derivative of the first-order susceptibility with respect to phase velocity at fixed positive retarded displacement. Angular-frequency derivative follows by d/domega=(1/k)d/dv_phase. This is a numerical contour derivative for the declared piecewise-linear, finite-support VDF model.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Collective Thomson scattering — tabulated projected EVDF"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_generalized_dispersion.generalized_electron_susceptibility",
+      "function_links": [
+        "tokamak_analysis.thomson_generalized_dispersion.generalized_electron_susceptibility"
+      ],
+      "formula_key": "cts_tabulated_evdf_landau_phase_derivative",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_evdf_susceptibility_analytic_phase_derivative_matches_finite_difference"
+      ]
+    },
+    "note": "The second-order pole integral is the analytic derivative of the first-order susceptibility with respect to phase velocity at fixed positive retarded displacement. Angular-frequency derivative follows by d/domega=(1/k)d/dv_phase. This is a numerical contour derivative for the declared piecewise-linear, finite-support VDF model.",
+    "description": "Generalized longitudinal susceptibility and analytic phase-velocity derivative for a researcher-supplied projected 1-D EVDF."
   }
 ]

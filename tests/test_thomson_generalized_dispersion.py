@@ -125,3 +125,18 @@ def test_collective_tabulated_evdf_accepts_compact_support_and_includes_edge_ter
     assert np.any(result["spectral_density_per_nm"] > 0.0)
     assert "distributional_finite_support_edges" in result["pole_quadrature"]
     assert result["velocity_support_extension"].startswith("zero_outside_supplied_interval")
+
+
+
+def test_tabulated_evdf_phase_derivative_formula_registry_is_synchronized():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root/"tis"/"data"/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "cts_tabulated_evdf_landau_phase_derivative"
+    matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
+    assert len(matches) == 1
+    assert formula == packaged
+    assert matches[0]["execution_contract"]["function_link"] == "tokamak_analysis.thomson_generalized_dispersion.generalized_electron_susceptibility"
