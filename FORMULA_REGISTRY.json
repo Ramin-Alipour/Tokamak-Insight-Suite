@@ -8149,5 +8149,143 @@
     },
     "note": "The second-order pole integral is the analytic derivative of the first-order susceptibility with respect to phase velocity at fixed positive retarded displacement. Angular-frequency derivative follows by d/domega=(1/k)d/dv_phase. This is a numerical contour derivative for the declared piecewise-linear, finite-support VDF model.",
     "description": "Generalized longitudinal susceptibility and analytic phase-velocity derivative for a researcher-supplied projected 1-D EVDF."
+  },
+  {
+    "name": "Gyrotropic bi-Kappa directional Landau susceptibility",
+    "equation": "T_q = T_perp + (T_parallel − T_perp)(b_hat·q_hat)^2; χ_e = −(ω_pe²/k²) ∫[f′_q(v)/(v−v_phi−i0⁺)]dv",
+    "inputs": "Electron density [m^-3], T_parallel and T_perpendicular [eV], unit magnetic-field and scattering vectors, κ>3/2, phase velocity [m s^-1], wave number [m^-1].",
+    "output": "Complex longitudinal electron susceptibility, directional temperature T_q, full-tail quadrature errors and analytic phase-velocity derivative.",
+    "assumptions": "Gyrotropic zero-drift 3-D bi-Kappa with common κ; exact 1-D marginal along q; collisionless, unmagnetized, non-relativistic longitudinal response.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.bi_kappa_electron_susceptibility",
+      "formula_key": "cts_gyrotropic_bi_kappa_landau_susceptibility",
+      "input_specs": [
+        {
+          "name": "v",
+          "unit": "m s^-1; increasing velocity grid for analytic-tail coverage gate",
+          "required": true
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s^-1",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "dimensionless 3-vector; unit norm",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "dimensionless 3-vector; unit norm",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; strictly greater than 3/2",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg; defaults to electron mass",
+          "required": false
+        },
+        {
+          "name": "pole_imaginary_part_m_s",
+          "unit": "m s^-1; optional positive Landau-pole regularization",
+          "required": false
+        },
+        {
+          "name": "minimum_velocity_grid_probability_coverage",
+          "unit": "dimensionless; default 0.999",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "projected_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "magnetic_pitch_cosine",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "susceptibility_phase_velocity_derivative_s_m",
+          "unit": "s m^-1"
+        },
+        {
+          "name": "landau_integral_real_absolute_error",
+          "unit": "solver-reported quadrature error"
+        },
+        {
+          "name": "landau_integral_imag_absolute_error",
+          "unit": "solver-reported quadrature error"
+        }
+      ],
+      "prerequisites": [
+        "Supplied magnetic-field and scattering vectors must be normalized and calibrated.",
+        "The exact projected marginal assumes a gyrotropic zero-drift bi-Kappa with common κ.",
+        "The velocity grid is a tail-coverage gate; the analytic Kappa tail is integrated over the full real axis."
+      ],
+      "uncertainty_model": "Adaptive quadrature errors are returned. Uncertainty in temperatures, κ, density and geometry is not inferred by this kernel and must be propagated by the caller.",
+      "limitations": [
+        "One scattering direction identifies T_q only; it cannot independently identify T_parallel and T_perpendicular.",
+        "Collisionless, unmagnetized, non-relativistic longitudinal electron response only.",
+        "No cyclotron harmonics, collisions, ion susceptibility, FDT source or Full-EM current vertex."
+      ],
+      "test_links": [
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_isotropic_limit_matches_existing_kappa_solver",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_directional_temperature_obeys_gyrotropic_projection",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
+      ],
+      "note": "Public solver is exposed through run_advanced_thomson_physics and the advanced physics dashboard. The exact directional marginal is reduced to the existing analytic full-tail Kappa Landau kernel; it is not a full magnetized/Full-EM susceptibility."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_kappa.bi_kappa_electron_susceptibility",
+      "function_links": [
+        "tokamak_analysis.cts_kappa.bi_kappa_electron_susceptibility"
+      ],
+      "formula_key": "cts_gyrotropic_bi_kappa_landau_susceptibility",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_isotropic_limit_matches_existing_kappa_solver",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_directional_temperature_obeys_gyrotropic_projection",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
+      ]
+    }
   }
 ]
