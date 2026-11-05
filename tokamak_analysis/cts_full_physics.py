@@ -590,7 +590,9 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = quantum_fdt_dynamic_structure_factor
     elif model == "quantum_fdt_unsymmetrized":
         solver = quantum_unsymmetrized_dynamic_structure_factor
-    elif model == "landau_fdt_full_em_constitutive":
+    elif model in {"landau_fdt_full_em_response", "landau_fdt_full_em_constitutive"}:
+        # Keep the documented response alias executable through the same
+        # assembled Landau-operator + matching-FDT constitutive solver.
         solver = analyze_landau_fdt_full_em_constitutive
     elif model == "polarized_kinetic_ece":
         solver = solve_polarized_kinetic_ece_with_mode_conversion
@@ -616,6 +618,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_relativistic_exact_flow_projection":
         solver = thomson_velocity_projection_relativistic_exact
+    elif model == "thomson_multiview_3d_evdf":
+        solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
     elif model == "thomson_relativistic_projected_evdf":
