@@ -1450,7 +1450,7 @@ def fit_collective_kappa(
         "scattering_parameter_alpha":float(alpha),
         "scattering_regime":"collective" if alpha>1.0 else "non_collective_or_weakly_collective",
         "model":"Plasma kinetic dielectric model with kappa electron VDF and Maxwellian ion species",
-        "distribution_model":"1-D projected kappa electron distribution; Maxwellian ions",
+        "distribution_model":"density-weighted multi-population projected kappa electron distribution when electron_populations is supplied; otherwise single projected kappa population; Maxwellian ions","electron_populations":None if electron_populations is None else [dict(item) for item in electron_populations],
     }
 
 
