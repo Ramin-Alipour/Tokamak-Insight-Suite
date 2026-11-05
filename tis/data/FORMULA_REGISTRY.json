@@ -2766,7 +2766,7 @@
     "equation": "T_e = (σ_λ/λ_0)^2 (m_e c²/4) / sin²(θ/2)",
     "inputs": "Intrinsic plasma Doppler-width parameter from the measured-response-convolved physical spectrum fit [nm], laser wavelength [nm], scattering angle [rad]",
     "output": "eV",
-    "assumptions": "Single scattering; isotropic non-relativistic Maxwellian electrons; intrinsic width inferred by the measured-response-convolved physical forward fit; known geometry",
+    "assumptions": "Intrinsic Gaussian width equals thermal Doppler width for a non-collective isotropic non-relativistic Maxwellian. This is a conditional Te estimator, not a generic conversion of any Gaussian width. Non-Maxwellian tails, flow broadening, unresolved populations and residual instrumental broadening require explicit forward modelling.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -2814,6 +2814,26 @@
         {
           "name": "uncertainty_electron_temperature_eV",
           "unit": "eV"
+        },
+        {
+          "name": "temperature_identifiability",
+          "unit": "text",
+          "description": "Explicit conditional identifiability under the stated non-collective isotropic non-relativistic Maxwellian model."
+        },
+        {
+          "name": "relativistic_temperature_parameter_theta_e",
+          "unit": "1",
+          "description": "Dimensionless thermal parameter Te/(m_e c^2)."
+        },
+        {
+          "name": "nonrelativistic_screen_status",
+          "unit": "text",
+          "description": "Conservative theta_e<=0.01 screen; values outside it should use a relativistic forward model."
+        },
+        {
+          "name": "screen_threshold_theta_e",
+          "unit": "1",
+          "description": "Conservative software screening threshold, not a universal physical validity boundary."
         }
       ],
       "prerequisites": [
@@ -2822,11 +2842,11 @@
         "intrinsic plasma Doppler-width parameter inferred by the measured-response-convolved physical forward fit",
         "known geometry"
       ],
-      "uncertainty_model": "Independent first-order propagation of width, laser-wavelength and angle uncertainties.",
+      "uncertainty_model": "Optional independent uncertainties in intrinsic width, laser wavelength and scattering angle are propagated by first-order linearization. This uncertainty is conditional on the Maxwellian non-relativistic width model.",
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
       ],
-      "note": "Standalone analytic relation for the intrinsic width parameter of the canonical measured-spectrum forward fit; it does not correct or deconvolve measured spectra. Numerical software tests only; not empirical validation.",
+      "note": "The helper does not deconvolve the instrument response. The supplied width must be intrinsic to a selected physical spectral fit; outside theta_e<=0.01 the result is screened as requiring a relativistic model.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
@@ -2972,6 +2992,131 @@
         "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
       ]
     }
+  },
+  {
+    "name": "Exact relativistic Thomson electron-flow projection",
+    "equation": "β∥ = (1 − r)/(sin(θ/2)(1 + r)); v∥ = c β∥; r = λs/λ0",
+    "inputs": "Intrinsic fitted spectral centre λs [nm], laser wavelength λ0 [nm], scattering angle θ [rad]",
+    "output": "q-parallel projected velocity [m s^-1]; optional propagated 1σ uncertainty",
+    "assumptions": "Single bulk-velocity projection along q=(ns−ni); exact relativistic Doppler kinematics; spectral centre must be intrinsic and model-fitted. It does not infer a 3-D flow or the mean of a broad/non-Maxwellian EVDF.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection_relativistic_exact",
+      "formula_key": "thomson_velocity_projection_relativistic_exact",
+      "input_specs": [
+        {
+          "name": "fitted_center_nm",
+          "unit": "nm",
+          "description": "Positive intrinsic fitted scattered-spectrum centre.",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "description": "Positive calibrated incident laser wavelength.",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "description": "Scattering angle strictly between zero and pi.",
+          "required": true
+        },
+        {
+          "name": "sigma_fitted_center_nm",
+          "unit": "nm",
+          "description": "Optional independent 1-sigma fitted-centre uncertainty; all three uncertainty inputs must be supplied together.",
+          "required": false
+        },
+        {
+          "name": "sigma_laser_wavelength_nm",
+          "unit": "nm",
+          "description": "Optional independent 1-sigma laser wavelength uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_scattering_angle_rad",
+          "unit": "rad",
+          "description": "Optional independent 1-sigma scattering-angle uncertainty.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Exact relativistic q-parallel velocity projection."
+        },
+        {
+          "name": "beta_parallel",
+          "unit": "1",
+          "description": "Signed projected velocity divided by c."
+        },
+        {
+          "name": "uncertainty_electron_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "First-order uncertainty from the three supplied independent input uncertainties; returned when all are supplied."
+        },
+        {
+          "name": "identifiability",
+          "unit": "text",
+          "description": "Explicitly identifies the result as one projected velocity only."
+        }
+      ],
+      "prerequisites": [
+        "A physically fitted intrinsic spectral centre; calibrated laser wavelength and scattering angle."
+      ],
+      "uncertainty_model": "First-order independent-error propagation using analytic derivatives with respect to fitted centre, laser wavelength and scattering angle. Cross-covariances are not inferred.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty",
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs"
+      ],
+      "note": "Exact single-projection relativistic Doppler inversion; not a 3-D velocity reconstruction and not a distribution-mean estimator.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson — exact relativistic Doppler flow projection"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection_relativistic_exact",
+      "function_links": [],
+      "formula_key": "thomson_velocity_projection_relativistic_exact",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty",
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs"
+      ]
+    },
+    "subanalysis": "Optical Thomson — exact relativistic Doppler flow projection"
   },
   {
     "name": "Thomson electron density from calibrated scattered power",
@@ -5743,9 +5888,9 @@
   {
     "name": "Relativistic projected Compton kinematics and polarized Klein–Nishina weight",
     "equation": "r=ε′_s/ε′_i=[1+(hν′_i/m_ec²)(1−cosθ′)]⁻¹; λ_s=λ_i[(1−βμ_s)/(1−βμ_i)]/r; dσ′/dΩ′=(r_e²/2)r²[r+r⁻¹−2|e′·n′_s|²]",
-    "inputs": "Strictly increasing subluminal projected electron-velocity grid v_q [m s^-1], laser wavelength [nm], scattering angle [rad]; optional incident polarization unit vector transverse to the incident ray.",
+    "inputs": "Finite strictly increasing subluminal projected electron-velocity grid v_q [m s^-1] (uniform or non-uniform), laser wavelength [nm], scattering angle [rad]; optional incident polarization transverse to the incident ray; optional paired arbitrary 3-D incident and scattered unit directions matching the scattering angle.",
     "output": "Thomson-limit and Compton scattered wavelengths [nm], rest-frame photon-energy ratio, rest-frame scattering-angle cosine, maximum recoil correction fraction, and relative lab-frame polarized differential-scattering weight.",
-    "assumptions": "Single scattering; electron velocity restricted to the scattering-vector direction; incident/scattered geometry symmetric about the q bisector; exact Lorentz aberration and Compton four-momentum conservation; supplied polarization is transformed to the electron rest frame. No unrestricted 3-D EVDF or absolute density is inferred.",
+    "assumptions": "Single scattering; electron velocity restricted to the scattering-vector direction. If explicit ray directions are omitted, symmetric geometry is constructed from scattering_angle_rad; otherwise arbitrary non-collinear 3-D incident/scattered directions are used and validated against the supplied angle. Exact Lorentz aberration and Compton four-momentum conservation; supplied polarization is transformed to the electron rest frame. No unrestricted 3-D EVDF or absolute density is inferred.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5756,7 +5901,7 @@
       "input_specs": [
         {
           "name": "velocity_grid_m_s",
-          "unit": "m s^-1; finite, strictly increasing and subluminal",
+          "unit": "m s^-1; finite, strictly increasing, subluminal; uniform and non-uniform grids supported by quadrature-consistent inversion",
           "required": true
         },
         {
@@ -5766,12 +5911,22 @@
         },
         {
           "name": "scattering_angle_rad",
-          "unit": "rad; strictly between 0 and π",
+          "unit": "rad; strictly between 0 and π and consistent with optional ray directions",
           "required": true
         },
         {
           "name": "incident_polarization",
-          "unit": "dimensionless 3-vector; optional and transverse to the incident ray",
+          "unit": "dimensionless 3-vector; optional and transverse to the incident ray; required for polarized Klein–Nishina Compton inversion",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless unit 3-vector; optional; must be supplied together with scattered_direction",
+          "required": false
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless unit 3-vector; optional; must be supplied together with incident_direction",
           "required": false
         }
       ],
@@ -5815,14 +5970,16 @@
       ],
       "prerequisites": [
         "One-dimensional projected velocity support parallel to the scattering vector.",
-        "Symmetric incident/scattered geometry about the scattering-vector bisector.",
-        "A transverse incident polarization vector is required to calculate the polarized Klein–Nishina weight."
+        "Either provide paired non-collinear 3-D incident/scattered unit ray directions consistent with scattering_angle_rad, or use the symmetric geometry constructed from scattering_angle_rad.",
+        "A transverse incident polarization vector is required to calculate the polarized Klein–Nishina weight.",
+        "For projected EVDF inversion, non-uniform velocity grids use non-uniform trapezoidal quadrature for both the forward integral and EVDF normalization, with a non-uniform second-derivative regularizer."
       ],
       "uncertainty_model": "Deterministic kinematic transform. The helper does not infer uncertainties in velocity, wavelength, angle or polarization; uncertainty propagation must be performed by the enclosing inference using supplied covariance.",
       "test_links": [
-        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
+        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift",
+        "tests/test_thomson_gap_closure.py::test_projected_evdf_normalizes_on_nonuniform_velocity_grid"
       ],
-      "note": "This is a projected single-scattering Compton kernel. It does not recover transverse velocity structure or an unrestricted 3-D EVDF."
+      "note": "This is a projected single-scattering Compton kernel. It does not recover transverse velocity structure or an unrestricted 3-D EVDF. The enclosing inverse supports arbitrary strictly increasing velocity grids and preserves the same quadrature measure in its forward operator and normalization."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
@@ -5838,16 +5995,17 @@
       "formula_key": "thomson_projected_compton_kinematics",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift"
+        "tests/test_thomson_gap_closure.py::test_projected_compton_kinematics_matches_rest_electron_compton_shift",
+        "tests/test_thomson_gap_closure.py::test_projected_evdf_normalizes_on_nonuniform_velocity_grid"
       ]
     }
   },
   {
     "name": "Gyrotropic bi-Maxwellian optical Thomson spectral inference",
-    "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; sigma_v,q²=e T_q/m_e; lambda_s/lambda_0 ≈ 1 - q_hat·v/c",
+    "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; sigma_v,q²=e T_q/m_e; lambda_s/lambda_0 ≈ 1 - q_hat·v/c; P_i=Φ((λ_i^+−λ_c)/σ_λ)−Φ((λ_i^−−λ_c)/σ_λ); S̄_i=P_i/Δλ_i",
     "inputs": "Calibrated multi-view optical Thomson spectra, measured spectral response, laser wavelength, scattering angle, magnetic-field and scattering-vector directions",
     "output": "T_parallel [eV], T_perpendicular [eV], per-view q-projected flow [m s^-1], fit and covariance diagnostics",
-    "assumptions": "Gyrotropic bi-Maxwellian electrons with zero heat flux; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles required to separate parallel and perpendicular temperatures",
+    "assumptions": "Gyrotropic bi-Maxwellian electrons with zero heat flux; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles required to separate parallel and perpendicular temperatures; Gaussian probability is integrated exactly between midpoint-defined wavelength-bin edges before response convolution; no midpoint-sampled PDF approximation is used.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5905,6 +6063,12 @@
           "name": "model_discrepancy_covariance",
           "unit": "full channel-major additive PSD covariance",
           "required": false
+        },
+        {
+          "name": "maximum_projected_rms_beta",
+          "unit": "dimensionless; conservative non-relativistic projected thermal-speed validity threshold",
+          "required": false,
+          "default": 0.1
         }
       ],
       "output_specs": [
@@ -5935,19 +6099,35 @@
         {
           "name": "parameter_covariance",
           "unit": "parameter covariance; withheld when anisotropy is non-identifiable"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; exact Gaussian probability captured by measured wavelength bins per view"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "declared projected thermal and fitted-flow beta diagnostics"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact Gaussian CDF integration over finite wavelength bins"
         }
       ],
       "prerequisites": [
         "Measured calibrated spectra and measured response operator",
         "Magnetic-field and scattering-vector geometry for each view",
-        "At least two distinct squared magnetic pitch angles to identify both temperatures"
+        "At least two distinct squared magnetic pitch angles to identify both temperatures",
+        "The fitted projected thermal rms beta must remain below maximum_projected_rms_beta; fitted bulk-flow beta must remain below 0.1."
       ],
       "uncertainty_model": "Full channel-major measurement covariance or pointwise standard uncertainties; optional independent additive model-discrepancy covariance is added once. Geometry covariance is not inferred or propagated by this spectral fitter.",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
-        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
+        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
+        "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen",
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ],
-      "note": "This is a non-relativistic small-beta multi-view spectral inference model. It does not infer a general 3-D EVDF, magnetic geometry, or calibration, and it does not apply relativistic corrections. Synthetic regression tests are not experimental validation."
+      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen."
     },
     "references": [
       {
@@ -5976,7 +6156,9 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
-        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures"
+        "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
+        "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ]
     }
   },
@@ -6377,10 +6559,10 @@
   },
   {
     "name": "Gyrotropic anisotropic Kappa projected Thomson marginal",
-    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](e T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; Var(v_q)=e T_q/m_e for T_q in eV; κ>3/2",
+    "equation": "p(v_q)=Γ(κ)/[√(πκ) Γ(κ−1/2) θ_q] [1+v_q²/(κ θ_q²)]^(−κ); θ_q²=[(2κ−3)/κ](e T_q/m_e); T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)²; Var(v_q)=e T_q/m_e for T_q in eV; κ>3/2; ν=2κ−1, s²=κθ_q²/(2κ−1); P_i=F_t(v_i^−/s;ν)−F_t(v_i^+/s;ν); S̄_i=P_i/Δλ_i",
     "inputs": "Kappa index κ, magnetic pitch cosine b_hat·q_hat, second-moment directional temperature T_q [eV], electron mass m_e, Boltzmann constant k_B",
     "output": "Normalized one-dimensional electron-velocity marginal along q; mapped to wavelength using λ=λ0[1−2 sin(θ_s/2) v_q/c] in the non-relativistic elastic-Thomson limit",
-    "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.",
+    "assumptions": "Three-dimensional gyrotropic bi-Kappa ansatz f∝[1+v_parallel²/(κθ_parallel²)+v_perp²/(κθ_perp²)]^(−(κ+1)); zero heat flux; finite second moments require κ>3/2; instrument response acts on bin-integrated spectral power.; each finite wavelength bin is integrated exactly through the Student-t CDF of the projected Kappa marginal; wavelength-window tails are not renormalized.",
     "status": "D",
     "category": "Optical Thomson scattering",
     "execution_contract": {
@@ -6453,6 +6635,10 @@
         {
           "name": "projected_velocity_distribution_m_s_inverse",
           "unit": "s m^-1; normalized q-projected marginal evaluated on the measured-window velocity grid"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact Student-t CDF probability integrated over finite wavelength bins"
         }
       ],
       "prerequisites": [
@@ -6472,8 +6658,10 @@
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain"
-      ]
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain",
+        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities"
+      ],
+      "note": "The projected bi-Kappa marginal is a Student-t distribution with ν=2κ−1 and scale²=κθ_q²/(2κ−1). The forward model integrates exact probability between wavelength-bin edges, applies the measured response to bin-integrated power, and reports measured-window coverage without tail renormalization."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
@@ -6489,7 +6677,8 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle"
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
+        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities"
       ]
     }
   },
@@ -6629,5 +6818,548 @@
         "tests/test_thomson_gap_closure.py::test_psf_profile_rejects_non_psd_operator_covariance"
       ]
     }
+  },
+  {
+    "name": "Finite-bin non-collective Maxwellian optical Thomson inference",
+    "equation": "S̄_i=A σ_λ√(2π)/Δλ_i [Φ((λ_i^+−λ_c)/σ_λ)−Φ((λ_i^-−λ_c)/σ_λ)]; λ_c=λ_0(1−q u_q/c); σ_λ=λ_0 q√(eT_e/m_e)/c",
+    "inputs": "Canonical analyze_thomson_spectra API inputs: calibrated wavelength_nm bin centres, spectra, radius_m, laser_wavelength_nm, scattering_angle_rad, measured instrument_response and explicit model selection; optional pointwise or joint spectral covariance, model-discrepancy covariance and systematic covariance.",
+    "output": "electron_temperature_eV [eV; inferred only within declared non-relativistic screen]; electron_velocity_projection_m_s [m s^-1; q-parallel projection]; captured_spectral_probability [dimensionless; exact Gaussian probability in recorded wavelength bins]; spectral_bin_integration [exact normal-CDF finite-volume integration]; fitted_spectrum [calibrated spectral density after measured response]; residual [calibrated spectral density]",
+    "assumptions": "Isotropic Maxwellian electrons; single-scattering non-collective optical Thomson regime; non-relativistic Doppler mapping; detector background is a separately fitted nuisance basis. Each bin is the exact Gaussian probability integrated over its midpoint-defined wavelength edges, divided by bin width; the measured response acts on bin-integrated spectral power.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_inference._fit_noncollective",
+      "formula_key": "optical_thomson_noncollective_maxwellian_finite_bin",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated wavelength-bin centres",
+          "required": true
+        },
+        {
+          "name": "spectra",
+          "unit": "calibrated spectral density; channel x wavelength",
+          "required": true
+        },
+        {
+          "name": "radius_m",
+          "unit": "m; one per measured channel",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin probability operator",
+          "required": true
+        },
+        {
+          "name": "model",
+          "unit": "non_collective_maxwellian",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "spectral-density pointwise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "joint_spectral_covariance",
+          "unit": "full channel-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "additive spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "additive spectral covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; inferred only within declared non-relativistic screen"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; q-parallel projection"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; exact Gaussian probability in recorded wavelength bins"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact normal-CDF finite-volume integration"
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "calibrated spectral density after measured response"
+        },
+        {
+          "name": "residual",
+          "unit": "calibrated spectral density"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated wavelength-bin centres and spectral-density samples",
+        "Laser wavelength, scattering angle and a measured detector-response operator",
+        "A measured wavelength grid with strictly increasing bin centres; finite-volume edges are midpoint-defined"
+      ],
+      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. The finite-bin CDF integral is deterministic conditional on wavelength centres, laser wavelength, geometry and fitted parameters.",
+      "limitations": [
+        "No relativistic or Compton correction; the canonical fitter rejects fits outside its theta_e and bulk-flow beta screens.",
+        "Only the q-projected one-dimensional Maxwellian marginal is identified from a single scattering geometry.",
+        "No absolute density from spectral shape alone; complete calibrated scattered-power and optical inputs are required."
+      ],
+      "test_links": [
+        "tests/test_thomson_inference.py::test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius",
+        "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs"
+      ],
+      "note": "The primary optical Maxwellian model now evaluates exact normal-CDF probability in every finite wavelength bin before response convolution. The recorded-window probability is reported without tail renormalization.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
+      "input_data_level": "measured_calibrated_spectrum",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; the function consumes calibrated measured spectra.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson finite-bin spectral inference"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum",
+    "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — finite-bin spectral inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_inference._fit_noncollective",
+      "function_links": [
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+        "tokamak_analysis.thomson_inference._fit_noncollective"
+      ],
+      "formula_key": "optical_thomson_noncollective_maxwellian_finite_bin",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_inference.py::test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius",
+        "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs"
+      ]
+    }
+  },
+  {
+    "name": "Finite-bin non-collective isotropic-Kappa optical Thomson inference",
+    "equation": "S̄_i=A I_κ/Δλ_i [F_t(z_i^+;ν)−F_t(z_i^-;ν)]; ν=2κ−1; s=σ_λ√((ν−2)/ν); I_κ=s√(νπ)Γ(κ−1/2)/Γ(κ); z_i^±=(λ_i^±−λ_c)/s",
+    "inputs": "Canonical analyze_thomson_spectra API inputs: calibrated wavelength_nm bin centres, spectra, radius_m, laser_wavelength_nm, scattering_angle_rad, measured instrument_response and explicit model selection; optional pointwise or joint spectral covariance, model-discrepancy covariance and systematic covariance.",
+    "output": "electron_temperature_eV [eV; second-moment temperature]; kappa_index [dimensionless; only when response-convolved spectral Jacobian identifies it]; integrated_scattered_power_W [full fitted model area; shape normalization includes Gamma(kappa-1/2)/Gamma(kappa)]; captured_spectral_probability [dimensionless; exact Student-t probability inside recorded wavelength bins]; spectral_bin_integration [exact Student-t CDF finite-volume integration]; kappa_index_identifiability [structured response-convolved Jacobian and nuisance-projected sensitivity diagnostics]; kappa_profile_likelihood [conditional profile likelihood with nuisance re-optimization]",
+    "assumptions": "Isotropic finite-variance Kappa electron distribution with kappa > 3/2; non-collective single scattering; non-relativistic Doppler mapping; the projected wavelength shape is Student-t with nu=2kappa-1 and scale s=sigma_lambda*sqrt((nu-2)/nu). Bin probability is integrated exactly by the Student-t CDF; the measured response acts on bin-integrated power. The full shape integral is I_kappa=s*sqrt(nu*pi)*Gamma(kappa-1/2)/Gamma(kappa).",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
+      "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated wavelength-bin centres",
+          "required": true
+        },
+        {
+          "name": "spectra",
+          "unit": "calibrated spectral density; channel x wavelength",
+          "required": true
+        },
+        {
+          "name": "radius_m",
+          "unit": "m; one per measured channel",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin probability operator",
+          "required": true
+        },
+        {
+          "name": "model",
+          "unit": "non_collective_kappa",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "spectral-density pointwise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "joint_spectral_covariance",
+          "unit": "full channel-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "additive spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "additive spectral covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; second-moment temperature"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; only when response-convolved spectral Jacobian identifies it"
+        },
+        {
+          "name": "integrated_scattered_power_W",
+          "unit": "full fitted model area; shape normalization includes Gamma(kappa-1/2)/Gamma(kappa)"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; exact Student-t probability inside recorded wavelength bins"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact Student-t CDF finite-volume integration"
+        },
+        {
+          "name": "kappa_index_identifiability",
+          "unit": "structured response-convolved Jacobian and nuisance-projected sensitivity diagnostics"
+        },
+        {
+          "name": "kappa_profile_likelihood",
+          "unit": "conditional profile likelihood with nuisance re-optimization"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated wavelength-bin centres and spectral-density samples",
+        "Laser wavelength, scattering angle and a measured detector-response operator",
+        "A measured wavelength grid with strictly increasing bin centres; finite-volume edges are midpoint-defined"
+      ],
+      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. The finite-bin CDF integral is deterministic conditional on wavelength centres, laser wavelength, geometry and fitted parameters.",
+      "limitations": [
+        "No relativistic or Compton correction; the canonical fitter rejects fits outside its theta_e and bulk-flow beta screens.",
+        "Kappa is a fitted parametric closure, not a general measured EVDF.",
+        "A finite wavelength window truncates heavy tails; captured probability is reported and missing tails are not silently renormalized.",
+        "Absolute density is not identifiable from normalized spectral shape alone."
+      ],
+      "test_links": [
+        "tests/test_thomson_inference.py::test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index",
+        "tests/test_thomson_inference.py::test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model",
+        "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
+        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
+      ],
+      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
+      "input_data_level": "measured_calibrated_spectrum",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; the function consumes calibrated measured spectra.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson finite-bin spectral inference"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      },
+      {
+        "title": "Computing the generalized plasma dispersion function for non-Maxwellian plasmas, with applications to Thomson scattering",
+        "authors": "Skolar, Longley & Goodwin",
+        "journal": "Physics of Plasmas",
+        "volume": "32",
+        "article": "043907",
+        "year": 2025,
+        "doi": "10.1063/5.0261966"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum",
+    "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — finite-bin spectral inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
+      "function_links": [
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+        "tokamak_analysis.thomson_inference._fit_kappa"
+      ],
+      "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_inference.py::test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index",
+        "tests/test_thomson_inference.py::test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model",
+        "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
+        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
+      ]
+    }
+  },
+  {
+    "name": "Conditional Maxwellian optical Thomson spectral-width mapping",
+    "equation": "T_e[eV] = (m_e c^2/e) [σ_λ/(λ_0 2 sin(θ/2))]^2; v_q = c(1 - λ_c/λ_0)/(2 sin(θ/2))",
+    "inputs": "Intrinsic response-convolved Gaussian width σ_λ [nm], fitted centroid λ_c [nm], laser wavelength λ_0 [nm], scattering angle θ [rad]",
+    "output": "Conditional T_e [eV], q-projected flow v_q [m s^-1], 2×2 covariance",
+    "assumptions": "Explicit non-collective Maxwellian selection; elastic non-relativistic Thomson mapping; supplied measured response is applied in the forward shape fit; independent laser/angle calibration uncertainties; theta_e < 0.01 and |v_q|/c < 0.1. This is a conditional diagnostic candidate, not primary inference.",
+    "status": "D",
+    "category": "Analysis 1 — Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
+      "formula_key": "optical_thomson_conditional_maxwellian_gaussian_mapping",
+      "input_specs": [
+        {
+          "name": "gaussian_fit_parameters.center_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "gaussian_fit_parameters.sigma_nm",
+          "unit": "nm; intrinsic width from measured-response forward fit",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "physical_inference.electron_temperature_candidate_eV",
+          "unit": "eV; withheld outside validity domain"
+        },
+        {
+          "name": "physical_inference.electron_velocity_projection_candidate_m_s",
+          "unit": "m s^-1; withheld outside validity domain"
+        },
+        {
+          "name": "physical_inference.parameter_covariance",
+          "unit": "2×2 covariance ordered [T_e, v_q]"
+        },
+        {
+          "name": "physical_inference.validity_parameters",
+          "unit": "theta_e and |beta_flow|"
+        }
+      ],
+      "prerequisites": [
+        "An explicitly selected non_collective_maxwellian physical model.",
+        "Calibrated laser wavelength and scattering angle.",
+        "Measured instrument response matrix applied to the intrinsic Gaussian forward model."
+      ],
+      "uncertainty_model": "Analytic Jacobian propagation of the fitted centroid/width covariance and independent laser-wavelength/scattering-angle calibration uncertainties. Model discrepancy, background-parameter cross-covariance and correlations between geometry and fit parameters are not included.",
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_selected_maxwellian_maps_intrinsic_gaussian_width_to_conditional_physics",
+        "tests/test_thomson_distribution.py::test_selected_maxwellian_physical_conversion_rejects_relativistic_domain",
+        "tests/test_thomson_distribution.py::test_spectral_distribution_requires_explicit_physical_model_geometry"
+      ],
+      "note": "Software implementation and independent synthetic tests; not experimental validation. The candidate is not promoted to primary Thomson inference."
+    }
+  },
+  {
+    "name": "Finite-bin isotropic-Kappa optical Thomson inference with structured background",
+    "equation": "ν=2κ−1; s_λ=λ₀ q √(Tₑ/(mₑc²/e)) √[(ν−2)/ν]; Pᵢ=F_t((λᵢ⁺−λ_c)/s_λ;ν)−F_t((λᵢ⁻−λ_c)/s_λ;ν); S̄ᵢ=Pᵢ/Δλᵢ; λ_c=λ₀(1−q u_q/c); y=R(A S̄)+Bβ+ε",
+    "inputs": "Calibrated wavelength-bin centres [nm], measured spectrum, laser wavelength [nm], scattering angle [rad], measured wavelength-response matrix, Te [eV] and flow/Kappa optimizer seeds; optional measurement, model-discrepancy and systematic covariance; explicit detector-background basis",
+    "output": "Kappa index, second-moment Te, q-parallel flow, fitted scattered spectrum, fitted detector background and full physical/amplitude/background covariance; no absolute density",
+    "assumptions": "Isotropic finite-variance Kappa electron distribution with κ>3/2; non-relativistic elastic-Thomson wavelength mapping; exact Student-t CDF integration over midpoint-defined finite wavelength bins; calibrated response acts on bin-integrated spectral power; supplied detector background basis",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "formula_key": "optical_thomson_kappa_finite_bin_structured_background_inference",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing measured bin centres",
+          "required": true
+        },
+        {
+          "name": "measured_spectrum",
+          "unit": "calibrated spectral density",
+          "required": true
+        },
+        {
+          "name": "physical_model",
+          "unit": "kappa or relativistic_maxwell_juttner",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin probability operator",
+          "required": true
+        },
+        {
+          "name": "physical_initial",
+          "unit": "[Te_eV, flow_projection_m_s, kappa] for Kappa; [Te_eV, flow_projection_m_s] for MJ",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "unit polarization vector in scattering-local frame; required for MJ",
+          "required": false
+        },
+        {
+          "name": "measurement_uncertainty or measurement_covariance",
+          "unit": "spectral measurement covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "positive-semidefinite spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "positive-semidefinite spectral covariance",
+          "required": false
+        },
+        {
+          "name": "background_model",
+          "unit": "constant, linear, polynomial, spline or supplied templates",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; second-moment temperature"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; q projection"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; κ>3/2"
+        },
+        {
+          "name": "fitted_thomson_spectrum",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "fitted_background",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "joint_parameter_covariance",
+          "unit": "full local covariance including physical/background cross terms"
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "data-Jacobian rank and conditioning"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated measured optical Thomson spectrum",
+        "Measured instrument response",
+        "Laser wavelength and scattering geometry",
+        "Explicit physical model and background basis"
+      ],
+      "uncertainty_model": "Whitening covariance is the sum of independently supplied measurement, model-discrepancy and systematic covariance components. The joint local covariance includes physical/amplitude/background cross terms; absent noise covariance it is residual-scaled and not measurement-noise uncertainty.",
+      "limitations": [
+        "Isotropic 1-D q-projected Kappa marginal, not general anisotropic or 3-D EVDF",
+        "Kappa finite variance requires κ>3/2",
+        "No absolute density inference from freely profiled spectral amplitude",
+        "Relativistic MJ requires explicit polarization and uses bin-averaged quadrature",
+        "No experimental validation is implied by numerical tests"
+      ],
+      "test_links": [
+        "tests/test_thomson_kinetic_background.py::test_kappa_structured_background_fit_retains_joint_cross_covariance",
+        "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
+        "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard"
+      ],
+      "note": "Physical inference is performed from the measured calibrated spectrum; Gaussian spectral width is not used as a surrogate temperature."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum",
+    "execution_scope": "conditional_noncollective_kinetic_spectral_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering"
   }
 ]

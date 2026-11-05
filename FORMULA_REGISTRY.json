@@ -7229,5 +7229,137 @@
       ],
       "note": "Software implementation and independent synthetic tests; not experimental validation. The candidate is not promoted to primary Thomson inference."
     }
+  },
+  {
+    "name": "Finite-bin isotropic-Kappa optical Thomson inference with structured background",
+    "equation": "ν=2κ−1; s_λ=λ₀ q √(Tₑ/(mₑc²/e)) √[(ν−2)/ν]; Pᵢ=F_t((λᵢ⁺−λ_c)/s_λ;ν)−F_t((λᵢ⁻−λ_c)/s_λ;ν); S̄ᵢ=Pᵢ/Δλᵢ; λ_c=λ₀(1−q u_q/c); y=R(A S̄)+Bβ+ε",
+    "inputs": "Calibrated wavelength-bin centres [nm], measured spectrum, laser wavelength [nm], scattering angle [rad], measured wavelength-response matrix, Te [eV] and flow/Kappa optimizer seeds; optional measurement, model-discrepancy and systematic covariance; explicit detector-background basis",
+    "output": "Kappa index, second-moment Te, q-parallel flow, fitted scattered spectrum, fitted detector background and full physical/amplitude/background covariance; no absolute density",
+    "assumptions": "Isotropic finite-variance Kappa electron distribution with κ>3/2; non-relativistic elastic-Thomson wavelength mapping; exact Student-t CDF integration over midpoint-defined finite wavelength bins; calibrated response acts on bin-integrated spectral power; supplied detector background basis",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "formula_key": "optical_thomson_kappa_finite_bin_structured_background_inference",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing measured bin centres",
+          "required": true
+        },
+        {
+          "name": "measured_spectrum",
+          "unit": "calibrated spectral density",
+          "required": true
+        },
+        {
+          "name": "physical_model",
+          "unit": "kappa or relativistic_maxwell_juttner",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin probability operator",
+          "required": true
+        },
+        {
+          "name": "physical_initial",
+          "unit": "[Te_eV, flow_projection_m_s, kappa] for Kappa; [Te_eV, flow_projection_m_s] for MJ",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "unit polarization vector in scattering-local frame; required for MJ",
+          "required": false
+        },
+        {
+          "name": "measurement_uncertainty or measurement_covariance",
+          "unit": "spectral measurement covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "positive-semidefinite spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "positive-semidefinite spectral covariance",
+          "required": false
+        },
+        {
+          "name": "background_model",
+          "unit": "constant, linear, polynomial, spline or supplied templates",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; second-moment temperature"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; q projection"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; κ>3/2"
+        },
+        {
+          "name": "fitted_thomson_spectrum",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "fitted_background",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "joint_parameter_covariance",
+          "unit": "full local covariance including physical/background cross terms"
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "data-Jacobian rank and conditioning"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated measured optical Thomson spectrum",
+        "Measured instrument response",
+        "Laser wavelength and scattering geometry",
+        "Explicit physical model and background basis"
+      ],
+      "uncertainty_model": "Whitening covariance is the sum of independently supplied measurement, model-discrepancy and systematic covariance components. The joint local covariance includes physical/amplitude/background cross terms; absent noise covariance it is residual-scaled and not measurement-noise uncertainty.",
+      "limitations": [
+        "Isotropic 1-D q-projected Kappa marginal, not general anisotropic or 3-D EVDF",
+        "Kappa finite variance requires κ>3/2",
+        "No absolute density inference from freely profiled spectral amplitude",
+        "Relativistic MJ requires explicit polarization and uses bin-averaged quadrature",
+        "No experimental validation is implied by numerical tests"
+      ],
+      "test_links": [
+        "tests/test_thomson_kinetic_background.py::test_kappa_structured_background_fit_retains_joint_cross_covariance",
+        "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
+        "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard"
+      ],
+      "note": "Physical inference is performed from the measured calibrated spectrum; Gaussian spectral width is not used as a surrogate temperature."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum",
+    "execution_scope": "conditional_noncollective_kinetic_spectral_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering"
   }
 ]

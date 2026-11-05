@@ -280,6 +280,12 @@
           "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
+          "name": "systematic_covariance",
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
+          "required": false,
+          "description": "Researcher-supplied additive systematic spectral covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. Positive-semidefinite systematic covariance is added once to measurement and model-discrepancy covariance before GLS; the combined covariance must be positive definite. Full channel-major input retains supplied cross-channel blocks."
+        },
+        {
           "name": "joint_profile_measurement_covariance",
           "unit": "full channel-major spectral covariance",
           "required": false,
@@ -8668,6 +8674,22 @@
           "required": false,
           "default": 200,
           "description": "Number of Monte Carlo draws used for moment uncertainty diagnostics."
+        },
+        {
+          "name": "physical_model",
+          "unit": "None, non_collective_maxwellian, kappa, or relativistic_maxwell_juttner",
+          "required": false,
+          "description": "Kappa/MJ selections invoke a separate measured-spectrum physical forward fit; Gaussian width is never converted into a definitive temperature."
+        },
+        {
+          "name": "physical_initial",
+          "unit": "Te, q-flow and optional Kappa index optimizer seeds",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance and systematic_covariance",
+          "unit": "positive-semidefinite wavelength-space covariance",
+          "required": false
         }
       ],
       "output_specs": [
@@ -8888,6 +8910,18 @@
         {
           "name": "background_uncertainty_supplied",
           "unit": "boolean"
+        },
+        {
+          "name": "kinetic_physical_inference",
+          "unit": "Kappa or relativistic Maxwell-Juttner physical fit with structured detector background"
+        },
+        {
+          "name": "joint_parameter_covariance",
+          "unit": "physical, amplitude and detector-background covariance including cross terms"
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "data-Jacobian rank and conditioning"
         }
       ],
       "assumptions": [
@@ -8900,7 +8934,7 @@
       "preprocessing": [
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
-      "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the parent Thomson Analysis 1 forward model.",
+      "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the parent Thomson Analysis 1 forward model. An additional explicit Kappa/relativistic-Maxwell-Juttner route fits the measured calibrated spectrum directly with a physical kinetic forward model and detector-background basis. The isotropic Kappa q-marginal is integrated exactly by Student-t CDF differences over finite wavelength bins; the relativistic MJ kernel is Gauss-Legendre averaged within each bin. The measured response acts on bin-integrated spectral power. The full joint covariance includes physical/background cross terms and is withheld when the data Jacobian is rank deficient or ill-conditioned.",
       "uncertainty_model": "Spectral-moment uncertainties are propagated by Monte Carlo from supplied pointwise signal uncertainty or full within-channel covariance and supplied background uncertainty. When signal_background_cross_covariance is supplied with both marginal covariance models, the complete positive-definite joint signal/background covariance is sampled jointly; otherwise signal and background errors are treated as independent. Gaussian-fit covariance is conditional on the fixed supplied measured response matrix.",
       "limitations": [
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
@@ -8911,19 +8945,22 @@
         "An explicitly supplied fitted background can include pointwise uncertainty or a full positive-definite covariance; in the absence of signal/background cross-covariance the two perturbations are assumed independent. Possible signal contamination in the background remains non-identifiable."
       ],
       "function_links": [
-        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
+        "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background"
       ],
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
-      "note": "Input is a measured, calibrated optical Thomson spectrum. This subanalysis reports wavelength-space spectral descriptors only; physical plasma parameters are inferred by the parent Analysis 1 forward model.",
-      "completion_scope": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics from calibrated measured spectra, without deconvolution or physical-parameter inference.",
+      "note": "Input is a measured, calibrated optical Thomson spectrum. This subanalysis reports wavelength-space spectral descriptors only; physical plasma parameters are inferred by the parent Analysis 1 forward model. The optional kinetic physical route is explicitly selected and is not inferred from Gaussian width.",
+      "completion_scope": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics from calibrated measured spectra, without deconvolution or physical-parameter inference. The optional physical route additionally provides finite-bin isotropic-Kappa or relativistic MJ inference with joint structured-background covariance; the descriptive Gaussian width remains non-physical.",
       "test_links": [
         "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
         "tests/test_thomson_distribution.py::test_distribution_does_not_accept_pre_extracted_physical_parameters_or_width_corrections",
         "tests/test_thomson_distribution.py::test_moments_use_signed_residuals_and_propagate_pointwise_uncertainty",
         "tests/test_thomson_inference.py::test_primary_thomson_inference_includes_spectral_distribution_diagnostics",
         "tests/test_thomson_distribution.py::test_distribution_propagates_joint_signal_background_cross_covariance",
-        "tests/test_thomson_distribution.py::test_distribution_rejects_non_positive_definite_joint_signal_background_covariance"
+        "tests/test_thomson_distribution.py::test_distribution_rejects_non_positive_definite_joint_signal_background_covariance",
+        "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
+        "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard"
       ],
       "input_data_level": "measured_calibrated_spectrum"
     },

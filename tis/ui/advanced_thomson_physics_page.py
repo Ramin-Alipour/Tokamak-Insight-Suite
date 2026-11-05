@@ -58,6 +58,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 
 MODEL_LABELS = {
+    "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
     "cts_collective_kappa_spectrum": "CTS — collective Kappa-electron / multispecies Maxwellian-ion dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
@@ -94,6 +95,13 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_kinetic_background_fit": (
+        "Fits calibrated measured optical Thomson spectra directly with the selected physical Kappa or relativistic Maxwell-Juttner forward model. "
+        "The Kappa q-projected Student-t marginal is integrated exactly over finite wavelength bins; the relativistic kernel is Gauss-Legendre averaged inside each bin. "
+        "The measured response acts on bin-integrated power. Physical amplitude and detector-background coefficients are fitted jointly, and the full local covariance retains physical/background cross terms. "
+        "Supply measurement, model-discrepancy and systematic covariance separately. Kappa is isotropic, finite-variance (kappa > 3/2), and shape-only; MJ requires an explicit incident-polarization vector. "
+        "No absolute density or unrestricted 3-D EVDF is inferred. A full-rank, well-conditioned data Jacobian is mandatory."
+    ),
     "cts_collective_kappa_inference": (
         "Nonlinear measured-spectrum inversion of electron density, second-moment electron temperature "
         "and Kappa index. Ion composition, ion temperatures/flows, scattering geometry and measured "
@@ -144,6 +152,21 @@ MODEL_PHYSICS_NOTES = {
 }
 
 EXAMPLES = {
+    "thomson_kinetic_background_fit": {
+        "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
+        "measured_spectrum": (0.04 + 0.006*(np.linspace(529.0, 535.0, 181)-532.0) + 2.3*np.exp(-0.5*((np.linspace(529.0, 535.0, 181)-532.0)/0.45)**2)).tolist(),
+        "physical_model": "kappa",
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response": np.eye(181).tolist(),
+        "physical_initial": [300.0, 80000.0, 3.5],
+        "background_model": "linear",
+        "measurement_uncertainty": np.full(181, 0.003).tolist(),
+        "model_discrepancy_covariance": None,
+        "systematic_covariance": None,
+        "include_compton_recoil": False,
+        "maximum_recoil_correction_fraction": 0.01
+    },
     "thomson_relativistic_exact_flow_projection": {
         "fitted_center_nm": 499.9998,
         "laser_wavelength_nm": 500.0,

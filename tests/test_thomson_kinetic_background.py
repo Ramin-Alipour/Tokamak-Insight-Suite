@@ -2,6 +2,8 @@ import numpy as np
 
 from tokamak_analysis.thomson_kinetic_background import (
     fit_noncollective_kinetic_thomson_with_background,
+    _kappa_bin_average_spectral_density,
+    _wavelength_edges,
 )
 
 
@@ -73,3 +75,29 @@ def test_structured_background_fit_rejects_non_psd_model_discrepancy_covariance(
             physical_initial=[300.0, 0.0, 3.5],
             model_discrepancy_covariance=-np.eye(wavelength.size),
         )
+
+
+def test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities():
+    wavelength = np.linspace(529.0, 535.0, 181)
+    spectrum = _kappa_bin_average_spectral_density(
+        wavelength, 532.0, np.pi / 2.0, 300.0, 0.0, 3.5
+    )
+    widths = np.diff(_wavelength_edges(wavelength))
+    assert np.all(spectrum >= 0.0)
+    assert np.sum(spectrum * widths) > 0.99
+    assert np.sum(spectrum * widths) < 1.0
+
+
+def test_kinetic_background_model_is_routed_through_public_advanced_dashboard():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "thomson_kinetic_background_fit"
+    assert model in MODEL_LABELS and model in EXAMPLES
+    config = dict(EXAMPLES[model])
+    result = run_advanced_thomson_physics(model, **config)
+    assert result["public_physics_entrypoint"] == model
+    assert result["physical_model"] == "kappa"
+    assert result["absolute_density_inferred"] is False
+    assert result["parameter_identifiability"]["status"] == "locally_identifiable_after_joint_structured_background_fit"
+    assert result["joint_parameter_covariance"].shape[0] == len(result["joint_parameter_names"])

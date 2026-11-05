@@ -515,7 +515,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
       - thomson_multiview_3d_evdf: non-negative 3-D velocity-space inversion from multiple measured scattering views; the data-only stacked kernel rank gates whether a 3-D EVDF is reportable.
       - thomson_relativistic_exact_flow_projection: exact relativistic Doppler inversion for one fitted q-parallel bulk-flow projection (not a distribution mean or 3-D flow).
-      - thomson_projected_evdf: response-aware non-negative inversion of the
+      - thomson_kinetic_background_fit: finite-bin Kappa or bin-averaged relativistic\n        Maxwell-Juttner physical fit with detector background, instrument response,\n        measurement/model-discrepancy/systematic covariance and joint nuisance covariance.\n      - thomson_projected_evdf: response-aware non-negative inversion of the
         measured optical Thomson electron feature to its 1-D q-projected VDF;
         absolute density and the unobserved 3-D distribution are not inferred.
       - thomson_relativistic_projected_evdf: exact relativistic projected
@@ -533,7 +533,10 @@ def run_advanced_thomson_physics(model, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "relativistic_kinetic_ece_profile":
+    if model == "thomson_kinetic_background_fit":
+        from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
+        solver = fit_noncollective_kinetic_thomson_with_background
+    elif model == "relativistic_kinetic_ece_profile":
         solver = solve_relativistic_kinetic_ece_profile
     elif model == "relativistic_kinetic_ece":
         solver = relativistic_kinetic_ece_absorption_coefficient

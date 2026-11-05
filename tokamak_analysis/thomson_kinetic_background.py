@@ -9,6 +9,7 @@ fitters until their UI contracts are migrated.
 from __future__ import annotations
 
 import numpy as np
+from scipy.special import stdtr
 
 _C = 299_792_458.0
 _E_REST_EV = 510_998.95069
@@ -22,6 +23,56 @@ def _real_vector(value, name, minimum=7):
     if not np.all(np.isfinite(out)):
         raise ValueError(f"{name} must contain finite values")
     return out
+
+
+def _wavelength_edges(axis):
+    """Midpoint-defined finite-volume wavelength edges for measured bins."""
+    x = np.asarray(axis, dtype=float)
+    if x.ndim != 1 or x.size < 7 or np.any(~np.isfinite(x)) or np.any(np.diff(x) <= 0):
+        raise ValueError("wavelength axis must be finite, one-dimensional and strictly increasing")
+    edges = np.empty(x.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (x[:-1] + x[1:])
+    edges[0] = x[0] - 0.5 * (x[1] - x[0])
+    edges[-1] = x[-1] + 0.5 * (x[-1] - x[-2])
+    if np.any(np.diff(edges) <= 0):
+        raise ValueError("wavelength bins must have positive widths")
+    return edges
+
+
+def _kappa_bin_average_spectral_density(wavelength_nm, laser_wavelength_nm,
+                                        scattering_angle_rad, temperature_eV,
+                                        flow_projection_m_s, kappa):
+    """Exact finite-bin Student-t probability for the isotropic Kappa q-marginal.
+
+    The projected marginal has nu=2*kappa-1 degrees of freedom and scale
+    sigma_lambda*sqrt((nu-2)/nu), where sigma_lambda is fixed by the
+    second-moment temperature. Integrating the CDF over each wavelength bin
+    avoids point-sampling bias and preserves probability before detector
+    response convolution.
+    """
+    x = np.asarray(wavelength_nm, dtype=float)
+    laser = float(laser_wavelength_nm)
+    angle = float(scattering_angle_rad)
+    temperature = float(temperature_eV)
+    flow = float(flow_projection_m_s)
+    index = float(kappa)
+    if (x.ndim != 1 or x.size < 7 or np.any(~np.isfinite(x))
+            or np.any(np.diff(x) <= 0) or laser <= 0 or temperature <= 0
+            or not 0 < angle < np.pi or abs(flow) >= _C or index <= 1.5):
+        raise ValueError("invalid wavelength or isotropic finite-variance Kappa parameters")
+    edges = _wavelength_edges(x)
+    q = 2.0 * np.sin(angle / 2.0)
+    center = laser * (1.0 - q * flow / _C)
+    sigma_nm = laser * q * np.sqrt(temperature / _E_REST_EV)
+    degrees = 2.0 * index - 1.0
+    scale_nm = sigma_nm * np.sqrt((degrees - 2.0) / degrees)
+    probability = (
+        stdtr(degrees, (edges[1:] - center) / scale_nm)
+        - stdtr(degrees, (edges[:-1] - center) / scale_nm)
+    )
+    if np.any(probability < -1e-12) or np.any(~np.isfinite(probability)):
+        raise ValueError("Kappa finite-bin integration produced invalid probability")
+    return np.maximum(probability, 0.0) / np.diff(edges)
 
 
 def _apply_response(response, spectrum, axis):
@@ -173,21 +224,26 @@ def fit_noncollective_kinetic_thomson_with_background(
     def intrinsic(parameters):
         te, flow = float(parameters[0]), float(parameters[1])
         if physical_model == "kappa":
-            kappa = float(parameters[2])
-            center = laser * (1.0 - q * flow / _C)
-            sigma_nm = laser * np.sqrt(2.0) * np.sin(angle / 2.0) * np.sqrt(te / _E_REST_EV)
-            df = 2.0 * kappa - 1.0
-            scale = sigma_nm * np.sqrt((df - 2.0) / df)
-            return (1.0 + ((x - center) / scale) ** 2 / df) ** (-kappa)
+            return _kappa_bin_average_spectral_density(
+                x, laser, angle, te, flow, float(parameters[2])
+            )
+        # Evaluate the relativistic kernel inside each measured finite bin and
+        # Gauss-Legendre average before the response acts on bin-integrated power.
+        edges = _wavelength_edges(x)
+        nodes, weights = np.polynomial.legendre.leggauss(8)
+        half_width = 0.5 * np.diff(edges)
+        midpoint = 0.5 * (edges[1:] + edges[:-1])
+        quadrature_wavelength = (midpoint[:, None] + half_width[:, None] * nodes[None, :]).ravel()
         result = relativistic_maxwell_juttner_spectrum(
-            x, laser, angle, te, flow_projection_m_s=flow,
+            quadrature_wavelength, laser, angle, te, flow_projection_m_s=flow,
             incident_polarization=np.asarray(incident_polarization, dtype=float),
             radial_order=radial_order, angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
             include_compton_recoil=include_compton_recoil,
             require_full_spectrum=False,
         )
-        return np.asarray(result["spectral_density_per_nm"], dtype=float)
+        density = np.asarray(result["spectral_density_per_nm"], dtype=float).reshape(x.size, nodes.size)
+        return 0.5 * (density @ weights)
 
     def profiled(parameters):
         shape = _apply_response(response, intrinsic(parameters), x)
