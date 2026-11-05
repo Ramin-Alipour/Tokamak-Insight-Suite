@@ -574,6 +574,10 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = multispecies_thermal_coulomb_collision_matrix
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
+    elif model == "landau_fdt_full_em_response":
+        # Public measured-input path: assemble the Landau operator, then expose
+        # its Cartesian Full-EM current response and matching FDT noise.
+        solver = analyze_landau_fdt_full_em_constitutive
     elif model == "quantum_fdt":
         solver = quantum_fdt_dynamic_structure_factor
     elif model == "quantum_fdt_unsymmetrized":
@@ -608,6 +612,10 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = thomson_velocity_projection_relativistic_exact
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
+    elif model == "thomson_multiview_3d_evdf":
+        # Keep the rank-gated multiview inverse reachable through the same
+        # public dispatcher used by the dashboard and API.
+        solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_relativistic_projected_evdf":
         solver = reconstruct_relativistic_projected_thomson_evdf
     elif model == "thomson_psf_profile_inverse":
