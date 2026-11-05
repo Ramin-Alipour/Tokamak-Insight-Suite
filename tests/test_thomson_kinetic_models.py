@@ -709,3 +709,47 @@ def test_gyrotropic_bimaxwellian_gls_enforces_positive_physical_temperatures():
     assert result["temperature_constraint"] == "T_perpendicular > 0 and T_parallel > 0 eV"
     assert result["active_temperature_lower_bounds"]["T_perpendicular"] is True
     assert result["temperature_covariance_status"].startswith("local_unconstrained_GLS_curvature")
+
+
+def test_gyrotropic_bimaxwellian_gls_propagates_temperature_pitch_cross_covariance():
+    from tokamak_analysis.thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
+
+    pitch = np.array([1.0, 0.5, 0.0, -0.7])
+    projected = 80.0*(1.0-pitch**2) + 180.0*pitch**2
+    temperature_covariance = np.eye(4)*0.04
+    pitch_covariance = np.eye(4)*0.0025
+    cross_covariance = np.diag([0.008, -0.006, 0.004, 0.005])
+    result = infer_gyrotropic_bi_maxwellian_temperatures(
+        projected, pitch,
+        projected_temperature_covariance_eV2=temperature_covariance,
+        magnetic_pitch_cosine_covariance=pitch_covariance,
+        projected_temperature_pitch_cross_covariance=cross_covariance,
+    )
+    assert result["temperature_geometry_cross_covariance_included"] is True
+    assert "cross_terms" in result["geometry_covariance_method"]
+    derivative = 2.0*pitch*(
+        result["electron_temperature_parallel_eV"]
+        - result["electron_temperature_perpendicular_eV"]
+    )
+    expected = (
+        temperature_covariance
+        + derivative[:, None]*pitch_covariance*derivative[None, :]
+        + cross_covariance*derivative[None, :]
+        + derivative[:, None]*cross_covariance.T
+    )
+    np.testing.assert_allclose(
+        result["effective_projected_temperature_covariance_eV2"],
+        expected, rtol=2e-8, atol=1e-12,
+    )
+
+
+def test_gyrotropic_bimaxwellian_rejects_inconsistent_joint_temperature_geometry_covariance():
+    from tokamak_analysis.thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
+
+    with pytest.raises(ValueError, match="joint covariance block must be positive semidefinite"):
+        infer_gyrotropic_bi_maxwellian_temperatures(
+            [80.0, 120.0, 180.0], [0.0, 0.5, 1.0],
+            projected_temperature_covariance_eV2=np.eye(3),
+            magnetic_pitch_cosine_covariance=np.eye(3)*1e-4,
+            projected_temperature_pitch_cross_covariance=np.eye(3)*0.1,
+        )
