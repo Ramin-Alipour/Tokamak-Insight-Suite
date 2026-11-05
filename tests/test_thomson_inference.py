@@ -527,6 +527,7 @@ def test_descriptive_moments_report_negative_residual_clipping_caveat():
     result = analyze_thomson_spectra(
         x, y[None, :], [0.1], laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+        model="non_collective_maxwellian",
     )
     out = result["channels"][0]["spectral_distribution"]
     assert "projected_evdf_spectral_moment_closure" in out
