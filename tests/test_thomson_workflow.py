@@ -108,3 +108,37 @@ def test_exact_relativistic_flow_projection_is_exposed_by_canonical_workflow():
     )
     assert result["electron_velocity_projection_m_s"] == pytest.approx(0.0)
     assert result["identifiability"] == "one_projected_velocity_only"
+
+
+def test_registered_gyrotropic_workflow_dispatches_bimaxwellian_and_bikappa_without_fallback(monkeypatch):
+    import tokamak_analysis.thomson_anisotropic_inference as anisotropic
+    calls = []
+    def fake_maxwellian(wavelength, spectra, **kwargs):
+        calls.append(("bi_maxwellian", kwargs.copy()))
+        return {"model": "bi_maxwellian"}
+    def fake_kappa(wavelength, spectra, **kwargs):
+        calls.append(("bi_kappa", kwargs.copy()))
+        return {"model": "bi_kappa"}
+    monkeypatch.setattr(anisotropic, "fit_gyrotropic_bi_maxwellian_thomson", fake_maxwellian)
+    monkeypatch.setattr(anisotropic, "fit_gyrotropic_bi_kappa_thomson", fake_kappa)
+    wavelength = np.linspace(499.0, 501.0, 17)
+    spectra = np.ones((2, wavelength.size))
+    common = {"laser_wavelength_nm": 500.0, "scattering_angle_rad": np.pi / 2,
+              "magnetic_field_unit": [0, 0, 1],
+              "scattering_vector_unit": [[0, 0, 1], [1, 0, 0]],
+              "instrument_response_matrix": np.eye(wavelength.size)}
+    default = workflow.fit_gyrotropic_thomson_spectra(wavelength, spectra, **common)
+    kappa = workflow.fit_gyrotropic_thomson_spectra(wavelength, spectra, distribution_model="bi_kappa", initial_kappa=5.0, **common)
+    assert default["selected_distribution_model"] == "bi_maxwellian"
+    assert kappa["selected_distribution_model"] == "bi_kappa"
+    assert default["model_switch_was_automatic"] is False
+    assert calls[0][0] == "bi_maxwellian" and calls[1][0] == "bi_kappa"
+    assert calls[1][1]["initial_kappa"] == 5.0
+
+def test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback():
+    with pytest.raises(ValueError, match="distribution_model"):
+        workflow.fit_gyrotropic_thomson_spectra(
+            np.linspace(499.0, 501.0, 17), np.ones((1, 17)), distribution_model="automatic",
+            laser_wavelength_nm=500.0, scattering_angle_rad=np.pi / 2,
+            magnetic_field_unit=[0, 0, 1], scattering_vector_unit=[[0, 0, 1]],
+            instrument_response_matrix=np.eye(17))
