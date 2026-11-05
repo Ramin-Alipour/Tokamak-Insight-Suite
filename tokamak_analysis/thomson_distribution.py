@@ -548,11 +548,16 @@ def analyze_thomson_spectral_distribution(
         ],
     }
 
-    if physical_model not in {None, "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner"}:
-        raise ValueError("physical_model must be None, non_collective_maxwellian, kappa, or relativistic_maxwell_juttner")
-    if physical_fit_options is not None and physical_model not in {
-        "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner"
-    }:
+    supported_physical_models = {
+        "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner",
+        "collective_maxwellian", "collective_kappa",
+    }
+    if physical_model is not None and physical_model not in supported_physical_models:
+        raise ValueError(
+            "physical_model must be one of: "
+            + ", ".join(sorted(supported_physical_models))
+        )
+    if physical_fit_options is not None and physical_model is None:
         raise ValueError(
             "physical_fit_options requires an explicitly selected physical_model"
         )
@@ -737,10 +742,10 @@ def analyze_thomson_spectral_distribution(
     # forward fitter when the caller supplies the spatial coordinate and fit
     # controls. The Gaussian-width conversion above remains a clearly labelled
     # diagnostic candidate; it is never promoted to the primary measurement.
-    if physical_model == "non_collective_maxwellian" and physical_fit_options is not None:
+    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"} and physical_fit_options is not None:
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError(
-                "laser_wavelength_nm and scattering_angle_rad are required for canonical Maxwellian inference"
+                "laser_wavelength_nm and scattering_angle_rad are required for canonical Thomson physical inference"
             )
         if not isinstance(physical_fit_options, dict):
             raise ValueError("physical_fit_options must be a mapping for canonical Maxwellian inference")
@@ -774,7 +779,7 @@ def analyze_thomson_spectral_distribution(
             laser_wavelength_nm=float(laser_wavelength_nm),
             scattering_angle_rad=float(scattering_angle_rad),
             instrument_response=response,
-            model="non_collective_maxwellian",
+            model=physical_model,
             **options,
         )
         if uncertainty is not None:
@@ -804,7 +809,10 @@ def analyze_thomson_spectral_distribution(
             "fit": canonical_result,
             "channel_fit": channel,
             "source_spectrum": "same_calibrated_measured_spectrum_as_spectral_distribution",
-            "forward_model": "canonical_multichannel_optical_thomson_maxwellian_forward_fit",
+            "forward_model": (
+                "canonical_optical_thomson_forward_fit:"
+                + physical_model
+            ),
             "gaussian_width_used_as_temperature": False,
             "gaussian_width_role": "independent_descriptive_cross_check_only",
             "fit_configuration": {
