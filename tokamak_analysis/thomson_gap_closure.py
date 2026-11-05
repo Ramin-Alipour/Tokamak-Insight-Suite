@@ -423,6 +423,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
             incident_polarization=incident_polarization,
             incident_direction=incident_direction, scattered_direction=scattered_direction,
         )
+        if kinematics is None:
+            kinematics = source_kinematics
         maximum_recoil = max(maximum_recoil, float(source_kinematics["maximum_recoil_correction_fraction"]))
         if not include_compton_recoil and source_kinematics["maximum_recoil_correction_fraction"] > recoil_limit:
             raise ValueError(
