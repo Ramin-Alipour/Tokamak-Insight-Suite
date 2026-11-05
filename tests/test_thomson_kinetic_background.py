@@ -194,3 +194,47 @@ def test_kappa_fit_reports_declared_asymptotic_validity_domain():
     assert result["model_validity_limits"]["electron_temperature_over_rest_energy_max"] == 0.01
     assert result["electron_temperature_eV"] / 510998.95069 <= 0.01
     assert abs(result["electron_velocity_projection_m_s"]) / 299792458.0 <= 0.1
+
+
+def test_full_em_cts_dashboard_alias_routes_to_the_public_landau_fdt_solver(monkeypatch):
+    import tokamak_analysis.cts_full_physics as physics
+
+    calls = {}
+
+    def fake_solver(**kwargs):
+        calls.update(kwargs)
+        return {"solver": "landau_fdt_full_em_constitutive", "response_shape": [2, 3, 3]}
+
+    monkeypatch.setattr(physics, "analyze_landau_fdt_full_em_constitutive", fake_solver)
+    result = physics.run_advanced_thomson_physics(
+        "landau_fdt_full_em_response",
+        angular_frequency_rad_s=[1.0e5, 2.0e5],
+        test_input="explicit",
+    )
+
+    assert calls == {
+        "angular_frequency_rad_s": [1.0e5, 2.0e5],
+        "test_input": "explicit",
+    }
+    assert result["solver"] == "landau_fdt_full_em_constitutive"
+    assert result["public_physics_entrypoint"] == "landau_fdt_full_em_response"
+    assert result["automatic_model_substitution"] is False
+
+
+def test_full_em_cts_constitutive_name_routes_to_the_same_public_solver(monkeypatch):
+    import tokamak_analysis.cts_full_physics as physics
+
+    calls = []
+
+    def fake_solver(**kwargs):
+        calls.append(kwargs)
+        return {"solver": "landau_fdt_full_em_constitutive"}
+
+    monkeypatch.setattr(physics, "analyze_landau_fdt_full_em_constitutive", fake_solver)
+    result = physics.run_advanced_thomson_physics(
+        "landau_fdt_full_em_constitutive", marker=17
+    )
+
+    assert calls == [{"marker": 17}]
+    assert result["solver"] == "landau_fdt_full_em_constitutive"
+    assert result["public_physics_entrypoint"] == "landau_fdt_full_em_constitutive"
