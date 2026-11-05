@@ -274,7 +274,9 @@ def maxwellian_electron_susceptibility(
     scalar_input = raw_phase.ndim == 0
     return {
         "electron_susceptibility": complex(susceptibility) if scalar_input else susceptibility,
-        "plasma_dispersion_function": complex(plasma_dispersion) if scalar_input else plasma_dispersion,\n        "plasma_dispersion_function_derivative": complex(plasma_dispersion_derivative) if scalar_input else plasma_dispersion_derivative,\n        "susceptibility_phase_velocity_derivative_s_m": complex(susceptibility_phase_derivative) if scalar_input else susceptibility_phase_derivative,
+        "plasma_dispersion_function": complex(plasma_dispersion) if scalar_input else plasma_dispersion,
+        "plasma_dispersion_function_derivative": complex(plasma_dispersion_derivative) if scalar_input else plasma_dispersion_derivative,
+        "susceptibility_phase_velocity_derivative_s_m": complex(susceptibility_phase_derivative) if scalar_input else susceptibility_phase_derivative,
         "normalized_phase_velocity": float(zeta) if scalar_input else zeta,
         "thermal_speed_m_s": thermal_speed,
         "one_dimensional_velocity_variance_m2_s2": float(sigma2),

@@ -59,7 +59,8 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
-    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",\n    "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
+    "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
@@ -95,7 +96,11 @@ MODEL_LABELS = {
     "thomson_normalized_poloidal_flux": "Optical Thomson — map channel positions to equilibrium-normalized poloidal flux rho_pol",
 }
 
-MODEL_PHYSICS_NOTES = {\n    "maxwellian_electrostatic_susceptibility": (\n        "Exact collisionless unmagnetized longitudinal Maxwellian response: chi_e = (2 omega_pe^2/(k^2 v_th^2)) [1 + zeta Z(zeta)], " \n        "with v_th=sqrt(2 e T_e/m_e), zeta=v_phase/v_th and Z=i sqrt(pi) wofz(zeta). This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."\n    ),
+MODEL_PHYSICS_NOTES = {
+    "maxwellian_electrostatic_susceptibility": (
+        "Exact collisionless unmagnetized longitudinal Maxwellian response: chi_e = (2 omega_pe^2/(k^2 v_th^2)) [1 + zeta Z(zeta)], " 
+        "with v_th=sqrt(2 e T_e/m_e), zeta=v_phase/v_th and Z=i sqrt(pi) wofz(zeta). This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."
+    ),
     "gyrotropic_bi_maxwellian_anisotropy": (
         "Uses T_q = T_perp*(1-mu^2) + T_parallel*mu^2 with iterative "
         "errors-in-variables GLS. Optional magnetic_pitch_cosine_covariance "
@@ -170,7 +175,13 @@ MODEL_PHYSICS_NOTES = {\n    "maxwellian_electrostatic_susceptibility": (\n     
     ),
 }
 
-EXAMPLES = {\n    "maxwellian_electrostatic_susceptibility": {\n        "phase_velocity_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),\n        "electron_density_m3": 2.0e19,\n        "electron_temperature_eV": 1000.0,\n        "wavenumber_m_inverse": 250.0\n    },
+EXAMPLES = {
+    "maxwellian_electrostatic_susceptibility": {
+        "phase_velocity_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),
+        "electron_density_m3": 2.0e19,
+        "electron_temperature_eV": 1000.0,
+        "wavenumber_m_inverse": 250.0
+    },
     "thomson_normalized_poloidal_flux": {
         "poloidal_flux_wb": [0.11, 0.19, 0.34, 0.58],
         "magnetic_axis_flux_wb": 0.10,

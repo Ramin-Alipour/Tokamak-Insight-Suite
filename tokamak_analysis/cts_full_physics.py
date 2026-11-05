@@ -481,7 +481,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
         Maxwellian multispecies ions. This is a forward model, not a 3-D EVDF inverse.
-      - maxwellian_electrostatic_susceptibility: exact Fried-Conte Maxwellian electron susceptibility using the Faddeeva function.\n      - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
+      - maxwellian_electrostatic_susceptibility: exact Fried-Conte Maxwellian electron susceptibility using the Faddeeva function.
+      - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
       - cts_collective_kappa_spectrum: collisionless electrostatic dynamic-structure
@@ -519,7 +520,10 @@ def run_advanced_thomson_physics(model, **kwargs):
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
       - thomson_multiview_3d_evdf: non-negative 3-D velocity-space inversion from multiple measured scattering views; the data-only stacked kernel rank gates whether a 3-D EVDF is reportable.
       - thomson_relativistic_exact_flow_projection: exact relativistic Doppler inversion for one fitted q-parallel bulk-flow projection (not a distribution mean or 3-D flow).
-      - thomson_kinetic_background_fit: finite-bin Kappa or bin-averaged relativistic\n        Maxwell-Juttner physical fit with detector background, instrument response,\n        measurement/model-discrepancy/systematic covariance and joint nuisance covariance.\n      - thomson_projected_evdf: response-aware non-negative inversion of the
+      - thomson_kinetic_background_fit: finite-bin Kappa or bin-averaged relativistic
+        Maxwell-Juttner physical fit with detector background, instrument response,
+        measurement/model-discrepancy/systematic covariance and joint nuisance covariance.
+      - thomson_projected_evdf: response-aware non-negative inversion of the
         measured optical Thomson electron feature to its 1-D q-projected VDF;
         absolute density and the unobserved 3-D distribution are not inferred.
       - thomson_relativistic_projected_evdf: exact relativistic projected
@@ -631,7 +635,8 @@ def run_advanced_thomson_physics(model, **kwargs):
 
 
 __all__ = [
-    "kappa_electron_susceptibility",\n    "maxwellian_electron_susceptibility",
+    "kappa_electron_susceptibility",
+    "maxwellian_electron_susceptibility",
     "collective_tabulated_electron_spectral_density",
     "quantum_fdt_dynamic_structure_factor",
     "quantum_unsymmetrized_dynamic_structure_factor",
