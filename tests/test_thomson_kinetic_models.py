@@ -477,3 +477,72 @@ def test_gyrotropic_bi_kappa_projected_marginal_enforces_finite_variance_domain(
             magnetic_field_unit=[0.0, 0.0, 1.0],
             scattering_vector_unit=[1.0, 0.0, 0.0],
         )
+
+
+
+def test_collective_kappa_mult_population_electron_dielectric_uses_weighted_landau_responses():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 41)
+    angle = np.pi/2.0
+    incident = np.array([-np.sin(angle/2), np.cos(angle/2), 0.0])
+    scattered = np.array([np.sin(angle/2), np.cos(angle/2), 0.0])
+    common = dict(
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=120.0,
+        kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident,
+        scattered_direction=scattered,
+    )
+    single = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle, **common
+    )
+    mixture = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_populations=[
+            {"density_fraction": 0.85, "temperature_ratio": 0.7,
+             "kappa": 5.0, "flow_projection_m_s": -1.0e5},
+            {"density_fraction": 0.15, "temperature_ratio": 4.0,
+             "kappa": 2.5, "flow_projection_m_s": 8.0e5},
+        ],
+        **common,
+    )
+    assert mixture["electron_population_susceptibilities"].shape == (2, wavelength.size)
+    assert mixture["electron_population_projected_vdfs_s_m"].shape == (2, wavelength.size)
+    np.testing.assert_allclose(
+        mixture["electron_susceptibility"],
+        np.sum(mixture["electron_population_susceptibilities"], axis=0),
+    )
+    assert not np.allclose(
+        mixture["spectral_density_per_nm"], single["spectral_density_per_nm"],
+        rtol=1e-4, atol=0.0,
+    )
+    assert sum(p["density_fraction"] for p in mixture["electron_populations"]) == pytest.approx(1.0)
+
+
+def test_collective_kappa_mult_population_rejects_non_normalized_density_fractions():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 21)
+    angle = np.pi/2.0
+    incident = np.array([-np.sin(angle/2), np.cos(angle/2), 0.0])
+    scattered = np.array([np.sin(angle/2), np.cos(angle/2), 0.0])
+    with pytest.raises(ValueError, match="must sum to one"):
+        collective_kappa_spectral_density(
+            wavelength, 1064.0, angle,
+            electron_density_m3=1.0e19, electron_temperature_eV=100.0,
+            kappa=3.0,
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0], ion_temperature_eV=[80.0],
+            electron_velocity_m_s=[0.0, 0.0, 0.0],
+            ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+            incident_direction=incident, scattered_direction=scattered,
+            electron_populations=[
+                {"density_fraction": 0.8}, {"density_fraction": 0.3}
+            ],
+        )
