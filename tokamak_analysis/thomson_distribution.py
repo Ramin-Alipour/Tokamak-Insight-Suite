@@ -143,6 +143,7 @@ def analyze_thomson_spectral_distribution(
     laser_wavelength_uncertainty_nm: float | None = None,
     scattering_angle_uncertainty_rad: float | None = None,
     laser_angle_covariance_nm_rad: float = 0.0,
+    fit_geometry_cross_covariance_nm2_rad: np.ndarray | None = None,
     physical_fit_options: dict | None = None,
     projected_evdf_options: dict | None = None,
 ) -> dict:
@@ -675,6 +676,26 @@ def analyze_thomson_spectral_distribution(
             input_covariance[3, 3] = angle_unc**2
             input_covariance[2, 3] = geometry_cross_covariance
             input_covariance[3, 2] = geometry_cross_covariance
+            if fit_geometry_cross_covariance_nm2_rad is not None:
+                raw_fit_geometry_cross = np.asarray(fit_geometry_cross_covariance_nm2_rad)
+                if (raw_fit_geometry_cross.dtype.kind not in "iuf"
+                        or raw_fit_geometry_cross.shape != (2, 2)
+                        or not np.all(np.isfinite(raw_fit_geometry_cross))):
+                    raise ValueError(
+                        "fit_geometry_cross_covariance_nm2_rad must be a finite real 2x2 "
+                        "cross-covariance for [fitted_center_nm, intrinsic_sigma_nm] "
+                        "against [laser_wavelength_nm, scattering_angle_rad]"
+                    )
+                input_covariance[:2, 2:] = raw_fit_geometry_cross.astype(float, copy=False)
+                input_covariance[2:, :2] = raw_fit_geometry_cross.T
+            input_covariance = 0.5 * (input_covariance + input_covariance.T)
+            joint_eigenvalues = np.linalg.eigvalsh(input_covariance)
+            joint_scale = max(float(np.max(np.abs(joint_eigenvalues))), np.finfo(float).tiny)
+            if joint_eigenvalues[0] < -1e-10 * joint_scale:
+                raise ValueError(
+                    "joint fitted-spectrum/laser/angle covariance must be positive semidefinite; "
+                    "the fitted-parameter/geometry cross-covariance is physically inconsistent"
+                )
             jacobian = np.vstack((grad_temperature, grad_flow))
             physical_covariance = jacobian @ input_covariance @ jacobian.T
             physical_covariance = 0.5 * (physical_covariance + physical_covariance.T)
@@ -703,7 +724,8 @@ def analyze_thomson_spectral_distribution(
                 "non-relativistic elastic Thomson wavelength mapping",
                 "laser wavelength and scattering-angle calibration errors are independent of fitted spectral parameters",
                 "laser wavelength/scattering-angle calibration cross-covariance is included when supplied",
-                "no model-discrepancy or background-parameter cross-covariance is included in this conditional conversion",
+                "fitted center/width to laser/angle cross-covariance is included when supplied via fit_geometry_cross_covariance_nm2_rad",
+                "no model-discrepancy or background-parameter cross-covariance is included unless represented in the supplied fitted-parameter covariance",
             ],
             "limitations": [
                 "This is a conditional diagnostic candidate, not a replacement for the canonical joint physical Thomson inference.",
