@@ -7540,10 +7540,10 @@
   },
   {
     "name": "Multi-population Kappa electron susceptibility for collective Thomson scattering",
-    "equation": "χ_e(k,ω) = Σ_j χ_e,j(k,ω); χ_e,j = -(ω_pe,j²/k²) ∫_L [∂f_j(v)/∂v]/(v−ω/k) dv; ω_pe,j² = n_e η_j e²/(ε₀ m_e), Σ_j η_j = 1",
-    "inputs": "n_e [m^-3], T_e [eV], population fractions η_j, temperature ratios τ_j, Kappa indices κ_j > 3/2, projected flows u_j [m/s], k [m^-1], ω [rad/s]",
+    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; χ_a=−(ω_pa²/k²)∫_L[(∂f_a/∂v)/(v−ω/k)]dv; ω_pe,j²=n_eη_je²/(ε₀m_e); ω_pi,s²=n_sZ_s²e²/(ε₀m_s); Σ_jη_j=1; n_s=α_sn_e/Z_s",
+    "inputs": "n_e [m^-3], T_e [eV], electron population fractions η_j, temperature ratios τ_j, distribution selector Maxwellian or Kappa, Kappa indices κ_j > 3/2 when selected, projected electron flows u_j [m/s], per-ion-species distribution selector Maxwellian or Kappa, ion Kappa indices κ_s > 3/2 when selected, ion charge-density fractions α_s, ion temperatures and projected flows, k [m^-1], ω [rad/s]",
     "output": "Complex total longitudinal electron susceptibility χ_e and density-weighted projected electron source distribution",
-    "assumptions": "Unmagnetized electrostatic longitudinal response; each population is an isotropic 3-D Kappa population represented by its 1-D scattering-direction marginal; populations share a common bulk density reference and are independently drifting.",
+    "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; quasi-neutrality; each species is represented by its exact 1-D projected marginal for the selected isotropic Maxwellian or finite-variance isotropic Kappa family; population fractions and species composition are fixed explicit inputs; susceptibility contributions are summed before common dielectric screening.",
     "status": "D",
     "category": "Thomson scattering / collective kinetic response",
     "execution_contract": {
@@ -7576,6 +7576,18 @@
           "name": "phase_velocity_m_s",
           "unit": "m s^-1",
           "required": true
+        },
+        {
+          "name": "electron_populations",
+          "unit": "optional list of density_fraction, temperature_ratio, distribution (maxwellian or kappa), kappa when selected, and flow_projection_m_s mappings",
+          "required": false,
+          "description": "Electron populations are independently represented by finite-variance Kappa or Maxwellian 1-D marginals; fractions must be positive and sum to one."
+        },
+        {
+          "name": "ion_populations",
+          "unit": "optional one-per-ion-species list of distribution (maxwellian or kappa), kappa when selected, and flow_projection_m_s mappings",
+          "required": false,
+          "description": "Ion populations default to Maxwellian with the supplied species flow. Kappa ions require kappa > 3/2; one mapping is required per ion species when supplied."
         }
       ],
       "output_specs": [
@@ -7593,17 +7605,19 @@
         }
       ],
       "prerequisites": [
-        "Each population density_fraction is positive and fractions sum to one.",
-        "Each population Kappa index is > 3/2 for finite variance.",
-        "Temperature ratios are positive and projected population flows are subluminal."
+        "Each supplied electron population density_fraction is positive and fractions sum to one; temperature_ratio is positive and projected flow is subluminal.",
+        "Electron and ion Kappa indices must exceed 3/2 to ensure finite variance.",
+        "When ion_populations is supplied, it must contain exactly one mapping per ion species; each flow is finite and subluminal.",
+        "Quasi-neutral ion density is n_i = alpha_i n_e / Z_i; each ion susceptibility uses omega_pi^2 = n_i Z_i^2 e^2/(epsilon_0 m_i)."
       ],
       "uncertainty_model": "Population parameters are fixed external inputs in the current CTS fit. Their uncertainties are not inferred or propagated by this extension; the fitted base electron density, reference temperature and global Kappa parameter retain the existing local-fit covariance.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_electron_dielectric_uses_weighted_landau_responses",
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_rejects_non_normalized_density_fractions"
       ],
-      "note": "This extends the collisionless unmagnetized electrostatic CTS branch. It is not a magnetized Full-EM multi-population model and does not independently identify all population parameters from one spectrum."
-    }
+      "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian and finite-variance Kappa distributions may be selected independently for each supplied population. The spectrum is then constructed from the common dielectric screening and the corresponding electron/ion source terms. This is still an unmagnetized collisionless electrostatic forward/inference branch; it is not a magnetized Full-EM or collisional closure. Population and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse."
+    },
+    "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian and finite-variance Kappa distributions may be selected independently for each supplied population. The spectrum is then constructed from the common dielectric screening and the corresponding electron/ion source terms. This is still an unmagnetized collisionless electrostatic forward/inference branch; it is not a magnetized Full-EM or collisional closure. Population and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse."
   },
   {
     "name": "Measured-laser-profile relativistic Compton Thomson spectral-power convolution",
