@@ -140,6 +140,19 @@ def test_joint_spatial_spectral_inverse_is_reachable_through_dashboard_dispatche
     }
     direct = reconstruct_joint_thomson_spatial_spectra(**inputs)
     dispatched = run_advanced_thomson_physics("thomson_joint_spatial_spectra", **inputs)
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    registered_profile_api = resolve_analysis(46)(
+        wavelength, spectra, radius,
+        model="non_collective_maxwellian",
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(spectra, 0.01),
+        joint_spatial_spectral=True,
+        spatial_mixing_matrix=mixing,
+        spatial_regularization_strength=0.0,
+    )
     np.testing.assert_allclose(
         dispatched["electron_temperature_profile_eV"],
         direct["electron_temperature_profile_eV"],
@@ -151,6 +164,11 @@ def test_joint_spatial_spectral_inverse_is_reachable_through_dashboard_dispatche
     assert dispatched["public_physics_entrypoint"] == "thomson_joint_spatial_spectra"
     assert dispatched["automatic_model_substitution"] is False
     assert dispatched["analysis_status"] == "completed"
+    np.testing.assert_allclose(
+        registered_profile_api["electron_temperature_profile_eV"],
+        direct["electron_temperature_profile_eV"],
+    )
+    assert registered_profile_api["analysis_status"] == "completed"
 
 
 def test_joint_spatial_spectral_solver_is_selectable_with_a_complete_dashboard_example():
