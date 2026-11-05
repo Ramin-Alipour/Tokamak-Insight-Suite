@@ -174,7 +174,10 @@ def fit_noncollective_kinetic_thomson_with_background(
         if not np.isfinite(photon_norm) or photon_norm <= 0:
             raise ValueError("laser source profile has zero photon-flux integral")
         photon_cdf /= photon_norm
-        unique_cdf, unique_indices = np.unique(photon_cdf, return_index=True)
+        unique_cdf, reverse_indices = np.unique(photon_cdf[::-1], return_index=True)
+        unique_indices = photon_cdf.size - 1 - reverse_indices
+        cdf_order = np.argsort(unique_cdf)
+        unique_cdf, unique_indices = unique_cdf[cdf_order], unique_indices[cdf_order]
         if unique_cdf.size < 2:
             raise ValueError("laser source profile has insufficient non-zero photon-flux support")
         probability_nodes, probability_weights = np.polynomial.legendre.leggauss(order)
@@ -554,7 +557,10 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         if not np.isfinite(photon_total) or photon_total <= 0:
             raise ValueError("laser source profile has zero photon-flux integral")
         photon_cdf /= photon_total
-        cdf_unique, cdf_indices = np.unique(photon_cdf, return_index=True)
+        cdf_unique, reverse_indices = np.unique(photon_cdf[::-1], return_index=True)
+        cdf_indices = photon_cdf.size - 1 - reverse_indices
+        cdf_order = np.argsort(cdf_unique)
+        cdf_unique, cdf_indices = cdf_unique[cdf_order], cdf_indices[cdf_order]
         if cdf_unique.size < 2:
             raise ValueError("laser source profile has insufficient non-zero photon-flux support")
         qnodes, qweights = np.polynomial.legendre.leggauss(order)
