@@ -142,6 +142,7 @@ def analyze_thomson_spectral_distribution(
     scattering_angle_rad: float | None = None,
     laser_wavelength_uncertainty_nm: float | None = None,
     scattering_angle_uncertainty_rad: float | None = None,
+    physical_fit_options: dict | None = None,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
 
@@ -544,11 +545,44 @@ def analyze_thomson_spectral_distribution(
         ],
     }
 
+    # Kappa and relativistic Maxwell-Juttner require their own physical
+    # forward models. Never map a Gaussian width to these non-Gaussian models.
+    if physical_model in {"kappa", "relativistic_maxwell_juttner"}:
+        if laser_wavelength_nm is None or scattering_angle_rad is None:
+            raise ValueError("laser_wavelength_nm and scattering_angle_rad are required for kinetic physical inference")
+        if not isinstance(physical_fit_options, dict):
+            raise ValueError("physical_fit_options must provide physical_initial and the selected model's nuisance/uncertainty inputs")
+        options = dict(physical_fit_options)
+        if "physical_model" in options or "instrument_response" in options or "laser_wavelength_nm" in options or "scattering_angle_rad" in options:
+            raise ValueError("physical_fit_options cannot override the selected model, geometry, or measured instrument response")
+        from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
+        kinetic_fit = fit_noncollective_kinetic_thomson_with_background(
+            x, y, physical_model=physical_model,
+            laser_wavelength_nm=laser_wavelength_nm,
+            scattering_angle_rad=scattering_angle_rad,
+            instrument_response=response,
+            **options,
+        )
+        result["physical_inference"] = {
+            "selected_model": physical_model,
+            "status": kinetic_fit.get("status", "completed_with_solver_status"),
+            "reportable_as_primary_inference": kinetic_fit.get("primary_result_status") == "identified_from_measurement",
+            "fit": kinetic_fit,
+            "source_spectrum": "same_calibrated_measured_spectrum_as_spectral_distribution",
+            "forward_model": "native_finite_bin_kinetic_thomson_model_with_measured_response_and_joint_detector_background",
+            "gaussian_width_used_as_temperature": False,
+            "limitations": [
+                "Kappa is the finite-variance isotropic projected Student-t model, not a general anisotropic or relativistic Kappa EVDF.",
+                "Relativistic Maxwell-Juttner uses the selected Thomson/Compton recoil contract and supplied polarization; it is not an unrestricted relativistic EVDF inverse.",
+                "Identifiability and covariance are conditional on the supplied response, background basis, and uncertainty model.",
+            ],
+        }
+
     # Optional physical interpretation: only an explicitly selected
     # non-relativistic Maxwellian model may map the intrinsic Gaussian
     # forward-fit width to Te. The measured response is already included in
     # fit_model; no scalar instrument-width subtraction is performed.
-    if physical_model is not None:
+    if physical_model == "non_collective_maxwellian":
         if physical_model != "non_collective_maxwellian":
             raise ValueError("physical_model must be None or 'non_collective_maxwellian'; a Gaussian shape fit cannot identify Kappa or arbitrary EVDF parameters")
         if laser_wavelength_nm is None or scattering_angle_rad is None:
@@ -628,7 +662,7 @@ def analyze_thomson_spectral_distribution(
                 "No primary physical result is reported outside the declared asymptotic validity screens.",
             ],
         }
-    else:
+    elif physical_model is None:
         result["physical_inference"] = {
             "selected_model": None,
             "status": "not_requested",

@@ -407,3 +407,57 @@ def test_spectral_distribution_requires_explicit_physical_model_geometry():
             background_signal=np.full_like(wavelength, 0.1),
             physical_model="non_collective_maxwellian",
         )
+
+
+def test_spectral_distribution_dispatches_kappa_to_native_physical_forward_fit(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_background as kinetic_background
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(1059.8, 1060.2, 61)
+    signal = 1.0 + 0.2 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.045) ** 2)
+    response = np.eye(wavelength.size)
+    captured = {}
+
+    def fake_fit(x, y, **kwargs):
+        captured.update(kwargs)
+        return {
+            "status": "identified_from_measurement",
+            "primary_result_status": "identified_from_measurement",
+            "parameter_estimates": {"electron_temperature_eV": 120.0, "kappa": 4.0},
+        }
+
+    monkeypatch.setattr(kinetic_background, "fit_noncollective_kinetic_thomson_with_background", fake_fit)
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=response,
+        background_signal=np.full_like(signal, 0.01),
+        physical_model="kappa",
+        laser_wavelength_nm=1060.0,
+        scattering_angle_rad=np.pi / 2,
+        physical_fit_options={
+            "physical_initial": [120.0, 0.0, 4.0],
+            "background_model": "linear",
+        },
+    )
+
+    assert captured["physical_model"] == "kappa"
+    assert captured["instrument_response"] is response
+    assert result["physical_inference"]["gaussian_width_used_as_temperature"] is False
+    assert result["physical_inference"]["reportable_as_primary_inference"] is True
+
+
+def test_spectral_distribution_rejects_kinetic_model_without_explicit_fit_options():
+    import pytest
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(1059.8, 1060.2, 61)
+    signal = 1.0 + 0.2 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.045) ** 2)
+    with pytest.raises(ValueError, match="physical_fit_options"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(signal, 0.01),
+            physical_model="kappa",
+            laser_wavelength_nm=1060.0,
+            scattering_angle_rad=np.pi / 2,
+        )
