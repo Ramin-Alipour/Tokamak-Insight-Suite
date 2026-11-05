@@ -199,11 +199,25 @@ def fit_noncollective_kinetic_thomson_with_background(
         lower = np.r_[1e-4, -0.95 * _C, 1.500001] if physical_model == "kappa" else np.array([1e-4, -0.95 * _C])
         upper = np.r_[2e6, 0.95 * _C, 100.0] if physical_model == "kappa" else np.array([2e6, 0.95 * _C])
     else:
-        lower, upper = (np.asarray(v, dtype=float) for v in physical_bounds)
+        lower, upper = (np.asarray(v, dtype=float).copy() for v in physical_bounds)
         if lower.shape != p0.shape or upper.shape != p0.shape or np.any(~np.isfinite(lower)) or np.any(~np.isfinite(upper)):
             raise ValueError("physical_bounds must be two finite vectors matching physical_initial")
+    validity_limits = None
+    if physical_model == "kappa":
+        # Non-relativistic projected Kappa marginal and first-order Doppler map.
+        theta_limit, beta_limit = 1.0e-2, 1.0e-1
+        te_limit, flow_limit = theta_limit * _E_REST_EV, beta_limit * _C
+        lower[0], upper[0] = max(float(lower[0]), np.finfo(float).tiny), min(float(upper[0]), te_limit)
+        lower[1], upper[1] = max(float(lower[1]), -flow_limit), min(float(upper[1]), flow_limit)
+        validity_limits = {
+            "electron_temperature_over_rest_energy_max": theta_limit,
+            "absolute_flow_speed_over_c_max": beta_limit,
+            "maximum_temperature_eV": te_limit,
+            "maximum_absolute_flow_m_s": flow_limit,
+            "interpretation": "software asymptotic-domain screen, not a universal plasma boundary",
+        }
     if np.any(lower >= upper) or np.any(p0 < lower) or np.any(p0 > upper):
-        raise ValueError("physical initial values must lie within strictly ordered physical_bounds")
+        raise ValueError("physical initial values must lie within the valid, strictly ordered physical_bounds")
 
     if measurement_uncertainty is not None and measurement_covariance is not None:
         raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
@@ -366,14 +380,27 @@ def fit_noncollective_kinetic_thomson_with_background(
     joint_jacobian = np.empty((x.size, n_physical + n_nuisance), dtype=float)
     step_scale = np.cbrt(np.finfo(float).eps)
     for index in range(n_physical):
-        step = step_scale * max(1.0, abs(float(fit.x[index])))
-        plus, minus = fit.x.copy(), fit.x.copy()
-        plus[index] += step
-        minus[index] -= step
-        plus_shape = _apply_response(response, intrinsic(plus), x)
-        minus_shape = _apply_response(response, intrinsic(minus), x)
-        derivative = amplitude * (plus_shape - minus_shape) / (2.0 * step)
-        joint_jacobian[:, index] = whiten(derivative)
+        value = float(fit.x[index])
+        step = step_scale * max(1.0, abs(value))
+        forward_room, backward_room = float(upper[index] - value), float(value - lower[index])
+        if forward_room >= step and backward_room >= step:
+            plus, minus = fit.x.copy(), fit.x.copy()
+            plus[index] += step
+            minus[index] -= step
+            derivative = (_apply_response(response, intrinsic(plus), x) - _apply_response(response, intrinsic(minus), x)) / (2.0 * step)
+        elif forward_room > 0.0:
+            step = min(step, forward_room)
+            plus = fit.x.copy()
+            plus[index] += step
+            derivative = (_apply_response(response, intrinsic(plus), x) - shape) / step
+        elif backward_room > 0.0:
+            step = min(step, backward_room)
+            minus = fit.x.copy()
+            minus[index] -= step
+            derivative = (shape - _apply_response(response, intrinsic(minus), x)) / step
+        else:
+            raise ValueError(f"cannot estimate covariance derivative for fixed parameter {index}")
+        joint_jacobian[:, index] = whiten(amplitude * derivative)
     design_at_solution = np.column_stack((shape, basis))
     joint_jacobian[:, n_physical:] = whiten(design_at_solution)
     joint_singular = np.linalg.svd(joint_jacobian, compute_uv=False)
@@ -466,6 +493,8 @@ def fit_noncollective_kinetic_thomson_with_background(
         "absolute_density_inferred": False,
         "recoil_included": bool(include_compton_recoil) if physical_model == "relativistic_maxwell_juttner" else False,
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if include_compton_recoil else "polarized_elastic_Thomson") if physical_model == "relativistic_maxwell_juttner" else "not_applicable_nonrelativistic_kappa_projection",
+        "model_validity_limits": validity_limits,
+        "model_validity_status": "within_declared_nonrelativistic_Kappa_domain" if physical_model == "kappa" else "relativistic_model_selected",
         "laser_source_profile_used": source_nodes is not None,
         "laser_source_profile_convolution": (
             "piecewise_linear_spectral_power_to_photon_flux_times_scattered_photon_energy_with_wavelength_resolved_recoil_and_Klein_Nishina_cross_section"
