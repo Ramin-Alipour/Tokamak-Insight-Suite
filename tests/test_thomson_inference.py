@@ -1687,3 +1687,39 @@ def test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs(
         kappa_shape*widths, amplitude*shape_integral*expected_probability,
         rtol=1e-12, atol=1e-14,
     )
+
+
+def test_structured_kappa_background_gets_profile_likelihood_with_all_nuisance_terms():
+    from tokamak_analysis.thomson_inference import _kappa_bin_averaged_shape
+    x = np.linspace(492.0, 572.0, 321)
+    basis_model = "polynomial"
+    z = 2.0 * (x - x.min()) / np.ptp(x) - 1.0
+    basis = np.polynomial.legendre.legvander(z, 2)
+    feature, _ = _kappa_bin_averaged_shape(x, 900.0, 532.0, 2.8, 3.5)
+    y = feature + basis @ np.array([18.0, 2.5, -1.2])
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        model="non_collective_kappa", background_model=basis_model,
+        background_degree=2, signal_uncertainty=np.full((1, x.size), 0.2),
+    )
+    profile = out["channels"][0]["kappa_profile_likelihood"]
+    assert profile["status"] in {"finite_profile_interval", "grid_censored"}
+    assert profile["profiled_background_model"] == "polynomial"
+    assert profile["profiled_background_parameter_count"] == 3
+    assert profile["profile_grid_kappa"].size >= 41
+
+
+def test_structured_background_gls_covariance_keeps_absolute_measurement_scale():
+    from tokamak_analysis.thomson_background import fit_structured_background
+    x = np.linspace(0.0, 1.0, 40)
+    design = np.column_stack([np.ones_like(x), x])
+    y = design @ np.array([2.0, -0.5])
+    covariance = np.eye(x.size) * 0.04
+    result = fit_structured_background(
+        x + 500.0, y, model="linear", covariance=covariance,
+    )
+    expected = np.linalg.inv(design.T @ np.linalg.solve(covariance, design))
+    np.testing.assert_allclose(
+        result["coefficient_covariance"], expected, rtol=1e-10, atol=1e-12,
+    )
