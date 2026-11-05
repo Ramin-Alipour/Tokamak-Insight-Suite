@@ -503,6 +503,9 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
     angular_order = kw.pop("angular_order", 18)
     recoil_limit = kw.pop("maximum_recoil_correction_fraction", 0.01)
     recoil = kw.pop("include_compton_recoil", False)
+    source_profile_wavelength = kw.pop("laser_spectrum_wavelength_nm", None)
+    source_profile_power = kw.pop("laser_spectrum_density_per_nm", None)
+    source_quadrature_order = kw.pop("laser_spectrum_quadrature_order", 9)
     bounds = kw.pop("physical_bounds", None)
     max_nfev = kw.pop("max_nfev", 5000)
     if kw:
@@ -524,6 +527,39 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         raise ValueError("include_compton_recoil must be boolean")
     if model == "kappa" and recoil:
         raise ValueError("Compton recoil selection is available only for the relativistic Maxwell-Juttner model")
+    if (source_profile_wavelength is None) != (source_profile_power is None):
+        raise ValueError("supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither")
+    source_nodes = source_weights = None
+    if source_profile_wavelength is not None:
+        if model != "relativistic_maxwell_juttner":
+            raise ValueError("measured source-profile convolution is currently implemented for relativistic Maxwell-Juttner inference")
+        source_x = _real_vector(source_profile_wavelength, "laser_spectrum_wavelength_nm", minimum=3)
+        source_y = _real_vector(source_profile_power, "laser_spectrum_density_per_nm", minimum=3)
+        if source_y.shape != source_x.shape or np.any(np.diff(source_x) <= 0) or np.any(source_x <= 0) or np.any(source_y < 0):
+            raise ValueError("laser source profile must be paired, positive-wavelength, increasing and non-negative")
+        if not np.isfinite(np.trapz(source_y, source_x)) or np.trapz(source_y, source_x) <= 0:
+            raise ValueError("laser source profile must have positive finite integrated spectral power")
+        order = int(source_quadrature_order)
+        if isinstance(source_quadrature_order, (bool, np.bool_)) or order != source_quadrature_order or order < 3 or order > 31:
+            raise ValueError("laser_spectrum_quadrature_order must be an integer from 3 through 31")
+        widths_source = np.diff(source_x)
+        slopes_source = np.diff(source_y)/widths_source
+        photon_segment = (
+            source_x[:-1]*source_y[:-1]*widths_source
+            + 0.5*(source_y[:-1]+source_x[:-1]*slopes_source)*widths_source**2
+            + slopes_source*widths_source**3/3.0
+        )
+        photon_cdf = np.r_[0.0,np.cumsum(photon_segment)]
+        photon_total = float(photon_cdf[-1])
+        if not np.isfinite(photon_total) or photon_total <= 0:
+            raise ValueError("laser source profile has zero photon-flux integral")
+        photon_cdf /= photon_total
+        cdf_unique, cdf_indices = np.unique(photon_cdf, return_index=True)
+        if cdf_unique.size < 2:
+            raise ValueError("laser source profile has insufficient non-zero photon-flux support")
+        qnodes, qweights = np.polynomial.legendre.leggauss(order)
+        source_nodes = np.interp(0.5*(qnodes+1.0),cdf_unique,source_x[cdf_indices])
+        source_weights = 0.5*qweights
     if uncertainty is not None and covariance is not None:
         raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
     if uncertainty is not None:
@@ -576,26 +612,55 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         raise ValueError("physical_bounds must match physical_initial and contain the initial values")
     q = 2*np.sin(angle/2)
     def shape(p):
+        edges = _wavelength_edges(x)
+        widths = np.diff(edges)
         if model == "kappa":
             te, flow, kap = p
             center = laser*(1-q*flow/_C)
             sigma_nm = laser*2.0*np.sin(angle/2)*np.sqrt(te/_E_REST_EV)
             df = 2*kap-1
             scale = sigma_nm*np.sqrt((df-2)/df)
-            intrinsic = (1+((x-center)/scale)**2/df)**(-kap)
+            from scipy.special import stdtr
+            probability = stdtr(df,(edges[1:]-center)/scale)-stdtr(df,(edges[:-1]-center)/scale)
+            intrinsic = np.maximum(probability,0.0)/widths
         else:
-            physical = relativistic_maxwell_juttner_spectrum(
-                x, laser, angle, float(p[0]), flow_projection_m_s=float(p[1]),
-                incident_polarization=np.asarray(polarization, dtype=float),
-                radial_order=radial_order, angular_order=angular_order,
-                maximum_recoil_correction_fraction=recoil_limit,
-                include_compton_recoil=recoil, require_full_spectrum=False)
-            intrinsic = np.asarray(physical["spectral_density_per_nm"], dtype=float)
-        edges = np.empty(x.size+1)
-        edges[1:-1] = 0.5*(x[:-1]+x[1:])
-        edges[0] = x[0]-0.5*(x[1]-x[0])
-        edges[-1] = x[-1]+0.5*(x[-1]-x[-2])
-        widths = np.diff(edges)
+            # Evaluate each incident wavelength with its own exact recoil and
+            # polarized Klein-Nishina kernel. Integrate each scattered finite
+            # detector bin before applying the measured response operator.
+            output_nodes, output_weights = np.polynomial.legendre.leggauss(8)
+            half_width = 0.5*widths
+            midpoint = 0.5*(edges[1:]+edges[:-1])
+            scattered_wavelength_nodes = (
+                midpoint[:,None]+half_width[:,None]*output_nodes[None,:]
+            ).ravel()
+            incident_nodes = [(laser,1.0)] if source_nodes is None else zip(source_nodes,source_weights)
+            combined = np.zeros(scattered_wavelength_nodes.size,dtype=float)
+            total_power_weight = 0.0
+            for incident_laser_nm, photon_weight in incident_nodes:
+                physical = relativistic_maxwell_juttner_spectrum(
+                    scattered_wavelength_nodes, float(incident_laser_nm), angle,
+                    float(p[0]), flow_projection_m_s=float(p[1]),
+                    incident_polarization=np.asarray(polarization,dtype=float),
+                    radial_order=radial_order, angular_order=angular_order,
+                    maximum_recoil_correction_fraction=recoil_limit,
+                    include_compton_recoil=recoil, require_full_spectrum=False,
+                )
+                cross_section = float(physical["effective_differential_cross_section_m2_sr"])
+                captured = float(physical["captured_spectral_probability"])
+                component_weight = float(photon_weight)*cross_section*captured
+                photon_pdf = np.asarray(physical["spectral_density_per_nm"],dtype=float)
+                power_pdf = photon_pdf/scattered_wavelength_nodes
+                combined += component_weight*power_pdf
+                bin_power = float(np.sum(
+                    power_pdf.reshape(x.size,output_weights.size)
+                    *output_weights[None,:]*half_width[:,None]
+                ))
+                total_power_weight += component_weight*bin_power
+            if not np.isfinite(total_power_weight) or total_power_weight<=0:
+                raise ValueError("source-convolved relativistic Thomson spectrum has zero captured scattering power")
+            intrinsic = 0.5*(combined/total_power_weight).reshape(
+                x.size,output_weights.size
+            )@output_weights
         return (response@(intrinsic*widths))/widths
     initial_shape = shape(p0)
     linear = np.linalg.lstsq(whiten(np.column_stack((initial_shape,basis))),whiten(y),rcond=None)[0]
@@ -655,6 +720,12 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         "absolute_density_inferred": False, "theta_e": theta_e, "bulk_flow_beta": beta_flow,
         "recoil_included": bool(recoil) if model=="relativistic_maxwell_juttner" else False,
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if recoil else "polarized_elastic_Thomson") if model=="relativistic_maxwell_juttner" else "isotropic_finite_variance_Kappa_projection",
+        "laser_source_profile_used": source_nodes is not None,
+        "laser_source_profile_convolution": (
+            "piecewise_linear_spectral_power_to_photon_flux_times_scattered_photon_energy_with_wavelength_resolved_recoil_and_Klein_Nishina_cross_section"
+            if source_nodes is not None else "monochromatic_incident_laser"
+        ),
+        "laser_source_quadrature_nodes": 0 if source_nodes is None else int(source_nodes.size),
         "experimental_validation": "not_performed"
     }
 
