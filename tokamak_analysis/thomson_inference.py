@@ -542,31 +542,47 @@ def _fit_noncollective(
                         "selected detector-space background basis"],
     }
 
-def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_covariance=None):
-    """Profile Kappa using exact Student-t bin probabilities and re-fit nuisances."""
+def _kappa_profile_likelihood_diagnostic(
+    x, y, response, parameters, sigma, spectral_covariance=None, *,
+    background_model="linear", background_degree=2,
+    background_interior_knots=3, background_templates=None,
+):
+    """Profile Kappa while re-optimizing every selected detector-background coefficient.
+
+    The physical Kappa spectrum uses exact finite-bin Student-t probabilities;
+    the selected background basis is held fixed while all its coefficients,
+    amplitude, centroid and width are re-fitted at each fixed Kappa.
+    """
+    from .thomson_background import _background_design
+
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
-    p = np.asarray(p, dtype=float)
+    p = np.asarray(parameters, dtype=float)
+    if p.ndim != 1 or p.size < 5 or x.shape != y.shape or p.size < 4:
+        raise ValueError("Kappa profile parameters must contain four physical parameters and background coefficients")
+    basis = _background_design(
+        x, background_model, degree=background_degree,
+        interior_knots=background_interior_knots, templates=background_templates,
+    )
+    if p.size != 4 + basis.shape[1]:
+        raise ValueError("Kappa profile parameter vector does not match the selected background basis")
     spacing = float(np.median(np.diff(x)))
-    lower = np.array([0.0, x[0], max(spacing * 0.2, 1e-12), -np.inf, -np.inf])
-    upper = np.array([np.inf, x[-1], x[-1] - x[0], np.inf, np.inf])
+    nuisance_start = np.r_[p[:3], p[4:]]
+    lower = np.r_[0.0, x[0], max(spacing * 0.2, 1e-12),
+                  np.full(basis.shape[1], -np.inf)]
+    upper = np.r_[np.inf, x[-1], x[-1] - x[0],
+                  np.full(basis.shape[1], np.inf)]
     kmin, kmax = 1.500001, max(20.0, float(p[3]) * 8.0)
     grid = np.unique(np.r_[np.geomspace(kmin, kmax, 41), p[3]])
-    response_is_identity = response.shape == (x.size, x.size) and np.array_equal(
-        response, np.eye(x.size)
-    )
 
     def forward(nuisance, kappa):
-        amp, center, width, offset, slope = nuisance
-        df = 2.0 * kappa - 1.0
-        student_scale = width * np.sqrt((df - 2.0) / df)
-        component = amp * (1.0 + ((x - center) / student_scale) ** 2 / df) ** (-kappa)
-        convolved = component if response_is_identity else _apply_response(response, component, x)
-        return convolved + offset + slope * (x - center)
+        amp, center, width = nuisance[:3]
+        coefficients = nuisance[3:]
+        component = _kappa_bin_averaged_shape(x, amp, center, width, kappa)[0]
+        return _apply_response(response, component, x) + basis @ coefficients
 
     if sigma is not None and spectral_covariance is not None:
         raise ValueError("Profile likelihood accepts pointwise uncertainty or spectral_covariance, not both")
-    covariance_cholesky = None
     if spectral_covariance is not None:
         covariance = np.asarray(spectral_covariance, dtype=float)
         if (covariance.shape != (y.size, y.size) or np.any(~np.isfinite(covariance))
@@ -579,9 +595,9 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_cova
         whiten = lambda residual: np.linalg.solve(covariance_cholesky, residual)
         noise_semantics = "researcher_supplied_full_within_channel_spectral_covariance_GLS"
     elif sigma is None:
-        best_residual = forward(p[[0, 1, 2, 4, 5]], p[3]) - y
-        residual_scale = float(np.sqrt(np.sum(best_residual ** 2) / max(1, y.size - p.size)))
-        scale = max(residual_scale, np.finfo(float).tiny)
+        residual = forward(nuisance_start, p[3]) - y
+        scale = max(float(np.sqrt(residual @ residual / max(1, y.size-p.size))),
+                    np.finfo(float).tiny)
         whiten = lambda residual: residual / scale
         noise_semantics = "unweighted_fit_residual_variance_estimated_from_best_fit; not_measurement_noise_calibrated"
     else:
@@ -595,11 +611,13 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_cova
     for i, kappa in enumerate(grid):
         objective = lambda z: whiten(forward(z, kappa) - y)
         try:
-            fit = least_squares(objective, p[[0, 1, 2, 4, 5]], bounds=(lower, upper),
-                                x_scale="jac", max_nfev=3000)
+            fit = least_squares(
+                objective, nuisance_start, bounds=(lower, upper),
+                x_scale="jac", max_nfev=3000,
+            )
             if fit.success and np.all(np.isfinite(fit.fun)):
                 profile[i] = float(fit.fun @ fit.fun)
-        except (ValueError, FloatingPointError):
+        except (ValueError, FloatingPointError, np.linalg.LinAlgError):
             pass
     finite = np.isfinite(profile)
     if not np.any(finite):
@@ -612,7 +630,7 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_cova
             if (delta[a] - 1.0) * (delta[b] - 1.0) <= 0.0:
                 if delta[b] == delta[a]:
                     return float((grid[a] + grid[b]) / 2.0)
-                return float(grid[a] + (1.0 - delta[a]) * (grid[b] - grid[a]) / (delta[b] - delta[a]))
+                return float(grid[a] + (1.0-delta[a])*(grid[b]-grid[a])/(delta[b]-delta[a]))
         return None
 
     lo = find_crossing(list(range(best, -1, -1)))
@@ -627,8 +645,10 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_cova
         "numerical_profile_domain": [kmin, kmax],
         "profile_grid_kappa": grid,
         "profile_delta_chi_square": delta,
+        "profiled_background_model": background_model,
+        "profiled_background_parameter_count": int(basis.shape[1]),
         "noise_scale": noise_semantics,
-        "interpretation": "Conditional one-parameter profile likelihood; a grid-censored limit is not a physical bound. The finite upper grid edge is numerical only."
+        "interpretation": "Conditional one-parameter profile likelihood; all selected background coefficients are re-optimized at fixed Kappa. A grid-censored limit is not a physical bound."
     }
 
 def _fit_kappa(
@@ -844,23 +864,13 @@ def _fit_kappa(
         "limitation": None if kappa_identifiable else "The measured spectral window and supplied response do not locally distinguish the Kappa shape parameter from the remaining fitted parameters; do not interpret the optimizer candidate as an identified physical Kappa index.",
     }
 
-    kappa_profile_likelihood = None
-    if background_model == "linear" and n_background == 2:
-        z_center = 2.0*(center-float(wavelength.min()))/span - 1.0
-        profile_parameters = np.array([
-            p_scaled[0], p_scaled[1], p_scaled[2], p_scaled[3],
-            p_scaled[4] + p_scaled[5]*z_center,
-            p_scaled[5]*2.0/span,
-        ])
-        kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(
-            wavelength, signal_scaled, response, profile_parameters,
-            uncertainty_scaled, spectral_covariance=covariance_scaled_input,
-        )
-    else:
-        kappa_profile_likelihood = {
-            "status": "not_computed_for_structured_background",
-            "reason": "The existing one-dimensional profile-likelihood routine is defined for a linear background; the selected higher-order/template basis is instead covered by the full joint-fit covariance and Jacobian identifiability diagnostic.",
-        }
+    kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(
+        wavelength, signal_scaled, response, p_scaled,
+        uncertainty_scaled, spectral_covariance=covariance_scaled_input,
+        background_model=background_model, background_degree=background_degree,
+        background_interior_knots=background_interior_knots,
+        background_templates=background_templates,
+    )
 
     def area_from_params(values):
         a, cen, sig, kap = values[:4]
