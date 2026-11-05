@@ -1145,18 +1145,24 @@ def collective_kappa_spectral_density(
     incident_direction, scattered_direction, electron_populations=None,
     ion_populations=None,
 ):
-    """Unmagnetized collective spectrum with kappa electrons and Maxwellian ions.
+    """Unmagnetized collective spectrum with Maxwellian/Kappa electron and ion mixtures.
 
-    electron_populations optionally supplies projected populations with
-    density_fraction (summing to one), temperature_ratio relative to the base
-    electron temperature, kappa (> 3/2), and flow_projection_m_s. Both the
-    longitudinal susceptibility and electron source term are density-weighted
-    sums over the populations; this is a kinetic mixture, not a sum of fitted
-    spectra.
+    electron_populations optionally supplies independently drifting electron
+    populations with density_fraction (summing to one), temperature_ratio,
+    distribution ('kappa' or 'maxwellian'), Kappa index when selected, and
+    flow_projection_m_s. ion_populations optionally supplies one mapping per
+    ion species with distribution, Kappa index when selected, and projected
+    flow; absent ion_populations preserves the Maxwellian-ion default.
 
-    The longitudinal susceptibilities are evaluated from the Landau-contour
-    integral of each supplied 1-D projected velocity distribution. This is a
-    collective dielectric model; it is not a non-collective Student-t fit.
+    Every species contributes its own Landau-contour susceptibility. The
+    species responses are summed before the common dielectric screening and
+    the electron/ion fluctuation source terms are assembled. This is a kinetic
+    mixture, not a sum of separately fitted spectra. All Kappa populations
+    require finite variance (kappa > 3/2); mixture fractions and flows are
+    validated rather than clipped or silently renormalized.
+
+    This is a collisionless, unmagnetized, electrostatic model. It does not
+    imply collisional, relativistic, magnetized or Full-EM Kappa-ion physics.
     """
     x = np.asarray(wavelength_nm, dtype=float)
     ne = _positive(electron_density_m3, "electron_density_m3")
@@ -1329,7 +1335,10 @@ def collective_kappa_spectral_density(
         "dielectric_function": dielectric,
         "dynamic_structure_factor": dynamic_structure,
         "electron_flow_projection_m_s": ue,
-        "ion_flow_projections_m_s": ui,
+        "ion_flow_projections_m_s": np.asarray(
+            [item["flow_projection_m_s"] for item in resolved_ion_populations],
+            dtype=float,
+        ),
         "ion_species": species,
         "ion_fractions": fractions,
         "ion_temperature_eV": temperatures,
