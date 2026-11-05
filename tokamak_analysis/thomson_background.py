@@ -87,7 +87,14 @@ def fit_structured_background(wavelength_nm, spectrum, *, model="linear",
     residual = y - design @ coef
     dof = max(1, x.size - design.shape[1])
     scale = float(np.linalg.norm(np.linalg.solve(chol, residual))**2 / dof) if covariance is not None else float(residual @ residual / dof)
-    coefficient_covariance = np.linalg.pinv(a.T @ a) * scale
+    # With a supplied covariance, GLS already contains the absolute noise
+    # scale: Cov(beta) = (X.T C^-1 X)^-1.  Multiplying by reduced chi-square
+    # would double-scale known measurement errors and understate/overstate
+    # uncertainty whenever the fitted model is imperfect.  Only the
+    # unweighted route estimates a residual variance from the data.
+    coefficient_covariance = np.linalg.pinv(a.T @ a) * (
+        1.0 if covariance is not None else scale
+    )
     return {
         "background": design @ coef, "coefficients": coef,
         "coefficient_covariance": coefficient_covariance,
