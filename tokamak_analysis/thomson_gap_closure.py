@@ -9,6 +9,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import lsq_linear
 
+from .thomson_scattering import _covariance_is_positive_semidefinite
+
 
 _C = 299792458.0
 
