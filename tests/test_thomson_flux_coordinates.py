@@ -35,7 +35,8 @@ def test_flux_coordinate_propagates_joint_channel_axis_and_edge_covariance():
     plus = np.sqrt((psi[1] - (axis + eps)) / (edge - (axis + eps)))
     minus = np.sqrt((psi[1] - (axis - eps)) / (edge - (axis - eps)))
     derivative = (plus - minus) / (2.0 * eps)
-    assert np.isfinite(derivative)
+    expected_variance = derivative**2 * covariance[3, 3]
+    assert result["rho_pol_covariance"][1, 1] >= expected_variance
     assert result["uncertainty_model"] == "full_joint_flux_axis_separatrix_covariance_delta_method"
 
 
@@ -59,3 +60,15 @@ def test_flux_coordinate_rejects_wrong_flux_orientation_and_invalid_covariance()
             [0.2, 0.3], magnetic_axis_flux_wb=0.1, separatrix_flux_wb=0.6,
             joint_flux_covariance=np.diag([1.0, 1.0, 1.0, 1.0]) * -1.0,
         )
+
+
+def test_advanced_physics_dispatch_exposes_flux_coordinate_mapping():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "thomson_normalized_poloidal_flux",
+        poloidal_flux_wb=[0.2, 0.3],
+        magnetic_axis_flux_wb=0.1,
+        separatrix_flux_wb=0.5,
+    )
+    np.testing.assert_allclose(result["rho_pol"], np.sqrt([0.25, 0.5]))
