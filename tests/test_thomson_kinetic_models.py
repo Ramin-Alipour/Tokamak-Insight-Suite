@@ -761,7 +761,7 @@ def test_gyrotropic_bimaxwellian_rejects_inconsistent_joint_temperature_geometry
 def test_projected_relativistic_evdf_convolves_measured_laser_spectrum():
     wavelength = np.linspace(1040.0, 1088.0, 161)
     velocity = np.linspace(-0.02, 0.02, 41) * 299_792_458.0
-    laser_axis = np.linspace(1063.8, 1064.2,  nine := 9)
+    laser_axis = np.linspace(1063.8, 1064.2, 9)
     laser_density = np.exp(-0.5*((laser_axis-1064.0)/0.055)**2)
     signal = np.exp(-0.5*((wavelength-1064.0)/4.0)**2)
     result = reconstruct_relativistic_projected_thomson_evdf(
@@ -775,7 +775,7 @@ def test_projected_relativistic_evdf_convolves_measured_laser_spectrum():
         laser_spectrum_density_per_nm=laser_density,
     )
     profile = result["laser_spectral_profile"]
-    assert profile["source_profile_used"] if "source_profile_used" in profile else profile["assumption"] != "monochromatic_incident_laser"
+    assert profile["assumption"] == "measured_source_spectrum_convolved_in_exact_single_electron_kinematics"
     assert profile["captured_scattering_probability_min"] >= 0.995
     assert result["fitted_spectrum"].shape == wavelength.shape
     assert np.all(np.isfinite(result["fitted_spectrum"]))
