@@ -160,3 +160,37 @@ def test_kinetic_background_model_is_routed_through_public_advanced_dashboard():
     assert result["absolute_density_inferred"] is False
     assert result["parameter_identifiability"]["status"] == "locally_identifiable_after_joint_structured_background_fit"
     assert result["joint_parameter_covariance"].shape[0] == len(result["joint_parameter_names"])
+
+
+def test_kappa_fit_enforces_nonrelativistic_temperature_and_flow_domain():
+    import pytest
+    wavelength = np.linspace(529.0, 535.0, 81)
+    measured = 1.0 + np.exp(-0.5 * ((wavelength - 532.0) / 0.5) ** 2)
+    common = dict(wavelength_nm=wavelength, measured_spectrum=measured, physical_model="kappa",
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size))
+    with pytest.raises(ValueError, match="valid, strictly ordered physical_bounds"):
+        fit_noncollective_kinetic_thomson_with_background(**common, physical_initial=[6000.0, 0.0, 3.5])
+    with pytest.raises(ValueError, match="valid, strictly ordered physical_bounds"):
+        fit_noncollective_kinetic_thomson_with_background(**common, physical_initial=[300.0, 0.11 * 299792458.0, 3.5])
+
+
+def test_kappa_fit_reports_declared_asymptotic_validity_domain():
+    wavelength = np.linspace(529.0, 535.0, 181)
+    te, flow, kappa = 300.0, 8.0e4, 3.5
+    q = 2.0 * np.sin(np.pi / 4.0)
+    center = 532.0 * (1.0 - q * flow / 299792458.0)
+    sigma = 532.0 * q * np.sqrt(te / 510998.95069)
+    df = 2.0 * kappa - 1.0
+    scale = sigma * np.sqrt((df - 2.0) / df)
+    shape = (1.0 + ((wavelength - center) / scale) ** 2 / df) ** (-kappa)
+    measured = 2.0 * shape + 0.03
+    result = fit_noncollective_kinetic_thomson_with_background(
+        wavelength, measured, physical_model="kappa", laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(wavelength.size),
+        physical_initial=[280.0, 0.0, 4.0],
+        measurement_uncertainty=np.full(wavelength.size, 0.003))
+    assert result["model_validity_status"] == "within_declared_nonrelativistic_Kappa_domain"
+    assert result["model_validity_limits"]["electron_temperature_over_rest_energy_max"] == 0.01
+    assert result["electron_temperature_eV"] / 510998.95069 <= 0.01
+    assert abs(result["electron_velocity_projection_m_s"]) / 299792458.0 <= 0.1
