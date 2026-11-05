@@ -268,3 +268,24 @@ Monte-Carlo population-sensitivity covariance. These are conditional
 uncertainties under the supplied Gaussian input covariance and accepted-draw
 policy, not a posterior or experimental validation. If no population
 covariance is supplied, the prior fixed-input behavior is unchanged.
+
+
+## Structured-background GLS fit acceptance and identifiability
+
+The joint physical-spectrum/background GLS operator now distinguishes three
+questions that must not be conflated:
+
+- optimizer convergence;
+- joint local identifiability of plasma and nuisance-background coefficients;
+- physical-parameter identifiability after projecting the whitened physical
+  Jacobian onto the orthogonal complement of the fitted background tangent
+  space.
+
+A covariance is returned only after optimizer convergence and full joint
+Jacobian rank. An optimizer failure is explicitly marked
+`not_reported_optimizer_failed`; a numerically full-rank Jacobian from a
+non-converged iterate is not a valid uncertainty estimate. The result also
+reports whitened residual chi-square, reduced chi-square, and a fit-acceptance
+state that requires scientific residual review rather than automatically
+declaring every converged fit acceptable. One-sided nuisance bounds receive a
+feasible initial coefficient vector instead of an infeasible all-zero start.

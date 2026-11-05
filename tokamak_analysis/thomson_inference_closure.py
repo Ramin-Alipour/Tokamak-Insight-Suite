@@ -98,10 +98,10 @@ def fit_thomson_with_structured_background(
 ):
     """Joint nonlinear physical-spectrum + linear detector-background GLS fit.
 
-    forward_model(physical_parameters, wavelength_nm) must return the Thomson
-    signal in detector units before addition of background.  background_design
-    has shape (n_wavelength, n_background_coefficients).  Both parameter
-    blocks are optimized together; nuisance/physics cross-covariance is kept.
+    The nuisance-background block is fitted jointly with the plasma parameters.
+    Physical identifiability is assessed after projecting out the background
+    subspace. A failed optimizer or rank-deficient joint fit never receives a
+    parameter covariance.
     """
     x = _real(wavelength_nm, "wavelength_nm", 1)
     y = _real(measured_spectrum, "measured_spectrum", 1)
@@ -113,48 +113,79 @@ def fit_thomson_with_structured_background(
         raise ValueError("background_design must have full column rank and one row per wavelength")
     if not callable(forward_model):
         raise ValueError("forward_model must be callable")
+    if isinstance(max_nfev, (bool, np.bool_)) or not isinstance(max_nfev, (int, np.integer)) or max_nfev < 1:
+        raise ValueError("max_nfev must be a positive integer")
     p_lo, p_hi = (np.broadcast_to(np.asarray(v, dtype=float), p0.shape).copy() for v in physical_bounds)
-    b0 = np.zeros(bmat.shape[1])
-    b_lo, b_hi = (np.broadcast_to(np.asarray(v, dtype=float), b0.shape).copy() for v in background_bounds)
+    b_lo, b_hi = (np.broadcast_to(np.asarray(v, dtype=float), (bmat.shape[1],)).copy() for v in background_bounds)
     lower, upper = np.r_[p_lo, b_lo], np.r_[p_hi, b_hi]
-    if np.any(lower >= upper) or np.any(p0 < p_lo) or np.any(p0 > p_hi):
-        raise ValueError("initial parameters must lie inside strictly ordered bounds")
+    if (np.any(np.isnan(lower)) or np.any(np.isnan(upper)) or np.any(lower >= upper)
+            or np.any(p0 < p_lo) or np.any(p0 > p_hi)):
+        raise ValueError("physical/background bounds must be ordered, non-NaN, and contain physical_initial")
+    # A zero nuisance initialization is not feasible for one-sided calibrated
+    # background bounds. Start at the closest feasible coefficient instead.
+    b0 = np.minimum(np.maximum(np.zeros(bmat.shape[1]), b_lo), b_hi)
     whiten, noise_model = _whitener(x.size, measurement_uncertainty, measurement_covariance)
+
     def prediction(z):
         physical = np.asarray(forward_model(z[:p0.size], x), dtype=float)
         if physical.shape != x.shape or not np.all(np.isfinite(physical)):
             raise ValueError("forward_model must return a finite vector matching wavelength_nm")
         return physical + bmat @ z[p0.size:]
+
     def residual(z):
         return whiten(prediction(z) - y)
-    result = least_squares(residual, np.r_[p0, b0], bounds=(lower, upper), method="trf", max_nfev=int(max_nfev), x_scale="jac")
+
+    result = least_squares(
+        residual, np.r_[p0, b0], bounds=(lower, upper), method="trf",
+        max_nfev=int(max_nfev), x_scale="jac",
+    )
     jac = np.asarray(result.jac, dtype=float)
     ident = _identifiability(jac)
+    nphys = p0.size
+    j_physical, j_background = jac[:, :nphys], jac[:, nphys:]
+    # Profile out the nuisance-background tangent space before asking whether
+    # the plasma parameters themselves are distinguishable from background.
+    q_background, _ = np.linalg.qr(j_background, mode="reduced")
+    profiled_physical_jacobian = j_physical - q_background @ (q_background.T @ j_physical)
+    physical_ident = _identifiability(profiled_physical_jacobian)
     dof = max(1, y.size - jac.shape[1])
     covariance = None
-    covariance_status = "not_reported_non_identifiable"
-    if ident["identifiable"]:
+    if not bool(result.success):
+        covariance_status = "not_reported_optimizer_failed"
+    elif not ident["identifiable"]:
+        covariance_status = "not_reported_joint_physics_background_non_identifiable"
+    else:
         covariance = np.linalg.pinv(jac.T @ jac)
         if noise_model == "unweighted_no_measurement_uncertainty_supplied":
             covariance *= float(result.fun @ result.fun / dof)
             covariance_status = "residual_scaled_unweighted_covariance_not_measurement_uncertainty"
         else:
-            covariance_status = "local_GLS_parameter_covariance_conditional_on_supplied_measurement_covariance"
+            covariance_status = "local_GLS_joint_parameter_covariance_conditional_on_supplied_measurement_covariance"
     z = result.x
     fitted = prediction(z)
-    nphys = p0.size
+    residual_vector = y - fitted
+    whitened_residual = whiten(residual_vector)
+    chi_square = float(whitened_residual @ whitened_residual)
+    reduced_chi_square = chi_square / dof
     return {
         "model": "joint_measured_Thomson_signal_plus_structured_detector_background",
         "physical_parameters": z[:nphys], "background_coefficients": z[nphys:],
         "fitted_spectrum": fitted, "fitted_thomson_spectrum": fitted - bmat @ z[nphys:],
-        "fitted_background": bmat @ z[nphys:], "residual": y - fitted,
+        "fitted_background": bmat @ z[nphys:], "residual": residual_vector,
         "measurement_origin": "user_supplied_calibrated_measured_spectrum",
-        "noise_model": noise_model, "parameter_order": ["physical"] * nphys + ["background"] * bmat.shape[1],
+        "noise_model": noise_model,
+        "parameter_order": ["physical"] * nphys + ["background"] * bmat.shape[1],
         "joint_parameter_covariance": covariance, "covariance_status": covariance_status,
         "physical_background_cross_covariance_retained": covariance is not None,
-        "identifiability": ident, "optimizer_success": bool(result.success),
-        "optimizer_message": str(result.message), "cost": float(result.cost),
-        "degrees_of_freedom": int(dof),
+        "identifiability": ident, "physical_parameter_identifiability_after_background_projection": physical_ident,
+        "optimizer_success": bool(result.success), "optimizer_message": str(result.message),
+        "cost": float(result.cost), "chi_square": chi_square,
+        "reduced_chi_square": float(reduced_chi_square), "degrees_of_freedom": int(dof),
+        "fit_acceptance": (
+            "optimizer_failed" if not result.success else
+            "joint_model_non_identifiable" if not ident["identifiable"] else
+            "fit_complete_requires_residual_and_reduced_chi_square_review"
+        ),
         "uncertainty_semantics": "No measurement uncertainty was inferred; unweighted covariance, if available, is residual-scaled only.",
     }
 
