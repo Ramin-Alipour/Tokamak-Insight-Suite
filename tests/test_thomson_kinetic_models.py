@@ -758,7 +758,8 @@ def test_gyrotropic_bimaxwellian_rejects_inconsistent_joint_temperature_geometry
         )
 
 
-def test_projected_relativistic_evdf_convolves_measured_laser_spectrum():
+@pytest.mark.parametrize("include_compton_recoil", [False, True])
+def test_projected_relativistic_evdf_convolves_measured_laser_spectrum(include_compton_recoil):
     wavelength = np.linspace(1040.0, 1088.0, 161)
     velocity = np.linspace(-0.02, 0.02, 41) * 299_792_458.0
     laser_axis = np.linspace(1063.8, 1064.2, 9)
@@ -771,6 +772,8 @@ def test_projected_relativistic_evdf_convolves_measured_laser_spectrum():
         instrument_response_matrix=np.eye(wavelength.size),
         background_signal=np.zeros_like(signal),
         velocity_grid_m_s=velocity,
+        include_compton_recoil=include_compton_recoil,
+        incident_polarization=[0.0, 0.0, 1.0] if include_compton_recoil else None,
         laser_spectrum_wavelength_nm=laser_axis,
         laser_spectrum_density_per_nm=laser_density,
     )
@@ -779,4 +782,9 @@ def test_projected_relativistic_evdf_convolves_measured_laser_spectrum():
     assert profile["captured_scattering_probability_min"] >= 0.995
     assert result["fitted_spectrum"].shape == wavelength.shape
     assert np.all(np.isfinite(result["fitted_spectrum"]))
-    assert result["model"] == "exact_relativistic_thomson_limit_projected_1d_kinematic_inversion"
+    assert result["recoil_included"] is include_compton_recoil
+    assert result["model"] == (
+        "relativistic_compton_klein_nishina_projected_1d_inverse"
+        if include_compton_recoil else
+        "exact_relativistic_thomson_limit_projected_1d_kinematic_inversion"
+    )
