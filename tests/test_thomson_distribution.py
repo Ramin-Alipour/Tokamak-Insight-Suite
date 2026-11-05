@@ -775,3 +775,62 @@ def test_projected_evdf_connection_requires_explicit_scattering_geometry():
             background_signal=np.full_like(wavelength, 0.1),
             projected_evdf_options={"velocity_points": 81},
         )
+
+
+@pytest.mark.parametrize("selected_model", ["collective_maxwellian", "collective_kappa"])
+def test_spectral_distribution_dispatches_selected_collective_physical_model(
+    monkeypatch, selected_model
+):
+    import tokamak_analysis.thomson_inference as inference
+
+    wavelength, signal = _spectrum()
+    captured = {}
+
+    def fake_canonical_fit(wavelength_nm, spectra, radius_m, **kwargs):
+        captured["wavelength"] = np.asarray(wavelength_nm).copy()
+        captured["spectra"] = np.asarray(spectra).copy()
+        captured["radius"] = np.asarray(radius_m).copy()
+        captured["kwargs"] = kwargs
+        return {
+            "channels": [{"electron_density_m3": 2.0e19,
+                          "electron_temperature_eV": 150.0}],
+            "result_classification": {
+                "channels": [{
+                    "primary": [
+                        {"parameter": "electron_density_m3"},
+                        {"parameter": "electron_temperature_eV"},
+                        {"parameter": "electron_velocity_projection_m_s"},
+                    ]
+                }]
+            },
+        }
+
+    monkeypatch.setattr(inference, "analyze_thomson_spectra", fake_canonical_fit)
+    uncertainty = np.full(wavelength.size, 0.02)
+    result = analyze_thomson_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_fraction=0.1,
+        signal_uncertainty=uncertainty,
+        physical_model=selected_model,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2.0,
+        physical_fit_options={
+            "radius_m": 0.42,
+            "ion_temperature_eV": 80.0,
+            "ion_species": [{"charge": 1, "mass_amu": 2.0, "density_fraction": 1.0}],
+        },
+    )
+
+    assert captured["kwargs"]["model"] == selected_model
+    assert captured["kwargs"]["ion_temperature_eV"] == 80.0
+    np.testing.assert_array_equal(captured["wavelength"], wavelength)
+    np.testing.assert_array_equal(captured["spectra"], signal.reshape(1, -1))
+    np.testing.assert_array_equal(captured["radius"], [0.42])
+    np.testing.assert_array_equal(captured["kwargs"]["signal_uncertainty"], uncertainty.reshape(1, -1))
+    assert result["physical_inference"]["selected_model"] == selected_model
+    assert result["physical_inference"]["reportable_as_primary_inference"] is True
+    assert result["physical_inference"]["forward_model"] == (
+        "canonical_optical_thomson_forward_fit:" + selected_model
+    )
