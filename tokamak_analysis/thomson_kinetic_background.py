@@ -289,10 +289,19 @@ def fit_noncollective_kinetic_thomson_with_background(
             cross_section = float(result["effective_differential_cross_section_m2_sr"])
             captured = float(result["captured_spectral_probability"])
             component_weight = float(photon_weight)*cross_section*captured
-            combined += component_weight*np.asarray(result["spectral_density_per_nm"], dtype=float)
-            total_scattered_weight += component_weight
+            # The forward kernel is a scattered-photon probability density.
+            # Convert it to detected spectral power with E_s = h*c/lambda_s
+            # before integrating over the measured finite wavelength bins.
+            photon_density = np.asarray(result["spectral_density_per_nm"], dtype=float)
+            power_density = photon_density / quadrature_wavelength
+            combined += component_weight*power_density
+            bin_energy_weight = float(np.sum(
+                (power_density.reshape(x.size, nodes.size) * weights[None, :]
+                 * half_width[:, None])
+            ))
+            total_scattered_weight += component_weight*bin_energy_weight
         if not np.isfinite(total_scattered_weight) or total_scattered_weight <= 0:
-            raise ValueError("source-convolved relativistic Thomson spectrum has zero captured scattering weight")
+            raise ValueError("source-convolved relativistic Thomson spectrum has zero captured scattering power")
         density = (combined/total_scattered_weight).reshape(x.size, nodes.size)
         return 0.5 * (density @ weights)
 
@@ -447,7 +456,7 @@ def fit_noncollective_kinetic_thomson_with_background(
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if include_compton_recoil else "polarized_elastic_Thomson") if physical_model == "relativistic_maxwell_juttner" else "not_applicable_nonrelativistic_kappa_projection",
         "laser_source_profile_used": source_nodes is not None,
         "laser_source_profile_convolution": (
-            "piecewise_linear_spectral_power_to_photon_flux_with_wavelength_resolved_recoil_and_Klein_Nishina_cross_section"
+            "piecewise_linear_spectral_power_to_photon_flux_times_scattered_photon_energy_with_wavelength_resolved_recoil_and_Klein_Nishina_cross_section"
             if source_nodes is not None else "monochromatic_incident_laser"
         ),
         "laser_source_quadrature_nodes": 0 if source_nodes is None else int(source_nodes.size),
