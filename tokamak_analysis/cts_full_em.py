@@ -1074,6 +1074,7 @@ def full_em_cts_spectral_density(
                 probe_frequency_Hz=f0,
             ),
             **collisional_diagnostics,
+        },
         "real_frequency_shift_preserved": True,
         "resonance_damping_changes_real_frequency": False,
         "zero_frequency_static_limit_supported": False,
