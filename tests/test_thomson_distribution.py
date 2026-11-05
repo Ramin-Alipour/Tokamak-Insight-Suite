@@ -709,6 +709,11 @@ def test_spectral_distribution_connects_same_spectrum_to_projected_evdf():
     assert np.isclose(inverse["evdf_normalization"], 1.0, rtol=1e-6, atol=1e-8)
     assert inverse["velocity_parallel_m_s"].shape == (81,)
     assert inverse["evdf_parallel_s_per_m"].shape == (81,)
+    closure = inverse["spectral_moment_closure"]
+    assert closure["comparison_performed"] is True
+    assert closure["status"] == "conditional_moment_closure"
+    assert np.isfinite(closure["centroid_closure_residual_nm"])
+    assert np.isfinite(closure["variance_closure_residual_nm2"])
 
 
 def test_projected_evdf_connection_requires_explicit_scattering_geometry():
