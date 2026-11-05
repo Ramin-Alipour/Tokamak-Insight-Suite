@@ -4705,6 +4705,19 @@ elif page=='Advanced Analysis':
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.json(result)
+                if selected_id == 81 and isinstance(result, dict) and isinstance(result.get('projected_evdf_inference'), dict):
+                    evdf_result = result['projected_evdf_inference']
+                    if {'velocity_parallel_m_s', 'evdf_parallel_s_per_m'} <= set(evdf_result):
+                        evdf_frame = pd.DataFrame({
+                            'Parallel velocity (m/s)': evdf_result['velocity_parallel_m_s'],
+                            'Projected EVDF (s/m)': evdf_result['evdf_parallel_s_per_m'],
+                        })
+                        st.markdown('**Response-aware projected electron velocity distribution**')
+                        st.line_chart(evdf_frame.set_index('Parallel velocity (m/s)')['Projected EVDF (s/m)'])
+                        st.caption(
+                            'One-dimensional marginal along the scattering vector only. '
+                            'This is not an unrestricted 3-D EVDF and does not identify absolute density.'
+                        )
                 if selected_id == 1 and isinstance(result, dict) and {'radius_m', 'density_m3', 'temperature_eV'} <= set(result):
                     profile_frame = pd.DataFrame({'Radius (m)': result['radius_m'], 'Electron density (m^-3)': result['density_m3'], 'Electron temperature (eV)': result['temperature_eV']})
                     st.markdown('**Electron-density profile**')
