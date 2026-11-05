@@ -31,7 +31,7 @@ from .cts_em_background import (
     integrate_receiver_spectral_power,
     brightness_temperature_from_radiance,
 )
-from .cts_kappa import kappa_electron_susceptibility
+from .cts_kappa import kappa_electron_susceptibility, bi_kappa_electron_susceptibility
 from .cts_kappa import maxwellian_electron_susceptibility
 from .thomson_generalized_dispersion import (
     collective_tabulated_electron_spectral_density,
@@ -562,6 +562,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = maxwellian_electron_susceptibility
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "bi_kappa_electrostatic_susceptibility":
+        solver = bi_kappa_electron_susceptibility
     elif model == "cts_collective_kappa_spectrum":
         solver = collective_kappa_spectral_density
     elif model == "cts_collective_kappa_inference":
