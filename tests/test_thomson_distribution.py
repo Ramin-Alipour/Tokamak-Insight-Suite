@@ -385,6 +385,49 @@ def test_selected_maxwellian_maps_intrinsic_gaussian_width_to_conditional_physic
     assert physical["parameter_standard_uncertainties"]["electron_temperature_eV"] > 0.0
 
 
+def test_maxwellian_physical_covariance_includes_fit_geometry_cross_terms():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    laser = 532.0
+    angle = np.pi / 2.0
+    q = 2.0 * np.sin(angle / 2.0)
+    temperature = 120.0
+    sigma = laser * q * np.sqrt(temperature / 510998.95069)
+    center = laser * (1.0 - q * 2.0e4 / 299792458.0)
+    signal = 5.0 * np.exp(-0.5 * ((wavelength - center) / sigma) ** 2) + 0.2
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal, instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.2),
+        signal_uncertainty=np.full(wavelength.size, 0.01),
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        laser_wavelength_uncertainty_nm=1.0e-2,
+        scattering_angle_uncertainty_rad=1.0e-2,
+        fit_geometry_cross_covariance_nm2_rad=np.array([
+            [1.0e-10, 1.0e-10],
+            [1.0e-10, 1.0e-10],
+        ]),
+    )
+    physical = result["physical_inference"]
+    assert physical["parameter_covariance"].shape == (2, 2)
+    assert np.all(np.isfinite(physical["parameter_covariance"]))
+    assert physical["parameter_covariance"][0, 1] == pytest.approx(
+        physical["parameter_covariance"][1, 0], rel=1e-12, abs=1e-14
+    )
+
+
+def test_maxwellian_physical_covariance_rejects_inconsistent_fit_geometry_cross_terms():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 1.0) ** 2) + 0.2
+    with pytest.raises(ValueError, match="joint fitted-spectrum/laser/angle covariance"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal, instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.2),
+            physical_model="non_collective_maxwellian",
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+            fit_geometry_cross_covariance_nm2_rad=np.ones((2, 2)),
+        )
+
+
 def test_selected_maxwellian_physical_conversion_rejects_relativistic_domain():
     wavelength = np.linspace(500.0, 564.0, 161)
     signal = 3.0 * np.exp(-0.5 * ((wavelength - 532.0) / 5.0) ** 2) + 0.1
