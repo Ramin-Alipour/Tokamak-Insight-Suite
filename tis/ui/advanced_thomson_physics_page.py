@@ -77,6 +77,8 @@ MODEL_LABELS = {
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
+    "landau_fdt_full_em_response": "Full-EM CTS — public Landau–FDT Cartesian response and matching noise solver",
+    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated non-negative 3-D EVDF inversion from multiple measured views",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
     "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
