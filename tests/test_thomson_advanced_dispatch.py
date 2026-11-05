@@ -22,7 +22,8 @@ def test_full_em_landau_response_is_reachable_through_public_dispatch(monkeypatc
         wave_number_m_inverse=12.0,
     )
 
-    assert result is sentinel
+    assert result["response"] == "cartesian_full_em"
+    assert result["public_physics_entrypoint"] == "landau_fdt_full_em_response"
     assert calls == {
         "system": "landau-system",
         "angular_frequency_rad_s": [1.0, 2.0],
@@ -51,7 +52,8 @@ def test_multiview_3d_evdf_is_reachable_through_public_dispatch(monkeypatch):
         regularization_strength=0.01,
     )
 
-    assert result is sentinel
+    assert result["status"] == "identified_from_multi_view_measurements"
+    assert result["public_physics_entrypoint"] == "thomson_multiview_3d_evdf"
     assert calls == {
         "spectral_kernels": "kernels",
         "measured_spectra": "spectra",
