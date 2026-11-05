@@ -1035,8 +1035,6 @@ def analyze_thomson_spectra(
         "non_collective_relativistic_maxwell_juttner",
     }:
         raise ValueError("A measured incident-laser spectral profile is currently supported for non-collective optical Thomson models; collective dielectric models require a source-frequency-resolved dielectric forward model.")
-    if laser_spectrum_wavelength_nm is not None and include_compton_recoil:
-        raise ValueError("Measured laser spectral-profile convolution is not yet implemented for the recoil/Klein-Nishina kernel; omit the source profile rather than applying an inconsistent elastic-Thomson approximation.")
     laser_wavelength_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
     scattering_angle_rad = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
     if scattering_angle_rad >= np.pi:
@@ -1563,13 +1561,22 @@ def analyze_thomson_spectra(
         source_response = None
         source_profile_metadata = None
         if laser_spectrum_wavelength_nm is not None:
-            source_response, source_profile_metadata = _laser_source_response(
-                xi, float(laser_wavelength_nm), laser_spectrum_wavelength_nm,
-                laser_spectrum_density_per_nm,
-            )
-            # Source broadening occurs before the spectrometer response:
-            # measured_model = instrument_response @ source_broadened_model.
-            response = response @ source_response
+            if model == "non_collective_relativistic_maxwell_juttner" and include_compton_recoil:
+                # Recoil changes the wavelength shift and Klein-Nishina weight
+                # for every incident laser wavelength. The exact source-resolved
+                # kernel is evaluated inside the nonlinear physical forward fit;
+                # do not substitute the elastic wavelength-ratio operator.
+                source_profile_metadata = {
+                    "source_profile_samples": int(np.asarray(laser_spectrum_wavelength_nm).size),
+                    "convolution_approximation": "wavelength_resolved_Compton_Klein_Nishina_forward_kernel",
+                }
+            else:
+                source_response, source_profile_metadata = _laser_source_response(
+                    xi, float(laser_wavelength_nm), laser_spectrum_wavelength_nm,
+                    laser_spectrum_density_per_nm,
+                )
+                # Elastic source broadening precedes the spectrometer response.
+                response = response @ source_response
         channel_responses.append(response)
         ui = None if unc is None else unc[i]
         channel_covariance = None
@@ -1652,6 +1659,18 @@ def analyze_thomson_spectra(
                 incident_polarization=incident_polarization,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                 include_compton_recoil=include_compton_recoil,
+                laser_spectrum_wavelength_nm=(
+                    laser_spectrum_wavelength_nm
+                    if source_profile_metadata is not None
+                    and model == "non_collective_relativistic_maxwell_juttner"
+                    and include_compton_recoil else None
+                ),
+                laser_spectrum_density_per_nm=(
+                    laser_spectrum_density_per_nm
+                    if source_profile_metadata is not None
+                    and model == "non_collective_relativistic_maxwell_juttner"
+                    and include_compton_recoil else None
+                ),
             )
             fit = dict(seed_fit)
             fit.update(joint_background_fit)
