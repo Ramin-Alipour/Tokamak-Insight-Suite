@@ -59,6 +59,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 MODEL_LABELS = {
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
@@ -91,6 +92,14 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "cts_tabulated_evdf_landau": (
+        "Forward model: evaluates the first-order Landau susceptibility from an explicitly "
+        "supplied 1-D projected electron VDF using analytic interval integration of its "
+        "piecewise-linear derivative and distributional endpoint jumps for the declared "
+        "zero extension. Maxwellian multispecies ions and their flow projections are supplied "
+        "separately. It does not infer the VDF, transverse velocity structure, or a general "
+        "3-D EVDF; finite velocity support and pole displacement remain explicit assumptions."
+    ),
     "thomson_relativistic_projected_evdf": (
         "Inverse model: exact relativistic Doppler kinematics in the Thomson limit, or "
         "single-electron Compton four-momentum conservation with polarized Klein-Nishina "

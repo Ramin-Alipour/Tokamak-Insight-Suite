@@ -32,6 +32,7 @@ from .cts_em_background import (
     brightness_temperature_from_radiance,
 )
 from .cts_kappa import kappa_electron_susceptibility
+from .thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from .cts_stokes_transfer import (
@@ -472,6 +473,10 @@ def run_advanced_thomson_physics(model, **kwargs):
       - cts_multi_ion_flow_inference: conditional fit of independent projected ion
         species flows from a calibrated electrostatic CTS spectrum with fixed
         plasma/composition inputs; the species-flow Jacobian rank gates reporting.
+      - cts_tabulated_evdf_landau: electrostatic CTS dynamic structure spectrum using
+        a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
+        Landau-pole integration (including finite-support endpoint jumps), and
+        Maxwellian multispecies ions. This is a forward model, not a 3-D EVDF inverse.
       - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
@@ -530,6 +535,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = analyze_cts_microwave_background
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "cts_tabulated_evdf_landau":
+        solver = collective_tabulated_electron_spectral_density
     elif model == "cts_electrostatic_measured_spectrum_inference":
         solver = analyze_cts_spectrum
     elif model == "cts_multi_ion_flow_inference":
@@ -605,6 +612,7 @@ def run_advanced_thomson_physics(model, **kwargs):
 
 __all__ = [
     "kappa_electron_susceptibility",
+    "collective_tabulated_electron_spectral_density",
     "quantum_fdt_dynamic_structure_factor",
     "quantum_unsymmetrized_dynamic_structure_factor",
     "analyze_cts_microwave_background",

@@ -72,3 +72,28 @@ def test_projected_evdf_dispatch_forwards_compton_controls(monkeypatch):
     assert result["recoil_included"] is True
     assert result["public_physics_entrypoint"] == "thomson_relativistic_projected_evdf"
     assert result["automatic_model_substitution"] is False
+
+
+def test_tabulated_evdf_landau_cts_dispatch_is_public_and_preserves_solver(monkeypatch):
+    calls = []
+    sentinel = {"dielectric_function": np.asarray([1.0 + 0.2j])}
+
+    def fake_solver(**kwargs):
+        calls.append(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(
+        physics, "collective_tabulated_electron_spectral_density", fake_solver
+    )
+    supplied = {
+        "wavelength_nm": [499.9, 500.0, 500.1],
+        "electron_density_m3": 1.0e19,
+        "electron_velocity_grid_m_s": [-1.0, 0.0, 1.0],
+    }
+    result = physics.run_advanced_thomson_physics(
+        "cts_tabulated_evdf_landau", **supplied
+    )
+    assert calls == [supplied]
+    assert result["dielectric_function"][0] == 1.0 + 0.2j
+    assert result["public_physics_entrypoint"] == "cts_tabulated_evdf_landau"
+    assert result["automatic_model_substitution"] is False
