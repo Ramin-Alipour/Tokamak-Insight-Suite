@@ -1001,7 +1001,6 @@ kernel shared with the Full-EM CTS implementation.  It is not a relativistic
 arbitrary-EVDF solver: finite harmonic/quadrature truncation and the supplied
 positive damping rate remain explicit numerical/model inputs.
 """
-from __future__ import annotations
 
 import numpy as np
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E
