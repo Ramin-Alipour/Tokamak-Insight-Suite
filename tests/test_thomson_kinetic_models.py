@@ -690,3 +690,22 @@ def test_collective_kappa_rejects_nonphysical_ion_kappa_and_mixture_fraction():
             ],
             **common
         )
+
+
+def test_gyrotropic_bimaxwellian_gls_enforces_positive_physical_temperatures():
+    from tokamak_analysis.thomson_kinetic_models import infer_gyrotropic_bi_maxwellian_temperatures
+
+    # Inconsistent noisy projections make unconstrained GLS return a negative
+    # perpendicular temperature. The physical inversion must stay in T > 0.
+    pitch = np.array([0.0, 0.5, 1.0])
+    projected = np.array([100.0, 1.0, 1000.0])
+    result = infer_gyrotropic_bi_maxwellian_temperatures(
+        projected, pitch,
+        projected_temperature_covariance_eV2=np.eye(3),
+    )
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["electron_temperature_perpendicular_eV"] > 0.0
+    assert result["electron_temperature_parallel_eV"] > 0.0
+    assert result["temperature_constraint"] == "T_perpendicular > 0 and T_parallel > 0 eV"
+    assert result["active_temperature_lower_bounds"]["T_perpendicular"] is True
+    assert result["temperature_covariance_status"].startswith("local_unconstrained_GLS_curvature")
