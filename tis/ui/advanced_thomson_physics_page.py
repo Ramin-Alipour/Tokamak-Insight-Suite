@@ -61,6 +61,7 @@ MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from multiple independent measured scattering views",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility and analytic phase-velocity derivative",
+    "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
@@ -106,6 +107,13 @@ MODEL_PHYSICS_NOTES = {
         "rank/conditioning gate determines whether the 3-D distribution is identifiable. "
         "Regularization can stabilize a conditional candidate but cannot create missing angular "
         "information. Supply calibrated kernels and uncertainty for every view."
+    ),
+    "bi_kappa_electrostatic_susceptibility": (
+        "Gyrotropic 3-D bi-Kappa distribution projected exactly onto the supplied scattering vector. "
+        "The directional second-moment temperature is T_q = T_perp + (T_parallel-T_perp)*(b_hat dot q_hat)^2; "
+        "the exact full-tail 1-D Kappa Landau integral and analytic phase derivative are then evaluated. "
+        "One view identifies T_q only, not T_parallel and T_perpendicular separately. "
+        "This is collisionless, non-relativistic, unmagnetized longitudinal susceptibility, not Full-EM CTS."
     ),
     "kappa_electrostatic_susceptibility": (
         "Collisionless, unmagnetized, non-relativistic longitudinal electron response for the exact "
@@ -203,6 +211,18 @@ MODEL_PHYSICS_NOTES = {
 }
 
 EXAMPLES = {
+    "bi_kappa_electrostatic_susceptibility": {
+        "v": np.linspace(-2.0e7, 2.0e7, 801).tolist(),
+        "phase_velocity_m_s": 1.0e6,
+        "electron_density_m3": 2.0e19,
+        "electron_temperature_parallel_eV": 1500.0,
+        "electron_temperature_perpendicular_eV": 700.0,
+        "magnetic_field_unit": [0.0, 0.0, 1.0],
+        "scattering_vector_unit": [0.7071067811865476, 0.0, 0.7071067811865476],
+        "kappa": 4.0,
+        "wavenumber_m_inverse": 250.0,
+        "minimum_velocity_grid_probability_coverage": 0.999
+    },
     "maxwellian_electrostatic_susceptibility": {
         "phase_velocity_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),
         "electron_density_m3": 2.0e19,
