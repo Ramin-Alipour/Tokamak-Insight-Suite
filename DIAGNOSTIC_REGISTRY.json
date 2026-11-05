@@ -6699,7 +6699,7 @@
         "unit": "integer"
       }
     ],
-    "uncertainty_model": "undefined Electrostatic CTS can add an explicitly supplied correlated model-discrepancy covariance to the measurement covariance before GLS; when supplied, reduced-chi-square overdispersion inflation is disabled. Reference-PCA bootstrap covariance is reported separately and remains conditional in the plasma-parameter covariance. For the optional electrostatic_kappa electron_populations mixture, population fractions, temperature ratios, Kappa indices and projected flows are fixed external inputs. Their covariance is not currently propagated; reported fitted covariance covers only the fitted reference density, reference temperature and global Kappa parameter, conditional on those fixed population inputs."
+    "uncertainty_model": "undefined Electrostatic CTS can add an explicitly supplied correlated model-discrepancy covariance to the measurement covariance before GLS; when supplied, reduced-chi-square overdispersion inflation is disabled. Reference-PCA bootstrap covariance is reported separately and remains conditional in the plasma-parameter covariance. For the optional electrostatic_kappa electron_populations mixture, the nominal population fractions, temperature ratios, Kappa indices and projected flows remain explicit inputs. When electron_population_parameter_covariance is supplied, its full joint covariance is propagated by deterministic Monte Carlo full-spectrum refits; the result retains fitted-parameter/population-input cross-covariance and reports the conditional local fit covariance separately. Invalid physical draws are rejected without clipping or fraction renormalization."
   },
   {
     "family": "Density and refractive diagnostics",
