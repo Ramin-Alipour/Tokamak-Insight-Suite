@@ -88,6 +88,63 @@ def test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilitie
     assert np.sum(spectrum * widths) < 1.0
 
 
+def test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(480.0, 584.0, 81)
+    laser = 532.0
+    angle = np.pi / 2.0
+    forward = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, angle, 100.0,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=12, angular_order=8,
+        include_compton_recoil=True,
+    )
+    measured = 2.0 * forward["spectral_density_per_nm"] + 0.03
+    source_wavelength = np.array([531.98, 532.0, 532.02])
+    source_power_density = np.array([0.0, 1.0, 0.0])
+    result = fit_noncollective_kinetic_thomson_with_background(
+        wavelength, measured,
+        physical_model="relativistic_maxwell_juttner",
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        physical_initial=[100.0, 0.0],
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=12, angular_order=8,
+        include_compton_recoil=True,
+        laser_spectrum_wavelength_nm=source_wavelength,
+        laser_spectrum_density_per_nm=source_power_density,
+        laser_spectrum_quadrature_order=3,
+        max_nfev=120,
+    )
+    assert result["optimizer_success"]
+    assert result["recoil_included"] is True
+    assert result["laser_source_profile_used"] is True
+    assert result["laser_source_quadrature_nodes"] == 6
+    assert "photon_flux" in result["laser_source_profile_convolution"]
+    assert "Klein_Nishina" in result["laser_source_profile_convolution"]
+
+
+def test_relativistic_source_profile_requires_a_valid_positive_spectrum():
+    import pytest
+
+    wavelength = np.linspace(480.0, 584.0, 41)
+    measured = 1.0 + np.exp(-0.5*((wavelength-532.0)/2.0)**2)
+    with pytest.raises(ValueError, match="non-negative"):
+        fit_noncollective_kinetic_thomson_with_background(
+            wavelength, measured,
+            physical_model="relativistic_maxwell_juttner",
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2.0,
+            instrument_response=np.eye(wavelength.size),
+            physical_initial=[100.0, 0.0],
+            incident_polarization=[0.0, 0.0, 1.0],
+            laser_spectrum_wavelength_nm=[531.9, 532.0, 532.1],
+            laser_spectrum_density_per_nm=[0.0, -1.0, 0.0],
+        )
+
+
 def test_kinetic_background_model_is_routed_through_public_advanced_dashboard():
     from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
     from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
