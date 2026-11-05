@@ -902,7 +902,7 @@ def test_collective_kappa_static_screening_uses_kappa_zero_frequency_susceptibil
         incident_direction=incident, scattered_direction=scattered,
     )
     expected_lambda = np.sqrt(
-        8.8541878128e-12*te*(kappa-1.5)/(ne*1.602176634e-19*kappa)
+        8.8541878128e-12*te*(2.0*kappa-3.0)/(ne*1.602176634e-19*(2.0*kappa-1.0))
     )
     expected_k = 4.0*np.pi*np.sin(angle/2.0)/(laser*1e-9)
     assert result["electron_debye_length_m"] == pytest.approx(expected_lambda, rel=1e-12)

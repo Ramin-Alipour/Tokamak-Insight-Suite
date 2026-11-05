@@ -1395,7 +1395,7 @@ def collective_kappa_spectral_density(
         static_screening_weight = 0.0
         for item, fraction, temperature in zip(populations, population_fractions, population_temperatures):
             enhancement = (
-                item["kappa"]/(item["kappa"]-1.5)
+                (2.0*item["kappa"]-1.0)/(2.0*item["kappa"]-3.0)
                 if item["distribution"] == "kappa" else 1.0
             )
             static_screening_weight += fraction*enhancement/temperature

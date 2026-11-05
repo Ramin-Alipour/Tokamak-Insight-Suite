@@ -79,7 +79,7 @@ susceptibility gives the effective screening length
 lambda_De,eff^-2 = (n_e e / epsilon_0) sum_j eta_j g_j/T_j,
 
 where g_j=1 for a Maxwellian component and
-g_j=kappa_j/(kappa_j-3/2) for a finite-variance Kappa component. The
+g_j=(2 kappa_j - 1)/(2 kappa_j - 3) for a finite-variance Kappa component. The
 scattering parameter is alpha=1/(k lambda_De,eff). This reduces to the
 Maxwellian Debye length for a single Maxwellian and includes the exact
 zero-frequency Kappa susceptibility enhancement for the stated 1-D
