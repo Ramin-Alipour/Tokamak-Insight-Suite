@@ -1300,7 +1300,8 @@ def fit_collective_kappa(
     electron_velocity_m_s, ion_velocity_m_s,
     initial_density_m3, initial_temperature_eV, initial_kappa,
     density_bounds_m3=None, temperature_bounds_eV=None, kappa_bounds=None,
-    electron_populations=None,
+    electron_populations=None, electron_population_parameter_covariance=None,
+    population_mc_samples=100, population_mc_seed=84623,
 ):
     """Fit ne, Te and kappa from a collective spectrum; ion inputs remain fixed."""
     x = np.asarray(wavelength_nm, dtype=float)
@@ -1401,6 +1402,100 @@ def fit_collective_kappa(
         covariance_log*=float(r@r/dof)
     transform=np.diag([np.log(10.0)*ne,np.log(10.0)*te,kap-1.5])
     covariance=transform@covariance_log@transform.T
+    conditional_fit_covariance = covariance.copy()
+    population_parameter_names = []
+    population_joint_covariance = None
+    population_successful_samples = 0
+    if electron_population_parameter_covariance is not None:
+        if electron_populations is None or not isinstance(electron_populations, (list, tuple)) or len(electron_populations) < 2:
+            raise ValueError("electron_population_parameter_covariance requires at least two explicit electron_populations")
+        if isinstance(population_mc_samples, (bool, np.bool_)) or not isinstance(population_mc_samples, (int, np.integer)) or population_mc_samples < 20:
+            raise ValueError("population_mc_samples must be an integer >=20")
+        if isinstance(population_mc_seed, (bool, np.bool_)) or not isinstance(population_mc_seed, (int, np.integer)):
+            raise ValueError("population_mc_seed must be an integer")
+        population_fields = ("density_fraction", "temperature_ratio", "kappa", "flow_projection_m_s")
+        population_mean = []
+        for index, population in enumerate(electron_populations):
+            if not isinstance(population, Mapping):
+                raise ValueError("each electron population must be a mapping")
+            missing_fields = [field for field in population_fields if field not in population]
+            if missing_fields:
+                raise ValueError(f"electron population {index} is missing covariance parameters: {missing_fields}")
+            values = np.asarray([population[field] for field in population_fields], dtype=float)
+            if not np.all(np.isfinite(values)):
+                raise ValueError("electron population covariance parameters must be finite")
+            population_mean.extend(values.tolist())
+            population_parameter_names.extend(
+                f"population_{index}_{field}" for field in population_fields
+            )
+        population_mean = np.asarray(population_mean, dtype=float)
+        population_covariance = np.asarray(electron_population_parameter_covariance, dtype=float)
+        expected_shape = (population_mean.size, population_mean.size)
+        if population_covariance.shape != expected_shape or np.any(~np.isfinite(population_covariance)):
+            raise ValueError(f"electron_population_parameter_covariance must be finite with shape {expected_shape}")
+        covariance_scale = max(float(np.max(np.abs(population_covariance))), np.finfo(float).tiny)
+        if not np.allclose(population_covariance, population_covariance.T, rtol=1e-10, atol=1e-12*covariance_scale):
+            raise ValueError("electron_population_parameter_covariance must be symmetric")
+        population_covariance = 0.5*(population_covariance+population_covariance.T)
+        population_eigenvalues = np.linalg.eigvalsh(population_covariance)
+        if population_eigenvalues[0] < -1e-10*covariance_scale:
+            raise ValueError("electron_population_parameter_covariance must be positive semidefinite")
+        if np.any(population_mean[0::4] <= 0.0) or not np.isclose(np.sum(population_mean[0::4]), 1.0, rtol=0.0, atol=1e-8):
+            raise ValueError("nominal electron population fractions must be positive and sum to one")
+        if np.any(population_mean[1::4] <= 0.0) or np.any(population_mean[2::4] <= 1.5) or np.any(np.abs(population_mean[3::4]) >= C):
+            raise ValueError("nominal population temperature ratios, Kappa indices or projected flows are outside their physical domains")
+        rng = np.random.default_rng(int(population_mc_seed))
+        fit_draws, input_draws = [], []
+        attempts = 0
+        maximum_attempts = 10*int(population_mc_samples)
+        while len(fit_draws) < int(population_mc_samples) and attempts < maximum_attempts:
+            attempts += 1
+            draw = rng.multivariate_normal(population_mean, population_covariance, check_valid="raise")
+            fractions, ratios, kappas, flows = draw[0::4], draw[1::4], draw[2::4], draw[3::4]
+            # Do not renormalize fractions or clip physical parameters: rejected
+            # draws preserve the stated covariance model without hidden repair.
+            if (np.any(fractions <= 0.0) or not np.isclose(np.sum(fractions), 1.0, rtol=0.0, atol=1e-7)
+                    or np.any(ratios <= 0.0) or np.any(kappas <= 1.5) or np.any(np.abs(flows) >= C)):
+                continue
+            sampled_populations = []
+            for j, nominal in enumerate(electron_populations):
+                sampled = dict(nominal)
+                sampled.update({
+                    "density_fraction": float(fractions[j]),
+                    "temperature_ratio": float(ratios[j]),
+                    "kappa": float(kappas[j]),
+                    "flow_projection_m_s": float(flows[j]),
+                })
+                sampled_populations.append(sampled)
+            try:
+                sampled_fit = fit_collective_kappa(
+                    wavelength_nm=x, signal=y, laser_wavelength_nm=laser_wavelength_nm,
+                    scattering_angle_rad=scattering_angle_rad, response=response,
+                    uncertainty=uncertainty, incident_direction=incident_direction,
+                    scattered_direction=scattered_direction, ion_species=ion_species,
+                    ion_fractions=ion_fractions, ion_temperature_eV=ion_temperature_eV,
+                    electron_velocity_m_s=electron_velocity_m_s, ion_velocity_m_s=ion_velocity_m_s,
+                    initial_density_m3=ne, initial_temperature_eV=te, initial_kappa=kap,
+                    density_bounds_m3=density_bounds_m3, temperature_bounds_eV=temperature_bounds_eV,
+                    kappa_bounds=kappa_bounds, electron_populations=sampled_populations,
+                )
+            except (ValueError, FloatingPointError, np.linalg.LinAlgError):
+                continue
+            fit_draws.append(np.asarray(sampled_fit["fit_parameters"], dtype=float))
+            input_draws.append(draw)
+        minimum_successful = max(20, int(np.ceil(0.7*int(population_mc_samples))))
+        if len(fit_draws) < minimum_successful:
+            raise ValueError(
+                f"electron population uncertainty propagation produced {len(fit_draws)} successful refits; "
+                f"at least {minimum_successful} are required. Check the supplied covariance and physical bounds."
+            )
+        population_successful_samples = len(fit_draws)
+        joint_draws = np.column_stack((np.asarray(fit_draws), np.asarray(input_draws)))
+        population_joint_covariance = np.cov(joint_draws, rowvar=False, ddof=1)
+        # Add the conditional spectral-fit covariance to the fitted-parameter
+        # block while retaining MC cross-covariance with population inputs.
+        population_joint_covariance[:3, :3] += conditional_fit_covariance
+        covariance = population_joint_covariance[:3, :3].copy()
     sigma=np.sqrt(np.maximum(np.diag(covariance),0.0))
     incident_unit=np.asarray(incident_direction,dtype=float)
     scattered_unit=np.asarray(scattered_direction,dtype=float)
@@ -1440,6 +1535,12 @@ def fit_collective_kappa(
         "background_intercept":float(offset*scale),
         "background_slope_per_nm":float(slope*scale),
         "fit_covariance":covariance,
+        "fit_covariance_conditional_on_population_inputs":conditional_fit_covariance,
+        "electron_population_parameter_names":population_parameter_names,
+        "electron_population_parameter_covariance":None if electron_population_parameter_covariance is None else np.asarray(electron_population_parameter_covariance,dtype=float),
+        "population_joint_fit_input_covariance":population_joint_covariance,
+        "population_uncertainty_successful_refits":int(population_successful_samples),
+        "population_uncertainty_seed":int(population_mc_seed) if electron_population_parameter_covariance is not None else None,
         "fit_parameters":np.array([ne,te,kap],dtype=float),
         "fit_parameter_names":["electron_density_m3","electron_temperature_eV","kappa_index"],
         "optimizer_success":bool(fit.success),
