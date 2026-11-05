@@ -7502,7 +7502,30 @@
         }
       ],
       "completion_scope": "Profile-oriented output from the canonical measured-calibrated optical Thomson spectrum-to-physics inference using the three selected non-collective models. PCHIP and generalized-cross-validation spline reconstruction are restricted to the measured radial interval; no pre-derived ne/Te profile points are accepted. Microwave collective CTS remains a dedicated subanalysis within primary Analysis 1. No independent experimental validation is claimed.",
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": true,
+      "advanced_physics_solvers": [
+        {
+          "model": "thomson_normalized_poloidal_flux",
+          "callable": "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
+          "dashboard": "tis.ui.advanced_thomson_physics_page",
+          "inputs": [
+            "poloidal_flux_wb: one equilibrium-mapped poloidal flux value per Thomson channel",
+            "magnetic_axis_flux_wb: equilibrium poloidal flux at magnetic axis",
+            "separatrix_flux_wb: equilibrium poloidal flux at separatrix",
+            "joint_flux_covariance: optional covariance of [channel fluxes, axis flux, separatrix flux]"
+          ],
+          "outputs": [
+            "rho_pol",
+            "normalized_poloidal_flux",
+            "inside_lcfs",
+            "rho_pol_covariance",
+            "rho_pol_standard_uncertainty"
+          ],
+          "equation": "rho_pol = sqrt((psi_pol - psi_axis)/(psi_sep - psi_axis))",
+          "uncertainty": "Full joint covariance propagated by the analytic delta-method Jacobian; singular at rho_pol=0.",
+          "scope": "Uses externally supplied equilibrium and channel-to-flux mapping. Does not reconstruct equilibrium and does not infer rho_tor."
+        }
+      ]
     },
     "scientific_references": [
       {
