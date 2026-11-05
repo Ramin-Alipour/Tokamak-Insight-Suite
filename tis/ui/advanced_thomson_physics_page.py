@@ -150,19 +150,19 @@ MODEL_PHYSICS_NOTES = {
         "its Student-t CDF (nu = 2*kappa - 1) over each finite wavelength bin, before measured "
         "response convolution. Wavelength-window tails are not renormalized."
     ),
-}
-
     "thomson_normalized_poloidal_flux": (
         "Maps externally supplied channel poloidal flux to rho_pol = sqrt((psi_pol-psi_axis)/(psi_sep-psi_axis)). "
         "Propagates the full joint covariance of channel fluxes, magnetic-axis flux and separatrix flux by the delta method. "
         "This does not reconstruct equilibrium or infer flux from R,Z; do not confuse rho_pol with rho_tor."
     ),
+}
+
 EXAMPLES = {
     "thomson_normalized_poloidal_flux": {
         "poloidal_flux_wb": [0.11, 0.19, 0.34, 0.58],
         "magnetic_axis_flux_wb": 0.10,
         "separatrix_flux_wb": 0.60,
-        "joint_flux_covariance": null
+        "joint_flux_covariance": None
     },
     "thomson_kinetic_background_fit": {
         "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
