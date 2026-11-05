@@ -137,6 +137,11 @@ def analyze_thomson_spectral_distribution(
     background_signal_covariance=None,
     signal_background_cross_covariance=None,
     moment_mc_samples: int = 200,
+    physical_model: str | None = None,
+    laser_wavelength_nm: float | None = None,
+    scattering_angle_rad: float | None = None,
+    laser_wavelength_uncertainty_nm: float = 0.0,
+    scattering_angle_uncertainty_rad: float = 0.0,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
 
@@ -433,7 +438,7 @@ def analyze_thomson_spectral_distribution(
         correlation = covariance / np.outer(scale, scale)
         covariance_condition = float(np.linalg.cond(correlation))
         covariance_valid = bool(np.isfinite(covariance_condition) and covariance_condition <= 1e14)
-    return {
+    result = {
         "wavelength_nm": x.copy(), "signal": y.copy(), "background": background,
         "background_subtracted_signal": corrected,
         "positive_spectral_weights": weights,
@@ -538,3 +543,96 @@ def analyze_thomson_spectral_distribution(
             "Pointwise-noise Monte Carlo treats wavelength samples as independent; supplied full within-channel covariance is sampled jointly. Signal/background cross-covariance is sampled jointly when supplied as a positive-definite block covariance; without it, the two are treated as independent. Possible signal contamination in the supplied background remains non-identifiable.",
         ],
     }
+
+    # Optional physical interpretation: only an explicitly selected
+    # non-relativistic Maxwellian model may map the intrinsic Gaussian
+    # forward-fit width to Te. The measured response is already included in
+    # fit_model; no scalar instrument-width subtraction is performed.
+    if physical_model is not None:
+        if physical_model != "non_collective_maxwellian":
+            raise ValueError("physical_model must be None or 'non_collective_maxwellian'; a Gaussian shape fit cannot identify Kappa or arbitrary EVDF parameters")
+        if laser_wavelength_nm is None or scattering_angle_rad is None:
+            raise ValueError("laser_wavelength_nm and scattering_angle_rad are required for Maxwellian physical interpretation")
+        laser = float(laser_wavelength_nm)
+        angle = float(scattering_angle_rad)
+        laser_unc = float(laser_wavelength_uncertainty_nm)
+        angle_unc = float(scattering_angle_uncertainty_rad)
+        if not np.isfinite(laser) or laser <= 0.0:
+            raise ValueError("laser_wavelength_nm must be positive and finite")
+        if not np.isfinite(angle) or not 0.0 < angle < np.pi:
+            raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
+        if not np.isfinite(laser_unc) or laser_unc < 0.0 or not np.isfinite(angle_unc) or angle_unc < 0.0:
+            raise ValueError("laser/angle uncertainties must be finite and non-negative")
+        q = 2.0 * np.sin(angle / 2.0)
+        light_speed = 299792458.0
+        electron_rest_energy_eV = 510998.95069
+        intrinsic_sigma = float(params[2])
+        fitted_center = float(params[1])
+        thermal_ratio = intrinsic_sigma / (laser * q)
+        temperature_candidate = electron_rest_energy_eV * thermal_ratio**2
+        flow_candidate = light_speed * (1.0 - fitted_center / laser) / q
+        theta_e = temperature_candidate / electron_rest_energy_eV
+        beta_flow = abs(flow_candidate) / light_speed
+        # Propagate the fitted (center,sigma) covariance and independent
+        # laser/angle calibration errors through the analytic Jacobian.
+        physical_covariance = None
+        physical_uncertainties = None
+        if covariance_valid and np.all(np.isfinite(covariance[np.ix_([1, 2], [1, 2])])):
+            cot_half = 1.0 / np.tan(angle / 2.0)
+            grad_temperature = np.array([
+                0.0, 2.0 * temperature_candidate / intrinsic_sigma,
+                -2.0 * temperature_candidate / laser,
+                -temperature_candidate * cot_half,
+            ])
+            grad_flow = np.array([
+                -light_speed / (laser * q), 0.0,
+                light_speed * fitted_center / (laser**2 * q),
+                -0.5 * flow_candidate * cot_half,
+            ])
+            input_covariance = np.zeros((4, 4), dtype=float)
+            input_covariance[:2, :2] = covariance[np.ix_([1, 2], [1, 2])]
+            input_covariance[2, 2] = laser_unc**2
+            input_covariance[3, 3] = angle_unc**2
+            jacobian = np.vstack((grad_temperature, grad_flow))
+            physical_covariance = jacobian @ input_covariance @ jacobian.T
+            physical_covariance = 0.5 * (physical_covariance + physical_covariance.T)
+            physical_uncertainties = {
+                "electron_temperature_eV": float(np.sqrt(max(physical_covariance[0, 0], 0.0))),
+                "electron_velocity_projection_m_s": float(np.sqrt(max(physical_covariance[1, 1], 0.0))),
+            }
+        valid_domain = bool(theta_e < 0.01 and beta_flow < 0.1)
+        result["physical_inference"] = {
+            "selected_model": physical_model,
+            "electron_temperature_candidate_eV": float(temperature_candidate) if valid_domain else None,
+            "electron_velocity_projection_candidate_m_s": float(flow_candidate) if valid_domain else None,
+            "parameter_covariance_order": ["electron_temperature_eV", "electron_velocity_projection_m_s"],
+            "parameter_covariance": physical_covariance if valid_domain else None,
+            "parameter_standard_uncertainties": physical_uncertainties if valid_domain else None,
+            "validity_parameters": {"theta_e": float(theta_e), "abs_beta_flow": float(beta_flow)},
+            "validity_limits": {"theta_e_strictly_less_than": 0.01, "abs_beta_flow_strictly_less_than": 0.1},
+            "status": "conditional_gaussian_maxwellian_candidate" if valid_domain else "rejected_outside_declared_nonrelativistic_validity_domain",
+            "reportable_as_primary_inference": False,
+            "formula_temperature_eV": "T_e = (m_e*c^2/e) * (sigma_lambda_intrinsic/(lambda_0*2*sin(theta/2)))^2",
+            "formula_velocity_projection_m_s": "v_q = c*(1 - lambda_centroid/lambda_0)/(2*sin(theta/2))",
+            "uncertainty_method": "analytic_Jacobian_propagation_from_intrinsic_Gaussian_fit_covariance_and_independent_laser/angle_calibration_uncertainties",
+            "assumptions": [
+                "explicit non-collective Maxwellian selection",
+                "intrinsic Gaussian width from forward convolution with the supplied measured response matrix",
+                "non-relativistic elastic Thomson wavelength mapping",
+                "laser wavelength and scattering-angle calibration errors are independent of fitted spectral parameters",
+                "no model-discrepancy or background-parameter cross-covariance is included in this conditional conversion",
+            ],
+            "limitations": [
+                "This is a conditional diagnostic candidate, not a replacement for the canonical joint physical Thomson inference.",
+                "Gaussian spectral shape alone cannot identify Kappa index, anisotropy, multiple populations or a general EVDF.",
+                "No primary physical result is reported outside the declared asymptotic validity screens.",
+            ],
+        }
+    else:
+        result["physical_inference"] = {
+            "selected_model": None,
+            "status": "not_requested",
+            "reportable_as_primary_inference": False,
+            "reason": "Spectral moments and Gaussian width remain descriptive unless a physical model and scattering geometry are explicitly selected.",
+        }
+    return result
