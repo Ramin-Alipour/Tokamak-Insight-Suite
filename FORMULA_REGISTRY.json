@@ -4269,7 +4269,7 @@
         {
           "name": "electron_temperature_eV",
           "unit": "eV",
-          "description": "Density-weighted total second-moment temperature of the projected electron mixture, including between-population drift spread."
+          "description": "For the forward spectrum, the total projected mixture second-moment temperature; for the inverse fit, the fitted reference temperature is separately named and the total mixture temperature is returned as electron_effective_second_moment_temperature_eV."
         },
         {
           "name": "electron_mixture_moments",
@@ -4295,6 +4295,31 @@
           "name": "static_screening_status",
           "unit": "status",
           "description": "Explains whether the supplied electron mixture has a common rest frame for static screening."
+        },
+        {
+          "name": "electron_effective_second_moment_temperature_eV",
+          "unit": "eV",
+          "description": "Total projected electron-mixture second-moment temperature including between-population drift spread; distinct from the fitted reference temperature."
+        },
+        {
+          "name": "electron_effective_second_moment_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Conditional fit uncertainty or joint fit/population covariance propagation for the total mixture second-moment temperature."
+        },
+        {
+          "name": "electron_bulk_flow_projection_uncertainty_m_s",
+          "unit": "m s^-1 or null",
+          "description": "Uncertainty in density-weighted bulk flow, available when the supplied joint population covariance is propagated."
+        },
+        {
+          "name": "electron_reference_temperature_eV",
+          "unit": "eV",
+          "description": "Reference temperature parameter used to scale the component population temperatures."
+        },
+        {
+          "name": "electron_reference_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Projection of the supplied reference electron velocity vector, distinct from the mixture bulk flow when population flows differ."
         }
       ],
       "prerequisites": [
@@ -4308,7 +4333,7 @@
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ],
-      "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2. Static screening is calculated from the zero-frequency susceptibility with the exact Kappa enhancement factor (2κ−1)/(2κ−3); no single scalar Debye length or alpha is reported for counter-streaming populations.",
+      "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2. Static screening is calculated from the zero-frequency susceptibility with the exact Kappa enhancement factor (2κ−1)/(2κ−3); no single scalar Debye length or alpha is reported for counter-streaming populations. The measured-spectrum inverse separately reports its reference-temperature fit and the derived mixture second-moment temperature; the latter uncertainty includes fit/population cross-covariance when the population covariance is supplied.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
@@ -4379,7 +4404,7 @@
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ]
     },
-    "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2. Static screening is calculated from the zero-frequency susceptibility with the exact Kappa enhancement factor (2κ−1)/(2κ−3); no single scalar Debye length or alpha is reported for counter-streaming populations."
+    "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2. Static screening is calculated from the zero-frequency susceptibility with the exact Kappa enhancement factor (2κ−1)/(2κ−3); no single scalar Debye length or alpha is reported for counter-streaming populations. The measured-spectrum inverse separately reports its reference-temperature fit and the derived mixture second-moment temperature; the latter uncertainty includes fit/population cross-covariance when the population covariance is supplied."
   },
   {
     "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",

@@ -333,6 +333,11 @@ EXAMPLES = {
         "ion_temperature_eV": [200.0],
         "electron_velocity_m_s": [0.0, 0.0, 0.0],
         "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "electron_populations": [
+            {"density_fraction": 0.60, "temperature_ratio": 0.5, "kappa": 5.0, "distribution": "kappa", "flow_projection_m_s": 0.0},
+            {"density_fraction": 0.25, "temperature_ratio": 1.5, "kappa": 3.5, "distribution": "kappa", "flow_projection_m_s": 0.0},
+            {"density_fraction": 0.15, "temperature_ratio": 4.0, "distribution": "maxwellian", "flow_projection_m_s": 0.0}
+        ],
         "initial_density_m3": 2.0e18,
         "initial_temperature_eV": 250.0,
         "initial_kappa": 4.0,
