@@ -260,6 +260,11 @@ def test_thomson_distribution_is_independently_registered():
     assert len(ANALYSES) >= 81
     assert get_analysis(81)["name"] == "Thomson spectral distribution"
     assert get_analysis(81)["function"] == "analyze_thomson_spectral_distribution"
+    input_names = {
+        item["name"]
+        for item in get_analysis(81)["execution_contract"]["input_specs"]
+    }
+    assert "fit_geometry_cross_covariance_nm2_rad" in input_names
 
 
 def test_distribution_exposes_background_and_statistical_interpretation():
