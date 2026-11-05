@@ -5,6 +5,9 @@ from tokamak_analysis.thomson_kinetic_models import (
     relativistic_maxwell_juttner_spectrum,
     collective_kappa_spectral_density,
 )
+from tokamak_analysis.thomson_gap_closure import (
+    reconstruct_relativistic_projected_thomson_evdf,
+)
 
 
 def test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite():
@@ -753,3 +756,27 @@ def test_gyrotropic_bimaxwellian_rejects_inconsistent_joint_temperature_geometry
             magnetic_pitch_cosine_covariance=np.eye(3)*1e-4,
             projected_temperature_pitch_cross_covariance=np.eye(3)*0.1,
         )
+
+
+def test_projected_relativistic_evdf_convolves_measured_laser_spectrum():
+    wavelength = np.linspace(1040.0, 1088.0, 161)
+    velocity = np.linspace(-0.02, 0.02, 41) * 299_792_458.0
+    laser_axis = np.linspace(1063.8, 1064.2,  nine := 9)
+    laser_density = np.exp(-0.5*((laser_axis-1064.0)/0.055)**2)
+    signal = np.exp(-0.5*((wavelength-1064.0)/4.0)**2)
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, signal,
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi/2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(signal),
+        velocity_grid_m_s=velocity,
+        laser_spectrum_wavelength_nm=laser_axis,
+        laser_spectrum_density_per_nm=laser_density,
+    )
+    profile = result["laser_spectral_profile"]
+    assert profile["source_profile_used"] if "source_profile_used" in profile else profile["assumption"] != "monochromatic_incident_laser"
+    assert profile["captured_scattering_probability_min"] >= 0.995
+    assert result["fitted_spectrum"].shape == wavelength.shape
+    assert np.all(np.isfinite(result["fitted_spectrum"]))
+    assert result["model"] == "exact_relativistic_thomson_limit_projected_1d_kinematic_inversion"
