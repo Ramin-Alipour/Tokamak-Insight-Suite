@@ -1142,9 +1142,16 @@ def collective_kappa_spectral_density(
     electron_density_m3, electron_temperature_eV, kappa,
     ion_species, ion_fractions, ion_temperature_eV,
     electron_velocity_m_s, ion_velocity_m_s,
-    incident_direction, scattered_direction,
+    incident_direction, scattered_direction, electron_populations=None,
 ):
-    """Unmagnetized collective spectrum with a kappa electron VDF and Maxwellian ions.
+    """Unmagnetized collective spectrum with kappa electrons and Maxwellian ions.
+
+    electron_populations optionally supplies projected populations with
+    density_fraction (summing to one), temperature_ratio relative to the base
+    electron temperature, kappa (> 3/2), and flow_projection_m_s. Both the
+    longitudinal susceptibility and electron source term are density-weighted
+    sums over the populations; this is a kinetic mixture, not a sum of fitted
+    spectra.
 
     The longitudinal susceptibilities are evaluated from the Landau-contour
     integral of each supplied 1-D projected velocity distribution. This is a
@@ -1196,8 +1203,46 @@ def collective_kappa_spectral_density(
     vphase = -C*(x-laser)/(2.0*laser*np.sin(angle/2.0))
     sigma_e = np.sqrt(te*E_CHARGE/ME)
     omega_pe2 = ne*E_CHARGE**2/(EPS0*ME)
-    electron_pdf, _, _ = _kappa_pdf_and_derivatives(vphase-ue, sigma_e, kap)
-    chi_e = np.empty(x.size, dtype=complex)
+    if electron_populations is None:
+        populations = [{"density_fraction": 1.0, "temperature_ratio": 1.0,
+                        "kappa": kap, "flow_projection_m_s": ue}]
+    else:
+        if not isinstance(electron_populations, Sequence) or isinstance(electron_populations, (str, bytes)) or len(electron_populations) < 1:
+            raise ValueError("electron_populations must be a non-empty sequence of population mappings")
+        populations = []
+        for index, population in enumerate(electron_populations):
+            if not isinstance(population, Mapping):
+                raise ValueError(f"electron_populations[{index}] must be a mapping")
+            fraction = _positive(population.get("density_fraction"), f"electron_populations[{index}].density_fraction")
+            ratio = _positive(population.get("temperature_ratio", 1.0), f"electron_populations[{index}].temperature_ratio")
+            population_kappa = float(population.get("kappa", kap))
+            flow = float(population.get("flow_projection_m_s", ue))
+            if not np.isfinite(population_kappa) or population_kappa <= 1.5:
+                raise ValueError(f"electron_populations[{index}].kappa must be finite and > 1.5")
+            if not np.isfinite(flow) or abs(flow) >= C:
+                raise ValueError(f"electron_populations[{index}].flow_projection_m_s must be finite and subluminal")
+            populations.append({"density_fraction": fraction, "temperature_ratio": ratio,
+                                "kappa": population_kappa, "flow_projection_m_s": flow})
+        if not np.isclose(sum(item["density_fraction"] for item in populations), 1.0, rtol=1e-6, atol=1e-8):
+            raise ValueError("electron population density_fraction values must sum to one")
+    electron_pdf = np.zeros(x.size, dtype=float)
+    chi_e = np.zeros(x.size, dtype=complex)
+    population_pdfs, population_susceptibilities = [], []
+    for population in populations:
+        fraction = population["density_fraction"]
+        sigma_population = sigma_e*np.sqrt(population["temperature_ratio"])
+        shifted_phase = vphase-population["flow_projection_m_s"]
+        pdf_population, _, _ = _kappa_pdf_and_derivatives(
+            shifted_phase, sigma_population, population["kappa"])
+        chi_population = np.empty(x.size, dtype=complex)
+        for j in range(x.size):
+            chi_population[j] = _landau_susceptibility(
+                shifted_phase[j], fraction*omega_pe2, k, sigma_population,
+                distribution="kappa", kappa=population["kappa"])
+        electron_pdf += fraction*pdf_population
+        chi_e += chi_population
+        population_pdfs.append(pdf_population)
+        population_susceptibilities.append(chi_population)
     ion_chi = []
     ion_pdf = []
     for index, item in enumerate(species):
@@ -1212,10 +1257,6 @@ def collective_kappa_spectral_density(
                 vphase[j]-ui[index], omega_pi2, k, sigma_i
             )
         ion_chi.append(chi_i)
-    for j in range(x.size):
-        chi_e[j] = _landau_susceptibility(
-            vphase[j]-ue, omega_pe2, k, sigma_e, distribution="kappa", kappa=kap
-        )
     ion_sum = np.sum(np.asarray(ion_chi), axis=0)
     dielectric = 1.0+chi_e+ion_sum
     denominator = np.maximum(np.abs(dielectric)**2, np.finfo(float).tiny)
@@ -1243,6 +1284,9 @@ def collective_kappa_spectral_density(
         "ion_fractions": fractions,
         "ion_temperature_eV": temperatures,
         "kappa_index": kap,
+        "electron_populations": [dict(item) for item in populations],
+        "electron_population_susceptibilities": np.asarray(population_susceptibilities),
+        "electron_population_projected_vdfs_s_m": np.asarray(population_pdfs),
         "wavenumber_m_inverse": k,
         "phase_velocity_m_s": vphase,
         "model": "unmagnetized collective Thomson scattering with kappa electrons and Maxwellian ions",
@@ -1256,6 +1300,7 @@ def fit_collective_kappa(
     electron_velocity_m_s, ion_velocity_m_s,
     initial_density_m3, initial_temperature_eV, initial_kappa,
     density_bounds_m3=None, temperature_bounds_eV=None, kappa_bounds=None,
+    electron_populations=None,
 ):
     """Fit ne, Te and kappa from a collective spectrum; ion inputs remain fixed."""
     x = np.asarray(wavelength_nm, dtype=float)
@@ -1316,6 +1361,7 @@ def fit_collective_kappa(
             electron_velocity_m_s=electron_velocity_m_s,
             ion_velocity_m_s=ion_velocity_m_s,
             incident_direction=incident_direction, scattered_direction=scattered_direction,
+            electron_populations=electron_populations,
         )["spectral_density_per_nm"]
         return _apply_response(response, physical, x)
 
