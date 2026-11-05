@@ -402,11 +402,16 @@ def reconstruct_relativistic_projected_thomson_evdf(
                 or np.any(np.diff(source_wavelengths) <= 0.0)
                 or np.any(source_density < 0.0)):
             raise ValueError("laser source wavelengths must be positive/increasing and paired with non-negative density")
-        source_area = float(np.trapz(source_density, source_wavelengths))
+        # The uploaded profile is spectral POWER density. Scattering events
+        # are driven by incident photon flux, dN/dlambda = P_lambda*lambda/(h*c),
+        # not by power density itself. Normalize this photon-flux measure before
+        # integrating the source-resolved scattering kernel.
+        source_photon_density = source_density * source_wavelengths
+        source_area = float(np.trapz(source_photon_density, source_wavelengths))
         if not np.isfinite(source_area) or source_area <= 0.0:
-            raise ValueError("laser source spectrum must have positive finite integrated area")
+            raise ValueError("laser source spectrum must have positive finite integrated photon flux")
         source_weights = (
-            source_density / source_area
+            source_photon_density / source_area
             * _trapezoid_quadrature_weights(source_wavelengths, "laser_spectrum_wavelength_nm")
         )
         source_weights /= float(np.sum(source_weights))
@@ -445,7 +450,13 @@ def reconstruct_relativistic_projected_thomson_evdf(
             scattering_weights_source = np.ones(v.size, dtype=float)
         if np.any(~np.isfinite(scattering_weights_source)) or np.any(scattering_weights_source < 0.0):
             raise ValueError("differential-scattering weights must be finite and non-negative")
-        weighted = float(source_weight) * scattering_weights_source
+        # The detector-space signal is spectral scattered POWER. Convert the
+        # incident photon rate to scattered photon power with E_s/E_i=lambda_i/lambda_s.
+        # This factor is wavelength dependent in the relativistic/Compton kernel.
+        weighted = (
+            float(source_weight) * scattering_weights_source
+            * (float(source_wavelength) / wavelength_centres_source)
+        )
         total_scattering_weight += weighted
         weighted_scattered_wavelength += weighted * wavelength_centres_source
         for j, centre in enumerate(wavelength_centres_source):
@@ -574,6 +585,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
             "assumption": "monochromatic_incident_laser" if laser_spectrum_wavelength_nm is None else "measured_source_spectrum_convolved_in_exact_single_electron_kinematics",
             "wavelength_nm": source_wavelengths.copy(),
             "normalized_quadrature_weights": source_weights.copy(),
+            "source_weighting": "incident_photon_flux_from_spectral_power_density",
+            "scattered_power_conversion": "E_scattered/E_incident = lambda_incident/lambda_scattered",
             "captured_scattering_probability_min": float(np.min(captured_fraction)),
         },
         "recoil_included": bool(include_compton_recoil),
