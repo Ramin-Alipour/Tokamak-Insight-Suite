@@ -2236,3 +2236,51 @@ def test_cts_frequency_resolved_geometry_uses_binwise_wave_number_for_physical_a
         frequency, f0, representative_angle
     )
     assert not np.allclose(actual, representative, rtol=1e-5, atol=0.0)
+
+
+def test_cts_dispatcher_forwards_joint_multi_population_covariance(monkeypatch):
+    from tokamak_analysis import cts_analysis, thomson_kinetic_models
+
+    captured = {}
+
+    def fake_fit_collective_kappa(**kwargs):
+        captured.update(kwargs)
+        return {"dispatcher_forwarded": True}
+
+    monkeypatch.setattr(thomson_kinetic_models, "fit_collective_kappa", fake_fit_collective_kappa)
+    wavelength = np.linspace(1050.0, 1070.0, 12)
+    populations = [
+        {"density_fraction": 0.8, "temperature_ratio": 0.8,
+         "kappa": 4.0, "flow_projection_m_s": 0.0},
+        {"density_fraction": 0.2, "temperature_ratio": 2.0,
+         "kappa": 3.0, "flow_projection_m_s": 1.0e5},
+    ]
+    population_covariance = np.zeros((8, 8))
+    result = cts_analysis.analyze_cts_spectrum_model(
+        model="electrostatic_kappa",
+        wavelength_nm=wavelength,
+        signal=np.ones(wavelength.size),
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi/2,
+        response=np.eye(wavelength.size),
+        incident_direction=[-np.sin(np.pi/4), np.cos(np.pi/4), 0.0],
+        scattered_direction=[np.sin(np.pi/4), np.cos(np.pi/4), 0.0],
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        initial_density_m3=1.0e19,
+        initial_temperature_eV=100.0,
+        initial_kappa=3.5,
+        electron_populations=populations,
+        electron_population_parameter_covariance=population_covariance,
+        population_mc_samples=20,
+        population_mc_seed=123,
+    )
+    assert result["dispatcher_forwarded"] is True
+    np.testing.assert_array_equal(
+        captured["electron_population_parameter_covariance"], population_covariance
+    )
+    assert captured["population_mc_samples"] == 20
+    assert captured["population_mc_seed"] == 123
