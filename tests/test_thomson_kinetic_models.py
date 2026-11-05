@@ -790,3 +790,95 @@ def test_projected_relativistic_evdf_convolves_measured_laser_spectrum(include_c
         if include_compton_recoil else
         "exact_relativistic_thomson_limit_projected_1d_kinematic_inversion"
     )
+
+
+
+def test_collective_kappa_three_population_moments_include_between_population_drift():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 41)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    populations = [
+        {"density_fraction": 0.55, "temperature_ratio": 0.5, "distribution": "maxwellian", "flow_projection_m_s": -2.0e5},
+        {"density_fraction": 0.30, "temperature_ratio": 2.0, "distribution": "kappa", "kappa": 4.0, "flow_projection_m_s": 1.0e5},
+        {"density_fraction": 0.15, "temperature_ratio": 5.0, "distribution": "kappa", "kappa": 3.0, "flow_projection_m_s": 9.0e5},
+    ]
+    result = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=200.0, kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        electron_populations=populations,
+    )
+    fractions = np.array([p["density_fraction"] for p in populations])
+    temperatures = 200.0*np.array([p["temperature_ratio"] for p in populations])
+    flows = np.array([p["flow_projection_m_s"] for p in populations])
+    mean_flow = float(fractions @ flows)
+    component_variances = 1.602176634e-19*temperatures/9.1093837015e-31
+    offsets = flows-mean_flow
+    expected_variance = float(fractions @ (component_variances+offsets**2))
+    expected_temperature = expected_variance*9.1093837015e-31/1.602176634e-19
+    moments = result["electron_mixture_moments"]
+    assert moments["population_count"] == 3
+    assert result["electron_flow_projection_m_s"] == pytest.approx(mean_flow)
+    assert moments["bulk_flow_projection_m_s"] == pytest.approx(mean_flow)
+    assert moments["thermal_second_moment_temperature_eV"] == pytest.approx(float(fractions @ temperatures))
+    assert moments["between_population_drift_temperature_eV"] > 0.0
+    assert moments["total_second_moment_temperature_eV"] == pytest.approx(expected_temperature)
+    assert result["electron_temperature_eV"] == pytest.approx(expected_temperature)
+    assert moments["fourth_moment_finite"] is True
+    assert moments["velocity_kurtosis"] > 3.0
+
+
+def test_collective_kappa_mixture_with_low_kappa_withholds_divergent_fourth_moment():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 21)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    result = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=200.0, kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        electron_populations=[
+            {"density_fraction": 0.8, "temperature_ratio": 1.0, "distribution": "kappa", "kappa": 2.2, "flow_projection_m_s": 0.0},
+            {"density_fraction": 0.2, "temperature_ratio": 2.0, "distribution": "maxwellian", "flow_projection_m_s": 1.0e5},
+        ],
+    )
+    moments = result["electron_mixture_moments"]
+    assert moments["fourth_moment_finite"] is False
+    assert moments["velocity_kurtosis"] is None
+    assert moments["velocity_excess_kurtosis"] is None
+    assert "1.5 < kappa <= 2.5" in moments["fourth_moment_status"]
+
+
+def test_collective_kappa_single_population_moments_reduce_to_input_temperature_and_flow():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 21)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    qvector = np.asarray(scattered)-np.asarray(incident)
+    input_flow = 2.5e5*qvector/np.linalg.norm(qvector)
+    result = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=200.0, kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=input_flow, ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+    )
+    moments = result["electron_mixture_moments"]
+    assert result["electron_flow_projection_m_s"] == pytest.approx(2.5e5)
+    assert moments["total_second_moment_temperature_eV"] == pytest.approx(200.0)
+    assert moments["between_population_drift_temperature_eV"] == pytest.approx(0.0, abs=1e-12)
+    assert moments["velocity_kurtosis"] == pytest.approx(3.0*(2.0*4.0-3.0)/(2.0*4.0-5.0))

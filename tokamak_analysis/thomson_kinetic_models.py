@@ -1315,8 +1315,14 @@ def collective_kappa_spectral_density(
             fraction = _positive(population.get("density_fraction"), f"electron_populations[{index}].density_fraction")
             ratio = _positive(population.get("temperature_ratio", 1.0), f"electron_populations[{index}].temperature_ratio")
             distribution = str(population.get("distribution", "kappa")).lower()
-            population_kappa = float(population.get("kappa", kap))
-            flow = float(population.get("flow_projection_m_s", ue))
+            raw_kappa = population.get("kappa", kap)
+            if isinstance(raw_kappa, (bool, np.bool_)) or not isinstance(raw_kappa, (int, float, np.integer, np.floating)):
+                raise ValueError(f"electron_populations[{index}].kappa must be a finite real scalar")
+            population_kappa = float(raw_kappa)
+            raw_flow = population.get("flow_projection_m_s", ue)
+            if isinstance(raw_flow, (bool, np.bool_)) or not isinstance(raw_flow, (int, float, np.integer, np.floating)):
+                raise ValueError(f"electron_populations[{index}].flow_projection_m_s must be a finite real scalar")
+            flow = float(raw_flow)
             if distribution not in ("kappa", "maxwellian"):
                 raise ValueError(f"electron_populations[{index}].distribution must be 'kappa' or 'maxwellian'")
             if distribution == "kappa" and (not np.isfinite(population_kappa) or population_kappa <= 1.5):
@@ -1328,6 +1334,56 @@ def collective_kappa_spectral_density(
                                 "flow_projection_m_s": flow})
         if not np.isclose(sum(item["density_fraction"] for item in populations), 1.0, rtol=1e-6, atol=1e-8):
             raise ValueError("electron population density_fraction values must sum to one")
+    # Exact total-mixture moments include thermal spread and between-population drift.
+    population_flows = np.asarray([item["flow_projection_m_s"] for item in populations], dtype=float)
+    population_fractions = np.asarray([item["density_fraction"] for item in populations], dtype=float)
+    population_temperatures = te*np.asarray([item["temperature_ratio"] for item in populations], dtype=float)
+    population_variances = E_CHARGE*population_temperatures/ME
+    mixture_flow = float(population_fractions @ population_flows)
+    flow_offsets = population_flows-mixture_flow
+    thermal_temperature = float(population_fractions @ population_temperatures)
+    drift_temperature = float(ME/E_CHARGE * (population_fractions @ (flow_offsets**2)))
+    effective_temperature = thermal_temperature+drift_temperature
+    mixture_variance = E_CHARGE*effective_temperature/ME
+    third_central_moment = float(np.sum(population_fractions*(3.0*flow_offsets*population_variances+flow_offsets**3)))
+    component_fourth_moments = []
+    fourth_moment_finite = True
+    for item, variance in zip(populations, population_variances):
+        if item["distribution"] == "maxwellian":
+            component_fourth_moments.append(3.0*variance**2)
+        elif item["kappa"] > 2.5:
+            component_fourth_moments.append(3.0*(2.0*item["kappa"]-3.0)/(2.0*item["kappa"]-5.0)*variance**2)
+        else:
+            fourth_moment_finite = False
+            component_fourth_moments.append(np.inf)
+    if fourth_moment_finite:
+        fourth_central_moment = float(np.sum(population_fractions*(np.asarray(component_fourth_moments)+6.0*flow_offsets**2*population_variances+flow_offsets**4)))
+        mixture_kurtosis = fourth_central_moment/mixture_variance**2
+        mixture_excess_kurtosis = mixture_kurtosis-3.0
+    else:
+        fourth_central_moment = None
+        mixture_kurtosis = None
+        mixture_excess_kurtosis = None
+    mixture_skewness = third_central_moment/mixture_variance**1.5
+    electron_mixture_moments = {
+        "population_count": len(populations),
+        "population_density_fractions": population_fractions.copy(),
+        "population_temperature_eV": population_temperatures.copy(),
+        "population_flow_projection_m_s": population_flows.copy(),
+        "bulk_flow_projection_m_s": mixture_flow,
+        "thermal_second_moment_temperature_eV": thermal_temperature,
+        "between_population_drift_temperature_eV": drift_temperature,
+        "total_second_moment_temperature_eV": effective_temperature,
+        "total_velocity_variance_m2_s2": mixture_variance,
+        "third_central_velocity_moment_m3_s3": third_central_moment,
+        "velocity_skewness": float(mixture_skewness),
+        "fourth_central_velocity_moment_m4_s4": fourth_central_moment,
+        "velocity_kurtosis": None if mixture_kurtosis is None else float(mixture_kurtosis),
+        "velocity_excess_kurtosis": None if mixture_excess_kurtosis is None else float(mixture_excess_kurtosis),
+        "fourth_moment_finite": fourth_moment_finite,
+        "fourth_moment_status": "finite_for_all_populations" if fourth_moment_finite else "diverges_because_at_least_one_Kappa_population_has_1.5 < kappa <= 2.5",
+        "moment_definition": "moments of the density-weighted projected mixture, including between-population drift offsets",
+    }
     electron_pdf = np.zeros(x.size, dtype=float)
     chi_e = np.zeros(x.size, dtype=complex)
     population_pdfs, population_susceptibilities = [], []
@@ -1425,7 +1481,10 @@ def collective_kappa_spectral_density(
         "ion_susceptibility": np.asarray(ion_chi),
         "dielectric_function": dielectric,
         "dynamic_structure_factor": dynamic_structure,
-        "electron_flow_projection_m_s": ue,
+        "electron_flow_projection_m_s": mixture_flow,
+        "electron_reference_flow_projection_m_s": ue,
+        "electron_temperature_eV": effective_temperature,
+        "electron_mixture_moments": electron_mixture_moments,
         "ion_flow_projections_m_s": np.asarray(
             [item["flow_projection_m_s"] for item in resolved_ion_populations],
             dtype=float,

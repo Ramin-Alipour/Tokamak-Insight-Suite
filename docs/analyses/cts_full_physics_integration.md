@@ -46,3 +46,26 @@ Unit tests verify software contracts and limiting cases. They do not establish
 experimental accuracy. A physical result must not be released quantitatively
 until velocity-space, harmonic, quadrature, spatial-step, angular-spectrum and
 boundary convergence have been demonstrated for the supplied regime.
+
+
+## Electron-mixture moment closure for collective Kappa CTS
+
+The collective kinetic spectrum sums all supplied electron-population
+susceptibilities before constructing the common dielectric response.
+For density fractions eta_j, projected drifts u_j and component second-moment
+temperatures T_j, the physical bulk flow is u_bar = sum_j eta_j u_j.
+The total projected second-moment temperature is
+T_e,2 = sum_j eta_j T_j + (m_e/e) sum_j eta_j (u_j-u_bar)^2.
+The second term is the between-population streaming contribution; omitting it
+reports only the weighted component temperature, not the variance of the
+total electron distribution.
+
+For symmetric Maxwellian/Kappa components, the third central moment is
+sum_j eta_j [3 delta_j sigma_j^2 + delta_j^3]. A 1-D Kappa marginal has a
+finite fourth central moment only for kappa > 5/2, with
+mu4_j = 3 (2 kappa_j - 3)/(2 kappa_j - 5) sigma_j^4. The mixture fourth
+moment adds the exact shift terms 6 delta_j^2 sigma_j^2 + delta_j^4.
+When any nonzero Kappa component has 3/2 < kappa <= 5/2, variance remains
+finite but kurtosis diverges and is returned as unavailable, never clipped.
+The public advanced-physics API and its Dashboard example expose these
+derived moments alongside the summed multi-population dielectric.
