@@ -562,8 +562,37 @@ def analyze_thomson_spectral_distribution(
         if not isinstance(physical_fit_options, dict):
             raise ValueError("physical_fit_options must provide physical_initial and the selected model's nuisance/uncertainty inputs")
         options = dict(physical_fit_options)
-        if "physical_model" in options or "instrument_response" in options or "laser_wavelength_nm" in options or "scattering_angle_rad" in options:
-            raise ValueError("physical_fit_options cannot override the selected model, geometry, or measured instrument response")
+        reserved = {
+            "physical_model", "instrument_response", "laser_wavelength_nm",
+            "scattering_angle_rad", "wavelength_nm", "measured_spectrum",
+        }
+        conflicts = sorted(reserved.intersection(options))
+        if conflicts:
+            raise ValueError(
+                "physical_fit_options cannot override the selected model, measured spectrum, "
+                f"geometry or instrument response: {conflicts}"
+            )
+
+        # Preserve the uncertainty supplied to the spectral-distribution API
+        # when handing the *same measured samples* to the native Kappa/MJ
+        # physical forward fitter.  The fitter uses these as measurement
+        # covariance inputs before adding any separately supplied discrepancy
+        # or systematic covariance components.
+        if uncertainty is not None:
+            if "measurement_uncertainty" in options or "measurement_covariance" in options:
+                raise ValueError(
+                    "Top-level signal_uncertainty cannot be combined with measurement_uncertainty "
+                    "or measurement_covariance in physical_fit_options."
+                )
+            options["measurement_uncertainty"] = uncertainty.copy()
+        elif signal_covariance_matrix is not None:
+            if "measurement_uncertainty" in options or "measurement_covariance" in options:
+                raise ValueError(
+                    "Top-level signal_covariance cannot be combined with measurement_uncertainty "
+                    "or measurement_covariance in physical_fit_options."
+                )
+            options["measurement_covariance"] = signal_covariance_matrix.copy()
+
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         kinetic_fit = fit_noncollective_kinetic_thomson_with_background(
             x, y, physical_model=physical_model,
