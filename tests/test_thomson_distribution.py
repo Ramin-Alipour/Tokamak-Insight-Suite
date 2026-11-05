@@ -459,3 +459,79 @@ def test_spectral_distribution_rejects_kinetic_model_without_explicit_fit_option
             laser_wavelength_nm=1060.0,
             scattering_angle_rad=np.pi / 2,
         )
+
+
+
+def test_selected_maxwellian_can_dispatch_to_canonical_measured_spectrum_inference(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(1059.8, 1060.2, 61)
+    signal = 1.0 + 0.2 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.045) ** 2)
+    response = np.eye(wavelength.size)
+    captured = {}
+
+    def fake_canonical(x, spectra, radius, **kwargs):
+        captured.update({
+            "wavelength": np.asarray(x).copy(),
+            "spectra": np.asarray(spectra).copy(),
+            "radius": np.asarray(radius).copy(),
+            "kwargs": kwargs,
+        })
+        return {
+            "channels": [{
+                "electron_temperature_eV": 125.0,
+                "electron_velocity_projection_m_s": 12000.0,
+            }],
+            "result_classification": {
+                "channels": [{
+                    "primary": [
+                        {"parameter": "electron_temperature_eV"},
+                        {"parameter": "electron_velocity_projection_m_s"},
+                    ]
+                }]
+            },
+        }
+
+    monkeypatch.setattr(inference, "analyze_thomson_spectra", fake_canonical)
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=response,
+        background_signal=np.full_like(signal, 0.01),
+        signal_uncertainty=np.full_like(signal, 0.002),
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=1060.0,
+        scattering_angle_rad=np.pi / 2,
+        physical_fit_options={"radius_m": 0.42, "background_model": "polynomial", "background_degree": 2},
+    )
+
+    physical = result["physical_inference"]
+    assert physical["status"] == "identified_from_measured_spectrum"
+    assert physical["reportable_as_primary_inference"] is True
+    assert physical["gaussian_width_used_as_temperature"] is False
+    assert physical["gaussian_width_role"] == "independent_descriptive_cross_check_only"
+    np.testing.assert_array_equal(captured["wavelength"], wavelength)
+    np.testing.assert_array_equal(captured["spectra"], signal.reshape(1, -1))
+    np.testing.assert_array_equal(captured["radius"], np.array([0.42]))
+    assert captured["kwargs"]["model"] == "non_collective_maxwellian"
+    assert captured["kwargs"]["instrument_response"] is response
+    assert captured["kwargs"]["signal_uncertainty"].shape == (1, wavelength.size)
+    assert captured["kwargs"]["background_model"] == "polynomial"
+
+
+def test_maxwellian_canonical_inference_requires_radius_in_fit_options():
+    import pytest
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(1059.8, 1060.2, 61)
+    signal = 1.0 + 0.2 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.045) ** 2)
+    with pytest.raises(ValueError, match="must include radius_m"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(signal, 0.01),
+            physical_model="non_collective_maxwellian",
+            laser_wavelength_nm=1060.0,
+            scattering_angle_rad=np.pi / 2,
+            physical_fit_options={"background_model": "linear"},
+        )

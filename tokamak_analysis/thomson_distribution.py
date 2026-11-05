@@ -547,8 +547,12 @@ def analyze_thomson_spectral_distribution(
 
     if physical_model not in {None, "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be None, non_collective_maxwellian, kappa, or relativistic_maxwell_juttner")
-    if physical_fit_options is not None and physical_model not in {"kappa", "relativistic_maxwell_juttner"}:
-        raise ValueError("physical_fit_options is supported only for kappa or relativistic_maxwell_juttner")
+    if physical_fit_options is not None and physical_model not in {
+        "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner"
+    }:
+        raise ValueError(
+            "physical_fit_options requires an explicitly selected physical_model"
+        )
 
     # Kappa and relativistic Maxwell-Juttner require their own physical
     # forward models. Never map a Gaussian width to these non-Gaussian models.
@@ -665,6 +669,96 @@ def analyze_thomson_spectral_distribution(
                 "No primary physical result is reported outside the declared asymptotic validity screens.",
             ],
         }
+    # The Maxwellian option must reach the canonical measured-spectrum
+    # forward fitter when the caller supplies the spatial coordinate and fit
+    # controls. The Gaussian-width conversion above remains a clearly labelled
+    # diagnostic candidate; it is never promoted to the primary measurement.
+    if physical_model == "non_collective_maxwellian" and physical_fit_options is not None:
+        if laser_wavelength_nm is None or scattering_angle_rad is None:
+            raise ValueError(
+                "laser_wavelength_nm and scattering_angle_rad are required for canonical Maxwellian inference"
+            )
+        if not isinstance(physical_fit_options, dict):
+            raise ValueError("physical_fit_options must be a mapping for canonical Maxwellian inference")
+        options = dict(physical_fit_options)
+        if "radius_m" not in options:
+            raise ValueError(
+                "physical_fit_options must include radius_m for the canonical measured-spectrum Maxwellian fit"
+            )
+        radius = options.pop("radius_m")
+        reserved = {
+            "wavelength_nm", "spectra", "laser_wavelength_nm",
+            "scattering_angle_rad", "instrument_response", "model",
+            "signal_uncertainty", "joint_spectral_covariance",
+        }
+        conflicts = sorted(reserved.intersection(options))
+        if conflicts:
+            raise ValueError(
+                "physical_fit_options cannot override measured spectrum, selected model, geometry, "
+                f"response or top-level uncertainty inputs: {conflicts}"
+            )
+        radius_array = np.asarray(radius)
+        if radius_array.dtype.kind not in "iuf" or radius_array.ndim != 0:
+            raise ValueError("physical_fit_options.radius_m must be one finite real scalar for the single spectrum")
+        radius_value = float(radius_array)
+        if not np.isfinite(radius_value):
+            raise ValueError("physical_fit_options.radius_m must be finite")
+        if uncertainty is not None and signal_covariance_matrix is not None:
+            raise ValueError("internal error: signal uncertainty and covariance are mutually exclusive")
+        from .thomson_inference import analyze_thomson_spectra as canonical_fit
+        canonical_kwargs = dict(
+            laser_wavelength_nm=float(laser_wavelength_nm),
+            scattering_angle_rad=float(scattering_angle_rad),
+            instrument_response=response,
+            model="non_collective_maxwellian",
+            **options,
+        )
+        if uncertainty is not None:
+            canonical_kwargs["signal_uncertainty"] = uncertainty.reshape(1, -1)
+        elif signal_covariance_matrix is not None:
+            canonical_kwargs["joint_spectral_covariance"] = signal_covariance_matrix
+        canonical_result = canonical_fit(
+            x, y.reshape(1, -1), np.asarray([radius_value]), **canonical_kwargs
+        )
+        channel = canonical_result.get("channels", [{}])[0]
+        primary_parameters = {
+            item.get("parameter")
+            for item in canonical_result.get("result_classification", {})
+            .get("channels", [{}])[0].get("primary", [])
+        }
+        required_primary = {
+            "electron_temperature_eV", "electron_velocity_projection_m_s"
+        }
+        result["physical_inference"] = {
+            "selected_model": physical_model,
+            "status": (
+                "identified_from_measured_spectrum"
+                if required_primary.issubset(primary_parameters)
+                else "canonical_fit_completed_with_conditional_or_nonidentifiable_parameters"
+            ),
+            "reportable_as_primary_inference": required_primary.issubset(primary_parameters),
+            "fit": canonical_result,
+            "channel_fit": channel,
+            "source_spectrum": "same_calibrated_measured_spectrum_as_spectral_distribution",
+            "forward_model": "canonical_multichannel_optical_thomson_maxwellian_forward_fit",
+            "gaussian_width_used_as_temperature": False,
+            "gaussian_width_role": "independent_descriptive_cross_check_only",
+            "fit_configuration": {
+                "radius_m": radius_value,
+                "background_model": canonical_kwargs.get("background_model", "linear"),
+                "measurement_uncertainty_source": (
+                    "pointwise_signal_uncertainty" if uncertainty is not None else
+                    "full_within_channel_spectral_covariance" if signal_covariance_matrix is not None else
+                    "not_supplied"
+                ),
+            },
+            "limitations": [
+                "The canonical physical fit uses the measured spectrum and selected detector-background nuisance basis; it does not use Gaussian moments or width as a substitute likelihood.",
+                "Absolute electron density remains conditional on absolute scattered-power calibration and complete optical geometry.",
+                "A single scattering view identifies only the q-parallel flow projection, not an unrestricted three-dimensional EVDF.",
+            ],
+        }
+
     elif physical_model is None:
         result["physical_inference"] = {
             "selected_model": None,
