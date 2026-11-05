@@ -95,7 +95,7 @@ MODEL_LABELS = {
     "thomson_normalized_poloidal_flux": "Optical Thomson — map channel positions to equilibrium-normalized poloidal flux rho_pol",
 }
 
-MODEL_PHYSICS_NOTES = {\n    "maxwellian_electrostatic_susceptibility": (\n        "Exact collisionless unmagnetized longitudinal Maxwellian response: chi_e = (omega_pe^2/(k^2 v_th^2)) [1 + zeta Z(zeta)], " \n        "with v_th=sqrt(2 e T_e/m_e), zeta=v_phase/v_th and Z=i sqrt(pi) wofz(zeta). This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."\n    ),
+MODEL_PHYSICS_NOTES = {\n    "maxwellian_electrostatic_susceptibility": (\n        "Exact collisionless unmagnetized longitudinal Maxwellian response: chi_e = (2 omega_pe^2/(k^2 v_th^2)) [1 + zeta Z(zeta)], " \n        "with v_th=sqrt(2 e T_e/m_e), zeta=v_phase/v_th and Z=i sqrt(pi) wofz(zeta). This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."\n    ),
     "gyrotropic_bi_maxwellian_anisotropy": (
         "Uses T_q = T_perp*(1-mu^2) + T_parallel*mu^2 with iterative "
         "errors-in-variables GLS. Optional magnetic_pitch_cosine_covariance "
