@@ -779,7 +779,9 @@ def test_projected_relativistic_evdf_convolves_measured_laser_spectrum(include_c
     )
     profile = result["laser_spectral_profile"]
     assert profile["assumption"] == "measured_source_spectrum_convolved_in_exact_single_electron_kinematics"
-    assert profile["captured_scattering_probability_min"] >= 0.995
+    assert profile["captured_scattered_power_fraction_min"] >= 0.995
+    assert profile["source_weighting"] == "incident_photon_flux_from_spectral_power_density"
+    assert "lambda_incident/lambda_scattered" in profile["scattered_power_conversion"]
     assert result["fitted_spectrum"].shape == wavelength.shape
     assert np.all(np.isfinite(result["fitted_spectrum"]))
     assert result["recoil_included"] is include_compton_recoil
