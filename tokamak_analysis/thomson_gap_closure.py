@@ -237,6 +237,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
     model_discrepancy_covariance=None,
     include_compton_recoil=False, incident_polarization=None,
     incident_direction=None, scattered_direction=None,
+    laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     maximum_recoil_correction_fraction=0.01,
     regularization_strength=None, max_iter=3000,
 ):
@@ -381,44 +382,93 @@ def reconstruct_relativistic_projected_thomson_evdf(
     if (not np.isfinite(recoil_limit) or recoil_limit <= 0.0
             or recoil_limit >= 1.0):
         raise ValueError("maximum_recoil_correction_fraction must be finite and lie in (0, 1)")
-    kinematics = relativistic_projected_compton_kinematics(
-        v, laser, angle, incident_polarization=incident_polarization,
-        incident_direction=incident_direction, scattered_direction=scattered_direction,
-    )
-    maximum_recoil = kinematics["maximum_recoil_correction_fraction"]
-    if not include_compton_recoil and maximum_recoil > recoil_limit:
-        raise ValueError(
-            "The Thomson/no-recoil approximation exceeds the selected correction "
-            f"limit ({maximum_recoil:.6g} > {recoil_limit:.6g}); set "
-            "include_compton_recoil=True and supply incident_polarization to use "
-            "the Compton/Klein-Nishina inverse."
-        )
-    wavelength_centres = (
-        kinematics["compton_scattered_wavelength_nm"] if include_compton_recoil
-        else kinematics["thomson_scattered_wavelength_nm"]
-    )
-    if include_compton_recoil:
-        scattering_weights = kinematics["relative_lab_differential_scattering_weight"]
-    elif incident_polarization is not None:
-        scattering_weights = kinematics["relative_lab_thomson_differential_scattering_weight"]
+    if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
+        raise ValueError("supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither")
+    if laser_spectrum_wavelength_nm is None:
+        source_wavelengths = np.asarray([laser], dtype=float)
+        source_weights = np.asarray([1.0], dtype=float)
     else:
-        scattering_weights = np.ones(v.size, dtype=float)
-    if np.any(~np.isfinite(scattering_weights)) or np.any(scattering_weights < 0.0):
-        raise ValueError("Compton differential-scattering weights must be finite and non-negative")
-    if np.any(wavelength_centres < x[0]) or np.any(wavelength_centres > x[-1]):
-        raise ValueError("velocity grid maps outside the measured wavelength interval")
-    latent = np.zeros((n, v.size), dtype=float)
-    for j, centre in enumerate(wavelength_centres):
-        right = int(np.searchsorted(x, centre, side="right"))
-        if right <= 0:
-            latent[0,j] = 1.0 / widths[0]
-        elif right >= n:
-            latent[-1,j] = 1.0 / widths[-1]
+        source_wavelengths = _real_vector(
+            laser_spectrum_wavelength_nm, "laser_spectrum_wavelength_nm", minimum=3
+        )
+        source_density = _real_vector(
+            laser_spectrum_density_per_nm, "laser_spectrum_density_per_nm", minimum=3
+        )
+        if (source_density.shape != source_wavelengths.shape
+                or np.any(source_wavelengths <= 0.0)
+                or np.any(np.diff(source_wavelengths) <= 0.0)
+                or np.any(source_density < 0.0)):
+            raise ValueError("laser source wavelengths must be positive/increasing and paired with non-negative density")
+        source_area = float(np.trapz(source_density, source_wavelengths))
+        if not np.isfinite(source_area) or source_area <= 0.0:
+            raise ValueError("laser source spectrum must have positive finite integrated area")
+        source_weights = (
+            source_density / source_area
+            * _trapezoid_quadrature_weights(source_wavelengths, "laser_spectrum_wavelength_nm")
+        )
+        source_weights /= float(np.sum(source_weights))
+
+    latent_mass = np.zeros((n, v.size), dtype=float)
+    total_scattering_weight = np.zeros(v.size, dtype=float)
+    captured_scattering_weight = np.zeros(v.size, dtype=float)
+    weighted_scattered_wavelength = np.zeros(v.size, dtype=float)
+    maximum_recoil = 0.0
+    kinematics = None
+    for source_wavelength, source_weight in zip(source_wavelengths, source_weights):
+        source_kinematics = relativistic_projected_compton_kinematics(
+            v, float(source_wavelength), angle,
+            incident_polarization=incident_polarization,
+            incident_direction=incident_direction, scattered_direction=scattered_direction,
+        )
+        maximum_recoil = max(maximum_recoil, float(source_kinematics["maximum_recoil_correction_fraction"]))
+        if not include_compton_recoil and source_kinematics["maximum_recoil_correction_fraction"] > recoil_limit:
+            raise ValueError(
+                "The Thomson/no-recoil approximation exceeds the selected correction "
+                f"limit ({source_kinematics['maximum_recoil_correction_fraction']:.6g} > {recoil_limit:.6g}); "
+                "set include_compton_recoil=True and supply incident_polarization to use "
+                "the Compton/Klein-Nishina inverse."
+            )
+        wavelength_centres_source = (
+            source_kinematics["compton_scattered_wavelength_nm"] if include_compton_recoil
+            else source_kinematics["thomson_scattered_wavelength_nm"]
+        )
+        if include_compton_recoil:
+            scattering_weights_source = source_kinematics["relative_lab_differential_scattering_weight"]
+        elif incident_polarization is not None:
+            scattering_weights_source = source_kinematics["relative_lab_thomson_differential_scattering_weight"]
         else:
-            left = right - 1
-            frac = (centre-x[left])/(x[right]-x[left])
-            latent[left,j] = (1-frac)/widths[left]
-            latent[right,j] = frac/widths[right]
+            scattering_weights_source = np.ones(v.size, dtype=float)
+        if np.any(~np.isfinite(scattering_weights_source)) or np.any(scattering_weights_source < 0.0):
+            raise ValueError("differential-scattering weights must be finite and non-negative")
+        weighted = float(source_weight) * scattering_weights_source
+        total_scattering_weight += weighted
+        weighted_scattered_wavelength += weighted * wavelength_centres_source
+        for j, centre in enumerate(wavelength_centres_source):
+            if centre < x[0] or centre > x[-1]:
+                continue
+            right = int(np.searchsorted(x, centre, side="right"))
+            if right <= 0:
+                latent_mass[0, j] += weighted[j]
+            elif right >= n:
+                latent_mass[-1, j] += weighted[j]
+            else:
+                left = right - 1
+                frac = (centre - x[left]) / (x[right] - x[left])
+                latent_mass[left, j] += weighted[j] * (1.0 - frac)
+                latent_mass[right, j] += weighted[j] * frac
+            captured_scattering_weight[j] += weighted[j]
+
+    if np.any(total_scattering_weight <= np.finfo(float).tiny):
+        raise ValueError("source-resolved scattering kernel has zero differential weight")
+    captured_fraction = captured_scattering_weight / total_scattering_weight
+    if np.any(captured_fraction < 0.995):
+        raise ValueError(
+            "wavelength/velocity support must capture at least 99.5% of each "
+            f"source-resolved scattering column; minimum captured fraction={float(np.min(captured_fraction)):.6g}"
+        )
+    latent = latent_mass / total_scattering_weight[None, :] / widths[:, None]
+    scattering_weights = total_scattering_weight
+    wavelength_centres = weighted_scattered_wavelength / total_scattering_weight
     dv = np.diff(v)
     velocity_weights = _trapezoid_quadrature_weights(v, "velocity_grid_m_s")
     # The latent columns are wavelength-bin probability densities for a
@@ -515,6 +565,12 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "velocity_parallel_m_s": v.copy(),
         "mono_velocity_scattered_wavelength_nm": wavelength_centres.copy(),
         "relative_lab_differential_scattering_weight": scattering_weights.copy(),
+        "laser_spectral_profile": {
+            "assumption": "monochromatic_incident_laser" if laser_spectrum_wavelength_nm is None else "measured_source_spectrum_convolved_in_exact_single_electron_kinematics",
+            "wavelength_nm": source_wavelengths.copy(),
+            "normalized_quadrature_weights": source_weights.copy(),
+            "captured_scattering_probability_min": float(np.min(captured_fraction)),
+        },
         "recoil_included": bool(include_compton_recoil),
         "maximum_recoil_correction_fraction": float(maximum_recoil),
         "maximum_recoil_correction_fraction_limit": float(recoil_limit),
