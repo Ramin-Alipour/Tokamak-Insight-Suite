@@ -547,9 +547,7 @@ def run_advanced_thomson_physics(model, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "landau_fdt_full_em_response":
-        solver = landau_full_em_current_response
-    elif model == "thomson_multiview_3d_evdf":
+    if model == "thomson_multiview_3d_evdf":
         solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_kinetic_background_fit":
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
@@ -582,10 +580,6 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = multispecies_thermal_coulomb_collision_matrix
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
-    elif model == "landau_fdt_full_em_response":
-        # Public measured-input path: assemble the Landau operator, then expose
-        # its Cartesian Full-EM current response and matching FDT noise.
-        solver = analyze_landau_fdt_full_em_constitutive
     elif model == "quantum_fdt":
         solver = quantum_fdt_dynamic_structure_factor
     elif model == "quantum_fdt_unsymmetrized":
