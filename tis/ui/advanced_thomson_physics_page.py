@@ -154,12 +154,21 @@ MODEL_PHYSICS_NOTES = {
 EXAMPLES = {
     "thomson_kinetic_background_fit": {
         "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
-        "measured_spectrum": (0.04 + 0.006*(np.linspace(529.0, 535.0, 181)-532.0) + 2.3*np.exp(-0.5*((np.linspace(529.0, 535.0, 181)-532.0)/0.45)**2)).tolist(),
+        "measured_spectrum": (
+            0.04 + 0.006*(np.linspace(529.0, 535.0, 181)-532.0)
+            + 2.3 * np.diff(stdtr(6.0, (
+                _example_wavelength_edges(np.linspace(529.0, 535.0, 181))[1:] - 532.0
+            ) / (532.0*2.0*np.sin(np.pi/4.0)*np.sqrt(300.0/510998.95069)*np.sqrt(4.0/6.0)))
+            - stdtr(6.0, (
+                _example_wavelength_edges(np.linspace(529.0, 535.0, 181))[:-1] - 532.0
+            ) / (532.0*2.0*np.sin(np.pi/4.0)*np.sqrt(300.0/510998.95069)*np.sqrt(4.0/6.0)))
+            ) / np.diff(_example_wavelength_edges(np.linspace(529.0, 535.0, 181)))
+        ).tolist(),
         "physical_model": "kappa",
         "laser_wavelength_nm": 532.0,
         "scattering_angle_rad": 1.5707963267948966,
         "instrument_response": np.eye(181).tolist(),
-        "physical_initial": [300.0, 80000.0, 3.5],
+        "physical_initial": [300.0, 0.0, 3.5],
         "background_model": "linear",
         "measurement_uncertainty": np.full(181, 0.003).tolist(),
         "model_discrepancy_covariance": None,
