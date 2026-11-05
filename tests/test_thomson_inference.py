@@ -529,6 +529,11 @@ def test_descriptive_moments_report_negative_residual_clipping_caveat():
         scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
     )
     out = result["channels"][0]["spectral_distribution"]
+    assert "projected_evdf_spectral_moment_closure" in out
+    closure = out["projected_evdf_spectral_moment_closure"]
+    assert closure["status"] == "conditional_moment_closure"
+    assert np.isfinite(closure["centroid_closure_residual_nm"])
+    assert np.isfinite(closure["variance_closure_residual_nm2"])
     assert "physical_parameter_extraction" not in out
     assert "negative_area_fraction_removed_by_clipping" in out
     assert "clipping" in out["moment_clipping_bias_warning"].lower()
