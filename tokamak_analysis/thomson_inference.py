@@ -1568,7 +1568,7 @@ def analyze_thomson_spectra(
         source_response = None
         source_profile_metadata = None
         if laser_spectrum_wavelength_nm is not None:
-            if model == "non_collective_relativistic_maxwell_juttner" and include_compton_recoil:
+            if model == "non_collective_relativistic_maxwell_juttner":
                 # Recoil changes the wavelength shift and Klein-Nishina weight
                 # for every incident laser wavelength. The exact source-resolved
                 # kernel is evaluated inside the nonlinear physical forward fit;
