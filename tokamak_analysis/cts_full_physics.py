@@ -50,6 +50,7 @@ from .thomson_anisotropic_inference import (
 from .thomson_gap_closure import (
     reconstruct_relativistic_projected_thomson_evdf,
     reconstruct_psf_aware_thomson_profile,
+    map_thomson_channels_to_normalized_poloidal_flux,
     relativistic_projected_compton_kinematics,
 )
 from .thomson_kinetic_models import (
@@ -522,6 +523,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         inversion in the Thomson limit, or exact Compton four-momentum
         kinematics with polarized Klein-Nishina weighting when recoil is enabled.
       - thomson_psf_profile_inverse: explicit PSF/mixing-aware regularized spatial inversion.
+      - thomson_normalized_poloidal_flux: equilibrium-supplied mapping of Thomson channel fluxes to rho_pol with full joint flux/axis/separatrix covariance propagation.
       - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.
       - thomson_three_dimensional_flow: GLS inversion of measured flow projections from three or more independent scattering-vector directions.
       - plasma_charge_state_moments: Zeff, ion charge balance and net charge
@@ -596,6 +598,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = reconstruct_relativistic_projected_thomson_evdf
     elif model == "thomson_psf_profile_inverse":
         solver = reconstruct_psf_aware_thomson_profile
+    elif model == "thomson_normalized_poloidal_flux":
+        solver = map_thomson_channels_to_normalized_poloidal_flux
     elif model == "gyrotropic_bi_maxwellian_anisotropy":
         solver = infer_gyrotropic_bi_maxwellian_temperatures
     elif model == "gyrotropic_bi_maxwellian_spectral_fit":
@@ -610,7 +614,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         raise ValueError(
             "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_collective_kappa_spectrum, cts_collective_kappa_inference, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
+            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, thomson_normalized_poloidal_flux, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"
         )
     result = solver(**kwargs)
