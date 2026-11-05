@@ -156,13 +156,10 @@ EXAMPLES = {
         "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
         "measured_spectrum": (
             0.04 + 0.006*(np.linspace(529.0, 535.0, 181)-532.0)
-            + 2.3 * np.diff(stdtr(6.0, (
-                _example_wavelength_edges(np.linspace(529.0, 535.0, 181))[1:] - 532.0
-            ) / (532.0*2.0*np.sin(np.pi/4.0)*np.sqrt(300.0/510998.95069)*np.sqrt(4.0/6.0)))
-            - stdtr(6.0, (
-                _example_wavelength_edges(np.linspace(529.0, 535.0, 181))[:-1] - 532.0
-            ) / (532.0*2.0*np.sin(np.pi/4.0)*np.sqrt(300.0/510998.95069)*np.sqrt(4.0/6.0)))
-            ) / np.diff(_example_wavelength_edges(np.linspace(529.0, 535.0, 181)))
+            + 2.3*_example_kappa_bin_density(
+                np.linspace(529.0, 535.0, 181), 532.0,
+                2.0*np.sin(np.pi/4.0), 0.0, 300.0, 3.5
+            )
         ).tolist(),
         "physical_model": "kappa",
         "laser_wavelength_nm": 532.0,
