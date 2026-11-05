@@ -398,7 +398,7 @@
         },
         {
           "name": "kappa_index",
-          "unit": "dimensionless; inferred for non-collective Kappa model"
+          "unit": "dimensionless; inferred for the non-collective finite-variance Kappa model (kappa > 3/2)"
         },
         {
           "name": "kappa_index_uncertainty",
@@ -420,7 +420,7 @@
         },
         {
           "name": "captured_spectral_probability",
-          "unit": "dimensionless; fraction of quadrature spectrum inside the supplied wavelength range"
+          "unit": "dimensionless; fraction of the selected model's full spectrum captured inside the measured wavelength window per view; missing tails are not renormalized"
         },
         {
           "name": "shared_instrument_response_parameter_covariance",
@@ -439,9 +439,9 @@
         },
         {
           "name": "validity_screening",
-          "unit": "per-channel dimensionless validity parameters and screening limits",
+          "unit": "structured; per-channel selected-model validity and non-relativistic thermal/flow beta screening",
           "required": false,
-          "description": "Non-relativistic Maxwellian/Kappa: theta_e < 0.01 and |v_flow|/c < 0.1. Conservative asymptotic error-budget screens (thermal corrections scale with theta_e; leading bulk-flow corrections scale with beta^2), not universal validity boundaries."
+          "description": "Reports theta_e, projected thermal-rms beta, fitted flow beta and selected-model validity status. Non-relativistic screening limits are conservative asymptotic error-budget controls, not universal physical boundaries."
         },
         {
           "name": "electron_density_angle_covariance_m6",
@@ -642,24 +642,12 @@
           "unit": "eV; gyrotropic bi-Kappa second-moment temperature, only when identifiable"
         },
         {
-          "name": "kappa_index",
-          "unit": "dimensionless; finite-variance domain kappa > 3/2"
-        },
-        {
           "name": "directional_temperature_eV",
           "unit": "eV; per-view second-moment temperature"
         },
         {
           "name": "parameter_covariance",
           "unit": "full covariance in declared parameter_order"
-        },
-        {
-          "name": "captured_spectral_probability",
-          "unit": "dimensionless; fitted Kappa feature probability inside measured wavelength window per view"
-        },
-        {
-          "name": "validity_screening",
-          "unit": "structured; projected thermal rms beta and fitted flow beta"
         },
         {
           "name": "projected_velocity_grid_m_s",
@@ -9068,8 +9056,8 @@
         },
         {
           "name": "parameter_identifiability",
-          "unit": "structured primary/conditional/non-identifiable classification",
-          "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
+          "unit": "structured; primary/conditional/non-identifiable classification plus data-Jacobian rank and conditioning",
+          "description": "Separates quantities identified from the measured spectral distribution, quantities conditional on additional inputs, and non-identifiable quantities; includes numerical rank and conditioning diagnostics where available."
         },
         {
           "name": "background_uncertainty_model",
@@ -9086,10 +9074,6 @@
         {
           "name": "joint_parameter_covariance",
           "unit": "physical, amplitude and detector-background covariance including cross terms"
-        },
-        {
-          "name": "parameter_identifiability",
-          "unit": "data-Jacobian rank and conditioning"
         }
       ],
       "assumptions": [
