@@ -3592,6 +3592,22 @@ def analyze_thomson_spectra(
                     signal_uncertainty=channel_uncertainty,
                     signal_covariance=channel_covariance,
                     background_signal=fitted_background,
+                    physical_model=(
+                        "non_collective_maxwellian"
+                        if model == "non_collective_maxwellian" else None
+                    ),
+                    laser_wavelength_nm=(
+                        laser_wavelength_nm if model == "non_collective_maxwellian" else None
+                    ),
+                    scattering_angle_rad=(
+                        scattering_angle_rad if model == "non_collective_maxwellian" else None
+                    ),
+                    laser_wavelength_uncertainty_nm=(
+                        laser_wavelength_uncertainty_nm if model == "non_collective_maxwellian" else None
+                    ),
+                    scattering_angle_uncertainty_rad=(
+                        scattering_angle_uncertainty_rad if model == "non_collective_maxwellian" else None
+                    ),
                 )
                 distribution["analysis_status"] = "completed"
                 distribution["background_source"] = (
