@@ -358,3 +358,52 @@ def test_spectral_distribution_marks_gaussian_width_as_nonphysical_temperature()
     assert result["gaussian_width_is_physical_temperature"] is False
     assert "not a unique electron temperature" in result["gaussian_width_interpretation"]
     assert "canonical Thomson physical forward-model fit" in result["physical_temperature_source"]
+
+
+def test_selected_maxwellian_maps_intrinsic_gaussian_width_to_conditional_physics():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    laser = 532.0
+    angle = np.pi / 2.0
+    q = 2.0 * np.sin(angle / 2.0)
+    temperature = 120.0
+    sigma = laser * q * np.sqrt(temperature / 510998.95069)
+    center = laser * (1.0 - q * 2.0e4 / 299792458.0)
+    signal = 5.0 * np.exp(-0.5 * ((wavelength - center) / sigma) ** 2) + 0.2
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal, instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.2),
+        signal_uncertainty=np.full(wavelength.size, 0.01),
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+    )
+    physical = result["physical_inference"]
+    assert physical["status"] == "conditional_gaussian_maxwellian_candidate"
+    assert physical["reportable_as_primary_inference"] is False
+    assert physical["electron_temperature_candidate_eV"] == pytest.approx(temperature, rel=2e-3)
+    assert physical["electron_velocity_projection_candidate_m_s"] == pytest.approx(2.0e4, rel=2e-3)
+    assert physical["parameter_covariance"].shape == (2, 2)
+    assert physical["parameter_standard_uncertainties"]["electron_temperature_eV"] > 0.0
+
+
+def test_selected_maxwellian_physical_conversion_rejects_relativistic_domain():
+    wavelength = np.linspace(500.0, 564.0, 161)
+    signal = 3.0 * np.exp(-0.5 * ((wavelength - 532.0) / 5.0) ** 2) + 0.1
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal, instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.1),
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+    )
+    assert result["physical_inference"]["status"] == "rejected_outside_declared_nonrelativistic_validity_domain"
+    assert result["physical_inference"]["electron_temperature_candidate_eV"] is None
+
+
+def test_spectral_distribution_requires_explicit_physical_model_geometry():
+    wavelength = np.linspace(520.0, 544.0, 121)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 0.1
+    with pytest.raises(ValueError, match="laser_wavelength_nm and scattering_angle_rad"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal, instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.1),
+            physical_model="non_collective_maxwellian",
+        )
