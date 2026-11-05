@@ -1632,7 +1632,9 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
         if missing:
             raise ValueError(f"electrostatic_kappa is missing required physical inputs: {missing}")
         allowed = required | {"uncertainty", "density_bounds_m3", "temperature_bounds_eV",
-                              "kappa_bounds", "electron_populations", "max_nfev"}
+                              "kappa_bounds", "electron_populations", "max_nfev",
+                              "electron_population_parameter_covariance",
+                              "population_mc_samples", "population_mc_seed"}
         unexpected = sorted(set(args)-allowed)
         if unexpected:
             raise ValueError(f"unsupported electrostatic_kappa inputs: {unexpected}")
