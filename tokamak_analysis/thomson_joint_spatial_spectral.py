@@ -167,8 +167,6 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("include_compton_recoil must be boolean")
     if include_compton_recoil and physical_model != "relativistic_maxwell_juttner":
         raise ValueError("Compton recoil is available only for relativistic_maxwell_juttner")
-    if include_compton_recoil and laser_spectrum_wavelength_nm is not None:
-        raise ValueError("Measured laser-profile convolution is not yet implemented for the recoil/Klein-Nishina kernel.")
     if not isinstance(fit_kappa_index, (bool, np.bool_)):
         raise ValueError("fit_kappa_index must be boolean")
     if physical_model == "kappa":
@@ -318,22 +316,65 @@ def reconstruct_joint_thomson_spatial_spectra(
     if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
         raise ValueError("Supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither.")
     laser_source_metadata = None
+    laser_source_quadrature = None
     if laser_spectrum_wavelength_nm is not None:
         from .thomson_inference import _laser_source_response
-        broadened_responses = []
-        source_metadata_by_channel = []
-        for channel in range(m):
-            source_operator, source_metadata = _laser_source_response(
-                x, laser, laser_spectrum_wavelength_nm,
-                laser_spectrum_density_per_nm,
+        # Validate the measured source profile with the same photon-conserving
+        # contract used by the elastic-Thomson path. For Compton scattering,
+        # source broadening is NOT an output-wavelength shift operator: each
+        # incident wavelength changes the photon energy in the Klein-Nishina
+        # kinematics and must be evaluated by the physical kernel.
+        _, source_metadata = _laser_source_response(
+            x, laser, laser_spectrum_wavelength_nm,
+            laser_spectrum_density_per_nm,
+        )
+        if include_compton_recoil:
+            source_x = _real_array(
+                laser_spectrum_wavelength_nm, "laser_spectrum_wavelength_nm"
             )
-            broadened_responses.append(response[channel] @ source_operator)
-            source_metadata_by_channel.append(source_metadata)
-        response = np.asarray(broadened_responses, dtype=float)
-        laser_source_metadata = {
-            "model": "measured_incident_laser_profile_convolved_before_instrument_response",
-            "channels": source_metadata_by_channel,
-        }
+            source_y = _real_array(
+                laser_spectrum_density_per_nm, "laser_spectrum_density_per_nm"
+            )
+            dx = np.diff(source_x)
+            quadrature = np.empty(source_x.size, dtype=float)
+            quadrature[0] = 0.5 * dx[0]
+            quadrature[-1] = 0.5 * dx[-1]
+            if source_x.size > 2:
+                quadrature[1:-1] = 0.5 * (dx[:-1] + dx[1:])
+            area = float(np.sum(source_y * quadrature))
+            source_weights = source_y * quadrature / area
+            source_weights /= np.sum(source_weights)
+            laser_source_quadrature = (source_x.copy(), source_weights)
+            source_metadata = {
+                **source_metadata,
+                "convolution_approximation": (
+                    "direct_incident_wavelength_quadrature_through_exact_"
+                    "single_scattering_Compton_and_polarized_Klein_Nishina_kernel"
+                ),
+                "incident_wavelength_quadrature_weights_sum": float(
+                    np.sum(source_weights)
+                ),
+                "instrument_response_applied_after_physical_source_integration": True,
+            }
+            laser_source_metadata = {
+                "model": "measured_incident_laser_profile_integrated_inside_Compton_forward_model",
+                "channels": [dict(source_metadata) for _ in range(m)],
+            }
+        else:
+            broadened_responses = []
+            source_metadata_by_channel = []
+            for channel in range(m):
+                source_operator, channel_metadata = _laser_source_response(
+                    x, laser, laser_spectrum_wavelength_nm,
+                    laser_spectrum_density_per_nm,
+                )
+                broadened_responses.append(response[channel] @ source_operator)
+                source_metadata_by_channel.append(channel_metadata)
+            response = np.asarray(broadened_responses, dtype=float)
+            laser_source_metadata = {
+                "model": "measured_incident_laser_profile_convolved_before_instrument_response",
+                "channels": source_metadata_by_channel,
+            }
     q = 2.0 * np.sin(angle / 2.0)
     d2 = _curvature(r)
     span = float(x[-1] - x[0])
@@ -415,17 +456,40 @@ def reconstruct_joint_thomson_spatial_spectra(
             from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
             node_spectra = np.empty((r.size,x.size),dtype=float)
             for node in range(r.size):
-                spectrum_result = relativistic_maxwell_juttner_spectrum(
-                    x, laser, angle, float(te[node]),
-                    flow_projection_m_s=float(flow[node]),
-                    incident_polarization=incident_polarization,
-                    radial_order=int(radial_order), angular_order=int(angular_order),
-                    maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
-                    include_compton_recoil=include_compton_recoil,
-                )
-                node_spectra[node] = amp[node] * np.asarray(
-                    spectrum_result["spectral_density_per_nm"],dtype=float
-                )
+                if laser_source_quadrature is None:
+                    spectrum_result = relativistic_maxwell_juttner_spectrum(
+                        x, laser, angle, float(te[node]),
+                        flow_projection_m_s=float(flow[node]),
+                        incident_polarization=incident_polarization,
+                        radial_order=int(radial_order), angular_order=int(angular_order),
+                        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                        include_compton_recoil=include_compton_recoil,
+                    )
+                    node_spectrum = np.asarray(
+                        spectrum_result["spectral_density_per_nm"], dtype=float
+                    )
+                else:
+                    # Integrate incident laser spectral density before detector
+                    # response. Recoil depends nonlinearly on incident photon
+                    # energy, so an elastic wavelength-shift operator is not a
+                    # valid substitute for evaluating each incident wavelength.
+                    source_wavelengths, source_weights = laser_source_quadrature
+                    node_spectrum = np.zeros(x.size, dtype=float)
+                    for source_wavelength, source_weight in zip(
+                        source_wavelengths, source_weights
+                    ):
+                        source_result = relativistic_maxwell_juttner_spectrum(
+                            x, float(source_wavelength), angle, float(te[node]),
+                            flow_projection_m_s=float(flow[node]),
+                            incident_polarization=incident_polarization,
+                            radial_order=int(radial_order), angular_order=int(angular_order),
+                            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                            include_compton_recoil=True,
+                        )
+                        node_spectrum += float(source_weight) * np.asarray(
+                            source_result["spectral_density_per_nm"], dtype=float
+                        )
+                node_spectra[node] = amp[node] * node_spectrum
         mixed = h @ node_spectra
         predicted = np.empty_like(y)
         for channel in range(m):

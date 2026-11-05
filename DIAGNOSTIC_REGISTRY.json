@@ -7303,6 +7303,18 @@
           "required": false,
           "description": "Deterministic random seed for spatial-mixing covariance refits.",
           "default": 84622
+        },
+        {
+          "name": "laser_spectrum_wavelength_nm",
+          "unit": "nm; strictly increasing measured incident-laser wavelength samples",
+          "required": false,
+          "description": "Optional measured incident-laser spectral-density wavelength grid. With Compton recoil, each incident wavelength is passed through the Klein-Nishina forward kernel; it is not approximated by elastic wavelength scaling."
+        },
+        {
+          "name": "laser_spectrum_density_per_nm",
+          "unit": "measured incident laser spectral density per nm",
+          "required": false,
+          "description": "Optional non-negative measured incident-laser spectral density paired with laser_spectrum_wavelength_nm; normalized by its integrated area for spectral-shape convolution."
         }
       ],
       "output_specs": [

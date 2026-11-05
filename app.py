@@ -993,6 +993,7 @@ elif page=='Spectral Analysis':
                     )
                 st.caption('The selected nuisance basis is fitted simultaneously with each measured Thomson spectrum. It is not interpreted as plasma emission.')
             spatial_mixing_upload=None
+            spatial_laser_profile_upload=None
             spatial_mixing_covariance_upload=None
             spatial_mixing_mc_samples=100
             spatial_regularization_text='0'
@@ -1005,6 +1006,11 @@ elif page=='Spectral Analysis':
             spatial_fit_kappa_index=False
             if joint_spatial_spectral:
                 spatial_mixing_upload=st.file_uploader('Nominal measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
+                spatial_laser_profile_upload=st.file_uploader(
+                    'Optional measured incident laser spectrum CSV (incident_wavelength_nm, spectral_density_per_nm)',
+                    type=['csv','txt'],key='ts_infer_spatial_laser_profile',
+                    help='For the relativistic Compton/Klein–Nishina route, each incident wavelength is integrated through the physical recoil kernel before the measured detector response. For elastic Thomson, the measured source profile is applied as a photon-conserving wavelength-shift operator.',
+                )
                 spatial_mixing_covariance_upload=st.file_uploader(
                     'Optional spatial-mixing element covariance CSV (row-major matrix-element order)',
                     type=['csv','txt'],key='ts_infer_spatial_mixing_covariance',
@@ -1131,6 +1137,7 @@ elif page=='Spectral Analysis':
                 'channel_background_interior_knots': channel_background_interior_knots,
                 'channel_background_templates_upload': _ts_upload_digest(channel_background_templates_upload),
                 'spatial_mixing_upload': _ts_upload_digest(spatial_mixing_upload),
+                'spatial_laser_profile_upload': _ts_upload_digest(spatial_laser_profile_upload),
                 'spatial_background_model': spatial_background_model,
                 'spatial_background_degree': spatial_background_degree,
                 'spatial_background_interior_knots': spatial_background_interior_knots,
@@ -1281,6 +1288,14 @@ elif page=='Spectral Analysis':
                         if spatial_mixing_upload is None:
                             raise ValueError('Upload the fixed spatial mixing matrix to run joint spatial-spectral inversion.')
                         spatial_mixing_matrix=pd.read_csv(spatial_mixing_upload,header=None).to_numpy(dtype=float)
+                        if spatial_laser_profile_upload is not None:
+                            laser_profile_table=pd.read_csv(
+                                spatial_laser_profile_upload,header=None
+                            ).to_numpy(dtype=float)
+                            if laser_profile_table.ndim!=2 or laser_profile_table.shape[1]!=2:
+                                raise ValueError('The incident laser spectrum CSV must contain exactly two columns: wavelength_nm and spectral_density_per_nm.')
+                            kwargs['laser_spectrum_wavelength_nm']=laser_profile_table[:,0]
+                            kwargs['laser_spectrum_density_per_nm']=laser_profile_table[:,1]
                         kwargs.update({
                             'joint_spatial_spectral':True,
                             'spatial_mixing_matrix':spatial_mixing_matrix,

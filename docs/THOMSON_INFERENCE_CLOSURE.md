@@ -212,3 +212,27 @@ systematic covariance and forwards them to the same numerical entry point.
 This closes the structured-background covariance gap for this dedicated
 Kappa/MJ route only. It does not imply universal background parity in the
 primary channel-wise Maxwellian/Kappa/MJ workflow or across CTS.
+
+
+## 2026-11-05 — measured laser spectrum in joint spatial Compton inference
+
+The wavelength-resolved joint spatial-profile inverse now supports a measured
+incident-laser spectral profile when the relativistic Maxwell–Jüttner model
+uses single-scattering Compton recoil. In this regime, incident wavelengths
+are quadrature-integrated by evaluating the physical recoil-corrected,
+polarized Klein–Nishina forward kernel at each measured source wavelength.
+The resulting plasma spectrum is then passed through the measured detector
+response. This deliberately replaces the elastic-Thomson wavelength-ratio
+shift approximation, which is not valid for the nonlinear incident-photon
+energy dependence of Compton recoil.
+
+The optional two-column incident-laser profile upload is exposed in the
+canonical Thomson Dashboard and declared in the spatial-profile diagnostic
+contract. Without a measured laser profile, the source remains monochromatic
+at the explicitly supplied laser wavelength. The source profile is normalized
+for spectral-shape convolution; it does not provide absolute laser power or
+electron density. This closes the measured-source-profile/Compton interaction
+for the declared isotropic Maxwell–Jüttner single-scattering model only; it
+does not extend the 1-D q-projection to a general 3-D EVDF or model multiple
+scattering. The new regression checks that every source wavelength is evaluated
+by the physical kernel and that the source quadrature is normalized.

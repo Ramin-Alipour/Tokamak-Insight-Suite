@@ -507,3 +507,51 @@ def test_joint_profile_workflow_rejects_invalid_spatial_mixing_covariance():
             joint_spatial_spectral=True, spatial_mixing_matrix=h,
             spatial_mixing_covariance=invalid,
         )
+
+
+
+def test_joint_compton_inverse_integrates_measured_laser_profile_in_physical_kernel(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as kinetic
+
+    x, y, radius, mixing, *_ = _synthetic_case()
+    incident_wavelengths = np.array([531.8, 532.0, 532.2])
+    incident_density = np.array([0.0, 1.0, 0.0])
+    evaluated_laser_wavelengths = []
+
+    def fake_mj_spectrum(
+        wavelength_nm, laser_wavelength_nm, scattering_angle_rad,
+        electron_temperature_eV, **kwargs,
+    ):
+        evaluated_laser_wavelengths.append(float(laser_wavelength_nm))
+        wavelength = np.asarray(wavelength_nm, dtype=float)
+        centre = float(laser_wavelength_nm) * (
+            1.0 - 2.0 * np.sin(scattering_angle_rad / 2.0)
+            * kwargs.get("flow_projection_m_s", 0.0) / 299792458.0
+        )
+        return {
+            "spectral_density_per_nm": np.exp(
+                -0.5 * ((wavelength - centre) / 1.5) ** 2
+            )
+        }
+
+    monkeypatch.setattr(kinetic, "relativistic_maxwell_juttner_spectrum", fake_mj_spectrum)
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, radius, mixing,
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        physical_model="relativistic_maxwell_juttner",
+        incident_polarization=[0.0, 0.0, 1.0],
+        include_compton_recoil=True,
+        laser_spectrum_wavelength_nm=incident_wavelengths,
+        laser_spectrum_density_per_nm=incident_density,
+        radial_order=12, angular_order=8, max_nfev=1,
+    )
+    assert set(incident_wavelengths).issubset(set(evaluated_laser_wavelengths))
+    assert out["laser_spectral_profile"]["model"] == (
+        "measured_incident_laser_profile_integrated_inside_Compton_forward_model"
+    )
+    for channel in out["laser_spectral_profile"]["channels"]:
+        assert channel["incident_wavelength_quadrature_weights_sum"] == pytest.approx(1.0)
+        assert "Klein_Nishina_kernel" in channel["convolution_approximation"]
