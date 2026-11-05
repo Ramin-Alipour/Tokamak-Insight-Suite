@@ -4122,10 +4122,10 @@
   },
   {
     "name": "Collective kappa-electron Thomson dielectric spectrum",
-    "equation": "χ_s(k,ω)=−(ω_ps²/k²)∫_L [∂f_s(v)/∂v]/(v−ω/k) dv; ε=1+Σ_sχ_s; S=(2π/k){|1+Σ_iχ_i|² f_e/|ε|²+Σ_i(Z_i²n_i/n_e)|χ_e|²f_i/|ε|²}",
-    "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/temperature/kappa, fixed Maxwellian ion species/fractions/temperatures/flows, electron flow and beam directions",
-    "output": "Collective spectral density, electron/ion susceptibilities, dielectric function and fitted ne/Te/kappa",
-    "assumptions": "Unmagnetized electrostatic longitudinal response; isotropic 1-D projected kappa electron VDF; Maxwellian ions; Landau contour; fixed supplied ion composition and flow vectors",
+    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; ε=1+χ_e+χ_i; S=(2π/k){|1+χ_i|² f_e/|ε|²+Σ_s Z_s α_s |χ_e|² f_i,s/|ε|²}; χ_a=−(ω_pa²/k²)∫_L[(∂f_a/∂v)/(v−ω/k)]dv",
+    "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/reference temperature/Kappa index, optional electron populations with independent Maxwellian or Kappa distributions and projected flows, ion species/fractions/temperatures, optional per-ion Maxwellian or Kappa distributions and projected flows, electron flow and beam directions",
+    "output": "Collective spectral density, per-population electron and per-species ion susceptibilities, dielectric function, dynamic structure factor and fitted ne/Te/electron Kappa index",
+    "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; exact 1-D projected marginals of isotropic Maxwellian or finite-variance Kappa species; Landau contour; quasi-neutral ion densities; fixed supplied composition and population/ion parameters; each Kappa index > 3/2.",
     "status": "D",
     "category": "Collective non-Maxwellian Thomson scattering",
     "execution_contract": {
@@ -4188,6 +4188,16 @@
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
           "required": true
+        },
+        {
+          "name": "electron_populations",
+          "unit": "optional population mappings with density_fraction, temperature_ratio, distribution, kappa when selected, and flow_projection_m_s",
+          "required": false
+        },
+        {
+          "name": "ion_populations",
+          "unit": "optional one-per-ion-species mappings with distribution, kappa when selected, and flow_projection_m_s",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4258,15 +4268,16 @@
         }
       ],
       "prerequisites": [
-        "Calibrated wavelength spectrum",
-        "Explicit ion species/fractions/temperatures/flows",
-        "Explicit beam directions and scattering angle"
+        "Electron population fractions are positive and sum to one; temperature ratios are positive.",
+        "Each selected Kappa electron or ion distribution has kappa > 3/2.",
+        "When ion_populations is supplied, it contains exactly one mapping per ion species.",
+        "All projected flows are finite and subluminal; ion densities follow n_i=alpha_i*n_e/Z_i."
       ],
       "uncertainty_model": "Local Jacobian covariance for ne, Te and kappa. Supplied ion, flow, beam and instrument-response uncertainties are not yet fully propagated by this model and are reported as missing inputs in the analysis result.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ],
-      "note": "Reference-only helper; not part of the public Analysis 1 model shortlist. Microwave collective CTS is handled by the separate registered CTS workflow.",
+      "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
@@ -4336,7 +4347,8 @@
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ]
-    }
+    },
+    "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied."
   },
   {
     "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",
