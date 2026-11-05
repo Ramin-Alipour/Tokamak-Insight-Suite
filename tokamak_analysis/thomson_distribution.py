@@ -140,8 +140,8 @@ def analyze_thomson_spectral_distribution(
     physical_model: str | None = None,
     laser_wavelength_nm: float | None = None,
     scattering_angle_rad: float | None = None,
-    laser_wavelength_uncertainty_nm: float = 0.0,
-    scattering_angle_uncertainty_rad: float = 0.0,
+    laser_wavelength_uncertainty_nm: float | None = None,
+    scattering_angle_uncertainty_rad: float | None = None,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
 
@@ -555,8 +555,8 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("laser_wavelength_nm and scattering_angle_rad are required for Maxwellian physical interpretation")
         laser = float(laser_wavelength_nm)
         angle = float(scattering_angle_rad)
-        laser_unc = float(laser_wavelength_uncertainty_nm)
-        angle_unc = float(scattering_angle_uncertainty_rad)
+        laser_unc = 0.0 if laser_wavelength_uncertainty_nm is None else float(laser_wavelength_uncertainty_nm)
+        angle_unc = 0.0 if scattering_angle_uncertainty_rad is None else float(scattering_angle_uncertainty_rad)
         if not np.isfinite(laser) or laser <= 0.0:
             raise ValueError("laser_wavelength_nm must be positive and finite")
         if not np.isfinite(angle) or not 0.0 < angle < np.pi:
