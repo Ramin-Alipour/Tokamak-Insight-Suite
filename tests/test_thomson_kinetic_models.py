@@ -760,7 +760,7 @@ def test_gyrotropic_bimaxwellian_rejects_inconsistent_joint_temperature_geometry
 
 @pytest.mark.parametrize("include_compton_recoil", [False, True])
 def test_projected_relativistic_evdf_convolves_measured_laser_spectrum(include_compton_recoil):
-    wavelength = np.linspace(1040.0, 1088.0, 161)
+    wavelength = np.linspace(1010.0, 1120.0, 161)
     velocity = np.linspace(-0.02, 0.02, 41) * 299_792_458.0
     laser_axis = np.linspace(1063.8, 1064.2, 9)
     laser_density = np.exp(-0.5*((laser_axis-1064.0)/0.055)**2)
