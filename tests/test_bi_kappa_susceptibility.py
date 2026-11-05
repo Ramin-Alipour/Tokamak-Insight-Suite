@@ -73,3 +73,19 @@ def test_bi_kappa_rejects_non_unit_geometry():
         assert "unit vectors" in str(exc)
     else:
         raise AssertionError("non-unit geometry must be rejected")
+
+
+def test_bi_kappa_is_executable_through_public_advanced_physics_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    args = _common()
+    result = run_advanced_thomson_physics(
+        "bi_kappa_electrostatic_susceptibility",
+        **args,
+        electron_temperature_parallel_eV=1200.0,
+        electron_temperature_perpendicular_eV=800.0,
+        magnetic_field_unit=[0.0, 0.0, 1.0],
+        scattering_vector_unit=[0.0, 0.0, 1.0],
+    )
+    assert result["distribution_model"] == "gyrotropic_3D_bi_Kappa_exact_1D_directional_marginal"
+    np.testing.assert_allclose(result["projected_temperature_eV"], 1200.0)
