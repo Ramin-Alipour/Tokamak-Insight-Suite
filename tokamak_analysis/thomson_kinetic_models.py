@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.special import gammaln, ndtr, kve
+from scipy.special import gammaln, ndtr, stdtr, kve
 from numpy.polynomial.legendre import leggauss
 
 E_CHARGE = 1.602176634e-19
@@ -1603,3 +1603,101 @@ def fit_relativistic_maxwell_juttner_channels(
         laser_z = 2.0*(laser-x.min())/np.ptp(x)-1.0
         result["channel_background_intercepts"] = coefficients[:, 0] + coefficients[:, 1]*laser_z
     return result
+
+
+
+def project_gyrotropic_bi_kappa_electron_vdf(
+    velocity_grid_m_s, *, temperature_parallel_eV,
+    temperature_perpendicular_eV, kappa, magnetic_field_unit,
+    scattering_vector_unit, flow_projection_m_s=0.0,
+):
+    r"""Return the exact 1-D marginal of a gyrotropic 3-D finite-variance Kappa EVDF.
+
+    The parent distribution is proportional to
+      [1 + v_parallel**2/(kappa*theta_parallel**2)
+         + v_perp**2/(kappa*theta_perpendicular**2)]**(-(kappa+1)).
+    For mu = b_hat.q_hat, the projected second-moment temperature is
+      T_q = T_perp*(1-mu**2) + T_parallel*mu**2,
+    and theta_q**2 = ((2*kappa-3)/kappa) * e*T_q/m_e.
+    Its normalized marginal is
+      p(v_q) = Gamma(kappa) /
+        (sqrt(pi*kappa)*Gamma(kappa-1/2)*theta_q)
+        * [1 + (v_q-u_q)**2/(kappa*theta_q**2)]**(-kappa).
+
+    The finite-variance requirement kappa>3/2 is enforced. The finite supplied
+    velocity grid is not renormalized; represented probability coverage is
+    returned explicitly. A single view identifies T_q, not both anisotropy
+    temperatures independently.
+    """
+    grid = np.asarray(velocity_grid_m_s)
+    if grid.dtype.kind not in "iuf" or grid.ndim != 1 or grid.size < 3:
+        raise ValueError("velocity_grid_m_s must be a real one-dimensional grid with at least three points")
+    grid = grid.astype(float, copy=False)
+    if not np.all(np.isfinite(grid)) or np.any(np.diff(grid) <= 0.0):
+        raise ValueError("velocity_grid_m_s must be finite and strictly increasing")
+    t_parallel = _positive(temperature_parallel_eV, "temperature_parallel_eV")
+    t_perpendicular = _positive(temperature_perpendicular_eV, "temperature_perpendicular_eV")
+    kappa_value = _positive(kappa, "kappa")
+    if kappa_value <= 1.5:
+        raise ValueError("finite-variance gyrotropic Kappa requires kappa > 3/2")
+    b = np.asarray(magnetic_field_unit)
+    q = np.asarray(scattering_vector_unit)
+    if b.dtype.kind not in "iuf" or q.dtype.kind not in "iuf" or b.shape != (3,) or q.shape != (3,):
+        raise ValueError("magnetic_field_unit and scattering_vector_unit must be real three-component vectors")
+    b, q = b.astype(float, copy=False), q.astype(float, copy=False)
+    if not np.all(np.isfinite(b)) or not np.all(np.isfinite(q)):
+        raise ValueError("direction vectors must be finite")
+    if not np.isclose(np.linalg.norm(b), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("magnetic_field_unit must have unit norm")
+    if not np.isclose(np.linalg.norm(q), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("scattering_vector_unit must have unit norm")
+    if isinstance(flow_projection_m_s, (bool, np.bool_)) or not np.isscalar(flow_projection_m_s):
+        raise ValueError("flow_projection_m_s must be a finite scalar")
+    flow = float(flow_projection_m_s)
+    if not np.isfinite(flow):
+        raise ValueError("flow_projection_m_s must be finite")
+    mu = float(np.clip(np.dot(b, q), -1.0, 1.0))
+    directional_temperature = t_perpendicular * (1.0 - mu**2) + t_parallel * mu**2
+    theta_squared = ((2.0*kappa_value - 3.0)/kappa_value) * E_CHARGE * directional_temperature / ME
+    theta = float(np.sqrt(theta_squared))
+    shifted = grid - flow
+    log_normalization = (
+        gammaln(kappa_value)
+        - 0.5*np.log(np.pi*kappa_value)
+        - gammaln(kappa_value - 0.5)
+        - np.log(theta)
+    )
+    log_shape = -kappa_value * np.log1p(shifted**2/(kappa_value*theta_squared))
+    distribution = np.exp(log_normalization + log_shape)
+    degrees = 2.0*kappa_value - 1.0
+    student_scale = theta*np.sqrt(kappa_value/degrees)
+    coverage = float(
+        stdtr(degrees, (grid[-1]-flow)/student_scale)
+        - stdtr(degrees, (grid[0]-flow)/student_scale)
+    )
+    if not np.isfinite(coverage) or coverage <= 0.0:
+        raise ValueError("velocity_grid_m_s does not cover a positive finite portion of the projected Kappa distribution")
+    return {
+        "velocity_grid_m_s": grid.copy(),
+        "projected_vdf_s_m": distribution,
+        "velocity_grid_probability_coverage": coverage,
+        "projected_temperature_eV": float(directional_temperature),
+        "projected_velocity_mean_m_s": flow,
+        "projected_kappa_index": float(kappa_value),
+        "projected_kappa_scale_m_s": theta,
+        "degrees_of_freedom": float(degrees),
+        "magnetic_pitch_cosine": mu,
+        "anisotropy_identifiability": "only_the_directional_temperature_combination_is_identified_from_one_scattering_direction",
+        "separate_parallel_perpendicular_temperatures_identifiable": False,
+        "model": "gyrotropic_finite_variance_bi_kappa_exact_projected_marginal",
+        "assumptions": [
+            "Gyrotropic 3-D Kappa distribution with a common magnetic-field axis",
+            "Zero heat flux and finite variance (kappa > 3/2)",
+            "Non-relativistic elastic-Thomson projected velocity coordinate",
+        ],
+        "limitations": [
+            "This is a forward projected-VDF kernel, not a measured-spectrum optimizer",
+            "One scattering direction cannot separate parallel and perpendicular temperatures",
+            "Finite-grid probability is reported without tail renormalization",
+        ],
+    }
