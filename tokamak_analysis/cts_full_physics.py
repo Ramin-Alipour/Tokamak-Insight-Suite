@@ -551,6 +551,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = relativistic_kinetic_ece_absorption_coefficient
     elif model == "microwave_background":
         solver = analyze_cts_microwave_background
+    elif model == "maxwellian_electrostatic_susceptibility":
+        solver = maxwellian_electron_susceptibility
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
     elif model == "cts_collective_kappa_spectrum":
