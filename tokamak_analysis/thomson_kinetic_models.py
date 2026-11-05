@@ -128,6 +128,7 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
     projected_temperature_eV, magnetic_pitch_cosine, *,
     projected_temperature_covariance_eV2,
     magnetic_pitch_cosine_covariance=None,
+    projected_temperature_pitch_cross_covariance=None,
 ):
     """Infer T_parallel and T_perpendicular from independent 1-D TS projections.
 
@@ -140,11 +141,13 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
     A single pitch angle (or repeated equivalent |mu|) cannot separate the
     two temperatures. In that case no anisotropy parameters are returned.
     Optional pitch-cosine covariance is propagated by first-order errors-in-
-    variables GLS. The effective data covariance is
-      C_eff = C_T + diag(2 mu (T_parallel-T_perp)) C_mu
-                    diag(2 mu (T_parallel-T_perp)).
-    The fit iterates because this geometry term depends on the inferred
-    anisotropy. Temperature/geometry cross-covariance is not inferred.
+    variables GLS. An optional cross-covariance C_Tmu between measured
+    directional temperatures and pitch cosines is also retained. With
+    D=diag(2 mu (T_parallel-T_perp)), the effective covariance is
+      C_eff = C_T + D C_mu D^T + C_Tmu D^T + D C_Tmu^T.
+    The fit iterates because D depends on the inferred anisotropy. The
+    temperature, geometry and cross-covariance inputs must form a positive
+    semidefinite joint covariance block.
     """
     tq = np.asarray(projected_temperature_eV)
     mu = np.asarray(magnetic_pitch_cosine)
@@ -187,6 +190,46 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         pitch_tolerance = np.finfo(float).eps*max(pitch_covariance.shape)*max(float(pitch_eigenvalues[-1]), np.finfo(float).tiny)
         if pitch_eigenvalues[0] < -pitch_tolerance:
             raise ValueError("magnetic_pitch_cosine_covariance must be positive semidefinite")
+    temperature_pitch_cross_covariance = None
+    if projected_temperature_pitch_cross_covariance is not None:
+        temperature_pitch_cross_covariance = np.asarray(
+            projected_temperature_pitch_cross_covariance
+        )
+        if (temperature_pitch_cross_covariance.dtype.kind not in "iuf"
+                or temperature_pitch_cross_covariance.shape != (tq.size, tq.size)):
+            raise ValueError(
+                "projected_temperature_pitch_cross_covariance must be a real "
+                "n_views x n_views matrix Cov(T_q, mu)"
+            )
+        temperature_pitch_cross_covariance = temperature_pitch_cross_covariance.astype(
+            float, copy=False
+        )
+        if np.any(~np.isfinite(temperature_pitch_cross_covariance)):
+            raise ValueError("projected_temperature_pitch_cross_covariance must be finite")
+        if pitch_covariance is None:
+            raise ValueError(
+                "projected_temperature_pitch_cross_covariance requires "
+                "magnetic_pitch_cosine_covariance"
+            )
+        joint_input_covariance = np.block([
+            [cov, temperature_pitch_cross_covariance],
+            [temperature_pitch_cross_covariance.T, pitch_covariance],
+        ])
+        joint_input_covariance = 0.5 * (
+            joint_input_covariance + joint_input_covariance.T
+        )
+        joint_input_eigenvalues = np.linalg.eigvalsh(joint_input_covariance)
+        joint_input_scale = max(
+            float(np.max(np.abs(joint_input_eigenvalues))), np.finfo(float).tiny
+        )
+        joint_input_tolerance = (
+            1e-10 * joint_input_scale
+        )
+        if joint_input_eigenvalues[0] < -joint_input_tolerance:
+            raise ValueError(
+                "temperature, pitch-angle and cross-covariance block must be "
+                "positive semidefinite"
+            )
     mu2 = mu*mu
     design = np.column_stack((1.0-mu2, mu2))
     rank = int(np.linalg.matrix_rank(design))
@@ -201,8 +244,17 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         "input_projected_temperature_covariance_eV2": cov.copy(),
         "geometry_uncertainty_included": pitch_covariance is not None,
         "input_magnetic_pitch_cosine_covariance": None if pitch_covariance is None else pitch_covariance.copy(),
+        "input_projected_temperature_pitch_cross_covariance": (
+            None if temperature_pitch_cross_covariance is None
+            else temperature_pitch_cross_covariance.copy()
+        ),
+        "temperature_geometry_cross_covariance_included": (
+            temperature_pitch_cross_covariance is not None
+        ),
         "geometry_covariance_method": (
-            "iterative_first_order_errors_in_variables_GLS"
+            "iterative_first_order_errors_in_variables_GLS_with_temperature_geometry_cross_terms"
+            if temperature_pitch_cross_covariance is not None
+            else "iterative_first_order_errors_in_variables_GLS"
             if pitch_covariance is not None else "not_supplied"
         ),
         "assumptions": [
@@ -257,6 +309,11 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
             effective_covariance = (
                 cov + derivative_mu[:, None]*pitch_covariance*derivative_mu[None, :]
             )
+            if temperature_pitch_cross_covariance is not None:
+                effective_covariance += (
+                    temperature_pitch_cross_covariance*derivative_mu[None, :]
+                    + derivative_mu[:, None]*temperature_pitch_cross_covariance.T
+                )
             updated_parameters, updated_covariance, updated_active_bounds = gls_solve(effective_covariance)
             change = np.linalg.norm(updated_parameters-parameters) / max(
                 np.linalg.norm(parameters), np.finfo(float).tiny
