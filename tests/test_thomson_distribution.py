@@ -683,3 +683,42 @@ def test_maxwellian_geometry_cross_covariance_must_be_positive_semidefinite():
             scattering_angle_uncertainty_rad=0.01,
             laser_angle_covariance_nm_rad=2.0e-4,
         )
+
+
+def test_spectral_distribution_connects_same_spectrum_to_projected_evdf():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 1.0) ** 2) + 0.02
+    result = analyze_thomson_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.02),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        signal_uncertainty=np.full_like(wavelength, 1e-3),
+        projected_evdf_options={
+            "velocity_limit_m_s": 1.0e6,
+            "velocity_points": 81,
+            "regularization_strength": 1e-3,
+        },
+    )
+    inverse = result["projected_evdf_inference"]
+    assert inverse["source_spectrum"] == "same_calibrated_measured_spectrum_as_spectral_distribution"
+    assert inverse["inference_scope"] == "one_dimensional_q_parallel_velocity_marginal_only"
+    assert inverse["gaussian_width_used_as_evdf"] is False
+    assert np.isclose(inverse["evdf_normalization"], 1.0, rtol=1e-6, atol=1e-8)
+    assert inverse["velocity_parallel_m_s"].shape == (81,)
+    assert inverse["evdf_parallel_s_per_m"].shape == (81,)
+
+
+def test_projected_evdf_connection_requires_explicit_scattering_geometry():
+    wavelength = np.linspace(520.0, 544.0, 121)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 0.1
+    with pytest.raises(ValueError, match="laser_wavelength_nm and scattering_angle_rad"):
+        analyze_thomson_spectral_distribution(
+            wavelength,
+            signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.1),
+            projected_evdf_options={"velocity_points": 81},
+        )
