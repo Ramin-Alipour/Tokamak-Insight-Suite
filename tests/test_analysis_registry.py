@@ -558,3 +558,15 @@ def test_gyrotropic_anisotropic_thomson_is_registered_and_dashboard_resolvable()
     }
     assert "T_q = T_perp + (T_parallel - T_perp)" in contract["algorithm"]
     assert callable(resolve_analysis(82))
+
+
+def test_gyrotropic_registry_entry_exposes_explicit_bikappa_model_dispatch():
+    entry = get_analysis(82)
+    assert entry["module"] == "thomson_workflow"
+    assert entry["function"] == "fit_gyrotropic_thomson_spectra"
+    contract = entry["execution_contract"]
+    selector = next(item for item in contract["input_specs"] if item["name"] == "distribution_model")
+    assert selector["default"] == "bi_maxwellian"
+    assert "bi_kappa" in selector["unit"]
+    assert any("fit_gyrotropic_bi_kappa_thomson" in link for link in contract["function_links"])
+    assert callable(resolve_analysis(82))
