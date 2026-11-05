@@ -436,3 +436,44 @@ def test_projected_evdf_reports_total_fit_including_structured_background():
         "measured_total_signal_minus_fitted_background_and_scattered_signal"
     )
 
+def test_projected_evdf_propagates_correlated_signal_background_covariance():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    signal_cov = np.eye(wavelength.size) * 4.0e-4
+    background_cov = np.eye(wavelength.size) * 9.0e-4
+    cross_cov = np.eye(wavelength.size) * 1.0e-4
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(measured),
+        velocity_grid_m_s=velocity,
+        signal_covariance=signal_cov,
+        background_covariance=background_cov,
+        signal_background_cross_covariance=cross_cov,
+        regularization_strength=1e-3,
+    )
+    expected = signal_cov + background_cov - cross_cov - cross_cov.T
+    np.testing.assert_allclose(result["measurement_covariance"], expected)
+    np.testing.assert_allclose(result["signal_background_cross_covariance"], cross_cov)
+    assert result["noise_model"] == "full_covariance_whitening"
+
+
+def test_projected_evdf_rejects_inconsistent_signal_background_cross_covariance():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    with pytest.raises(ValueError, match="joint signal/background covariance"):
+        reconstruct_relativistic_projected_thomson_evdf(
+            wavelength, measured, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.zeros_like(measured),
+            velocity_grid_m_s=velocity,
+            signal_covariance=np.eye(wavelength.size) * 1e-4,
+            background_covariance=np.eye(wavelength.size) * 1e-4,
+            signal_background_cross_covariance=np.eye(wavelength.size) * 2e-4,
+            regularization_strength=1e-3,
+        )
+
