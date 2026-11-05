@@ -795,9 +795,11 @@ def analyze_thomson_spectral_distribution(
             for item in canonical_result.get("result_classification", {})
             .get("channels", [{}])[0].get("primary", [])
         }
-        required_primary = {
-            "electron_temperature_eV", "electron_velocity_projection_m_s"
-        }
+        required_primary = (
+            {"electron_density_m3", "electron_temperature_eV"}
+            if physical_model in {"collective_maxwellian", "collective_kappa"}
+            else {"electron_temperature_eV", "electron_velocity_projection_m_s"}
+        )
         result["physical_inference"] = {
             "selected_model": physical_model,
             "status": (
