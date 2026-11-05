@@ -488,6 +488,8 @@ def run_advanced_thomson_physics(model, **kwargs):
       - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
+      - bi_kappa_electrostatic_susceptibility: exact gyrotropic bi-Kappa directional
+        marginal with full-tail Landau response; one view identifies only T_q.
       - cts_collective_kappa_spectrum: collisionless electrostatic dynamic-structure
         spectrum using independently selected Maxwellian/Kappa electron populations
         and Maxwellian/Kappa multispecies ions with species-resolved Landau response.
