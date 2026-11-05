@@ -582,8 +582,6 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = quantum_fdt_dynamic_structure_factor
     elif model == "quantum_fdt_unsymmetrized":
         solver = quantum_unsymmetrized_dynamic_structure_factor
-    elif model == "landau_fdt_full_em_response":
-        solver = landau_full_em_current_response
     elif model == "landau_fdt_full_em_constitutive":
         solver = analyze_landau_fdt_full_em_constitutive
     elif model == "polarized_kinetic_ece":
@@ -612,10 +610,6 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = thomson_velocity_projection_relativistic_exact
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
-    elif model == "thomson_multiview_3d_evdf":
-        # Keep the rank-gated multiview inverse reachable through the same
-        # public dispatcher used by the dashboard and API.
-        solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_relativistic_projected_evdf":
         solver = reconstruct_relativistic_projected_thomson_evdf
     elif model == "thomson_psf_profile_inverse":
