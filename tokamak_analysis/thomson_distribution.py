@@ -918,21 +918,55 @@ def analyze_thomson_spectral_distribution(
                        "comparison_performed": False, "evdf_mean_velocity_parallel_m_s": evdf_mean,
                        "evdf_variance_velocity_parallel_m2_s2": evdf_variance}
         else:
-            predicted_centroid = float(laser_wavelength_nm) * (1.0 - q * evdf_mean / c_light)
-            predicted_variance = (float(laser_wavelength_nm) * q / c_light)**2 * evdf_variance
+            # The EVDF moments predict the *intrinsic* Doppler distribution.
+            # The measured moments, however, include the instrument response.
+            # Compare like with like by taking moments of the EVDF solver's
+            # response-forward-modelled spectrum on the measured wavelength
+            # grid.  The inverse solver's fitted_spectrum is the scattered
+            # component after the measured response; the supplied background
+            # is added only so _moment_statistics can apply the same explicit
+            # background subtraction and finite-volume quadrature as the data.
+            intrinsic_centroid = float(laser_wavelength_nm) * (
+                1.0 - q * evdf_mean / c_light
+            )
+            intrinsic_variance = (
+                float(laser_wavelength_nm) * q / c_light
+            )**2 * evdf_variance
+            fitted_scattered = np.asarray(inverse.get("fitted_spectrum"), dtype=float)
+            if (fitted_scattered.shape != x.shape
+                    or not np.all(np.isfinite(fitted_scattered))):
+                raise ValueError(
+                    "Projected EVDF solver must return a finite fitted_spectrum "
+                    "on the measured wavelength grid for response-aware moment closure"
+                )
+            forward_moments = _moment_statistics(
+                x, fitted_scattered + background, None, None, background
+            )
+            predicted_centroid = float(forward_moments["center"])
+            predicted_variance = float(forward_moments["variance"])
             closure = {
-                "status": "conditional_moment_closure",
-                "formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
+                "status": "conditional_response_aware_moment_closure",
+                "intrinsic_doppler_formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
                 "evdf_mean_velocity_parallel_m_s": evdf_mean,
                 "evdf_variance_velocity_parallel_m2_s2": evdf_variance,
-                "evdf_predicted_spectral_centroid_nm": predicted_centroid,
-                "evdf_predicted_spectral_sigma_nm": float(np.sqrt(max(predicted_variance, 0.0))),
+                "intrinsic_evdf_predicted_centroid_nm": intrinsic_centroid,
+                "intrinsic_evdf_predicted_sigma_nm": float(np.sqrt(max(intrinsic_variance, 0.0))),
+                "response_forward_modelled_centroid_nm": predicted_centroid,
+                "response_forward_modelled_sigma_nm": float(np.sqrt(max(predicted_variance, 0.0))),
                 "measured_spectral_centroid_nm": float(center),
                 "measured_spectral_sigma_nm": float(sigma_observed),
                 "centroid_closure_residual_nm": float(center - predicted_centroid),
                 "variance_closure_residual_nm2": float(variance_observed - predicted_variance),
+                "instrument_response_in_closure": True,
+                "background_model_shared_with_measured_moments": True,
                 "comparison_performed": True,
-                "interpretation": "Compare conditionally after accounting for background, finite spectral window, instrument response and regularization; disagreement is a model/data consistency warning, not grounds to force a Gaussian temperature.",
+                "interpretation": (
+                    "Measured moments are compared with moments of the reconstructed "
+                    "EVDF after the same measured instrument-response forward operator "
+                    "and explicit background convention. Intrinsic EVDF moments are "
+                    "reported separately; they must not be compared directly with "
+                    "response-broadened measured moments."
+                ),
             }
         inverse["spectral_moment_closure"] = closure
 
