@@ -674,6 +674,16 @@ def reconstruct_psf_aware_thomson_profile(
     fits its effective degrees of freedom use the fitted active set. The
     data-only rank test is independent of regularization, so smoothing cannot
     promote spatial null-space modes to measured outputs.
+
+    The local inverse uses
+        x_hat = argmin_x ||C_y^(-1/2)(H x - y)||^2 + lambda ||D2 x||^2,
+    with optional x >= 0. Its first-order covariance includes the PSF
+    sensitivity J_H = d x_hat / d vec(H). If the caller supplies
+    C_yH = Cov(y, vec(H)), the total covariance additionally includes
+        J_y C_yH J_H.T + J_H C_yH.T J_y.T,
+    and the complete joint block covariance is required to be positive
+    semidefinite. This avoids the usual but often unjustified assumption that
+    calibration/PSF errors are independent of measured channel values.
     """
     y = _real_vector(measured_channel_values, "measured_channel_values", minimum=2)
     raw_h = np.asarray(spatial_mixing_matrix)
