@@ -834,3 +834,54 @@ def test_spectral_distribution_dispatches_selected_collective_physical_model(
     assert result["physical_inference"]["forward_model"] == (
         "canonical_optical_thomson_forward_fit:" + selected_model
     )
+
+
+@pytest.mark.parametrize(
+    ("public_model", "solver_model", "initial"),
+    [
+        ("non_collective_kappa", "kappa", [120.0, 0.0, 4.0]),
+        (
+            "non_collective_relativistic_maxwell_juttner",
+            "relativistic_maxwell_juttner",
+            [120.0, 0.0],
+        ),
+    ],
+)
+def test_spectral_distribution_accepts_canonical_analysis1_kinetic_model_ids(
+    monkeypatch, public_model, solver_model, initial
+):
+    import tokamak_analysis.thomson_kinetic_background as kinetic_background
+
+    wavelength = np.linspace(1059.8, 1060.2, 61)
+    signal = 1.0 + 0.2 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.045) ** 2)
+    captured = {}
+
+    def fake_fit(x, y, **kwargs):
+        captured.update(kwargs)
+        return {
+            "status": "identified_from_measurement",
+            "primary_result_status": "identified_from_measurement",
+            "parameter_estimates": {"electron_temperature_eV": 120.0},
+        }
+
+    monkeypatch.setattr(
+        kinetic_background,
+        "fit_noncollective_kinetic_thomson_with_background",
+        fake_fit,
+    )
+    result = analyze_thomson_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(signal, 0.01),
+        physical_model=public_model,
+        laser_wavelength_nm=1060.0,
+        scattering_angle_rad=np.pi / 2.0,
+        physical_fit_options={"physical_initial": initial, "background_model": "linear"},
+    )
+
+    assert captured["physical_model"] == solver_model
+    assert result["physical_inference"]["selected_model"] == public_model
+    assert result["physical_inference"]["solver_model"] == solver_model
+    assert result["physical_inference"]["gaussian_width_used_as_temperature"] is False
+    assert result["physical_inference"]["reportable_as_primary_inference"] is True
