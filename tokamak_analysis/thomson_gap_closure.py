@@ -767,10 +767,30 @@ def reconstruct_psf_aware_thomson_profile(
     active = np.ones(values.size, dtype=bool) if not positive else values > max(float(np.max(values)) * 1e-9, np.finfo(float).tiny)
     aa, pp = a[:, active], d2[:, active]
     normal_inverse = np.linalg.pinv(aa.T @ aa + lam * (pp.T @ pp), hermitian=True)
-    covariance_active = normal_inverse.copy()
     residual = z - a @ values
-    if noise_status == "unweighted_no_measurement_uncertainty_supplied":
-        covariance_active *= float(residual @ residual / max(1, y.size - rank))
+
+    # Frequentist covariance of the regularized estimator is the sandwich
+    # J_y C_y J_y.T, not the inverse penalized Hessian.  The latter is a
+    # posterior/prior-dependent curvature matrix and overstates/understates
+    # sampling uncertainty when the penalty is non-zero.
+    whitening_matrix = whiten(np.eye(y.size))
+    measurement_sensitivity = normal_inverse @ a[:, active].T @ whitening_matrix
+    if measurement_uncertainty is not None:
+        sigma_y = _real_vector(
+            measurement_uncertainty, "measurement_uncertainty", minimum=y.size
+        )
+        measurement_covariance_matrix = np.diag(sigma_y**2)
+    elif measurement_covariance is not None:
+        measurement_covariance_matrix = np.asarray(measurement_covariance, dtype=float)
+    else:
+        residual_variance = float(residual @ residual) / max(1, y.size - rank)
+        measurement_covariance_matrix = np.eye(y.size) * residual_variance
+    covariance_active = (
+        measurement_sensitivity
+        @ measurement_covariance_matrix
+        @ measurement_sensitivity.T
+    )
+    covariance_active = 0.5 * (covariance_active + covariance_active.T)
     covariance = np.zeros((values.size, values.size))
     covariance[np.ix_(np.flatnonzero(active), np.flatnonzero(active))] = covariance_active
 
@@ -828,13 +848,6 @@ def reconstruct_psf_aware_thomson_profile(
                     "with shape (n_channels, n_channels*n_nodes), row-major in PSF elements"
                 )
             cross_covariance = cross_raw.astype(float, copy=False)
-            whitening_matrix = whiten(np.eye(y.size))
-            measurement_sensitivity = normal_inverse @ a[:, active].T @ whitening_matrix
-            if measurement_uncertainty is not None:
-                sigma_y = _real_vector(measurement_uncertainty, "measurement_uncertainty", minimum=y.size)
-                measurement_covariance_matrix = np.diag(sigma_y**2)
-            else:
-                measurement_covariance_matrix = np.asarray(measurement_covariance, dtype=float)
             joint_covariance = np.block([
                 [measurement_covariance_matrix, cross_covariance],
                 [cross_covariance.T, operator_covariance],
