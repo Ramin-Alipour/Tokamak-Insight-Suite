@@ -7850,5 +7850,121 @@
         "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_derivative_matches_central_difference"
       ]
     }
+  },
+  {
+    "name": "Full-tail isotropic-Kappa Landau susceptibility phase-velocity derivative",
+    "equation": "χ_e(vφ)=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη) dv; ∂χ_e/∂vφ=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη)² dv, η>0",
+    "inputs": "Electron density [m^-3], second-moment electron temperature [eV], Kappa index κ>3/2, real phase velocity [m/s], wavenumber [m^-1], optional positive retarded-pole displacement η [m/s], velocity grid for probability-coverage gate",
+    "output": "Complex longitudinal electron susceptibility and its complex phase-velocity derivative [s/m], with adaptive-quadrature error estimates",
+    "assumptions": "Exact 1-D marginal of an isotropic 3-D finite-variance Kappa distribution; collisionless, unmagnetized, non-relativistic longitudinal response; positive retarded pole displacement held fixed during differentiation; analytic Kappa tail integrated over the full velocity axis.",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.kappa_electron_susceptibility",
+      "formula_key": "cts_kappa_landau_phase_velocity_derivative",
+      "input_specs": [
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m/s; real scalar",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; second-moment temperature",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; strictly > 3/2",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1; positive",
+          "required": true
+        },
+        {
+          "name": "pole_imaginary_part_m_s",
+          "unit": "m/s; positive retarded-pole displacement",
+          "required": false
+        },
+        {
+          "name": "v",
+          "unit": "m/s; increasing grid used for analytic probability-coverage gate",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "susceptibility_phase_velocity_derivative_s_m",
+          "unit": "s/m; complex derivative at fixed pole displacement"
+        },
+        {
+          "name": "integral_phase_velocity_derivative_s3_m3",
+          "unit": "s^3/m^3; complex Landau-integral derivative"
+        },
+        {
+          "name": "integral_phase_velocity_derivative_real_absolute_error",
+          "unit": "s^3/m^3"
+        },
+        {
+          "name": "integral_phase_velocity_derivative_imag_absolute_error",
+          "unit": "s^3/m^3"
+        }
+      ],
+      "prerequisites": [
+        "κ>3/2 for finite second moment",
+        "Positive finite density, temperature and wavenumber",
+        "Strictly increasing velocity grid meeting the requested analytic Kappa probability-coverage threshold"
+      ],
+      "uncertainty_model": "No physical-parameter uncertainty is inferred. The derivative is evaluated by adaptive full-axis quadrature; separate real and imaginary quadrature error estimates are returned. The derivative is conditional on the supplied positive pole displacement.",
+      "limitations": [
+        "Collisionless, unmagnetized, non-relativistic longitudinal electron response only",
+        "No ion susceptibility, FDT spectrum, collisions, magnetization, relativistic response or Full-EM current vertex",
+        "Finite velocity grid is used only for the probability-coverage gate; the analytic Kappa tail is integrated over the complete real axis"
+      ],
+      "test_links": [
+        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_complex_step_scale_finite_difference"
+      ],
+      "note": "The derivative follows by differentiating the retarded Landau kernel with respect to real phase velocity at fixed positive pole displacement. It is returned by the existing public kappa_electrostatic_susceptibility dispatcher and advanced Thomson physics dashboard. Software limiting/finite-difference tests are not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "physical_response_kernel",
+      "input_data_level": "physical_parameters",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Collective Thomson scattering"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_kappa.kappa_electron_susceptibility",
+      "function_links": [
+        "tokamak_analysis.cts_kappa.kappa_electron_susceptibility",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ],
+      "formula_key": "cts_kappa_landau_phase_velocity_derivative",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_complex_step_scale_finite_difference"
+      ]
+    }
   }
 ]

@@ -282,3 +282,20 @@ def test_analytic_maxwellian_susceptibility_derivative_matches_central_differenc
     assert result["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(
         finite_difference, rel=2e-8, abs=1e-14
     )
+
+
+def test_kappa_phase_derivative_formula_registry_is_synchronized_and_executable():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "cts_kappa_landau_phase_velocity_derivative"
+    matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
+    assert len(matches) == 1
+    assert matches == [item for item in packaged if item.get("execution_contract", {}).get("formula_key") == key]
+    assert matches[0]["execution_contract"]["function_link"] == "tokamak_analysis.cts_kappa.kappa_electron_susceptibility"
+    assert "susceptibility_phase_velocity_derivative_s_m" in {
+        item["name"] for item in matches[0]["execution_contract"]["output_specs"]
+    }
