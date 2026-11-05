@@ -417,8 +417,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
         source_weights /= float(np.sum(source_weights))
 
     latent_mass = np.zeros((n, v.size), dtype=float)
-    total_scattering_weight = np.zeros(v.size, dtype=float)
-    captured_scattering_weight = np.zeros(v.size, dtype=float)
+    total_cross_section_weight = np.zeros(v.size, dtype=float)
+    total_power_weight = np.zeros(v.size, dtype=float)
+    captured_power_weight = np.zeros(v.size, dtype=float)
     weighted_scattered_wavelength = np.zeros(v.size, dtype=float)
     maximum_recoil = 0.0
     kinematics = None
@@ -453,11 +454,12 @@ def reconstruct_relativistic_projected_thomson_evdf(
         # The detector-space signal is spectral scattered POWER. Convert the
         # incident photon rate to scattered photon power with E_s/E_i=lambda_i/lambda_s.
         # This factor is wavelength dependent in the relativistic/Compton kernel.
-        weighted = (
-            float(source_weight) * scattering_weights_source
-            * (float(source_wavelength) / wavelength_centres_source)
+        cross_section_weight = float(source_weight) * scattering_weights_source
+        weighted = cross_section_weight * (
+            float(source_wavelength) / wavelength_centres_source
         )
-        total_scattering_weight += weighted
+        total_cross_section_weight += cross_section_weight
+        total_power_weight += weighted
         weighted_scattered_wavelength += weighted * wavelength_centres_source
         for j, centre in enumerate(wavelength_centres_source):
             if centre < x[0] or centre > x[-1]:
@@ -472,19 +474,19 @@ def reconstruct_relativistic_projected_thomson_evdf(
                 frac = (centre - x[left]) / (x[right] - x[left])
                 latent_mass[left, j] += weighted[j] * (1.0 - frac)
                 latent_mass[right, j] += weighted[j] * frac
-            captured_scattering_weight[j] += weighted[j]
+            captured_power_weight[j] += weighted[j]
 
-    if np.any(total_scattering_weight <= np.finfo(float).tiny):
-        raise ValueError("source-resolved scattering kernel has zero differential weight")
-    captured_fraction = captured_scattering_weight / total_scattering_weight
+    if np.any(total_power_weight <= np.finfo(float).tiny):
+        raise ValueError("source-resolved scattering kernel has zero differential scattered power")
+    captured_fraction = captured_power_weight / total_power_weight
     if np.any(captured_fraction < 0.995):
         raise ValueError(
             "wavelength/velocity support must capture at least 99.5% of each "
             f"source-resolved scattering column; minimum captured fraction={float(np.min(captured_fraction)):.6g}"
         )
-    latent = latent_mass / total_scattering_weight[None, :] / widths[:, None]
-    scattering_weights = total_scattering_weight
-    wavelength_centres = weighted_scattered_wavelength / total_scattering_weight
+    latent = latent_mass / total_power_weight[None, :] / widths[:, None]
+    scattering_weights = total_power_weight
+    wavelength_centres = weighted_scattered_wavelength / total_power_weight
     dv = np.diff(v)
     velocity_weights = _trapezoid_quadrature_weights(v, "velocity_grid_m_s")
     # The latent columns are wavelength-bin probability densities for a
@@ -580,14 +582,15 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "quantity": "Projected 1D electron velocity distribution along the scattering vector",
         "velocity_parallel_m_s": v.copy(),
         "mono_velocity_scattered_wavelength_nm": wavelength_centres.copy(),
-        "relative_lab_differential_scattering_weight": scattering_weights.copy(),
+        "relative_lab_differential_scattering_weight": total_cross_section_weight.copy(),
+        "relative_lab_differential_scattered_power_weight": scattering_weights.copy(),
         "laser_spectral_profile": {
             "assumption": "monochromatic_incident_laser" if laser_spectrum_wavelength_nm is None else "measured_source_spectrum_convolved_in_exact_single_electron_kinematics",
             "wavelength_nm": source_wavelengths.copy(),
             "normalized_quadrature_weights": source_weights.copy(),
             "source_weighting": "incident_photon_flux_from_spectral_power_density",
             "scattered_power_conversion": "E_scattered/E_incident = lambda_incident/lambda_scattered",
-            "captured_scattering_probability_min": float(np.min(captured_fraction)),
+            "captured_scattered_power_fraction_min": float(np.min(captured_fraction)),
         },
         "recoil_included": bool(include_compton_recoil),
         "maximum_recoil_correction_fraction": float(maximum_recoil),
