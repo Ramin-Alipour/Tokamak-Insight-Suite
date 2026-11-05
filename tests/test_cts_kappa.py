@@ -163,3 +163,38 @@ def test_collective_kappa_dispatcher_converts_canonical_frequency_schema(monkeyp
     assert captured["response"].shape == (12, 12)
     assert captured["electron_velocity_m_s"].shape == (3,)
     assert captured["ion_velocity_m_s"].shape == (1, 3)
+
+
+
+def test_collective_kappa_dispatcher_passes_multi_population_contract_to_physical_fit(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as kinetic
+    from tokamak_analysis.cts_analysis import analyze_cts_spectrum_model
+
+    populations = [
+        {"density_fraction": 0.8, "temperature_ratio": 0.75,
+         "kappa": 5.0, "flow_projection_m_s": -2.0e4},
+        {"density_fraction": 0.2, "temperature_ratio": 3.0,
+         "kappa": 2.4, "flow_projection_m_s": 4.0e5},
+    ]
+    captured = {}
+
+    def fake_fit(**kwargs):
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(kinetic, "fit_collective_kappa", fake_fit)
+    result = analyze_cts_spectrum_model(
+        model="electrostatic_kappa",
+        wavelength_nm=np.linspace(500.0, 501.0, 12), signal=np.ones(12),
+        laser_wavelength_nm=500.0, scattering_angle_rad=1.0,
+        response=np.eye(12), incident_direction=[0.0, 0.0, 1.0],
+        scattered_direction=[np.sin(1.0), 0.0, np.cos(1.0)],
+        ion_species=[{"name": "D", "charge_state": 1, "mass_amu": 2.0}],
+        ion_fractions=[1.0], ion_temperature_eV=[20.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        initial_density_m3=1e19, initial_temperature_eV=100.0,
+        initial_kappa=4.0, electron_populations=populations,
+    )
+    assert result == {"ok": True}
+    assert captured["electron_populations"] == populations
