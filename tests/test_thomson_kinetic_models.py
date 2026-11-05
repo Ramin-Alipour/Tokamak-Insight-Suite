@@ -621,3 +621,72 @@ def test_collective_kappa_propagates_joint_mult_population_input_covariance(monk
     assert result["fit_covariance"].shape == (3, 3)
     assert np.all(np.diag(result["fit_covariance"]) >=
                   np.diag(result["fit_covariance_conditional_on_population_inputs"]))
+
+
+
+def test_collective_kappa_supports_mixed_electron_and_kappa_ion_populations():
+    wavelength = np.linspace(1048.0, 1080.0, 81)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    common = dict(
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=angle,
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=150.0,
+        kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident,
+        scattered_direction=scattered,
+    )
+    electron_mixture = [
+        {"density_fraction": 0.8, "temperature_ratio": 0.7,
+         "kappa": 5.0, "distribution": "kappa", "flow_projection_m_s": 0.0},
+        {"density_fraction": 0.2, "temperature_ratio": 4.0,
+         "distribution": "maxwellian", "flow_projection_m_s": 1.0e5},
+    ]
+    ion_mixture = [{"distribution": "kappa", "kappa": 3.0}]
+    result = collective_kappa_spectral_density(
+        wavelength, electron_populations=electron_mixture,
+        ion_populations=ion_mixture, **common
+    )
+    assert result["electron_populations"][1]["distribution"] == "maxwellian"
+    assert result["ion_populations"][0]["distribution"] == "kappa"
+    assert result["ion_populations"][0]["kappa"] == pytest.approx(3.0)
+    assert result["electron_population_susceptibilities"].shape == (2, wavelength.size)
+    assert result["ion_susceptibility"].shape == (1, wavelength.size)
+    assert np.all(np.isfinite(result["dielectric_function"]))
+    assert np.all(result["spectral_density_per_nm"] >= 0.0)
+
+
+def test_collective_kappa_rejects_nonphysical_ion_kappa_and_mixture_fraction():
+    wavelength = np.linspace(1048.0, 1080.0, 31)
+    angle = np.pi/2.0
+    common = dict(
+        laser_wavelength_nm=1064.0, scattering_angle_rad=angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=150.0, kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[-np.sin(angle/2.0), np.cos(angle/2.0), 0.0],
+        scattered_direction=[np.sin(angle/2.0), np.cos(angle/2.0), 0.0],
+    )
+    with pytest.raises(ValueError, match="kappa must be finite and > 1.5"):
+        collective_kappa_spectral_density(
+            wavelength, ion_populations=[{"distribution": "kappa", "kappa": 1.4}],
+            **common
+        )
+    with pytest.raises(ValueError, match="density_fraction values must sum to one"):
+        collective_kappa_spectral_density(
+            wavelength,
+            electron_populations=[
+                {"density_fraction": 0.7, "temperature_ratio": 1.0, "kappa": 4.0},
+                {"density_fraction": 0.4, "temperature_ratio": 1.0, "kappa": 4.0},
+            ],
+            **common
+        )
