@@ -2207,3 +2207,32 @@ def test_full_em_cts_background_state_distinguishes_omission_from_explicit_zero(
         assert "physical background is unknown rather than assumed zero" in result["background_state_provenance"]
     assert result["background_zero_assumption"] is False
     assert result["profiled_offset"] == pytest.approx(0.7, abs=1e-5)
+
+
+def test_cts_frequency_resolved_geometry_uses_binwise_wave_number_for_physical_alpha():
+    from tokamak_analysis.cts_analysis import (
+        _frequency_resolved_scattering_wave_numbers,
+        _frequency_dependent_scattering_wave_number,
+        _geometry,
+    )
+
+    f0, frequency, _, *_ = _case()
+    entries = [
+        {"scattering_angle_rad": np.deg2rad(angle)}
+        for angle in np.linspace(55.0, 135.0, frequency.size)
+    ]
+    geometry = {"frequency_resolved_geometry": entries}
+    actual = _frequency_resolved_scattering_wave_numbers(frequency, f0, geometry)
+    expected = np.asarray([
+        _frequency_dependent_scattering_wave_number(
+            np.asarray([shift]), f0, _geometry(entry, f0)[2]
+        )[0]
+        for shift, entry in zip(frequency, entries)
+    ])
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=0.0)
+    assert np.ptp(actual) > 0.0
+    representative_angle = _geometry(geometry, f0)[2]
+    representative = _frequency_dependent_scattering_wave_number(
+        frequency, f0, representative_angle
+    )
+    assert not np.allclose(actual, representative, rtol=1e-5, atol=0.0)
