@@ -1143,6 +1143,7 @@ def collective_kappa_spectral_density(
     ion_species, ion_fractions, ion_temperature_eV,
     electron_velocity_m_s, ion_velocity_m_s,
     incident_direction, scattered_direction, electron_populations=None,
+    ion_populations=None,
 ):
     """Unmagnetized collective spectrum with kappa electrons and Maxwellian ions.
 
@@ -1215,14 +1216,18 @@ def collective_kappa_spectral_density(
                 raise ValueError(f"electron_populations[{index}] must be a mapping")
             fraction = _positive(population.get("density_fraction"), f"electron_populations[{index}].density_fraction")
             ratio = _positive(population.get("temperature_ratio", 1.0), f"electron_populations[{index}].temperature_ratio")
+            distribution = str(population.get("distribution", "kappa")).lower()
             population_kappa = float(population.get("kappa", kap))
             flow = float(population.get("flow_projection_m_s", ue))
-            if not np.isfinite(population_kappa) or population_kappa <= 1.5:
+            if distribution not in ("kappa", "maxwellian"):
+                raise ValueError(f"electron_populations[{index}].distribution must be 'kappa' or 'maxwellian'")
+            if distribution == "kappa" and (not np.isfinite(population_kappa) or population_kappa <= 1.5):
                 raise ValueError(f"electron_populations[{index}].kappa must be finite and > 1.5")
             if not np.isfinite(flow) or abs(flow) >= C:
                 raise ValueError(f"electron_populations[{index}].flow_projection_m_s must be finite and subluminal")
             populations.append({"density_fraction": fraction, "temperature_ratio": ratio,
-                                "kappa": population_kappa, "flow_projection_m_s": flow})
+                                "kappa": population_kappa, "distribution": distribution,
+                                "flow_projection_m_s": flow})
         if not np.isclose(sum(item["density_fraction"] for item in populations), 1.0, rtol=1e-6, atol=1e-8):
             raise ValueError("electron population density_fraction values must sum to one")
     electron_pdf = np.zeros(x.size, dtype=float)
@@ -1232,30 +1237,74 @@ def collective_kappa_spectral_density(
         fraction = population["density_fraction"]
         sigma_population = sigma_e*np.sqrt(population["temperature_ratio"])
         shifted_phase = vphase-population["flow_projection_m_s"]
-        pdf_population, _, _ = _kappa_pdf_and_derivatives(
-            shifted_phase, sigma_population, population["kappa"])
+        if population["distribution"] == "kappa":
+            pdf_population, _, _ = _kappa_pdf_and_derivatives(
+                shifted_phase, sigma_population, population["kappa"])
+        else:
+            pdf_population, _, _ = _maxwellian_pdf_and_derivatives(
+                shifted_phase, sigma_population)
         chi_population = np.empty(x.size, dtype=complex)
         for j in range(x.size):
             chi_population[j] = _landau_susceptibility(
                 shifted_phase[j], fraction*omega_pe2, k, sigma_population,
-                distribution="kappa", kappa=population["kappa"])
+                distribution=population["distribution"],
+                kappa=population["kappa"] if population["distribution"] == "kappa" else None)
         electron_pdf += fraction*pdf_population
         chi_e += chi_population
         population_pdfs.append(pdf_population)
         population_susceptibilities.append(chi_population)
+    if ion_populations is None:
+        resolved_ion_populations = [
+            {"distribution": "maxwellian", "kappa": None,
+             "flow_projection_m_s": float(ui[index])}
+            for index in range(len(species))
+        ]
+    else:
+        if (not isinstance(ion_populations, Sequence)
+                or isinstance(ion_populations, (str, bytes))
+                or len(ion_populations) != len(species)):
+            raise ValueError("ion_populations must provide one distribution mapping per ion species")
+        resolved_ion_populations = []
+        for index, population in enumerate(ion_populations):
+            if not isinstance(population, Mapping):
+                raise ValueError(f"ion_populations[{index}] must be a mapping")
+            distribution = str(population.get("distribution", "maxwellian")).lower()
+            kappa_i = population.get("kappa")
+            flow_i = float(population.get("flow_projection_m_s", ui[index]))
+            if distribution not in ("maxwellian", "kappa"):
+                raise ValueError(f"ion_populations[{index}].distribution must be 'maxwellian' or 'kappa'")
+            if distribution == "kappa":
+                kappa_i = float(kappa_i)
+                if not np.isfinite(kappa_i) or kappa_i <= 1.5:
+                    raise ValueError(f"ion_populations[{index}].kappa must be finite and > 1.5")
+            elif kappa_i is not None:
+                raise ValueError(f"ion_populations[{index}].kappa is only valid for a Kappa ion distribution")
+            if not np.isfinite(flow_i) or abs(flow_i) >= C:
+                raise ValueError(f"ion_populations[{index}].flow_projection_m_s must be finite and subluminal")
+            resolved_ion_populations.append({
+                "distribution": distribution, "kappa": kappa_i,
+                "flow_projection_m_s": flow_i,
+            })
     ion_chi = []
     ion_pdf = []
     for index, item in enumerate(species):
         density = fractions[index]*ne/item["charge_state"]
         sigma_i = np.sqrt(temperatures[index]*E_CHARGE/item["mass_kg"])
         omega_pi2 = density*(item["charge_state"]*E_CHARGE)**2/(EPS0*item["mass_kg"])
-        ion_pdf_i, _, _ = _maxwellian_pdf_and_derivatives(vphase-ui[index], sigma_i)
+        ion_model = resolved_ion_populations[index]
+        ion_phase = vphase-ion_model["flow_projection_m_s"]
+        if ion_model["distribution"] == "kappa":
+            ion_pdf_i, _, _ = _kappa_pdf_and_derivatives(
+                ion_phase, sigma_i, ion_model["kappa"])
+        else:
+            ion_pdf_i, _, _ = _maxwellian_pdf_and_derivatives(ion_phase, sigma_i)
         ion_pdf.append(ion_pdf_i)
         chi_i = np.empty(x.size, dtype=complex)
         for j in range(x.size):
             chi_i[j] = _landau_susceptibility(
-                vphase[j]-ui[index], omega_pi2, k, sigma_i
-            )
+                ion_phase[j], omega_pi2, k, sigma_i,
+                distribution=ion_model["distribution"],
+                kappa=ion_model["kappa"])
         ion_chi.append(chi_i)
     ion_sum = np.sum(np.asarray(ion_chi), axis=0)
     dielectric = 1.0+chi_e+ion_sum
@@ -1285,6 +1334,7 @@ def collective_kappa_spectral_density(
         "ion_temperature_eV": temperatures,
         "kappa_index": kap,
         "electron_populations": [dict(item) for item in populations],
+        "ion_populations": [dict(item) for item in resolved_ion_populations],
         "electron_population_susceptibilities": np.asarray(population_susceptibilities),
         "electron_population_projected_vdfs_s_m": np.asarray(population_pdfs),
         "wavenumber_m_inverse": k,
