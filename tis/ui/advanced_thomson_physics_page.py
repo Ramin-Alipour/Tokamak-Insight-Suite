@@ -107,8 +107,11 @@ MODEL_PHYSICS_NOTES = {
         "Nonlinear measured-spectrum inversion of electron density, second-moment electron temperature "
         "and Kappa index. Ion composition, ion temperatures/flows, scattering geometry and measured "
         "instrument response are fixed explicit inputs. The data-only fit Jacobian must identify all "
-        "three fitted parameters; otherwise the solver rejects the result. This is not a simultaneous "
-        "ion-temperature or fast-ion inference and remains collisionless, unmagnetized electrostatic CTS."
+        "three fitted parameters; otherwise the solver rejects the result. Optional electron_population_parameter_covariance "
+        "supplies a joint covariance over every population's fraction, temperature ratio, Kappa index and projected flow; "
+        "the solver propagates it through deterministic full-spectrum Monte Carlo refits and retains fit/input cross-covariance. "
+        "Fractions must remain normalized in every accepted draw; invalid physical draws are rejected rather than clipped or renormalized. "
+        "This is not a simultaneous ion-temperature or fast-ion inference and remains collisionless, unmagnetized electrostatic CTS."
     ),
     "cts_collective_kappa_spectrum": (
         "Collisionless, unmagnetized, longitudinal electrostatic CTS forward model. "
