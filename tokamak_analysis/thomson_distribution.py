@@ -143,12 +143,6 @@ def analyze_thomson_spectral_distribution(
     laser_wavelength_uncertainty_nm: float | None = None,
     scattering_angle_uncertainty_rad: float | None = None,
     physical_fit_options: dict | None = None,
-    physical_initial=None,
-    model_discrepancy_covariance=None,
-    systematic_covariance=None,
-    incident_polarization=None,
-    include_compton_recoil: bool = False,
-    physical_background_model: str = "linear",
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
 
@@ -553,43 +547,19 @@ def analyze_thomson_spectral_distribution(
 
     if physical_model not in {None, "non_collective_maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be None, non_collective_maxwellian, kappa, or relativistic_maxwell_juttner")
-    if any(value is not None for value in (
-        physical_fit_options, physical_initial, model_discrepancy_covariance,
-        systematic_covariance, incident_polarization,
-    )) and physical_model not in {"kappa", "relativistic_maxwell_juttner"}:
-        raise ValueError("kinetic fit options are supported only for kappa or relativistic_maxwell_juttner")
+    if physical_fit_options is not None and physical_model not in {"kappa", "relativistic_maxwell_juttner"}:
+        raise ValueError("physical_fit_options is supported only for kappa or relativistic_maxwell_juttner")
 
     # Kappa and relativistic Maxwell-Juttner require their own physical
     # forward models. Never map a Gaussian width to these non-Gaussian models.
     if physical_model in {"kappa", "relativistic_maxwell_juttner"}:
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError("laser_wavelength_nm and scattering_angle_rad are required for kinetic physical inference")
-        if physical_fit_options is not None and not isinstance(physical_fit_options, dict):
-            raise ValueError("physical_fit_options must be a mapping of selected-model nuisance/uncertainty inputs")
-        options = dict(physical_fit_options or {})
-        if physical_initial is not None:
-            if "physical_initial" in options:
-                raise ValueError("physical_initial must be supplied either directly or through physical_fit_options, not both")
-            options["physical_initial"] = physical_initial
-        for name, value in (
-            ("model_discrepancy_covariance", model_discrepancy_covariance),
-            ("systematic_covariance", systematic_covariance),
-            ("incident_polarization", incident_polarization),
-        ):
-            if value is not None:
-                if name in options:
-                    raise ValueError(f"{name} must be supplied either directly or through physical_fit_options, not both")
-                options[name] = value
+        if not isinstance(physical_fit_options, dict):
+            raise ValueError("physical_fit_options must provide physical_initial and the selected model's nuisance/uncertainty inputs")
+        options = dict(physical_fit_options)
         if "physical_model" in options or "instrument_response" in options or "laser_wavelength_nm" in options or "scattering_angle_rad" in options:
             raise ValueError("physical_fit_options cannot override the selected model, geometry, or measured instrument response")
-        options.setdefault("background_model", physical_background_model)
-        if signal_uncertainty is not None:
-            options.setdefault("measurement_uncertainty", signal_uncertainty)
-        if signal_covariance is not None:
-            options.setdefault("measurement_covariance", signal_covariance)
-        if not isinstance(include_compton_recoil, (bool, np.bool_)):
-            raise ValueError("include_compton_recoil must be boolean")
-        options.setdefault("include_compton_recoil", bool(include_compton_recoil))
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         kinetic_fit = fit_noncollective_kinetic_thomson_with_background(
             x, y, physical_model=physical_model,
