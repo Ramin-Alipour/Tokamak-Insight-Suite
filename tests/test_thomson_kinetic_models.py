@@ -546,3 +546,78 @@ def test_collective_kappa_mult_population_rejects_non_normalized_density_fractio
                 {"density_fraction": 0.8}, {"density_fraction": 0.3}
             ],
         )
+
+
+def test_collective_kappa_propagates_joint_mult_population_input_covariance(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as kinetic
+
+    wavelength = np.linspace(1058.0, 1070.0, 41)
+    populations = [
+        {"density_fraction": 0.85, "temperature_ratio": 0.7,
+         "kappa": 5.0, "flow_projection_m_s": -1.0e5},
+        {"density_fraction": 0.15, "temperature_ratio": 4.0,
+         "kappa": 2.5, "flow_projection_m_s": 8.0e5},
+    ]
+
+    def synthetic_collective_spectrum(
+        wavelength_nm, laser_wavelength_nm, scattering_angle_rad, *,
+        electron_density_m3, electron_temperature_eV, kappa,
+        electron_populations=None, **kwargs,
+    ):
+        x = (np.asarray(wavelength_nm) - laser_wavelength_nm) / 0.12
+        if electron_populations:
+            fractions = np.array([p["density_fraction"] for p in electron_populations])
+            ratios = np.array([p["temperature_ratio"] for p in electron_populations])
+            flows = np.array([p["flow_projection_m_s"] for p in electron_populations])
+            mixture_width = np.sqrt(np.dot(fractions, ratios))
+            mixture_shift = np.dot(fractions, flows) / 1.0e7
+        else:
+            mixture_width, mixture_shift = 1.0, 0.0
+        centre = 0.04*np.log(electron_density_m3/1.0e19) + 0.02*mixture_shift
+        width = np.sqrt(electron_temperature_eV/150.0)*mixture_width
+        shape = np.exp(-0.5*((x-centre)/width)**2)
+        shape *= 1.0 + 0.025*(kappa-3.5)*x**3/(1.0+x**4)
+        return {"spectral_density_per_nm": shape}
+
+    monkeypatch.setattr(kinetic, "collective_kappa_spectral_density", synthetic_collective_spectrum)
+    common = dict(
+        wavelength_nm=wavelength,
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi/2,
+        response=np.eye(wavelength.size),
+        incident_direction=[-np.sin(np.pi/4), np.cos(np.pi/4), 0.0],
+        scattered_direction=[np.sin(np.pi/4), np.cos(np.pi/4), 0.0],
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        initial_density_m3=1.0e19,
+        initial_temperature_eV=150.0,
+        initial_kappa=3.5,
+        electron_populations=populations,
+    )
+    nominal = synthetic_collective_spectrum(
+        wavelength, 1064.0, np.pi/2, electron_density_m3=1.0e19,
+        electron_temperature_eV=150.0, kappa=3.5,
+        electron_populations=populations,
+    )["spectral_density_per_nm"]
+    signal = 2.0e4*nominal + 10.0 + 0.001*(wavelength-1064.0)
+    covariance = np.diag([0.0, 1e-4, 0.0, 1e8, 0.0, 2.5e-3, 1e-4, 4e8])
+    result = kinetic.fit_collective_kappa(
+        signal=signal, uncertainty=np.full(wavelength.size, 0.02),
+        electron_population_parameter_covariance=covariance,
+        population_mc_samples=20, population_mc_seed=17,
+        **common,
+    )
+    assert result["population_uncertainty_successful_refits"] >= 20
+    assert result["electron_population_parameter_names"] == [
+        "population_0_density_fraction", "population_0_temperature_ratio",
+        "population_0_kappa", "population_0_flow_projection_m_s",
+        "population_1_density_fraction", "population_1_temperature_ratio",
+        "population_1_kappa", "population_1_flow_projection_m_s",
+    ]
+    assert result["population_joint_fit_input_covariance"].shape == (11, 11)
+    assert result["fit_covariance"].shape == (3, 3)
+    assert np.all(np.diag(result["fit_covariance"]) >=
+                  np.diag(result["fit_covariance_conditional_on_population_inputs"]))
