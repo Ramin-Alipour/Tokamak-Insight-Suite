@@ -510,6 +510,21 @@ EXAMPLES = {
         "common_bulk_flow_m_s": [0.0, 0.0, 0.0],
         "coulomb_logarithm": 12.0
     },
+    "landau_fdt_full_em_response": {
+        "angular_frequency_rad_s": [1.0e5, 2.0e5],
+        "normalized_velocity_x": [-4.0, 0.0, 4.0],
+        "normalized_velocity_y": [-4.0, 0.0, 4.0],
+        "normalized_velocity_z": [-4.0, 0.0, 4.0],
+        "species": [
+            {"name": "electrons", "density_m3": 1.0e18, "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
+            {"name": "ions", "density_m3": 1.0e18, "mass_kg": 1.67262192369e-27, "charge_C": 1.602176634e-19}
+        ],
+        "common_temperature_J": 1.602176634e-17,
+        "wave_number_m_inverse": 0.001,
+        "propagation_direction": [1.0, 0.0, 0.0],
+        "common_bulk_flow_m_s": [0.0, 0.0, 0.0],
+        "coulomb_logarithm": 12.0
+    },
     "polarized_kinetic_ece": {
         "frequency_Hz": [45.0e9],
         "segment_length_m": [0.001],
