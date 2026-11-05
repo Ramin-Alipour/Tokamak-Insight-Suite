@@ -158,23 +158,31 @@ def fit_noncollective_kinetic_thomson_with_background(
         if isinstance(laser_spectrum_quadrature_order, (bool, np.bool_)) or order != laser_spectrum_quadrature_order or order < 3 or order > 31:
             raise ValueError("laser_spectrum_quadrature_order must be an integer from 3 through 31")
         # Integrate the measured piecewise-linear spectral-power density as
-        # photon flux: dN/dlambda = P_lambda * lambda / (h*c).
-        nodes, weights = np.polynomial.legendre.leggauss(order)
-        source_nodes_list, source_weights_list = [], []
-        for left, right, p_left, p_right in zip(source_x[:-1], source_x[1:], source_y[:-1], source_y[1:]):
-            half = 0.5 * (right-left)
-            midpoint = 0.5 * (right+left)
-            lam = midpoint + half*nodes
-            power_density = p_left + (p_right-p_left)*(lam-left)/(right-left)
-            photon_weight = half*weights*np.maximum(power_density, 0.0)*lam
-            source_nodes_list.extend(lam.tolist())
-            source_weights_list.extend(photon_weight.tolist())
-        source_nodes = np.asarray(source_nodes_list, dtype=float)
-        source_weights = np.asarray(source_weights_list, dtype=float)
-        source_norm = float(np.sum(source_weights))
-        if not np.isfinite(source_norm) or source_norm <= 0:
+        # photon flux: dN/dlambda = P_lambda * lambda / (h*c). Construct its
+        # exact piecewise-polynomial CDF, then apply a fixed-order Gauss rule in
+        # probability space. Runtime therefore scales with the selected order,
+        # not with the number of laser-profile samples.
+        segment_width = np.diff(source_x)
+        segment_slope = np.diff(source_y) / segment_width
+        segment_photon_integral = (
+            source_x[:-1]*source_y[:-1]*segment_width
+            + 0.5*(source_y[:-1] + source_x[:-1]*segment_slope)*segment_width**2
+            + (segment_slope*segment_width**3)/3.0
+        )
+        photon_cdf = np.r_[0.0, np.cumsum(segment_photon_integral)]
+        photon_norm = float(photon_cdf[-1])
+        if not np.isfinite(photon_norm) or photon_norm <= 0:
             raise ValueError("laser source profile has zero photon-flux integral")
-        source_weights /= source_norm
+        photon_cdf /= photon_norm
+        unique_cdf, unique_indices = np.unique(photon_cdf, return_index=True)
+        if unique_cdf.size < 2:
+            raise ValueError("laser source profile has insufficient non-zero photon-flux support")
+        probability_nodes, probability_weights = np.polynomial.legendre.leggauss(order)
+        probability_nodes = 0.5*(probability_nodes+1.0)
+        source_nodes = np.interp(
+            probability_nodes, unique_cdf, source_x[unique_indices]
+        )
+        source_weights = 0.5*probability_weights
     response = np.asarray(instrument_response, dtype=float)
     # Validate response independently before optimization.
     _apply_response(response, np.ones_like(x), x)
