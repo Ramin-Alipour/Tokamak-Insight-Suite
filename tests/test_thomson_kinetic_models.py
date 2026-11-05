@@ -425,3 +425,55 @@ def test_maxwell_juttner_normalization_overshoot_reports_ratio_without_unbound_v
             incident_polarization=[0.0, 0.0, 1.0],
             radial_order=16, angular_order=8,
         )
+
+
+def test_gyrotropic_bi_kappa_projected_marginal_has_declared_second_moment_and_coverage():
+    from tokamak_analysis.thomson_kinetic_models import (
+        project_gyrotropic_bi_kappa_electron_vdf,
+    )
+
+    velocity = np.linspace(-3.0e7, 3.0e7, 24001)
+    b = np.array([0.0, 0.0, 1.0])
+    q = np.array([np.sqrt(0.5), 0.0, np.sqrt(0.5)])
+    t_parallel, t_perpendicular, kappa = 800.0, 200.0, 4.0
+    flow = 1.5e5
+    result = project_gyrotropic_bi_kappa_electron_vdf(
+        velocity,
+        temperature_parallel_eV=t_parallel,
+        temperature_perpendicular_eV=t_perpendicular,
+        kappa=kappa,
+        magnetic_field_unit=b,
+        scattering_vector_unit=q,
+        flow_projection_m_s=flow,
+    )
+    expected_temperature = 0.5*t_parallel + 0.5*t_perpendicular
+    density = result["projected_vdf_s_m"]
+    area = np.trapezoid(density, velocity)
+    mean = np.trapezoid(velocity*density, velocity)/area
+    variance = np.trapezoid((velocity-mean)**2*density, velocity)/area
+
+    assert result["projected_temperature_eV"] == pytest.approx(expected_temperature)
+    assert result["velocity_grid_probability_coverage"] == pytest.approx(area, rel=2e-3)
+    assert area > 0.999
+    assert mean == pytest.approx(flow, abs=2e3)
+    assert variance == pytest.approx(
+        1.602176634e-19*expected_temperature/9.1093837015e-31,
+        rel=3e-3,
+    )
+    assert result["separate_parallel_perpendicular_temperatures_identifiable"] is False
+
+
+def test_gyrotropic_bi_kappa_projected_marginal_enforces_finite_variance_domain():
+    from tokamak_analysis.thomson_kinetic_models import (
+        project_gyrotropic_bi_kappa_electron_vdf,
+    )
+
+    with pytest.raises(ValueError, match="kappa > 3/2"):
+        project_gyrotropic_bi_kappa_electron_vdf(
+            np.linspace(-1e6, 1e6, 101),
+            temperature_parallel_eV=100.0,
+            temperature_perpendicular_eV=100.0,
+            kappa=1.5,
+            magnetic_field_unit=[0.0, 0.0, 1.0],
+            scattering_vector_unit=[1.0, 0.0, 0.0],
+        )
