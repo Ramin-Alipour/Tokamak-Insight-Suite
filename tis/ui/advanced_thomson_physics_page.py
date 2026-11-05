@@ -60,6 +60,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 MODEL_LABELS = {
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
     "cts_collective_kappa_spectrum": "CTS — collective Kappa-electron / multispecies Maxwellian-ion dynamic structure spectrum",
+    "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
@@ -93,6 +94,13 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "cts_collective_kappa_inference": (
+        "Nonlinear measured-spectrum inversion of electron density, second-moment electron temperature "
+        "and Kappa index. Ion composition, ion temperatures/flows, scattering geometry and measured "
+        "instrument response are fixed explicit inputs. The data-only fit Jacobian must identify all "
+        "three fitted parameters; otherwise the solver rejects the result. This is not a simultaneous "
+        "ion-temperature or fast-ion inference and remains collisionless, unmagnetized electrostatic CTS."
+    ),
     "cts_collective_kappa_spectrum": (
         "Collisionless, unmagnetized, longitudinal electrostatic CTS forward model. "
         "Electrons use the exact 1-D marginal of an isotropic 3-D Kappa distribution "
@@ -234,6 +242,27 @@ EXAMPLES = {
             "probability_density_m_s_inverse": np.exp(-0.5*(np.linspace(-2.0e6, 2.0e6, 81)/3.0e5)**2).tolist(),
             "smoothness": 0.0
         }
+    },
+    "cts_collective_kappa_inference": {
+        "wavelength_nm": np.linspace(499.7, 500.3, 81).tolist(),
+        "signal": (0.02 + np.exp(-0.5*((np.linspace(499.7, 500.3, 81)-500.0)/0.08)**2)).tolist(),
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "response": np.eye(81).tolist(),
+        "uncertainty": np.full(81, 0.01).tolist(),
+        "incident_direction": [1.0, 0.0, 0.0],
+        "scattered_direction": [0.0, 1.0, 0.0],
+        "ion_species": [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        "ion_fractions": [1.0],
+        "ion_temperature_eV": [200.0],
+        "electron_velocity_m_s": [0.0, 0.0, 0.0],
+        "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "initial_density_m3": 2.0e18,
+        "initial_temperature_eV": 250.0,
+        "initial_kappa": 4.0,
+        "density_bounds_m3": [1.0e17, 1.0e20],
+        "temperature_bounds_eV": [20.0, 2000.0],
+        "kappa_bounds": [1.6, 30.0]
     },
     "cts_collective_kappa_spectrum": {
         "wavelength_nm": np.linspace(499.7, 500.3, 81).tolist(),

@@ -111,3 +111,16 @@ def test_collective_kappa_cts_is_exposed_through_public_dispatch(monkeypatch):
     assert result["spectral_density_per_nm"] is sentinel["spectral_density_per_nm"]
     assert result["public_physics_entrypoint"] == "cts_collective_kappa_spectrum"
     assert result["automatic_model_substitution"] is False
+
+
+def test_collective_kappa_cts_inference_is_exposed_through_public_dispatch(monkeypatch):
+    sentinel = {"electron_density_m3": 2.0e18, "kappa_index": 4.0}
+    calls = []
+    def fake_solver(**kwargs):
+        calls.append(kwargs)
+        return sentinel
+    monkeypatch.setattr(physics, "fit_collective_kappa", fake_solver)
+    result = physics.run_advanced_thomson_physics("cts_collective_kappa_inference", signal=[1.0, 2.0])
+    assert calls == [{"signal": [1.0, 2.0]}]
+    assert result["electron_density_m3"] == 2.0e18
+    assert result["public_physics_entrypoint"] == "cts_collective_kappa_inference"

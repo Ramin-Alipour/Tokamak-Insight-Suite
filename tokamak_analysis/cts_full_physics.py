@@ -56,6 +56,7 @@ from .thomson_kinetic_models import (
     infer_gyrotropic_bi_maxwellian_temperatures,
     infer_three_dimensional_flow_from_thomson_projections,
     collective_kappa_spectral_density,
+    fit_collective_kappa,
 )
 from .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
@@ -483,6 +484,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
       - cts_collective_kappa_spectrum: collisionless electrostatic dynamic-structure
         spectrum using Kappa electrons, Maxwellian multispecies ions and Landau response.
+      - cts_collective_kappa_inference: joint measured-spectrum fit of electron density,
+        second-moment temperature and Kappa index with fixed supplied ion state and response.
       - landau_fdt_cts: multispecies electrostatic CTS with the discrete
         Landau operator, matching Langevin source and Poisson screening.
       - quantum_fdt: symmetrized quantum FDT applied to a supplied causal response.
@@ -540,6 +543,8 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = kappa_electron_susceptibility
     elif model == "cts_collective_kappa_spectrum":
         solver = collective_kappa_spectral_density
+    elif model == "cts_collective_kappa_inference":
+        solver = fit_collective_kappa
     elif model == "cts_tabulated_evdf_landau":
         solver = collective_tabulated_electron_spectral_density
     elif model == "cts_electrostatic_measured_spectrum_inference":
@@ -600,7 +605,7 @@ def run_advanced_thomson_physics(model, **kwargs):
         solver = plasma_charge_state_moments
     else:
         raise ValueError(
-            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_collective_kappa_spectrum, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
+            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_collective_kappa_spectrum, cts_collective_kappa_inference, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
             "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
             "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"

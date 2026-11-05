@@ -241,3 +241,10 @@ def test_collective_kappa_cts_is_available_in_advanced_dashboard():
     assert "cts_collective_kappa_spectrum" in advanced.MODEL_LABELS
     assert "cts_collective_kappa_spectrum" in advanced.EXAMPLES
     assert "cts_collective_kappa_spectrum" in advanced.MODEL_PHYSICS_NOTES
+
+
+def test_collective_kappa_inference_is_available_in_advanced_dashboard():
+    from tis.ui import advanced_thomson_physics_page as advanced
+    assert "cts_collective_kappa_inference" in advanced.MODEL_LABELS
+    assert "cts_collective_kappa_inference" in advanced.EXAMPLES
+    assert "cts_collective_kappa_inference" in advanced.MODEL_PHYSICS_NOTES
