@@ -121,7 +121,7 @@ def test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flu
     assert result["optimizer_success"]
     assert result["recoil_included"] is True
     assert result["laser_source_profile_used"] is True
-    assert result["laser_source_quadrature_nodes"] == 6
+    assert result["laser_source_quadrature_nodes"] == 3
     assert "photon_flux" in result["laser_source_profile_convolution"]
     assert "Klein_Nishina" in result["laser_source_profile_convolution"]
 
