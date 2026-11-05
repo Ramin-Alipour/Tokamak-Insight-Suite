@@ -471,6 +471,7 @@ def fit_noncollective_kinetic_thomson_with_background(
             if source_nodes is not None else "monochromatic_incident_laser"
         ),
         "laser_source_quadrature_nodes": 0 if source_nodes is None else int(source_nodes.size),
+        "laser_source_quadrature_wavelength_nm": [] if source_nodes is None else source_nodes.tolist(),
         "experimental_validation": "not_performed",
     }
 
@@ -732,6 +733,7 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
             if source_nodes is not None else "monochromatic_incident_laser"
         ),
         "laser_source_quadrature_nodes": 0 if source_nodes is None else int(source_nodes.size),
+        "laser_source_quadrature_wavelength_nm": [] if source_nodes is None else source_nodes.tolist(),
         "experimental_validation": "not_performed"
     }
 
