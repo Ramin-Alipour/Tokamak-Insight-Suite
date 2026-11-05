@@ -71,15 +71,6 @@ MODEL_LABELS = {
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware inversion with optional GCV regularization",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
-    "gyrotropic_bi_maxwellian_anisotropy": (
-        "Uses T_q = T_perp*(1-mu^2) + T_parallel*mu^2 with iterative "
-        "errors-in-variables GLS. Optional magnetic_pitch_cosine_covariance "
-        "and projected_temperature_pitch_cross_covariance are propagated "
-        "together; their joint input covariance must be positive semidefinite. "
-        "The physical inversion enforces strictly positive parallel and "
-        "perpendicular temperatures. If a positivity bound is active, the "
-        "reported local curvature covariance is not a symmetric confidence interval."
-    ),
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
@@ -105,6 +96,15 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "gyrotropic_bi_maxwellian_anisotropy": (
+        "Uses T_q = T_perp*(1-mu^2) + T_parallel*mu^2 with iterative "
+        "errors-in-variables GLS. Optional magnetic_pitch_cosine_covariance "
+        "and projected_temperature_pitch_cross_covariance are propagated "
+        "together; their joint input covariance must be positive semidefinite. "
+        "The physical inversion enforces strictly positive parallel and "
+        "perpendicular temperatures. If a positivity bound is active, the "
+        "reported local curvature covariance is not a symmetric confidence interval."
+    ),
     "thomson_kinetic_background_fit": (
         "Fits calibrated measured optical Thomson spectra directly with the selected physical Kappa or relativistic Maxwell-Juttner forward model. "
         "The Kappa q-projected Student-t marginal is integrated exactly over finite wavelength bins; the relativistic kernel is Gauss-Legendre averaged inside each bin. "
