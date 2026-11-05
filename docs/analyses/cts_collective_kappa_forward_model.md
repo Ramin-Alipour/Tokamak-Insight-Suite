@@ -40,3 +40,14 @@ API returns the complex derivative and separate real/imaginary quadrature
 error estimates. This derivative supports dielectric root sensitivity and
 local identifiability analysis, but does not add collisions, magnetization,
 relativistic kinetics or a Full-EM CTS vertex.
+
+
+At fixed scattering wavenumber, the angular-frequency sensitivity follows
+from the chain rule \(v_\phi=\omega/k\):
+\[
+\left.\frac{\partial\chi_e}{\partial\omega}\right|_k
+=\frac{1}{k}\frac{\partial\chi_e}{\partial v_\phi}.
+\]
+The solver returns this quantity as
+`susceptibility_angular_frequency_derivative_s`; it is not a derivative at
+fixed phase velocity or a full multi-species dielectric derivative.

@@ -230,6 +230,10 @@ def kappa_electron_susceptibility(
             -plasma_frequency_squared / wave_number**2
             * response["integral_phase_velocity_derivative_s3_m3"]
         ),
+        "susceptibility_angular_frequency_derivative_s": complex(
+            -plasma_frequency_squared / wave_number**3
+            * response["integral_phase_velocity_derivative_s3_m3"]
+        ),
         "plasma_frequency_squared_s_minus2": float(plasma_frequency_squared),
         "wavenumber_m_inverse": wave_number,
         "distribution_model": "exact_1D_marginal_of_isotropic_3D_Kappa",

@@ -104,7 +104,7 @@ MODEL_PHYSICS_NOTES = {
         "returns chi_e = -(omega_pe^2/k^2) integral f'_kappa(v)/(v-v_phase-i*eta) dv. "
         "It also returns d chi_e/d v_phase = -(omega_pe^2/k^2) integral "
         "f'_kappa(v)/(v-v_phase-i*eta)^2 dv at fixed positive eta, with separate real/imaginary "
-        "quadrature error estimates. The velocity grid is a tail-coverage gate, not a truncated-tail "
+        "quadrature error estimates, plus the fixed-k chain-rule derivative d chi_e/d omega = (1/k) d chi_e/d v_phase. The velocity grid is a tail-coverage gate, not a truncated-tail "
         "approximation. This remains an electron-only electrostatic response, not collisional, "
         "magnetized, relativistic, FDT or Full-EM CTS."
     ),

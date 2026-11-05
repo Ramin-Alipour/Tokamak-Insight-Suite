@@ -7853,9 +7853,9 @@
   },
   {
     "name": "Full-tail isotropic-Kappa Landau susceptibility phase-velocity derivative",
-    "equation": "χ_e(vφ)=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη) dv; ∂χ_e/∂vφ=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη)² dv, η>0",
+    "equation": "χ_e(vφ)=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη) dv; ∂χ_e/∂vφ=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη)² dv, η>0; at fixed k, ∂χ_e/∂ω=(1/k)∂χ_e/∂vφ",
     "inputs": "Electron density [m^-3], second-moment electron temperature [eV], Kappa index κ>3/2, real phase velocity [m/s], wavenumber [m^-1], optional positive retarded-pole displacement η [m/s], velocity grid for probability-coverage gate",
-    "output": "Complex longitudinal electron susceptibility and its complex phase-velocity derivative [s/m], with adaptive-quadrature error estimates",
+    "output": "Complex longitudinal electron susceptibility and its complex phase-velocity derivative [s/m], with adaptive-quadrature error estimates and angular-frequency derivative [s]",
     "assumptions": "Exact 1-D marginal of an isotropic 3-D finite-variance Kappa distribution; collisionless, unmagnetized, non-relativistic longitudinal response; positive retarded pole displacement held fixed during differentiation; analytic Kappa tail integrated over the full velocity axis.",
     "status": "D",
     "category": "Collective Thomson scattering",
@@ -7921,6 +7921,10 @@
         {
           "name": "integral_phase_velocity_derivative_imag_absolute_error",
           "unit": "s^3/m^3"
+        },
+        {
+          "name": "susceptibility_angular_frequency_derivative_s",
+          "unit": "s; derivative at fixed wavenumber and fixed pole displacement"
         }
       ],
       "prerequisites": [

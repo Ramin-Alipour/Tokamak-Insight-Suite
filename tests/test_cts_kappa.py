@@ -323,6 +323,11 @@ def test_kappa_susceptibility_phase_derivative_matches_central_finite_difference
     assert np.isfinite(result["integral_phase_velocity_derivative_s3_m3"].imag)
     assert result["integral_phase_velocity_derivative_real_absolute_error"] >= 0.0
     assert result["integral_phase_velocity_derivative_imag_absolute_error"] >= 0.0
+    assert result["susceptibility_angular_frequency_derivative_s"] == pytest.approx(
+        result["susceptibility_phase_velocity_derivative_s_m"]
+        / parameters["wavenumber_m_inverse"],
+        rel=1e-12,
+    )
 
 
 def test_kappa_phase_derivative_formula_registry_is_synchronized_and_executable():
