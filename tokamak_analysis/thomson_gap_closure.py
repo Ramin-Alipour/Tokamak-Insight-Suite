@@ -820,8 +820,13 @@ def reconstruct_psf_aware_thomson_profile(
             cross_covariance = cross_raw.astype(float, copy=False)
             whitening_matrix = whiten(np.eye(y.size))
             measurement_sensitivity = normal_inverse @ a[:, active].T @ whitening_matrix
+            if measurement_uncertainty is not None:
+                sigma_y = _real_vector(measurement_uncertainty, "measurement_uncertainty", minimum=y.size)
+                measurement_covariance_matrix = np.diag(sigma_y**2)
+            else:
+                measurement_covariance_matrix = np.asarray(measurement_covariance, dtype=float)
             joint_covariance = np.block([
-                [whitening_matrix.T @ whitening_matrix, cross_covariance],
+                [measurement_covariance_matrix, cross_covariance],
                 [cross_covariance.T, operator_covariance],
             ])
             joint_covariance = 0.5 * (joint_covariance + joint_covariance.T)
