@@ -535,3 +535,97 @@ def test_maxwellian_canonical_inference_requires_radius_in_fit_options():
             scattering_angle_rad=np.pi / 2,
             physical_fit_options={"background_model": "linear"},
         )
+
+
+@pytest.mark.parametrize("uncertainty_kind", ["pointwise", "full_covariance"])
+def test_kinetic_physical_fit_receives_top_level_spectral_measurement_uncertainty(
+    monkeypatch, uncertainty_kind
+):
+    import tokamak_analysis.thomson_kinetic_background as kinetic_background
+
+    x, y = _spectrum()
+    captured = {}
+
+    def fake_kinetic_fit(wavelength, measured, **kwargs):
+        captured["wavelength"] = np.asarray(wavelength).copy()
+        captured["measured"] = np.asarray(measured).copy()
+        captured["kwargs"] = kwargs
+        return {
+            "status": "completed",
+            "primary_result_status": "identified_from_measurement",
+            "parameter_order": ["electron_temperature_eV", "electron_velocity_projection_m_s", "kappa"],
+        }
+
+    monkeypatch.setattr(
+        kinetic_background,
+        "fit_noncollective_kinetic_thomson_with_background",
+        fake_kinetic_fit,
+    )
+    supplied = (
+        np.full(x.size, 0.75)
+        if uncertainty_kind == "pointwise"
+        else np.diag(np.full(x.size, 0.75**2))
+    )
+    uncertainty_kwargs = (
+        {"signal_uncertainty": supplied}
+        if uncertainty_kind == "pointwise"
+        else {"signal_covariance": supplied}
+    )
+
+    result = analyze_thomson_spectral_distribution(
+        x,
+        y,
+        instrument_response_matrix=np.eye(x.size),
+        background_fraction=0.1,
+        physical_model="kappa",
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2,
+        physical_fit_options={"physical_initial": [120.0, 0.0, 4.0]},
+        **uncertainty_kwargs,
+    )
+
+    np.testing.assert_array_equal(captured["wavelength"], x)
+    np.testing.assert_array_equal(captured["measured"], y)
+    if uncertainty_kind == "pointwise":
+        np.testing.assert_array_equal(
+            captured["kwargs"]["measurement_uncertainty"], supplied
+        )
+        assert "measurement_covariance" not in captured["kwargs"]
+    else:
+        np.testing.assert_array_equal(
+            captured["kwargs"]["measurement_covariance"], supplied
+        )
+        assert "measurement_uncertainty" not in captured["kwargs"]
+    assert result["physical_inference"]["reportable_as_primary_inference"] is True
+
+
+def test_kinetic_physical_fit_rejects_duplicate_top_level_and_nested_uncertainty(
+    monkeypatch,
+):
+    import tokamak_analysis.thomson_kinetic_background as kinetic_background
+
+    x, y = _spectrum()
+
+    def unused_fit(*args, **kwargs):
+        raise AssertionError("the conflicting fit must be rejected before solver execution")
+
+    monkeypatch.setattr(
+        kinetic_background,
+        "fit_noncollective_kinetic_thomson_with_background",
+        unused_fit,
+    )
+    with pytest.raises(ValueError, match="cannot be combined"):
+        analyze_thomson_spectral_distribution(
+            x,
+            y,
+            instrument_response_matrix=np.eye(x.size),
+            background_fraction=0.1,
+            signal_uncertainty=np.full(x.size, 0.75),
+            physical_model="kappa",
+            laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi / 2,
+            physical_fit_options={
+                "physical_initial": [120.0, 0.0, 4.0],
+                "measurement_uncertainty": np.full(x.size, 0.5),
+            },
+        )
