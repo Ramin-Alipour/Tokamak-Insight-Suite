@@ -882,3 +882,96 @@ def test_collective_kappa_single_population_moments_reduce_to_input_temperature_
     assert moments["total_second_moment_temperature_eV"] == pytest.approx(200.0)
     assert moments["between_population_drift_temperature_eV"] == pytest.approx(0.0, abs=1e-12)
     assert moments["velocity_kurtosis"] == pytest.approx(3.0*(2.0*4.0-3.0)/(2.0*4.0-5.0))
+
+
+
+def test_collective_kappa_static_screening_uses_kappa_zero_frequency_susceptibility():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 21)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    ne, te, kappa, laser = 1.0e19, 200.0, 4.0, 1064.0
+    result = collective_kappa_spectral_density(
+        wavelength, laser, angle,
+        electron_density_m3=ne, electron_temperature_eV=te, kappa=kappa,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+    )
+    expected_lambda = np.sqrt(
+        8.8541878128e-12*te*(kappa-1.5)/(ne*1.602176634e-19*kappa)
+    )
+    expected_k = 4.0*np.pi*np.sin(angle/2.0)/(laser*1e-9)
+    assert result["electron_debye_length_m"] == pytest.approx(expected_lambda, rel=1e-12)
+    assert result["scattering_parameter_alpha"] == pytest.approx(1.0/(expected_k*expected_lambda), rel=1e-12)
+    assert result["static_screening_status"] == "static_rest_frame_susceptibility_for_co_moving_electron_populations"
+
+
+def test_collective_kappa_counterstreaming_mixture_does_not_report_scalar_debye_length():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1050.0, 1078.0, 21)
+    angle = np.pi/2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    result = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=200.0, kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        electron_populations=[
+            {"density_fraction": 0.7, "temperature_ratio": 0.5, "distribution": "kappa", "kappa": 4.0, "flow_projection_m_s": -2.0e5},
+            {"density_fraction": 0.3, "temperature_ratio": 2.0, "distribution": "maxwellian", "flow_projection_m_s": 2.0e5},
+        ],
+    )
+    assert result["electron_debye_length_m"] is None
+    assert result["scattering_parameter_alpha"] is None
+    assert result["static_screening_status"] == "not_defined_for_counter_streaming_electron_populations"
+
+
+def test_collective_kappa_fit_reports_effective_mixture_temperature_and_static_alpha():
+    from tokamak_analysis.thomson_kinetic_models import fit_collective_kappa, collective_kappa_spectral_density
+
+    wavelength = np.linspace(1048.0, 1080.0, 101)
+    angle = np.pi/2.0
+    laser = 1064.0
+    incident = np.array([-np.sin(angle/2.0), np.cos(angle/2.0), 0.0])
+    scattered = np.array([np.sin(angle/2.0), np.cos(angle/2.0), 0.0])
+    populations = [
+        {"density_fraction": 0.7, "temperature_ratio": 0.5, "kappa": 4.0, "distribution": "kappa", "flow_projection_m_s": 0.0},
+        {"density_fraction": 0.3, "temperature_ratio": 2.0, "distribution": "maxwellian", "flow_projection_m_s": 0.0},
+    ]
+    fixed = dict(
+        electron_density_m3=1.0e19, electron_temperature_eV=150.0, kappa=3.5,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        electron_populations=populations,
+    )
+    spectrum = collective_kappa_spectral_density(wavelength, laser, angle, **fixed)["spectral_density_per_nm"]
+    signal = 2.0e4*spectrum + 10.0 + 0.001*(wavelength-laser)
+    result = fit_collective_kappa(
+        wavelength_nm=wavelength, signal=signal, laser_wavelength_nm=laser,
+        scattering_angle_rad=angle, response=np.eye(wavelength.size),
+        uncertainty=np.full(wavelength.size, 0.01*np.max(signal)),
+        incident_direction=incident, scattered_direction=scattered,
+        ion_species=fixed["ion_species"], ion_fractions=fixed["ion_fractions"],
+        ion_temperature_eV=fixed["ion_temperature_eV"],
+        electron_velocity_m_s=fixed["electron_velocity_m_s"],
+        ion_velocity_m_s=fixed["ion_velocity_m_s"],
+        initial_density_m3=1.0e19, initial_temperature_eV=150.0, initial_kappa=3.5,
+        electron_populations=populations,
+    )
+    assert result["electron_temperature_eV"] == pytest.approx(150.0, rel=2e-3)
+    assert result["electron_effective_second_moment_temperature_eV"] == pytest.approx(142.5, rel=2e-3)
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(0.0, abs=1e-8)
+    assert result["electron_debye_length_m"] is not None
+    assert result["scattering_parameter_alpha"] == pytest.approx(
+        result["electron_mixture_moments"]["scattering_parameter_alpha"], rel=1e-12
+    )

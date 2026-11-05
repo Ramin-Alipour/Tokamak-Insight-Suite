@@ -69,3 +69,26 @@ When any nonzero Kappa component has 3/2 < kappa <= 5/2, variance remains
 finite but kurtosis diverges and is returned as unavailable, never clipped.
 The public advanced-physics API and its Dashboard example expose these
 derived moments alongside the summed multi-population dielectric.
+
+
+## Static screening and inference outputs for electron mixtures
+
+For co-moving electron populations, the zero-frequency longitudinal
+susceptibility gives the effective screening length
+
+lambda_De,eff^-2 = (n_e e / epsilon_0) sum_j eta_j g_j/T_j,
+
+where g_j=1 for a Maxwellian component and
+g_j=kappa_j/(kappa_j-3/2) for a finite-variance Kappa component. The
+scattering parameter is alpha=1/(k lambda_De,eff). This reduces to the
+Maxwellian Debye length for a single Maxwellian and includes the exact
+zero-frequency Kappa susceptibility enhancement for the stated 1-D
+isotropic-Kappa marginal.
+
+For counter-streaming electron populations there is no common electron rest
+frame in which a scalar static Debye length describes the mixture. The API
+therefore returns null for the scalar Debye length and alpha, together with an
+explicit status, rather than reusing the reference temperature in a misleading
+Maxwellian expression. The inverse also distinguishes the fitted reference
+temperature from the total mixture second-moment temperature and the
+density-weighted bulk electron flow.

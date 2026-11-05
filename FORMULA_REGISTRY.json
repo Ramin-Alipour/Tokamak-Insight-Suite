@@ -4122,7 +4122,7 @@
   },
   {
     "name": "Collective kappa-electron Thomson dielectric spectrum",
-    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; ε=1+χ_e+χ_i; S=(2π/k){|1+χ_i|² Σ_j η_j f_e,j/|ε|²+Σ_s Z_s α_s |χ_e|² f_i,s/|ε|²}; ū_e=Σ_jη_j u_j; T_e,2=Σ_jη_jT_j+(m_e/e)Σ_jη_j(u_j−ū_e)²",
+    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; ε=1+χ_e+χ_i; S=(2π/k){|1+χ_i|² Σ_j η_j f_e,j/|ε|²+Σ_s Z_s α_s |χ_e|² f_i,s/|ε|²}; ū_e=Σ_jη_j u_j; T_e,2=Σ_jη_jT_j+(m_e/e)Σ_jη_j(u_j−ū_e)²; λ_De,eff^-2=(n_e e/ε_0)Σ_jη_j g_j/T_j, g_j=1 (Maxwellian) or κ_j/(κ_j−3/2) (Kappa, common-flow rest frame); α=1/(kλ_De,eff)",
     "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/reference temperature/Kappa index, optional electron populations with independent Maxwellian or Kappa distributions and projected flows, ion species/fractions/temperatures, optional per-ion Maxwellian or Kappa distributions and projected flows, electron flow and beam directions",
     "output": "Collective spectral density, per-population electron and per-species ion susceptibilities, dielectric function, dynamic structure factor and fitted ne/Te/electron Kappa index",
     "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; exact 1-D projected marginals of isotropic Maxwellian or finite-variance Kappa species; Landau contour; quasi-neutral ion densities; fixed supplied composition and population/ion parameters; each Kappa index > 3/2.",
@@ -4280,6 +4280,21 @@
           "name": "electron_reference_flow_projection_m_s",
           "unit": "m s^-1",
           "description": "Projection of the supplied reference electron velocity vector; differs from mixture bulk flow when population drifts differ."
+        },
+        {
+          "name": "electron_debye_length_m",
+          "unit": "m or null",
+          "description": "Static rest-frame Debye length derived from zero-frequency electron susceptibility; null for counter-streaming mixtures without a common rest frame."
+        },
+        {
+          "name": "scattering_parameter_alpha",
+          "unit": "dimensionless or null",
+          "description": "k times the static rest-frame Debye length inverse; withheld when a scalar static rest-frame screening length is not defined."
+        },
+        {
+          "name": "static_screening_status",
+          "unit": "status",
+          "description": "Explains whether the supplied electron mixture has a common rest frame for static screening."
         }
       ],
       "prerequisites": [
@@ -4293,7 +4308,7 @@
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ],
-      "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied.",
+      "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2. Static screening is calculated from the zero-frequency susceptibility with the Kappa enhancement factor; no single scalar Debye length or alpha is reported for counter-streaming populations.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
@@ -4364,7 +4379,7 @@
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ]
     },
-    "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2."
+    "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied. Returned electron bulk flow and second-moment temperature include exact between-population drift variance. The projected Kappa fourth moment exists only for kappa > 5/2; kurtosis is withheld when any nonzero Kappa component has 3/2 < kappa <= 5/2. Static screening is calculated from the zero-frequency susceptibility with the Kappa enhancement factor; no single scalar Debye length or alpha is reported for counter-streaming populations."
   },
   {
     "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",

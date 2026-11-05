@@ -1384,6 +1384,32 @@ def collective_kappa_spectral_density(
         "fourth_moment_status": "finite_for_all_populations" if fourth_moment_finite else "diverges_because_at_least_one_Kappa_population_has_1.5 < kappa <= 2.5",
         "moment_definition": "moments of the density-weighted projected mixture, including between-population drift offsets",
     }
+    # A scalar static Debye length is meaningful only in a common electron
+    # rest frame. For co-moving Maxwellian/Kappa populations, derive it from
+    # the zero-frequency susceptibility, including the Kappa enhancement.
+    co_moving_populations = bool(np.allclose(
+        population_flows, mixture_flow, rtol=0.0,
+        atol=1e-10*max(float(np.max(np.abs(population_flows))), 1.0),
+    ))
+    if co_moving_populations:
+        static_screening_weight = 0.0
+        for item, fraction, temperature in zip(populations, population_fractions, population_temperatures):
+            enhancement = (
+                item["kappa"]/(item["kappa"]-1.5)
+                if item["distribution"] == "kappa" else 1.0
+            )
+            static_screening_weight += fraction*enhancement/temperature
+        inverse_debye_squared = ne*E_CHARGE/EPS0*static_screening_weight
+        electron_debye_length = float(1.0/np.sqrt(inverse_debye_squared))
+        scattering_parameter_alpha = float(1.0/(k*electron_debye_length))
+        debye_status = "static_rest_frame_susceptibility_for_co_moving_electron_populations"
+    else:
+        electron_debye_length = None
+        scattering_parameter_alpha = None
+        debye_status = "not_defined_for_counter_streaming_electron_populations"
+    electron_mixture_moments["static_screening_status"] = debye_status
+    electron_mixture_moments["electron_debye_length_m"] = electron_debye_length
+    electron_mixture_moments["scattering_parameter_alpha"] = scattering_parameter_alpha
     electron_pdf = np.zeros(x.size, dtype=float)
     chi_e = np.zeros(x.size, dtype=complex)
     population_pdfs, population_susceptibilities = [], []
@@ -1485,6 +1511,9 @@ def collective_kappa_spectral_density(
         "electron_reference_flow_projection_m_s": ue,
         "electron_temperature_eV": effective_temperature,
         "electron_mixture_moments": electron_mixture_moments,
+        "electron_debye_length_m": electron_debye_length,
+        "scattering_parameter_alpha": scattering_parameter_alpha,
+        "static_screening_status": debye_status,
         "ion_flow_projections_m_s": np.asarray(
             [item["flow_projection_m_s"] for item in resolved_ion_populations],
             dtype=float,
@@ -1728,19 +1757,67 @@ def fit_collective_kappa(
             dtype=float,
         )
     k=4.0*np.pi*np.sin(float(scattering_angle_rad)/2.0)/(float(laser_wavelength_nm)*1e-9)
-    debye=np.sqrt(EPS0*te/(ne*E_CHARGE))
-    alpha=1.0/(k*debye)
+    mixture_physics = collective_kappa_spectral_density(
+        x, laser_wavelength_nm, scattering_angle_rad,
+        electron_density_m3=ne, electron_temperature_eV=te, kappa=kap,
+        ion_species=ion_species, ion_fractions=ion_fractions,
+        ion_temperature_eV=ion_temperature_eV,
+        electron_velocity_m_s=electron_velocity_m_s,
+        ion_velocity_m_s=ion_velocity_m_s,
+        incident_direction=incident_direction, scattered_direction=scattered_direction,
+        electron_populations=electron_populations, ion_populations=ion_populations,
+    )
+    mixture_moments = mixture_physics["electron_mixture_moments"]
+    electron_bulk_flow = float(mixture_moments["bulk_flow_projection_m_s"])
+    electron_effective_temperature = float(mixture_moments["total_second_moment_temperature_eV"])
+    debye = mixture_physics["electron_debye_length_m"]
+    alpha = mixture_physics["scattering_parameter_alpha"]
+    resolved_populations = mixture_physics["electron_populations"]
+    moment_covariance = population_joint_covariance if population_joint_covariance is not None else covariance
+    temperature_gradient = np.zeros(moment_covariance.shape[0], dtype=float)
+    flow_gradient = np.zeros(moment_covariance.shape[0], dtype=float)
+    fractions_m = np.asarray([item["density_fraction"] for item in resolved_populations], dtype=float)
+    ratios_m = np.asarray([item["temperature_ratio"] for item in resolved_populations], dtype=float)
+    flows_m = np.asarray([item["flow_projection_m_s"] for item in resolved_populations], dtype=float)
+    temperature_gradient[1] = float(fractions_m @ ratios_m)
+    effective_temperature_uncertainty = None
+    bulk_flow_uncertainty = None
+    if population_joint_covariance is not None:
+        for j, (fraction, ratio, flow) in enumerate(zip(fractions_m, ratios_m, flows_m)):
+            base = 3+4*j
+            temperature_gradient[base] = te*ratio + (ME/E_CHARGE)*(flow**2-2.0*electron_bulk_flow*flow)
+            temperature_gradient[base+1] = te*fraction
+            temperature_gradient[base+3] = 2.0*ME/E_CHARGE*fraction*(flow-electron_bulk_flow)
+            flow_gradient[base] = flow
+            flow_gradient[base+3] = fraction
+        effective_temperature_uncertainty = float(np.sqrt(max(
+            float(temperature_gradient @ moment_covariance @ temperature_gradient), 0.0
+        )))
+        bulk_flow_uncertainty = float(np.sqrt(max(
+            float(flow_gradient @ moment_covariance @ flow_gradient), 0.0
+        )))
+    else:
+        effective_temperature_uncertainty = float(abs(temperature_gradient[1])*sigma[1])
     fitted=predicted*scale
     residual_signal=y-fitted
     return {
         "electron_density_m3":float(ne),
         "electron_density_uncertainty_m3":float(sigma[0]),
         "electron_temperature_eV":float(te),
+        "electron_reference_temperature_eV":float(te),
         "electron_temperature_uncertainty_eV":float(sigma[1]),
+        "electron_effective_second_moment_temperature_eV":electron_effective_temperature,
+        "electron_effective_second_moment_temperature_uncertainty_eV":effective_temperature_uncertainty,
+        "electron_mixture_moments":mixture_moments,
+        "electron_debye_length_m":debye,
+        "scattering_parameter_alpha":alpha,
+        "static_screening_status":mixture_physics["static_screening_status"],
         "kappa_index":float(kap),
         "kappa_index_uncertainty":float(sigma[2]),
-        "electron_velocity_projection_m_s":ue,
-        "electron_flow_source":"explicitly supplied electron velocity vector",
+        "electron_velocity_projection_m_s":electron_bulk_flow,
+        "electron_reference_velocity_projection_m_s":ue,
+        "electron_bulk_flow_projection_uncertainty_m_s":bulk_flow_uncertainty,
+        "electron_flow_source":"density_weighted_mean_of_supplied_electron_population_flows",
         "ion_velocity_projection_m_s":ui.tolist(),
         "ion_species":[item["name"] for item in ion_properties],
         "ion_fractions":np.asarray(ion_fractions,dtype=float).tolist(),
