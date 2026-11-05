@@ -527,3 +527,55 @@ def test_psf_profile_inverse_rejects_non_psd_joint_measurement_operator_covarian
             measurement_spatial_mixing_cross_covariance=np.ones((3, 9)) * 1e-3,
             positive=False,
         )
+
+
+
+def test_psf_profile_covariance_uses_regularized_estimator_sandwich():
+    """Known-noise uncertainty must use J_y C_y J_y.T, not inverse Hessian."""
+    mixing = np.array([
+        [1.0, 0.2, 0.0],
+        [0.3, 1.0, 0.2],
+        [0.0, 0.4, 1.0],
+        [0.5, 0.2, 0.4],
+    ])
+    truth = np.array([2.0, 1.5, 2.5])
+    measured = mixing @ truth + np.array([0.03, -0.02, 0.01, -0.015])
+    measurement_covariance = np.array([
+        [0.04, 0.006, 0.0, 0.0],
+        [0.006, 0.05, 0.004, 0.0],
+        [0.0, 0.004, 0.03, 0.003],
+        [0.0, 0.0, 0.003, 0.045],
+    ])
+    lam = 0.35
+    result = reconstruct_psf_aware_thomson_profile(
+        measured, mixing, regularization_strength=lam,
+        measurement_covariance=measurement_covariance, positive=False,
+    )
+
+    chol = np.linalg.cholesky(measurement_covariance)
+    whitening = np.linalg.solve(chol, np.eye(measured.size))
+    design = whitening @ mixing
+    curvature = np.diff(np.eye(mixing.shape[1]), n=2, axis=0)
+    normal = design.T @ design + lam * curvature.T @ curvature
+    sensitivity = np.linalg.solve(normal, design.T @ whitening)
+    expected = sensitivity @ measurement_covariance @ sensitivity.T
+    expected = 0.5 * (expected + expected.T)
+    np.testing.assert_allclose(result["profile_covariance"], expected, rtol=2e-10, atol=1e-12)
+    assert not np.allclose(result["profile_covariance"], np.linalg.inv(normal), rtol=1e-3, atol=1e-8)
+    assert result["uncertainty_method"] == "frequentist_regularized_estimator_sandwich_Jy_Cy_JyT"
+
+
+def test_psf_profile_covariance_sandwich_reduces_to_unregularized_gls_covariance():
+    mixing = np.array([
+        [1.0, 0.0],
+        [0.2, 0.8],
+        [0.0, 1.0],
+    ])
+    covariance = np.diag([0.02, 0.03, 0.025])
+    truth = np.array([1.7, 2.4])
+    result = reconstruct_psf_aware_thomson_profile(
+        mixing @ truth, mixing, regularization_strength=1e-10,
+        measurement_covariance=covariance, positive=False,
+    )
+    expected = np.linalg.inv(mixing.T @ np.linalg.solve(covariance, mixing))
+    np.testing.assert_allclose(result["profile_covariance"], expected, rtol=2e-8, atol=1e-10)
