@@ -547,8 +547,8 @@ def test_gyrotropic_anisotropic_thomson_is_registered_and_dashboard_resolvable()
     entry = get_analysis(82)
     assert entry["name"] == "Gyrotropic anisotropic optical Thomson inference"
     assert (entry["module"], entry["function"]) == (
-        "thomson_anisotropic_inference",
-        "fit_gyrotropic_bi_maxwellian_thomson",
+        "thomson_workflow",
+        "fit_gyrotropic_thomson_spectra",
     )
     contract = entry["execution_contract"]
     assert contract["raw_data_to_physics"] is True
