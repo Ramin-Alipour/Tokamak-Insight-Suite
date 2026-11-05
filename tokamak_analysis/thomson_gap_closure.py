@@ -273,6 +273,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
     if background_uncertainty is not None and background_covariance is not None:
         raise ValueError("supply background_uncertainty or background_covariance, not both")
     n = x.size
+    widths = _bin_widths(x)
     if signal_uncertainty is not None:
         sc = np.diag(_real_vector(signal_uncertainty, "signal_uncertainty", n)**2)
     elif signal_covariance is not None:

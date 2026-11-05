@@ -455,7 +455,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         return whiten(y - predict(parameters)[0])
 
     parameter_count = int(fit.x.size)
-    background_start = 3*n + kappa_parameter_count
+    background_start = 3*r.size + kappa_parameter_count
     fitted_background_coefficients = fit.x[background_start:].reshape(m, n_background).copy()
     data_jacobian = _bound_aware_jacobian(
         data_residual_only, fit.x, lower, upper

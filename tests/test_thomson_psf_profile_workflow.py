@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import tokamak_analysis.thomson_workflow as workflow
 
