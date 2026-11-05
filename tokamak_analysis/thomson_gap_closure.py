@@ -664,7 +664,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
 def reconstruct_psf_aware_thomson_profile(
     measured_channel_values, spatial_mixing_matrix, *, regularization_strength=None,
     measurement_uncertainty=None, measurement_covariance=None,
-    spatial_mixing_covariance=None, positive=True, max_iter=3000, gcv_candidate_count=31,
+    spatial_mixing_covariance=None, measurement_spatial_mixing_cross_covariance=None,
+    positive=True, max_iter=3000, gcv_candidate_count=31,
     gcv_log10_range=(-8.0, 8.0),
 ):
     """PSF-aware profile inverse with optional GCV-selected curvature penalty.
@@ -765,6 +766,13 @@ def reconstruct_psf_aware_thomson_profile(
 
     operator_covariance_contribution = None
     covariance_with_operator = None
+    measurement_operator_cross_contribution = None
+    covariance_with_joint_operator = None
+    if measurement_spatial_mixing_cross_covariance is not None:
+        if spatial_mixing_covariance is None:
+            raise ValueError("measurement_spatial_mixing_cross_covariance requires spatial_mixing_covariance")
+        if measurement_uncertainty is None and measurement_covariance is None:
+            raise ValueError("measurement_spatial_mixing_cross_covariance requires measurement_uncertainty or measurement_covariance")
     if spatial_mixing_covariance is not None:
         raw_operator_covariance = np.asarray(spatial_mixing_covariance)
         if raw_operator_covariance.dtype.kind not in "iuf":
@@ -799,6 +807,42 @@ def reconstruct_psf_aware_thomson_profile(
             operator_covariance_contribution + operator_covariance_contribution.T
         )
         covariance_with_operator = covariance + operator_covariance_contribution
+        covariance_with_joint_operator = covariance_with_operator.copy()
+        if measurement_spatial_mixing_cross_covariance is not None:
+            cross_raw = np.asarray(measurement_spatial_mixing_cross_covariance)
+            expected_cross_shape = (y.size, h.size)
+            if (cross_raw.dtype.kind not in "iuf" or cross_raw.shape != expected_cross_shape
+                    or not np.all(np.isfinite(cross_raw))):
+                raise ValueError(
+                    "measurement_spatial_mixing_cross_covariance must be finite real "
+                    "with shape (n_channels, n_channels*n_nodes), row-major in PSF elements"
+                )
+            cross_covariance = cross_raw.astype(float, copy=False)
+            whitening_matrix = whiten(np.eye(y.size))
+            measurement_sensitivity = normal_inverse @ a[:, active].T @ whitening_matrix
+            joint_covariance = np.block([
+                [whitening_matrix.T @ whitening_matrix, cross_covariance],
+                [cross_covariance.T, operator_covariance],
+            ])
+            joint_covariance = 0.5 * (joint_covariance + joint_covariance.T)
+            joint_eigenvalues = np.linalg.eigvalsh(joint_covariance)
+            joint_scale = max(float(np.max(np.abs(joint_eigenvalues))), np.finfo(float).tiny)
+            if joint_eigenvalues[0] < -1e-10 * joint_scale:
+                raise ValueError(
+                    "joint measurement/PSF covariance block must be positive semidefinite"
+                )
+            cross_active = measurement_sensitivity @ cross_covariance @ sensitivity.T
+            measurement_operator_cross_contribution = np.zeros_like(covariance)
+            measurement_operator_cross_contribution[np.ix_(np.flatnonzero(active), np.flatnonzero(active))] = (
+                cross_active + cross_active.T
+            )
+            covariance_with_joint_operator = (
+                covariance_with_operator + measurement_operator_cross_contribution
+            )
+        else:
+            cross_covariance = None
+    elif measurement_spatial_mixing_cross_covariance is not None:
+        raise ValueError("measurement_spatial_mixing_cross_covariance requires spatial_mixing_covariance")
     return {
         "status": "identified_from_measurement" if identifiable else "conditional_regularized_candidate",
         "latent_profile": values if identifiable else None,
@@ -808,6 +852,10 @@ def reconstruct_psf_aware_thomson_profile(
         "regularized_candidate_covariance_with_psf_uncertainty": covariance_with_operator,
         "psf_operator_covariance_contribution": operator_covariance_contribution,
         "psf_uncertainty_propagated": spatial_mixing_covariance is not None,
+        "measurement_psf_cross_covariance_propagated": measurement_operator_cross_contribution is not None,
+        "measurement_psf_cross_covariance_contribution": measurement_operator_cross_contribution,
+        "profile_covariance_with_joint_measurement_psf_uncertainty": covariance_with_joint_operator if identifiable else None,
+        "regularized_candidate_covariance_with_joint_measurement_psf_uncertainty": covariance_with_joint_operator,
         "psf_covariance_order": "row-major spatial_mixing_matrix elements" if spatial_mixing_covariance is not None else None,
         "fitted_channel_values": h @ values,
         "residual": y - h @ values,
@@ -828,7 +876,7 @@ def reconstruct_psf_aware_thomson_profile(
             "conditional": ["regularized_candidate_profile; conditional on supplied PSF, regularization, and noise model"],
             "non_identifiable": ["spatial modes in the data-only null space", "sub-resolution modes not encoded by the supplied mixing operator"],
         },
-        "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval. When supplied, PSF covariance is propagated by first-order differentiation of the regularized normal equations, assuming independence from measurement noise; higher-order operator effects and measurement-operator cross-covariance are excluded.",
+        "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval. PSF covariance is propagated by first-order differentiation of the regularized normal equations. If measurement_spatial_mixing_cross_covariance is supplied, its two cross terms are included after validating the full joint measurement/PSF covariance block as positive semidefinite; higher-order operator effects remain excluded.",
         "experimental_validation": "not_performed",
     }
 
