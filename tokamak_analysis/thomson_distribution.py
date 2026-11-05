@@ -862,5 +862,46 @@ def analyze_thomson_spectral_distribution(
             "one_dimensional_q_parallel_velocity_marginal_only"
         )
         result["projected_evdf_inference"]["gaussian_width_used_as_evdf"] = False
+        # Cross-check the reconstructed q-parallel EVDF against measured spectral moments.
+        # In the non-relativistic Thomson limit: lambda=lambda0*(1-q*v_parallel/c).
+        # This is a forward-model consistency diagnostic, never a Gaussian Te estimator.
+        inverse = result["projected_evdf_inference"]
+        velocity_grid = np.asarray(inverse["velocity_parallel_m_s"], dtype=float)
+        projected_pdf = np.asarray(inverse["evdf_parallel_s_per_m"], dtype=float)
+        from scipy.integrate import trapezoid
+        if (velocity_grid.ndim != 1 or projected_pdf.shape != velocity_grid.shape
+                or not np.all(np.isfinite(velocity_grid))
+                or not np.all(np.isfinite(projected_pdf)) or np.any(projected_pdf < 0.0)):
+            raise ValueError("Projected EVDF returned an invalid probability density")
+        evdf_norm = float(trapezoid(projected_pdf, velocity_grid))
+        if not np.isfinite(evdf_norm) or evdf_norm <= 0.0:
+            raise ValueError("Projected EVDF has non-positive integrated probability")
+        normalized_pdf = projected_pdf / evdf_norm
+        evdf_mean = float(trapezoid(velocity_grid * normalized_pdf, velocity_grid))
+        evdf_variance = float(trapezoid((velocity_grid - evdf_mean)**2 * normalized_pdf, velocity_grid))
+        q = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
+        c_light = 299792458.0
+        if float(np.max(np.abs(velocity_grid))) >= 0.1 * c_light:
+            closure = {"status": "outside_nonrelativistic_doppler_closure_domain",
+                       "comparison_performed": False, "evdf_mean_velocity_parallel_m_s": evdf_mean,
+                       "evdf_variance_velocity_parallel_m2_s2": evdf_variance}
+        else:
+            predicted_centroid = float(laser_wavelength_nm) * (1.0 - q * evdf_mean / c_light)
+            predicted_variance = (float(laser_wavelength_nm) * q / c_light)**2 * evdf_variance
+            closure = {
+                "status": "conditional_moment_closure",
+                "formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
+                "evdf_mean_velocity_parallel_m_s": evdf_mean,
+                "evdf_variance_velocity_parallel_m2_s2": evdf_variance,
+                "evdf_predicted_spectral_centroid_nm": predicted_centroid,
+                "evdf_predicted_spectral_sigma_nm": float(np.sqrt(max(predicted_variance, 0.0))),
+                "measured_spectral_centroid_nm": float(center),
+                "measured_spectral_sigma_nm": float(sigma_observed),
+                "centroid_closure_residual_nm": float(center - predicted_centroid),
+                "variance_closure_residual_nm2": float(variance_observed - predicted_variance),
+                "comparison_performed": True,
+                "interpretation": "Compare conditionally after accounting for background, finite spectral window, instrument response and regularization; disagreement is a model/data consistency warning, not grounds to force a Gaussian temperature.",
+            }
+        inverse["spectral_moment_closure"] = closure
 
     return result
