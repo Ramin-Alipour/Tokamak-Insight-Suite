@@ -752,3 +752,90 @@ def reconstruct_psf_aware_thomson_profile(
         "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval. When supplied, PSF covariance is propagated by first-order differentiation of the regularized normal equations, assuming independence from measurement noise; higher-order operator effects and measurement-operator cross-covariance are excluded.",
         "experimental_validation": "not_performed",
     }
+
+
+def map_thomson_channels_to_normalized_poloidal_flux(
+    poloidal_flux_wb, *, magnetic_axis_flux_wb, separatrix_flux_wb,
+    joint_flux_covariance=None,
+):
+    """Map measured Thomson channels to rho_pol using supplied equilibrium flux.
+
+    rho_pol = sqrt((psi_pol - psi_axis) / (psi_sep - psi_axis)).
+    The covariance is propagated with the full Jacobian for the joint vector
+    [psi_channel_1, ..., psi_channel_N, psi_axis, psi_sep]. No equilibrium
+    reconstruction or flux-surface inference is performed here.
+    """
+    raw = np.asarray(poloidal_flux_wb)
+    if raw.dtype.kind not in "iuf" or raw.ndim != 1 or raw.size < 1:
+        raise ValueError("poloidal_flux_wb must be a non-empty real one-dimensional array")
+    psi = raw.astype(float, copy=False)
+    if not np.all(np.isfinite(psi)):
+        raise ValueError("poloidal_flux_wb must contain finite values")
+    axis = float(magnetic_axis_flux_wb)
+    edge = float(separatrix_flux_wb)
+    if not np.isfinite(axis) or not np.isfinite(edge) or edge == axis:
+        raise ValueError("magnetic-axis and separatrix fluxes must be finite and distinct")
+    denominator = edge - axis
+    normalized_flux = (psi - axis) / denominator
+    if np.any(normalized_flux < 0.0):
+        raise ValueError(
+            "A channel lies on the opposite side of the magnetic-axis flux from the separatrix; "
+            "check equilibrium flux convention and channel mapping."
+        )
+    rho = np.sqrt(normalized_flux)
+    covariance = None
+    if joint_flux_covariance is not None:
+        raw_cov = np.asarray(joint_flux_covariance)
+        size = psi.size + 2
+        if raw_cov.dtype.kind not in "iuf" or raw_cov.shape != (size, size):
+            raise ValueError(
+                "joint_flux_covariance must be a real (n_channels+2,n_channels+2) "
+                "covariance for [channel fluxes, axis flux, separatrix flux]."
+            )
+        cov = raw_cov.astype(float, copy=False)
+        if (not np.all(np.isfinite(cov))
+                or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-14)
+                or not _covariance_is_positive_semidefinite(cov)):
+            raise ValueError("joint_flux_covariance must be finite, symmetric and positive semidefinite")
+        if np.any(rho <= 0.0):
+            raise ValueError(
+                "The delta-method rho_pol covariance is singular at the magnetic axis; "
+                "supply channels strictly outside the axis or use a nonlinear Monte Carlo transform."
+            )
+        jacobian = np.zeros((psi.size, size), dtype=float)
+        for index, (flux, coordinate) in enumerate(zip(psi, rho)):
+            jacobian[index, index] = 1.0 / (2.0 * coordinate * denominator)
+            jacobian[index, psi.size] = (flux - edge) / (
+                2.0 * coordinate * denominator**2
+            )
+            jacobian[index, psi.size + 1] = -(flux - axis) / (
+                2.0 * coordinate * denominator**2
+            )
+        covariance = jacobian @ cov @ jacobian.T
+        covariance = 0.5 * (covariance + covariance.T)
+    return {
+        "rho_pol": rho,
+        "normalized_poloidal_flux": normalized_flux,
+        "inside_lcfs": normalized_flux <= 1.0,
+        "outside_lcfs_channel_indices": np.flatnonzero(normalized_flux > 1.0),
+        "rho_pol_covariance": covariance,
+        "rho_pol_standard_uncertainty": (
+            np.sqrt(np.maximum(np.diag(covariance), 0.0))
+            if covariance is not None else None
+        ),
+        "coordinate_definition": "sqrt((psi_pol-psi_axis)/(psi_separatrix-psi_axis))",
+        "equilibrium_inputs": {
+            "magnetic_axis_flux_wb": axis,
+            "separatrix_flux_wb": edge,
+            "flux_convention": "user-supplied; axis-to-separatrix normalization",
+        },
+        "uncertainty_model": (
+            "full_joint_flux_axis_separatrix_covariance_delta_method"
+            if covariance is not None else "not_propagated"
+        ),
+        "limitations": [
+            "Equilibrium reconstruction and mapping from detector sightlines to flux are external inputs.",
+            "The delta-method covariance is local and is not reliable at rho_pol=0.",
+            "Toroidal-flux rho_tor is a different coordinate and is not inferred by this mapping.",
+        ],
+    }
