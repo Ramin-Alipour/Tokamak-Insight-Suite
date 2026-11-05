@@ -560,6 +560,30 @@ EXAMPLES = {
 # Reuse the same explicit physical input contract for the public response alias.
 EXAMPLES["landau_fdt_full_em_response"] = dict(EXAMPLES["landau_fdt_full_em_constitutive"])
 
+# A deterministic synthetic measured-spectrum case for the joint spatial inverse.
+_joint_ts_wavelength = np.linspace(520.0, 544.0, 121)
+_joint_ts_radius = np.array([0.0, 0.5, 1.0])
+_joint_ts_temperature = np.array([80.0, 100.0, 120.0])
+_joint_ts_flow = np.array([-5.0e3, 0.0, 5.0e3])
+_joint_ts_sigma = 2.0 * 532.0 * np.sqrt(_joint_ts_temperature / 510998.95069) * np.sin(np.pi / 4.0)
+_joint_ts_center = 532.0 * (1.0 - 2.0 * np.sin(np.pi / 4.0) * _joint_ts_flow / 299792458.0)
+_joint_ts_spectra = (
+    np.exp(-0.5 * ((_joint_ts_wavelength[None, :] - _joint_ts_center[:, None]) / _joint_ts_sigma[:, None]) ** 2)
+    + 0.01
+)
+EXAMPLES["thomson_joint_spatial_spectra"] = {
+    "wavelength_nm": _joint_ts_wavelength.tolist(),
+    "measured_spectra": _joint_ts_spectra.tolist(),
+    "radius_m": _joint_ts_radius.tolist(),
+    "spatial_mixing_matrix": np.eye(3).tolist(),
+    "laser_wavelength_nm": 532.0,
+    "scattering_angle_rad": float(np.pi / 2.0),
+    "instrument_response": np.eye(_joint_ts_wavelength.size).tolist(),
+    "signal_uncertainty": np.full_like(_joint_ts_spectra, 0.01).tolist(),
+    "regularization_strength": 0.0,
+    "physical_model": "maxwellian",
+}
+
 
 def decode_complex_json(value):
     """Decode nested JSON arrays; {real: ..., imag: ...} denotes complex data."""
