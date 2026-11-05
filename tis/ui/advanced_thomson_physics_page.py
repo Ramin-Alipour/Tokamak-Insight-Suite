@@ -100,6 +100,9 @@ MODEL_LABELS = {
     "thomson_normalized_poloidal_flux": "Optical Thomson — map channel positions to equilibrium-normalized poloidal flux rho_pol",
 }
 
+# The documented Full-EM response alias is exposed as a selectable dashboard route.
+MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
+
 MODEL_PHYSICS_NOTES = {
     "thomson_multiview_3d_evdf": (
         "Non-negative 3-D velocity-space inversion from independently measured scattering views. "
@@ -537,6 +540,9 @@ EXAMPLES = {
         "ky_rad_m": 0.0
     }
 }
+
+# Reuse the same explicit physical input contract for the public response alias.
+EXAMPLES["landau_fdt_full_em_response"] = dict(EXAMPLES["landau_fdt_full_em_constitutive"])
 
 
 def decode_complex_json(value):
