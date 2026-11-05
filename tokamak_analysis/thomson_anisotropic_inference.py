@@ -488,27 +488,63 @@ def fit_gyrotropic_bi_kappa_thomson(
     if measurement_covariance is not None and signal_uncertainty is not None:
         raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
     size = n_view * n_bin
+    measurement_covariance_supplied = (
+        measurement_covariance is not None or signal_uncertainty is not None
+    )
     if measurement_covariance is not None:
-        cov = _real_array(measurement_covariance, "measurement_covariance", 2)
-        if cov.shape != (size, size) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-12 * max(np.max(np.abs(cov)), 1e-300)):
+        measurement_covariance_only = _real_array(
+            measurement_covariance, "measurement_covariance", 2
+        )
+        if (measurement_covariance_only.shape != (size, size)
+                or not np.allclose(
+                    measurement_covariance_only, measurement_covariance_only.T,
+                    rtol=1e-10, atol=1e-12 * max(
+                        float(np.max(np.abs(measurement_covariance_only))), 1e-300
+                    )
+                )):
             raise ValueError("measurement_covariance must be symmetric and channel-major")
-        cov = 0.5 * (cov + cov.T)
+        measurement_covariance_only = 0.5 * (
+            measurement_covariance_only + measurement_covariance_only.T
+        )
     elif signal_uncertainty is not None:
         sigma = _real_array(signal_uncertainty, "signal_uncertainty", 2)
         if sigma.shape != spectra.shape or np.any(sigma <= 0.0):
             raise ValueError("signal_uncertainty must be positive and match measured_spectra")
-        cov = np.diag(sigma.ravel() ** 2)
+        measurement_covariance_only = np.diag(sigma.ravel() ** 2)
     else:
-        cov = np.eye(size)
+        measurement_covariance_only = None
+
+    discrepancy = None
     if model_discrepancy_covariance is not None:
-        discrepancy = _real_array(model_discrepancy_covariance, "model_discrepancy_covariance", 2)
-        if discrepancy.shape != (size, size) or not np.allclose(discrepancy, discrepancy.T, rtol=1e-10, atol=1e-12 * max(np.max(np.abs(discrepancy)), 1e-300)):
+        discrepancy = _real_array(
+            model_discrepancy_covariance, "model_discrepancy_covariance", 2
+        )
+        if (discrepancy.shape != (size, size)
+                or not np.allclose(
+                    discrepancy, discrepancy.T, rtol=1e-10,
+                    atol=1e-12 * max(float(np.max(np.abs(discrepancy))), 1e-300)
+                )):
             raise ValueError("model_discrepancy_covariance must be symmetric and channel-major")
         discrepancy = 0.5 * (discrepancy + discrepancy.T)
         eig = np.linalg.eigvalsh(discrepancy)
         if eig[0] < -1e-10 * max(float(np.max(np.abs(eig))), 1e-300):
             raise ValueError("model_discrepancy_covariance must be positive semidefinite")
-        cov = cov + discrepancy
+
+    covariance_components = [
+        component for component in (measurement_covariance_only, discrepancy)
+        if component is not None
+    ]
+    if covariance_components:
+        cov = np.sum(covariance_components, axis=0)
+        covariance_model = (
+            "measurement_plus_model_discrepancy"
+            if measurement_covariance_only is not None and discrepancy is not None
+            else "measurement_only" if measurement_covariance_only is not None
+            else "model_discrepancy_only"
+        )
+    else:
+        cov = np.eye(size)
+        covariance_model = "unweighted_identity_metric_residual_scaled"
     try:
         chol = np.linalg.cholesky(cov)
     except np.linalg.LinAlgError as exc:
@@ -598,10 +634,12 @@ def fit_gyrotropic_bi_kappa_thomson(
     full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
     parameter_covariance = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if (full_rank and geometry_rank == 2) else None
     covariance_scale_method = "supplied_absolute_covariance"
-    if parameter_covariance is not None and measurement_covariance is None and signal_uncertainty is None:
+    if parameter_covariance is not None and not measurement_covariance_supplied and discrepancy is None:
         dof = max(1, size - fit.x.size)
         parameter_covariance *= (2.0 * float(fit.cost) / dof)
         covariance_scale_method = "unweighted_residual_scaled"
+    elif parameter_covariance is not None and discrepancy is not None and not measurement_covariance_supplied:
+        covariance_scale_method = "absolute_model_discrepancy_covariance"
     if parameter_covariance is not None:
         transform = np.eye(fit.x.size)
         transform[0, 0] = np.exp(fit.x[0])
@@ -659,9 +697,10 @@ def fit_gyrotropic_bi_kappa_thomson(
             "measurement": "supplied_full_channel_major" if measurement_covariance is not None else (
                 "supplied_pointwise_diagonal" if signal_uncertainty is not None else "unweighted_identity_for_fit"
             ),
+            "effective_covariance_model": covariance_model,
             "parameter_covariance_scale": covariance_scale_method,
-            "model_discrepancy_supplied": model_discrepancy_covariance is not None,
-            "combination": "C_effective = C_measurement + C_model_discrepancy; added once",
+            "model_discrepancy_supplied": discrepancy is not None,
+            "combination": "C_effective is the sum of only supplied covariance components; an identity metric is used only when neither component is supplied",
         },
         "model_validity": {
             "kinematics": "non-relativistic elastic Thomson mapping",
