@@ -1713,11 +1713,13 @@ def test_structured_kappa_background_gets_profile_likelihood_with_all_nuisance_t
 def test_structured_background_gls_covariance_keeps_absolute_measurement_scale():
     from tokamak_analysis.thomson_background import fit_structured_background
     x = np.linspace(0.0, 1.0, 40)
-    design = np.column_stack([np.ones_like(x), x])
+    wavelength = x + 500.0
+    z = 2.0 * (wavelength - wavelength.min()) / np.ptp(wavelength) - 1.0
+    design = np.column_stack([np.ones_like(x), z])
     y = design @ np.array([2.0, -0.5])
     covariance = np.eye(x.size) * 0.04
     result = fit_structured_background(
-        x + 500.0, y, model="linear", covariance=covariance,
+        wavelength, y, model="linear", covariance=covariance,
     )
     expected = np.linalg.inv(design.T @ np.linalg.solve(covariance, design))
     np.testing.assert_allclose(
