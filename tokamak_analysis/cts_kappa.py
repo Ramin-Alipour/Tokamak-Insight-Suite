@@ -159,33 +159,55 @@ def kappa_electron_susceptibility(
             scaled_offset, -1.0
         )
 
-    def integrate_component(component):
+    def outer_derivative_integrand(scaled_velocity):
+        denominator = complex(scaled_velocity, 0.0)-zeta_scaled
+        return dimensionless_pdf_derivative(scaled_velocity)/(denominator**2)
+
+    def central_derivative_integrand(scaled_offset):
+        scaled_velocity = phase_velocity_scaled+eta_scaled*scaled_offset
+        return dimensionless_pdf_derivative(scaled_velocity)/(
+            eta_scaled*complex(scaled_offset, -1.0)**2
+        )
+
+    def integrate_component(component, central_function, outer_function, scale_power):
         central_value, central_error = quad(
-            lambda offset: float(component(central_integrand(offset))),
+            lambda offset: float(component(central_function(offset))),
             -50.0, 50.0, epsabs=1e-12, epsrel=2e-8, limit=500,
         )
         left_value, left_error = quad(
-            lambda value: float(component(outer_integrand(value))),
+            lambda value: float(component(outer_function(value))),
             -np.inf, phase_velocity_scaled-50.0*eta_scaled,
             epsabs=1e-12, epsrel=2e-8, limit=500,
         )
         right_value, right_error = quad(
-            lambda value: float(component(outer_integrand(value))),
+            lambda value: float(component(outer_function(value))),
             phase_velocity_scaled+50.0*eta_scaled, np.inf,
             epsabs=1e-12, epsrel=2e-8, limit=500,
         )
         return (
-            (central_value+left_value+right_value)/scale_squared,
-            (central_error+left_error+right_error)/scale_squared,
+            (central_value+left_value+right_value)/thermal_speed**scale_power,
+            (central_error+left_error+right_error)/thermal_speed**scale_power,
         )
 
-    integral_real, real_error = integrate_component(lambda value: np.real(value))
-    integral_imag, imag_error = integrate_component(lambda value: np.imag(value))
+    integral_real, real_error = integrate_component(
+        lambda value: np.real(value), central_integrand, outer_integrand, 2
+    )
+    integral_imag, imag_error = integrate_component(
+        lambda value: np.imag(value), central_integrand, outer_integrand, 2
+    )
     integral = complex(integral_real, integral_imag)
-    if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
-        raise ValueError("full-tail Kappa Landau integral did not converge to a finite value")
+    derivative_real, derivative_real_error = integrate_component(
+        lambda value: np.real(value), central_derivative_integrand, outer_derivative_integrand, 3
+    )
+    derivative_imag, derivative_imag_error = integrate_component(
+        lambda value: np.imag(value), central_derivative_integrand, outer_derivative_integrand, 3
+    )
+    integral_phase_derivative = complex(derivative_real, derivative_imag)
     response = {
         "integral": integral,
+        "integral_phase_velocity_derivative_s3_m3": integral_phase_derivative,
+        "integral_phase_velocity_derivative_real_absolute_error": float(derivative_real_error),
+        "integral_phase_velocity_derivative_imag_absolute_error": float(derivative_imag_error),
         "interior_derivative_integral": integral,
         "finite_support_boundary_integral": 0.0j,
         "normalized_probability_density_s_m": pdf.copy() / grid_coverage,
@@ -203,6 +225,10 @@ def kappa_electron_susceptibility(
     response.update({
         "electron_susceptibility": complex(
             -plasma_frequency_squared / wave_number**2 * response["integral"]
+        ),
+        "susceptibility_phase_velocity_derivative_s_m": complex(
+            -plasma_frequency_squared / wave_number**2
+            * response["integral_phase_velocity_derivative_s3_m3"]
         ),
         "plasma_frequency_squared_s_minus2": float(plasma_frequency_squared),
         "wavenumber_m_inverse": wave_number,
@@ -226,6 +252,7 @@ def kappa_electron_susceptibility(
             "A 1-D marginal is not a reconstruction of the full 3-D EVDF.",
             "The result is non-relativistic; relativistic Kappa response is not implemented.",
             "The positive Landau-pole displacement and adaptive quadrature tolerances control numerical accuracy; the finite grid affects only the explicit coverage gate.",
+            "The phase-velocity derivative is evaluated from the differentiated retarded Landau kernel at fixed positive pole displacement.",
         ],
     })
     return response
