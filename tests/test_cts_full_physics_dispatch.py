@@ -151,3 +151,17 @@ def test_joint_spatial_spectral_inverse_is_reachable_through_dashboard_dispatche
     assert dispatched["public_physics_entrypoint"] == "thomson_joint_spatial_spectra"
     assert dispatched["automatic_model_substitution"] is False
     assert dispatched["analysis_status"] == "completed"
+
+
+def test_joint_spatial_spectral_solver_is_selectable_with_a_complete_dashboard_example():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+
+    assert "thomson_joint_spatial_spectra" in MODEL_LABELS
+    assert "thomson_joint_spatial_spectra" in EXAMPLES
+    example = EXAMPLES["thomson_joint_spatial_spectra"]
+    assert set((
+        "wavelength_nm", "measured_spectra", "radius_m",
+        "spatial_mixing_matrix", "laser_wavelength_nm",
+        "scattering_angle_rad", "instrument_response",
+    )).issubset(example)
+    assert np.asarray(example["measured_spectra"]).shape == (3, 121)
