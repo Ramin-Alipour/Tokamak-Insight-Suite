@@ -7667,6 +7667,10 @@
         {
           "name": "laser_source_quadrature_nodes",
           "unit": "count"
+        },
+        {
+          "name": "laser_source_quadrature_wavelength_nm",
+          "unit": "nm; fixed-order photon-flux quadrature nodes inside measured non-zero source support"
         }
       ],
       "prerequisites": [
