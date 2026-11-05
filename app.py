@@ -3776,6 +3776,13 @@ elif page=='Advanced Analysis':
                         st.json(physical)
                     else:
                         st.warning('The canonical fit did not return identifiable electron temperature and scattering-vector flow for this channel; spectral-distribution descriptors remain separate from physical-parameter extraction.')
+                    conditional_physics=distribution.get('physical_inference') or {}
+                    if conditional_physics.get('status')=='conditional_gaussian_maxwellian_candidate':
+                        st.info('Conditional Maxwellian interpretation of the intrinsic response-convolved Gaussian fit. This is a diagnostic candidate with its own covariance, not the canonical primary Thomson inference.')
+                        st.json(conditional_physics)
+                    elif conditional_physics.get('status')=='rejected_outside_declared_nonrelativistic_validity_domain':
+                        st.warning('The Gaussian-Maxwellian physical interpretation was withheld because the fitted parameters fall outside the declared non-relativistic validity domain.')
+                        st.json(conditional_physics)
                     st.json(distribution)
                     json_download('Export Analysis 1 spectral-distribution diagnostics',distribution,'tis_thomson_spectral_distribution.json')
                     add_report_section('Analysis 1 spectral-distribution subanalysis',distribution)
