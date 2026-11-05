@@ -18,12 +18,27 @@ def test_analysis_1_optical_profile_and_distribution_routes_are_executable():
 
 
 def test_thomson_analysis_1_registry_input_and_output_names_are_unique():
-    for analysis_id in (1, 30, 46, 81):
+    for analysis_id in (1, 30, 46, 81, 82):
         contract = get_analysis(analysis_id)["execution_contract"]
         input_names = [item["name"] for item in contract["input_specs"]]
         output_names = [item["name"] for item in contract["output_specs"]]
         assert len(input_names) == len(set(input_names)), analysis_id
         assert len(output_names) == len(set(output_names)), analysis_id
+
+
+def test_thomson_diagnostic_registry_output_names_are_unique_and_packaged_copy_matches():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    records = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    assert records == packaged
+    for record in records:
+        if "thomson" not in str(record.get("diagnostic", "")).lower():
+            continue
+        outputs = [item["name"] for item in record.get("execution_contract", {}).get("output_specs", [])]
+        assert len(outputs) == len(set(outputs)), record.get("diagnostic")
 
 
 def test_parameter_identifiability_is_declared_across_all_thomson_subanalyses():
