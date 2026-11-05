@@ -7361,5 +7361,183 @@
     "input_data_level": "measured_calibrated_spectrum",
     "execution_scope": "conditional_noncollective_kinetic_spectral_inference",
     "analysis_family": "Analysis 1 — Thomson scattering"
+  },
+  {
+    "name": "Gyrotropic anisotropic Kappa optical Thomson spectral inference",
+    "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; theta_q²=(2κ−3)eT_q/(κm_e); p(v_q) ∝ [1+v_q²/(κ theta_q²)]^(−κ); P_i=∫_(λ_i−)^(λ_i+) p(v_q(λ)) |dv_q/dλ| dλ; S̄_i=P_i/Δλ_i",
+    "inputs": "Calibrated multi-view optical Thomson spectra, measured spectral response, laser wavelength, scattering angle, magnetic-field and scattering-vector directions",
+    "output": "T_parallel [eV], T_perpendicular [eV], per-view q-projected flow [m s^-1], fit and covariance diagnostics",
+    "assumptions": "Gyrotropic anisotropic 3-D Kappa electron distribution with finite variance κ>3/2; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles and full spectral Jacobian rank required to separate T_parallel, T_perpendicular and κ; exact projected 1-D Kappa marginal integrated over finite wavelength bins before measured-response convolution.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
+      "formula_key": "gyrotropic_anisotropic_kappa_optical_thomson_joint_fit",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated bins",
+          "required": true
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral density; view x wavelength",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "unit 3-vector or view x 3",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "view x unit 3-vectors",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized wavelength response matrix",
+          "required": true
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full channel-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "view x wavelength; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "full channel-major additive PSD covariance",
+          "required": false
+        },
+        {
+          "name": "distribution_model",
+          "unit": "bi_kappa",
+          "required": false,
+          "default": "bi_maxwellian",
+          "description": "Select bi_kappa through the registered workflow dispatcher; default remains bi_maxwellian."
+        },
+        {
+          "name": "initial_kappa",
+          "unit": "dimensionless; finite-variance Kappa index > 3/2",
+          "required": false,
+          "default": 4
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless; lower bound strictly > 3/2",
+          "required": false,
+          "default": [
+            1.5001,
+            200
+          ]
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; emitted only when identifiable"
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; emitted only when identifiable"
+        },
+        {
+          "name": "directional_temperature_eV",
+          "unit": "eV; one projected temperature per view"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; one q-projection per view"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "residual_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "parameter covariance; withheld when anisotropy is non-identifiable"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; exact Gaussian probability captured by measured wavelength bins per view"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "declared projected thermal and fitted-flow beta diagnostics"
+        },
+        {
+          "name": "spectral_bin_integration",
+          "unit": "exact Gaussian CDF integration over finite wavelength bins"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; only when the full data Jacobian identifies the Kappa index"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated spectra and measured response operator",
+        "Magnetic-field and scattering-vector geometry for each view",
+        "At least two distinct squared magnetic pitch angles to identify both temperatures",
+        "The fitted projected thermal rms beta must remain below maximum_projected_rms_beta; fitted bulk-flow beta must remain below 0.1.",
+        "Kappa index must remain strictly greater than 3/2; otherwise the finite-variance model is rejected."
+      ],
+      "uncertainty_model": "Full channel-major measurement covariance or pointwise standard uncertainties plus optional independent additive model-discrepancy covariance. Local covariance is conditional on the selected Kappa model and is withheld when the data-only Jacobian does not identify the requested parameters.",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_bikappa_model_discrepancy_is_not_added_to_a_synthetic_identity_covariance",
+        "tests/test_thomson_workflow.py::test_registered_gyrotropic_workflow_dispatches_bimaxwellian_and_bikappa_without_fallback",
+        "tests/test_thomson_workflow.py::test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback"
+      ],
+      "note": "The registered dispatcher selects the exact gyrotropic bi-Kappa fitter only when distribution_model='bi_kappa'; the default bi-Maxwellian path remains backward compatible. The Kappa model is non-relativistic and is not a general anisotropic relativistic EVDF."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Gyrotropic anisotropic Kappa projected Thomson marginal",
+        "authors": "Tokamak Insight Suite implementation; model equations documented in the source contract",
+        "year": 2026,
+        "type": "implementation_reference"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
+      "function_links": [
+        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
+      ],
+      "formula_key": "gyrotropic_anisotropic_kappa_optical_thomson_joint_fit",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_bikappa_model_discrepancy_is_not_added_to_a_synthetic_identity_covariance",
+        "tests/test_thomson_workflow.py::test_registered_gyrotropic_workflow_dispatches_bimaxwellian_and_bikappa_without_fallback",
+        "tests/test_thomson_workflow.py::test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback"
+      ]
+    }
   }
 ]
