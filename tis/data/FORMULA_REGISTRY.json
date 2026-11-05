@@ -7909,10 +7909,10 @@
   },
   {
     "name": "Full-tail isotropic-Kappa Landau susceptibility phase-velocity derivative",
-    "equation": "χ_e(vφ)=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη) dv; ∂χ_e/∂vφ=−(ω_pe²/k²)∫_{−∞}^{∞} f′_κ(v)/(v−vφ−iη)² dv, η>0; at fixed k, ∂χ_e/∂ω=(1/k)∂χ_e/∂vφ",
-    "inputs": "Electron density [m^-3], second-moment electron temperature [eV], Kappa index κ>3/2, real phase velocity [m/s], wavenumber [m^-1], optional positive retarded-pole displacement η [m/s], velocity grid for probability-coverage gate",
-    "output": "Complex longitudinal electron susceptibility and its complex phase-velocity derivative [s/m], with adaptive-quadrature error estimates and angular-frequency derivative [s]",
-    "assumptions": "Exact 1-D marginal of an isotropic 3-D finite-variance Kappa distribution; collisionless, unmagnetized, non-relativistic longitudinal response; positive retarded pole displacement held fixed during differentiation; analytic Kappa tail integrated over the full velocity axis.",
+    "equation": "Iκ(vφ)=PV∫_{−∞}^{∞} f′κ(v)/(v−vφ) dv + iπ f′κ(vφ); χe=−(ωpe²/k²)Iκ; ∂χe/∂vφ=−(ωpe²/k²)[FP∫ f′κ(v)/(v−vφ)² dv + iπ f″κ(vφ)]; ∂χe/∂ω=(1/k)∂χe/∂vφ. Default: exact retarded η→0+ Landau limit.",
+    "inputs": "Electron density [m^-3], second-moment electron temperature [eV], Kappa index κ>3/2, real phase velocity [m/s], wavenumber [m^-1], optional explicit finite-pole regularization η [m/s], velocity grid for probability-coverage gate.",
+    "output": "Complex longitudinal electron susceptibility, analytic phase-velocity derivative and angular-frequency derivative, with separate real-axis quadrature error estimates and explicit Landau-contour mode.",
+    "assumptions": "Exact 1-D marginal of isotropic 3-D finite-variance Kappa; collisionless, unmagnetized, non-relativistic longitudinal response; default exact retarded Landau contour evaluated by Sokhotski-Plemelj real-axis quadrature and analytic resonant residues; optional finite positive η only when explicitly supplied; analytic Kappa tail integrated over the full velocity axis.",
     "status": "D",
     "category": "Collective Thomson scattering",
     "execution_contract": {
@@ -7949,7 +7949,8 @@
         {
           "name": "pole_imaginary_part_m_s",
           "unit": "m/s; positive retarded-pole displacement",
-          "required": false
+          "required": false,
+          "description": "Optional finite-pole regularization; omitted selects exact retarded eta-to-zero Sokhotski-Plemelj Landau contour."
         },
         {
           "name": "v",
@@ -7964,11 +7965,11 @@
         },
         {
           "name": "susceptibility_phase_velocity_derivative_s_m",
-          "unit": "s/m; complex derivative at fixed pole displacement"
+          "unit": "s/m; analytic derivative, exact Landau limit by default or fixed finite pole when explicitly requested"
         },
         {
           "name": "integral_phase_velocity_derivative_s3_m3",
-          "unit": "s^3/m^3; complex Landau-integral derivative"
+          "unit": "s^3/m^3; analytic derivative of Landau integral"
         },
         {
           "name": "integral_phase_velocity_derivative_real_absolute_error",
@@ -7981,6 +7982,14 @@
         {
           "name": "susceptibility_angular_frequency_derivative_s",
           "unit": "s; derivative at fixed wavenumber and fixed pole displacement"
+        },
+        {
+          "name": "landau_contour_method",
+          "unit": "exact_eta_to_zero_plus or finite_positive_imaginary_pole_regularization"
+        },
+        {
+          "name": "finite_pole_regularization_used",
+          "unit": "boolean"
         }
       ],
       "prerequisites": [
@@ -7988,7 +7997,7 @@
         "Positive finite density, temperature and wavenumber",
         "Strictly increasing velocity grid meeting the requested analytic Kappa probability-coverage threshold"
       ],
-      "uncertainty_model": "No physical-parameter uncertainty is inferred. The derivative is evaluated by adaptive full-axis quadrature; separate real and imaginary quadrature error estimates are returned. The derivative is conditional on the supplied positive pole displacement.",
+      "uncertainty_model": "No physical-parameter uncertainty is inferred. Exact Landau mode returns separate adaptive real-axis quadrature errors for the principal-value integral and its phase derivative; resonant residues are analytic. Explicit finite-pole mode returns adaptive complex-quadrature errors and is conditional on the supplied pole displacement.",
       "limitations": [
         "Collisionless, unmagnetized, non-relativistic longitudinal electron response only",
         "No ion susceptibility, FDT spectrum, collisions, magnetization, relativistic response or Full-EM current vertex",
@@ -7997,7 +8006,7 @@
       "test_links": [
         "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_central_finite_difference"
       ],
-      "note": "The derivative follows by differentiating the retarded Landau kernel with respect to real phase velocity at fixed positive pole displacement. It is returned by the existing public kappa_electrostatic_susceptibility dispatcher and advanced Thomson physics dashboard. Software tests are not experimental validation.",
+      "note": "Default exact retarded eta-to-zero response uses Sokhotski-Plemelj residues. Explicit positive eta selects finite-pole regularization. Returned by the public CTS dispatcher and advanced Thomson physics dashboard. Software tests are not experimental validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "physical_response_kernel",
@@ -8023,7 +8032,9 @@
       "formula_key": "cts_kappa_landau_phase_velocity_derivative",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_central_finite_difference"
+        "tests/test_cts_kappa.py::test_kappa_susceptibility_phase_derivative_matches_central_finite_difference",
+        "tests/test_cts_kappa.py::test_kappa_exact_landau_susceptibility_converges_to_maxwellian_as_kappa_increases",
+        "tests/test_cts_kappa.py::test_kappa_exact_landau_phase_derivative_matches_finite_difference"
       ]
     }
   },

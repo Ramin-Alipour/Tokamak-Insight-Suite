@@ -29,6 +29,34 @@ def _positive_real_scalar(value, name):
     return result
 
 
+def _kappa_landau_real_axis_integrals(kappa, normalized_phase_velocity):
+    """Exact retarded Landau integral and phase derivative at eta -> 0+."""
+    kap, xp = float(kappa), float(normalized_phase_velocity)
+    log_norm = gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi)
+    def pdf(x):
+        return np.exp(log_norm-kap*np.log1p(x*x))
+    def first(x):
+        return -2.0*kap*x/(1.0+x*x)*pdf(x)
+    def second(x):
+        return pdf(x)*(-2.0*kap*(1.0-x*x)+4.0*kap*kap*x*x)/(1.0+x*x)**2
+    def third(x):
+        lp=-2.0*kap*x/(1.0+x*x)
+        lpp=-2.0*kap*(1.0-x*x)/(1.0+x*x)**2
+        lppp=4.0*kap*x*(3.0-x*x)/(1.0+x*x)**3
+        return pdf(x)*(lp**3+3.0*lp*lpp+lppp)
+    fp,fpp,fppp=first(xp),second(xp),third(xp)
+    scale=max(1.0,abs(xp))
+    def pv_integrand(x):
+        d=x-xp
+        return fpp+0.5*fppp*d if abs(d)<1e-4*scale else (first(x)-fp)/d
+    def derivative_integrand(x):
+        d=x-xp
+        return 0.5*fppp if abs(d)<2e-4*scale else (first(x)-fp-fpp*d)/(d*d)
+    real,real_error=quad(pv_integrand,-np.inf,np.inf,epsabs=2e-11,epsrel=2e-9,limit=500)
+    derivative,derivative_error=quad(derivative_integrand,-np.inf,np.inf,epsabs=2e-10,epsrel=2e-8,limit=500)
+    return complex(real,np.pi*fp),complex(derivative,np.pi*fpp),float(real_error),float(derivative_error)
+
+
 def kappa_electron_susceptibility(
     v,
     phase_velocity_m_s,
@@ -111,116 +139,52 @@ def kappa_electron_susceptibility(
     # the tabulated interval; merely multiplying by the represented probability
     # mass does not restore that missing susceptibility.  Integrate the exact
     # marginal derivative on (-inf, inf), keeping the positive retarded pole.
-    eta = (
-        1e-6 * float(np.median(np.diff(velocity)))
-        if pole_imaginary_part_m_s is None
-        else float(pole_imaginary_part_m_s)
-    )
-    zeta = complex(phase_velocity, eta)
-    def landau_integrand(real_velocity):
-        pdf_value = np.exp(
-            log_normalization - kap*np.log1p(real_velocity**2/scale_squared)
-        )
-        derivative = (
-            -2.0*kap*real_velocity/(scale_squared+real_velocity**2)
-        )*pdf_value
-        return derivative/(complex(real_velocity, 0.0)-zeta)
-
-    # Work in thermal-speed units x=v/sqrt(a_kappa), so the integrand is
-    # O(1) rather than O(1/a_kappa).  This avoids impossible absolute
-    # tolerances for SI-scale velocities and resolves the narrow resonance.
     thermal_speed = float(np.sqrt(scale_squared))
     phase_velocity_scaled = phase_velocity/thermal_speed
-    eta_scaled = eta/thermal_speed
-    zeta_scaled = complex(phase_velocity_scaled, eta_scaled)
-    log_dimensionless_normalization = (
-        gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi)
-    )
+    log_dimensionless_normalization = gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi)
 
-    def dimensionless_pdf_derivative(scaled_velocity):
-        pdf_scaled = np.exp(
-            log_dimensionless_normalization
-            -kap*np.log1p(scaled_velocity**2)
-        )
-        return (
-            -2.0*kap*scaled_velocity/(1.0+scaled_velocity**2)
-        )*pdf_scaled
+    if pole_imaginary_part_m_s is None:
+        dimensionless_integral, dimensionless_derivative, real_error, derivative_real_error = _kappa_landau_real_axis_integrals(kap, phase_velocity_scaled)
+        integral = dimensionless_integral/thermal_speed**2
+        integral_phase_derivative = dimensionless_derivative/thermal_speed**3
+        imag_error = derivative_imag_error = 0.0
+        eta = 0.0
+        zeta = complex(phase_velocity, 0.0)
+        quadrature = "Sokhotski_Plemelj_exact_retarded_Landau_limit_with_subtracted_real_axis_PV_quadrature"
+        contour_method = "exact_eta_to_zero_plus"
+    else:
+        eta = _positive_real_scalar(pole_imaginary_part_m_s, "pole_imaginary_part_m_s")
+        zeta = complex(phase_velocity, eta)
+        eta_scaled = eta/thermal_speed
+        zeta_scaled = complex(phase_velocity_scaled, eta_scaled)
+        def dimensionless_pdf_derivative(x):
+            pdf_scaled=np.exp(log_dimensionless_normalization-kap*np.log1p(x*x))
+            return -2.0*kap*x/(1.0+x*x)*pdf_scaled
+        def outer_integrand(x):
+            return dimensionless_pdf_derivative(x)/(complex(x,0.0)-zeta_scaled)
+        def central_integrand(t):
+            x=phase_velocity_scaled+eta_scaled*t
+            return dimensionless_pdf_derivative(x)/complex(t,-1.0)
+        def outer_derivative_integrand(x):
+            denominator=complex(x,0.0)-zeta_scaled
+            return dimensionless_pdf_derivative(x)/(denominator**2)
+        def central_derivative_integrand(t):
+            x=phase_velocity_scaled+eta_scaled*t
+            return dimensionless_pdf_derivative(x)/(eta_scaled*complex(t,-1.0)**2)
+        def integrate_component(component,central,outer,power):
+            c,ce=quad(lambda t:float(component(central(t))),-50.0,50.0,epsabs=1e-12,epsrel=2e-8,limit=500)
+            l,le=quad(lambda x:float(component(outer(x))),-np.inf,phase_velocity_scaled-50.0*eta_scaled,epsabs=1e-12,epsrel=2e-8,limit=500)
+            r,re=quad(lambda x:float(component(outer(x))),phase_velocity_scaled+50.0*eta_scaled,np.inf,epsabs=1e-12,epsrel=2e-8,limit=500)
+            return (c+l+r)/thermal_speed**power,(ce+le+re)/thermal_speed**power
+        integral_real,real_error=integrate_component(np.real,central_integrand,outer_integrand,2)
+        integral_imag,imag_error=integrate_component(np.imag,central_integrand,outer_integrand,2)
+        integral=complex(integral_real,integral_imag)
+        derivative_real,derivative_real_error=integrate_component(np.real,central_derivative_integrand,outer_derivative_integrand,3)
+        derivative_imag,derivative_imag_error=integrate_component(np.imag,central_derivative_integrand,outer_derivative_integrand,3)
+        integral_phase_derivative=complex(derivative_real,derivative_imag)
+        quadrature="adaptive_complex_quadrature_of_exact_analytic_Kappa_derivative_over_minus_infinity_to_infinity"
+        contour_method="finite_positive_imaginary_pole_regularization"
 
-    def outer_integrand(scaled_velocity):
-        return dimensionless_pdf_derivative(scaled_velocity)/(
-            complex(scaled_velocity, 0.0)-zeta_scaled
-        )
-
-    def central_integrand(scaled_offset):
-        scaled_velocity = phase_velocity_scaled+eta_scaled*scaled_offset
-        # The Jacobian dx=eta_scaled dt cancels the pole denominator
-        # eta_scaled*(t-i), leaving g'(x_phi+eta_scaled*t)/(t-i).
-        return dimensionless_pdf_derivative(scaled_velocity)/complex(
-            scaled_offset, -1.0
-        )
-
-    def outer_derivative_integrand(scaled_velocity):
-        denominator = complex(scaled_velocity, 0.0)-zeta_scaled
-        return dimensionless_pdf_derivative(scaled_velocity)/(denominator**2)
-
-    def central_derivative_integrand(scaled_offset):
-        scaled_velocity = phase_velocity_scaled+eta_scaled*scaled_offset
-        return dimensionless_pdf_derivative(scaled_velocity)/(
-            eta_scaled*complex(scaled_offset, -1.0)**2
-        )
-
-    def integrate_component(component, central_function, outer_function, scale_power):
-        central_value, central_error = quad(
-            lambda offset: float(component(central_function(offset))),
-            -50.0, 50.0, epsabs=1e-12, epsrel=2e-8, limit=500,
-        )
-        left_value, left_error = quad(
-            lambda value: float(component(outer_function(value))),
-            -np.inf, phase_velocity_scaled-50.0*eta_scaled,
-            epsabs=1e-12, epsrel=2e-8, limit=500,
-        )
-        right_value, right_error = quad(
-            lambda value: float(component(outer_function(value))),
-            phase_velocity_scaled+50.0*eta_scaled, np.inf,
-            epsabs=1e-12, epsrel=2e-8, limit=500,
-        )
-        return (
-            (central_value+left_value+right_value)/thermal_speed**scale_power,
-            (central_error+left_error+right_error)/thermal_speed**scale_power,
-        )
-
-    integral_real, real_error = integrate_component(
-        lambda value: np.real(value), central_integrand, outer_integrand, 2
-    )
-    integral_imag, imag_error = integrate_component(
-        lambda value: np.imag(value), central_integrand, outer_integrand, 2
-    )
-    integral = complex(integral_real, integral_imag)
-    derivative_real, derivative_real_error = integrate_component(
-        lambda value: np.real(value), central_derivative_integrand, outer_derivative_integrand, 3
-    )
-    derivative_imag, derivative_imag_error = integrate_component(
-        lambda value: np.imag(value), central_derivative_integrand, outer_derivative_integrand, 3
-    )
-    integral_phase_derivative = complex(derivative_real, derivative_imag)
-    response = {
-        "integral": integral,
-        "integral_phase_velocity_derivative_s3_m3": integral_phase_derivative,
-        "integral_phase_velocity_derivative_real_absolute_error": float(derivative_real_error),
-        "integral_phase_velocity_derivative_imag_absolute_error": float(derivative_imag_error),
-        "interior_derivative_integral": integral,
-        "finite_support_boundary_integral": 0.0j,
-        "normalized_probability_density_s_m": pdf.copy() / grid_coverage,
-        "pole": zeta,
-        "pole_imaginary_part_m_s": eta,
-        "pole_order": 1,
-        "quadrature": "adaptive_complex_quadrature_of_exact_analytic_Kappa_derivative_over_minus_infinity_to_infinity",
-        "finite_support_extension": "analytic_Kappa_tail_integrated_to_infinity",
-        "finite_support_boundary_terms_included": False,
-        "landau_integral_real_absolute_error": float(real_error),
-        "landau_integral_imag_absolute_error": float(imag_error),
-        "landau_integral_tail_complete": True,
-    }
     plasma_frequency_squared = ne * E**2 / (EPS0 * mass)
     response.update({
         "electron_susceptibility": complex(
@@ -255,7 +219,7 @@ def kappa_electron_susceptibility(
             "No conserving collisions, FDT noise, magnetized response or Full-EM vertex.",
             "A 1-D marginal is not a reconstruction of the full 3-D EVDF.",
             "The result is non-relativistic; relativistic Kappa response is not implemented.",
-            "The positive Landau-pole displacement and adaptive quadrature tolerances control numerical accuracy; the finite grid affects only the explicit coverage gate.",
+            "The default response is the exact retarded eta-to-zero Landau limit; an explicitly supplied positive pole displacement selects a finite-pole regularized response.",
             "The phase-velocity derivative is evaluated from the differentiated retarded Landau kernel at fixed positive pole displacement.",
         ],
     })

@@ -389,7 +389,6 @@ EXAMPLES = {
         "electron_temperature_eV": 250.0,
         "kappa": 4.0,
         "wavenumber_m_inverse": 120.0,
-        "pole_imaginary_part_m_s": 2.0e3,
         "minimum_velocity_grid_probability_coverage": 0.999
     },
     "thomson_three_dimensional_flow": {

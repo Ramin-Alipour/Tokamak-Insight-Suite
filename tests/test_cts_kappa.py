@@ -345,3 +345,52 @@ def test_kappa_phase_derivative_formula_registry_is_synchronized_and_executable(
     assert "susceptibility_phase_velocity_derivative_s_m" in {
         item["name"] for item in matches[0]["execution_contract"]["output_specs"]
     }
+
+
+
+def test_kappa_default_uses_exact_retarded_landau_limit_and_preserves_resonant_damping():
+    parameters = args()
+    parameters.pop("pole_imaginary_part_m_s")
+    result = kappa_electron_susceptibility(**parameters)
+    assert result["landau_contour_method"] == "exact_eta_to_zero_plus"
+    assert result["finite_pole_regularization_used"] is False
+    assert result["pole_imaginary_part_m_s"] == 0.0
+    assert result["landau_integral_tail_complete"] is True
+    assert result["integral"].imag < 0.0
+    assert result["integral_phase_velocity_derivative_s3_m3"].imag != 0.0
+
+
+def test_kappa_exact_landau_susceptibility_converges_to_maxwellian_as_kappa_increases():
+    from tokamak_analysis.cts_kappa import maxwellian_electron_susceptibility
+    parameters = args(k=300.0)
+    parameters.pop("pole_imaginary_part_m_s")
+    thermal_speed = np.sqrt(2.0*1.602176634e-19*parameters["electron_temperature_eV"]/9.1093837015e-31)
+    parameters["phase_velocity_m_s"] = 0.5*thermal_speed
+    kappa_result = kappa_electron_susceptibility(**parameters)
+    maxwellian_result = maxwellian_electron_susceptibility(
+        parameters["phase_velocity_m_s"],
+        electron_density_m3=parameters["electron_density_m3"],
+        electron_temperature_eV=parameters["electron_temperature_eV"],
+        wavenumber_m_inverse=parameters["wavenumber_m_inverse"],
+    )
+    relative_error = abs(kappa_result["electron_susceptibility"]-maxwellian_result["electron_susceptibility"])/abs(maxwellian_result["electron_susceptibility"])
+    assert relative_error < 4.0e-3
+
+
+def test_kappa_exact_landau_phase_derivative_matches_finite_difference():
+    parameters = args(k=5.0)
+    parameters.pop("pole_imaginary_part_m_s")
+    parameters["phase_velocity_m_s"] = 0.71e6
+    result = kappa_electron_susceptibility(**parameters)
+    step = 1.0e-5*np.sqrt(1.602176634e-19*parameters["electron_temperature_eV"]/9.1093837015e-31)
+    plus = kappa_electron_susceptibility(**{**parameters,"phase_velocity_m_s":parameters["phase_velocity_m_s"]+step})["electron_susceptibility"]
+    minus = kappa_electron_susceptibility(**{**parameters,"phase_velocity_m_s":parameters["phase_velocity_m_s"]-step})["electron_susceptibility"]
+    finite_difference = (plus-minus)/(2.0*step)
+    assert result["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(finite_difference,rel=2.0e-6,abs=1.0e-10)
+
+
+def test_explicit_kappa_pole_displacement_retains_finite_pole_mode():
+    result = kappa_electron_susceptibility(**args())
+    assert result["landau_contour_method"] == "finite_positive_imaginary_pole_regularization"
+    assert result["finite_pole_regularization_used"] is True
+    assert result["pole_imaginary_part_m_s"] == 2.0e3

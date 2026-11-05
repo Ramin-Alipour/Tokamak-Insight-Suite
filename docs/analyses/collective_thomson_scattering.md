@@ -551,3 +551,33 @@ must not be interpreted as electron density, electron or ion temperature,
 flow, composition, or an electron/ion velocity distribution. Physical
 parameter inference remains the separate responsibility of
 `analyze_cts_spectrum` and its explicitly selected forward model.
+
+
+## Exact retarded Landau limit for isotropic-Kappa susceptibility
+
+The default `kappa_electron_susceptibility` evaluates the physical retarded
+Landau contour at `eta -> 0+` using the Sokhotski-Plemelj identity. For the
+normalized dimensionless Kappa marginal (g(x)),
+
+[
+I(x_p)=operatorname{PV}int_{-\infty}^{\infty}
+\frac{g'(x)}{x-x_p}\,dx+i\pi g'(x_p),
+\qquad
+\chi_e=-\frac{\omega_{pe}^2}{k^2 a^2}I(x_p),
+]
+
+where (a^2=(2\kappa-3)eT_e/m_e) and (x_p=v_\phi/a). The principal-value
+quadrature subtracts (g'(x_p)) before integration. Its phase derivative
+subtracts the first two Taylor terms and retains the analytic resonant residue
+(i\pi g''(x_p)); it is not obtained by finite differences.
+
+An explicitly supplied positive `pole_imaginary_part_m_s` remains available
+as a separate finite-pole regularization mode. It is no longer selected
+implicitly from velocity-grid spacing. The dashboard default uses the exact
+retarded limit.
+
+Physical regression gates include the `\kappa\to\infty` Maxwellian limit,
+resonant damping sign, and an independent finite-difference check of the
+analytic phase derivative. The model remains collisionless, isotropic,
+non-relativistic, unmagnetized and electrostatic; this change does not claim
+collisional, magnetized or Full-EM Kappa CTS.
