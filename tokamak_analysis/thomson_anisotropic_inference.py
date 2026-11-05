@@ -682,6 +682,13 @@ def fit_gyrotropic_bi_kappa_thomson(
         "electron_velocity_projection_m_s": fit.x[3::4].copy(),
         "fitted_spectra": fitted,
         "residual_spectra": spectra - fitted,
+        "measurement_covariance": (
+            None if measurement_covariance_only is None
+            else measurement_covariance_only.copy()
+        ),
+        "model_discrepancy_covariance": (
+            None if discrepancy is None else discrepancy.copy()
+        ),
         "effective_covariance": cov,
         "parameter_covariance": parameter_covariance,
         "parameter_order": ["T_parallel_eV", "T_perpendicular_eV", "kappa_minus_1p5"] + [
@@ -695,7 +702,7 @@ def fit_gyrotropic_bi_kappa_thomson(
                       "nfev": int(fit.nfev), "cost": float(fit.cost)},
         "covariance_provenance": {
             "measurement": "supplied_full_channel_major" if measurement_covariance is not None else (
-                "supplied_pointwise_diagonal" if signal_uncertainty is not None else "unweighted_identity_for_fit"
+                "supplied_pointwise_diagonal" if signal_uncertainty is not None else "not_supplied"
             ),
             "effective_covariance_model": covariance_model,
             "parameter_covariance_scale": covariance_scale_method,
