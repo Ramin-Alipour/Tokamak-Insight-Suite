@@ -59,6 +59,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 MODEL_LABELS = {
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility",
+    "cts_collective_kappa_spectrum": "CTS — collective Kappa-electron / multispecies Maxwellian-ion dynamic structure spectrum",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
@@ -92,6 +93,14 @@ MODEL_LABELS = {
 }
 
 MODEL_PHYSICS_NOTES = {
+    "cts_collective_kappa_spectrum": (
+        "Collisionless, unmagnetized, longitudinal electrostatic CTS forward model. "
+        "Electrons use the exact 1-D marginal of an isotropic 3-D Kappa distribution "
+        "with finite-variance convention kappa > 3/2 and full Landau-contour susceptibility. "
+        "Maxwellian ion species, fractions, temperatures and flow vectors are explicit. "
+        "Dielectric screening combines electron and ion fluctuation terms into S(k,omega). "
+        "Not magnetized, collisional, relativistic, Full-EM, or an inverse fit."
+    ),
     "cts_tabulated_evdf_landau": (
         "Forward model: evaluates the first-order Landau susceptibility from an explicitly "
         "supplied 1-D projected electron VDF using analytic interval integration of its "
@@ -225,6 +234,21 @@ EXAMPLES = {
             "probability_density_m_s_inverse": np.exp(-0.5*(np.linspace(-2.0e6, 2.0e6, 81)/3.0e5)**2).tolist(),
             "smoothness": 0.0
         }
+    },
+    "cts_collective_kappa_spectrum": {
+        "wavelength_nm": np.linspace(499.7, 500.3, 81).tolist(),
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "electron_density_m3": 2.0e18,
+        "electron_temperature_eV": 250.0,
+        "kappa": 4.0,
+        "ion_species": [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        "ion_fractions": [1.0],
+        "ion_temperature_eV": [200.0],
+        "electron_velocity_m_s": [0.0, 0.0, 0.0],
+        "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "incident_direction": [1.0, 0.0, 0.0],
+        "scattered_direction": [0.0, 1.0, 0.0]
     },
     "kappa_electrostatic_susceptibility": {
         "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),

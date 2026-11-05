@@ -234,3 +234,10 @@ def test_dashboard_exposes_and_executes_gyrotropic_anisotropic_kappa_fit():
     assert result["model"] == "gyrotropic_bi_kappa_nonrelativistic_optical_thomson"
     assert result["kappa_finite_variance_domain"] is True
     assert result["model_validity"]["relativistic_corrections"] is False
+
+
+def test_collective_kappa_cts_is_available_in_advanced_dashboard():
+    from tis.ui import advanced_thomson_physics_page as advanced
+    assert "cts_collective_kappa_spectrum" in advanced.MODEL_LABELS
+    assert "cts_collective_kappa_spectrum" in advanced.EXAMPLES
+    assert "cts_collective_kappa_spectrum" in advanced.MODEL_PHYSICS_NOTES

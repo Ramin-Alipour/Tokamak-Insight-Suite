@@ -97,3 +97,17 @@ def test_tabulated_evdf_landau_cts_dispatch_is_public_and_preserves_solver(monke
     assert result["dielectric_function"][0] == 1.0 + 0.2j
     assert result["public_physics_entrypoint"] == "cts_tabulated_evdf_landau"
     assert result["automatic_model_substitution"] is False
+
+
+def test_collective_kappa_cts_is_exposed_through_public_dispatch(monkeypatch):
+    sentinel = {"spectral_density_per_nm": np.asarray([1.0, 2.0]), "model": "collective Kappa CTS"}
+    calls = []
+    def fake_solver(**kwargs):
+        calls.append(kwargs)
+        return sentinel
+    monkeypatch.setattr(physics, "collective_kappa_spectral_density", fake_solver)
+    result = physics.run_advanced_thomson_physics("cts_collective_kappa_spectrum", wavelength_nm=[499.9, 500.1], kappa=4.0)
+    assert calls == [{"wavelength_nm": [499.9, 500.1], "kappa": 4.0}]
+    assert result["spectral_density_per_nm"] is sentinel["spectral_density_per_nm"]
+    assert result["public_physics_entrypoint"] == "cts_collective_kappa_spectrum"
+    assert result["automatic_model_substitution"] is False
