@@ -7152,5 +7152,82 @@
         "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
       ]
     }
+  },
+  {
+    "name": "Conditional Maxwellian optical Thomson spectral-width mapping",
+    "equation": "T_e[eV] = (m_e c^2/e) [σ_λ/(λ_0 2 sin(θ/2))]^2; v_q = c(1 - λ_c/λ_0)/(2 sin(θ/2))",
+    "inputs": "Intrinsic response-convolved Gaussian width σ_λ [nm], fitted centroid λ_c [nm], laser wavelength λ_0 [nm], scattering angle θ [rad]",
+    "output": "Conditional T_e [eV], q-projected flow v_q [m s^-1], 2×2 covariance",
+    "assumptions": "Explicit non-collective Maxwellian selection; elastic non-relativistic Thomson mapping; supplied measured response is applied in the forward shape fit; independent laser/angle calibration uncertainties; theta_e < 0.01 and |v_q|/c < 0.1. This is a conditional diagnostic candidate, not primary inference.",
+    "status": "D",
+    "category": "Analysis 1 — Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
+      "formula_key": "optical_thomson_conditional_maxwellian_gaussian_mapping",
+      "input_specs": [
+        {
+          "name": "gaussian_fit_parameters.center_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "gaussian_fit_parameters.sigma_nm",
+          "unit": "nm; intrinsic width from measured-response forward fit",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "physical_inference.electron_temperature_candidate_eV",
+          "unit": "eV; withheld outside validity domain"
+        },
+        {
+          "name": "physical_inference.electron_velocity_projection_candidate_m_s",
+          "unit": "m s^-1; withheld outside validity domain"
+        },
+        {
+          "name": "physical_inference.parameter_covariance",
+          "unit": "2×2 covariance ordered [T_e, v_q]"
+        },
+        {
+          "name": "physical_inference.validity_parameters",
+          "unit": "theta_e and |beta_flow|"
+        }
+      ],
+      "prerequisites": [
+        "An explicitly selected non_collective_maxwellian physical model.",
+        "Calibrated laser wavelength and scattering angle.",
+        "Measured instrument response matrix applied to the intrinsic Gaussian forward model."
+      ],
+      "uncertainty_model": "Analytic Jacobian propagation of the fitted centroid/width covariance and independent laser-wavelength/scattering-angle calibration uncertainties. Model discrepancy, background-parameter cross-covariance and correlations between geometry and fit parameters are not included.",
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_selected_maxwellian_maps_intrinsic_gaussian_width_to_conditional_physics",
+        "tests/test_thomson_distribution.py::test_selected_maxwellian_physical_conversion_rejects_relativistic_domain",
+        "tests/test_thomson_distribution.py::test_spectral_distribution_requires_explicit_physical_model_geometry"
+      ],
+      "note": "Software implementation and independent synthetic tests; not experimental validation. The candidate is not promoted to primary Thomson inference."
+    }
   }
 ]
