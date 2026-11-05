@@ -545,7 +545,11 @@ def run_advanced_thomson_physics(model, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "thomson_kinetic_background_fit":
+    if model == "landau_fdt_full_em_response":
+        solver = landau_full_em_current_response
+    elif model == "thomson_multiview_3d_evdf":
+        solver = reconstruct_multiview_3d_evdf
+    elif model == "thomson_kinetic_background_fit":
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         solver = fit_noncollective_kinetic_thomson_with_background
     elif model == "relativistic_kinetic_ece_profile":
