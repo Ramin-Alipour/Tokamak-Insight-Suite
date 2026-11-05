@@ -144,6 +144,7 @@ def analyze_thomson_spectral_distribution(
     scattering_angle_uncertainty_rad: float | None = None,
     laser_angle_covariance_nm_rad: float = 0.0,
     physical_fit_options: dict | None = None,
+    projected_evdf_options: dict | None = None,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
 
@@ -807,4 +808,59 @@ def analyze_thomson_spectral_distribution(
             "reportable_as_primary_inference": False,
             "reason": "Spectral moments and Gaussian width remain descriptive unless a physical model and scattering geometry are explicitly selected.",
         }
+
+    # SD-02: connect the same measured spectrum to the native response-aware
+    # projected-EVDF inverse. This solves y = R A_q f_q + b, with f_q >= 0
+    # and integral(f_q dv) = 1. A single view identifies only the q-parallel
+    # marginal, never an unrestricted three-dimensional EVDF.
+    if projected_evdf_options is not None:
+        if not isinstance(projected_evdf_options, dict):
+            raise ValueError("projected_evdf_options must be a mapping")
+        if laser_wavelength_nm is None or scattering_angle_rad is None:
+            raise ValueError(
+                "laser_wavelength_nm and scattering_angle_rad are required for projected EVDF inversion"
+            )
+        options = dict(projected_evdf_options)
+        reserved = {
+            "wavelength_nm", "signal", "laser_wavelength_nm",
+            "scattering_angle_rad", "instrument_response_matrix",
+            "background_signal", "signal_uncertainty", "signal_covariance",
+            "background_uncertainty", "background_covariance",
+            "signal_background_cross_covariance",
+        }
+        conflicts = sorted(reserved.intersection(options))
+        if conflicts:
+            raise ValueError(
+                "projected_evdf_options cannot override the measured spectrum, geometry, "
+                f"response, background or top-level covariance inputs: {conflicts}"
+            )
+        from .thomson_evdf import reconstruct_thomson_evdf
+        evdf_kwargs = {
+            "wavelength_nm": x,
+            "signal": y,
+            "laser_wavelength_nm": float(laser_wavelength_nm),
+            "scattering_angle_rad": float(scattering_angle_rad),
+            "instrument_response_matrix": response,
+            "background_signal": background.copy(),
+            **options,
+        }
+        if uncertainty is not None:
+            evdf_kwargs["signal_uncertainty"] = uncertainty.copy()
+        elif signal_covariance_matrix is not None:
+            evdf_kwargs["signal_covariance"] = signal_covariance_matrix.copy()
+        if background_uncertainty is not None:
+            evdf_kwargs["background_uncertainty"] = background_uncertainty.copy()
+        elif background_covariance_matrix is not None:
+            evdf_kwargs["background_covariance"] = background_covariance_matrix.copy()
+        if signal_background_cross_covariance is not None:
+            evdf_kwargs["signal_background_cross_covariance"] = cross_covariance.copy()
+        result["projected_evdf_inference"] = reconstruct_thomson_evdf(**evdf_kwargs)
+        result["projected_evdf_inference"]["source_spectrum"] = (
+            "same_calibrated_measured_spectrum_as_spectral_distribution"
+        )
+        result["projected_evdf_inference"]["inference_scope"] = (
+            "one_dimensional_q_parallel_velocity_marginal_only"
+        )
+        result["projected_evdf_inference"]["gaussian_width_used_as_evdf"] = False
+
     return result
