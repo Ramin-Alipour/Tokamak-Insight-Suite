@@ -4122,10 +4122,10 @@
   },
   {
     "name": "Collective kappa-electron Thomson dielectric spectrum",
-    "equation": "χ_s(k,ω)=−(ω_ps²/k²)∫_L [∂f_s(v)/∂v]/(v−ω/k) dv; ε=1+Σ_sχ_s; S=(2π/k){|1+Σ_iχ_i|² f_e/|ε|²+Σ_i(Z_i²n_i/n_e)|χ_e|²f_i/|ε|²}",
-    "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/temperature/kappa, fixed Maxwellian ion species/fractions/temperatures/flows, electron flow and beam directions",
-    "output": "Collective spectral density, electron/ion susceptibilities, dielectric function and fitted ne/Te/kappa",
-    "assumptions": "Unmagnetized electrostatic longitudinal response; isotropic 1-D projected kappa electron VDF; Maxwellian ions; Landau contour; fixed supplied ion composition and flow vectors",
+    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; ε=1+χ_e+χ_i; S=(2π/k){|1+χ_i|² f_e/|ε|²+Σ_s Z_s α_s |χ_e|² f_i,s/|ε|²}; χ_a=−(ω_pa²/k²)∫_L[(∂f_a/∂v)/(v−ω/k)]dv",
+    "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/reference temperature/Kappa index, optional electron populations with independent Maxwellian or Kappa distributions and projected flows, ion species/fractions/temperatures, optional per-ion Maxwellian or Kappa distributions and projected flows, electron flow and beam directions",
+    "output": "Collective spectral density, per-population electron and per-species ion susceptibilities, dielectric function, dynamic structure factor and fitted ne/Te/electron Kappa index",
+    "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; exact 1-D projected marginals of isotropic Maxwellian or finite-variance Kappa species; Landau contour; quasi-neutral ion densities; fixed supplied composition and population/ion parameters; each Kappa index > 3/2.",
     "status": "D",
     "category": "Collective non-Maxwellian Thomson scattering",
     "execution_contract": {
@@ -4188,6 +4188,16 @@
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
           "required": true
+        },
+        {
+          "name": "electron_populations",
+          "unit": "optional population mappings with density_fraction, temperature_ratio, distribution, kappa when selected, and flow_projection_m_s",
+          "required": false
+        },
+        {
+          "name": "ion_populations",
+          "unit": "optional one-per-ion-species mappings with distribution, kappa when selected, and flow_projection_m_s",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4258,15 +4268,16 @@
         }
       ],
       "prerequisites": [
-        "Calibrated wavelength spectrum",
-        "Explicit ion species/fractions/temperatures/flows",
-        "Explicit beam directions and scattering angle"
+        "Electron population fractions are positive and sum to one; temperature ratios are positive.",
+        "Each selected Kappa electron or ion distribution has kappa > 3/2.",
+        "When ion_populations is supplied, it contains exactly one mapping per ion species.",
+        "All projected flows are finite and subluminal; ion densities follow n_i=alpha_i*n_e/Z_i."
       ],
       "uncertainty_model": "Local Jacobian covariance for ne, Te and kappa. Supplied ion, flow, beam and instrument-response uncertainties are not yet fully propagated by this model and are reported as missing inputs in the analysis result.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ],
-      "note": "Reference-only helper; not part of the public Analysis 1 model shortlist. Microwave collective CTS is handled by the separate registered CTS workflow.",
+      "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
@@ -4336,7 +4347,8 @@
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ]
-    }
+    },
+    "note": "Electron and ion populations independently support Maxwellian or finite-variance Kappa projected marginals. Their Landau-contour susceptibilities are summed before forming the common dielectric response and fluctuation source terms. The public inverse estimates only its declared ne, reference Te and electron Kappa parameters; mixture/ion parameters are fixed inputs. No collisional, magnetized or Full-EM Kappa-ion extension is implied."
   },
   {
     "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",
@@ -7540,10 +7552,10 @@
   },
   {
     "name": "Multi-population Kappa electron susceptibility for collective Thomson scattering",
-    "equation": "χ_e(k,ω) = Σ_j χ_e,j(k,ω); χ_e,j = -(ω_pe,j²/k²) ∫_L [∂f_j(v)/∂v]/(v−ω/k) dv; ω_pe,j² = n_e η_j e²/(ε₀ m_e), Σ_j η_j = 1",
-    "inputs": "n_e [m^-3], T_e [eV], population fractions η_j, temperature ratios τ_j, Kappa indices κ_j > 3/2, projected flows u_j [m/s], k [m^-1], ω [rad/s]",
+    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; χ_a=−(ω_pa²/k²)∫_L[(∂f_a/∂v)/(v−ω/k)]dv; ω_pe,j²=n_eη_je²/(ε₀m_e); ω_pi,s²=n_sZ_s²e²/(ε₀m_s); Σ_jη_j=1; n_s=α_sn_e/Z_s",
+    "inputs": "n_e [m^-3], T_e [eV], electron population fractions η_j, temperature ratios τ_j, distribution selector Maxwellian or Kappa, Kappa indices κ_j > 3/2 when selected, projected electron flows u_j [m/s], per-ion-species distribution selector Maxwellian or Kappa, ion Kappa indices κ_s > 3/2 when selected, ion charge-density fractions α_s, ion temperatures and projected flows, k [m^-1], ω [rad/s]",
     "output": "Complex total longitudinal electron susceptibility χ_e and density-weighted projected electron source distribution",
-    "assumptions": "Unmagnetized electrostatic longitudinal response; each population is an isotropic 3-D Kappa population represented by its 1-D scattering-direction marginal; populations share a common bulk density reference and are independently drifting.",
+    "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; quasi-neutrality; each species is represented by its exact 1-D projected marginal for the selected isotropic Maxwellian or finite-variance isotropic Kappa family; population fractions and species composition are fixed explicit inputs; susceptibility contributions are summed before common dielectric screening.",
     "status": "D",
     "category": "Thomson scattering / collective kinetic response",
     "execution_contract": {
@@ -7576,6 +7588,18 @@
           "name": "phase_velocity_m_s",
           "unit": "m s^-1",
           "required": true
+        },
+        {
+          "name": "electron_populations",
+          "unit": "optional list of density_fraction, temperature_ratio, distribution (maxwellian or kappa), kappa when selected, and flow_projection_m_s mappings",
+          "required": false,
+          "description": "Electron populations are independently represented by finite-variance Kappa or Maxwellian 1-D marginals; fractions must be positive and sum to one."
+        },
+        {
+          "name": "ion_populations",
+          "unit": "optional one-per-ion-species list of distribution (maxwellian or kappa), kappa when selected, and flow_projection_m_s mappings",
+          "required": false,
+          "description": "Ion populations default to Maxwellian with the supplied species flow. Kappa ions require kappa > 3/2; one mapping is required per ion species when supplied."
         }
       ],
       "output_specs": [
@@ -7593,16 +7617,228 @@
         }
       ],
       "prerequisites": [
-        "Each population density_fraction is positive and fractions sum to one.",
-        "Each population Kappa index is > 3/2 for finite variance.",
-        "Temperature ratios are positive and projected population flows are subluminal."
+        "Each supplied electron population density_fraction is positive and fractions sum to one; temperature_ratio is positive and projected flow is subluminal.",
+        "Electron and ion Kappa indices must exceed 3/2 to ensure finite variance.",
+        "When ion_populations is supplied, it must contain exactly one mapping per ion species; each flow is finite and subluminal.",
+        "Quasi-neutral ion density is n_i = alpha_i n_e / Z_i; each ion susceptibility uses omega_pi^2 = n_i Z_i^2 e^2/(epsilon_0 m_i)."
       ],
       "uncertainty_model": "Population parameters are fixed external inputs in the current CTS fit. Their uncertainties are not inferred or propagated by this extension; the fitted base electron density, reference temperature and global Kappa parameter retain the existing local-fit covariance.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_electron_dielectric_uses_weighted_landau_responses",
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_rejects_non_normalized_density_fractions"
       ],
-      "note": "This extends the collisionless unmagnetized electrostatic CTS branch. It is not a magnetized Full-EM multi-population model and does not independently identify all population parameters from one spectrum."
+      "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian and finite-variance Kappa distributions may be selected independently for each supplied population. The spectrum is then constructed from the common dielectric screening and the corresponding electron/ion source terms. This is still an unmagnetized collisionless electrostatic forward/inference branch; it is not a magnetized Full-EM or collisional closure. Population and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse."
+    },
+    "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian and finite-variance Kappa distributions may be selected independently for each supplied population. The spectrum is then constructed from the common dielectric screening and the corresponding electron/ion source terms. This is still an unmagnetized collisionless electrostatic forward/inference branch; it is not a magnetized Full-EM or collisional closure. Population and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse."
+  },
+  {
+    "name": "Measured-laser-profile relativistic Compton Thomson spectral-power convolution",
+    "equation": "I_s(λ_s) ∝ ∫ dλ_i [P_i(λ_i) λ_i/(h c)] [dσ_KN(λ_i,T_e,u_q)/dΩ] [h c/λ_s] p_MJ(λ_s | λ_i,T_e,u_q);  m_j = Σ_k R_jk ∫_(Δλ_k) I_s(λ_s) dλ_s",
+    "inputs": "Measured non-negative incident spectral power density P_i(λ_i) [W nm^-1] on a strictly increasing wavelength grid [nm]; calibrated scattered spectral bins; measured instrument response; relativistic Maxwell-Juttner temperature and scattering-vector flow; scattering geometry and transverse incident polarization.",
+    "output": "Source-profile-convolved scattered spectral power shape after wavelength-resolved relativistic Compton recoil and polarized Klein-Nishina weighting, finite detector-bin integration and measured instrument-response convolution.",
+    "assumptions": "Single scattering; isotropic Maxwell-Juttner rest-frame electron distribution with bulk flow parallel to the scattering vector; source profile is piecewise-linear in incident spectral power density and integrated by Gauss-Legendre quadrature; incident photon flux is proportional to P_i(λ_i)λ_i/(hc); each incident wavelength uses its own Lorentz-transformed Compton recoil and polarized Klein-Nishina differential cross-section; scattered photon energy hc/λ_s weights detected spectral power; finite wavelength-window capture is retained rather than renormalized; detector response acts after source convolution. Source-profile uncertainty and joint spatial-spectral Compton source convolution are not yet propagated.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "formula_key": "thomson_measured_laser_profile_compton_power_convolution",
+      "input_specs": [
+        {
+          "name": "laser_spectrum_wavelength_nm",
+          "unit": "nm; strictly increasing measured incident-laser wavelength",
+          "required": true
+        },
+        {
+          "name": "laser_spectrum_density_per_nm",
+          "unit": "W nm^-1; measured incident spectral power density",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; fitted relativistic Maxwell-Juttner temperature",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; fitted subluminal scattering-vector flow",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "dimensionless transverse 3-vector",
+          "required": true
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean; must be true for this formula route",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin response matrix",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "laser_source_profile_used",
+          "unit": "boolean"
+        },
+        {
+          "name": "laser_source_profile_convolution",
+          "unit": "source photon-flux integration, wavelength-resolved Klein-Nishina cross-section and scattered-photon-energy weighting"
+        },
+        {
+          "name": "laser_source_quadrature_nodes",
+          "unit": "count"
+        },
+        {
+          "name": "laser_source_quadrature_wavelength_nm",
+          "unit": "nm; fixed-order photon-flux quadrature nodes inside measured non-zero source support"
+        }
+      ],
+      "prerequisites": [
+        "Canonical channel-wise relativistic Maxwell-Juttner optical Thomson inference.",
+        "Measured incident laser spectral power profile with at least three samples.",
+        "Explicit incident polarization and scattering geometry.",
+        "Measured instrument response."
+      ],
+      "uncertainty_model": "Local physical/background covariance conditional on the supplied measured source profile and selected finite-order source quadrature. Source-profile covariance is not propagated.",
+      "test_links": [
+        "tests/test_thomson_kinetic_background.py::test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space",
+        "tests/test_thomson_kinetic_background.py::test_relativistic_source_profile_requires_a_valid_positive_spectrum"
+      ],
+      "note": "This is a wavelength-resolved physical forward convolution, not the elastic wavelength-ratio source-response approximation. The measured source spectrum is integrated before the detector response."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_incident_spectral_power_density_and_calibrated_scattered_spectrum",
+    "execution_scope": "channel_wise_relativistic_maxwell_juttner_single_scattering_compton_spectral_power_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — relativistic Maxwell-Juttner Compton source-profile inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
+      ],
+      "formula_key": "thomson_measured_laser_profile_compton_power_convolution",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_kinetic_background.py::test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space"
+      ]
+    }
+  },
+  {
+    "name": "Analytic Maxwellian longitudinal susceptibility (Fried–Conte)",
+    "equation": "χ_e(ζ) = (1/(k² λ_De²))[1 + ζ Z(ζ)],  Z(ζ)=i√π w(ζ),  ζ=v_phase/(√2 σ_e),  σ_e²=e T_e/m_e,  λ_De²=ε₀ e T_e/(n_e e²)",
+    "inputs": "Real phase velocity [m/s], electron density [m^-3], electron temperature [eV], wavenumber [m^-1]",
+    "output": "Dimensionless complex longitudinal electron susceptibility",
+    "assumptions": "Collisionless, unmagnetized, non-relativistic isotropic Maxwellian electrons; retarded Landau contour; SI units; electron-only susceptibility (no ion term or FDT fluctuation spectrum).",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.maxwellian_electron_susceptibility",
+      "formula_key": "cts_maxwellian_fried_conte_susceptibility",
+      "input_specs": [
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m/s; real scalar or vector",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1; positive",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg; defaults to electron mass",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "plasma_dispersion_function",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "normalized_phase_velocity",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "thermal_speed_m_s",
+          "unit": "m/s"
+        },
+        {
+          "name": "plasma_frequency_squared_s_minus2",
+          "unit": "s^-2"
+        }
+      ],
+      "prerequisites": [
+        "Positive finite electron density, temperature, wavenumber and mass",
+        "Real finite phase velocity"
+      ],
+      "uncertainty_model": "No uncertainty is inferred. Propagate supplied uncertainties externally through the analytic complex response.",
+      "limitations": [
+        "Collisionless longitudinal electron response only",
+        "No ion susceptibility, dynamic structure factor, FDT, collisions, magnetization, relativistic correction or Full-EM current vertex"
+      ],
+      "test_links": [
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference",
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits"
+      ],
+      "note": "Analytic Fried–Conte response evaluated with the Faddeeva function; independently compared with the full-axis Landau quadrature and cold high-phase-velocity limit. Not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "physical_response_kernel",
+      "input_data_level": "physical_parameters",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Collective Thomson scattering"
+    },
+    "references": [
+      {
+        "title": "The Plasma Dispersion Function: The Hilbert Transform of the Gaussian",
+        "authors": "B. D. Fried and S. D. Conte",
+        "year": 1961,
+        "publisher": "Academic Press",
+        "type": "monograph"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "physical_parameters",
+    "execution_scope": "physical_response_kernel",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_kappa.maxwellian_electron_susceptibility",
+      "function_links": [
+        "tokamak_analysis.cts_kappa.maxwellian_electron_susceptibility"
+      ],
+      "formula_key": "cts_maxwellian_fried_conte_susceptibility",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference",
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits"
+      ]
     }
   }
 ]

@@ -7730,5 +7730,115 @@
         "tests/test_thomson_kinetic_background.py::test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space"
       ]
     }
+  },
+  {
+    "name": "Analytic Maxwellian longitudinal susceptibility (Fried–Conte)",
+    "equation": "χ_e(ζ) = (1/(k² λ_De²))[1 + ζ Z(ζ)],  Z(ζ)=i√π w(ζ),  ζ=v_phase/(√2 σ_e),  σ_e²=e T_e/m_e,  λ_De²=ε₀ e T_e/(n_e e²)",
+    "inputs": "Real phase velocity [m/s], electron density [m^-3], electron temperature [eV], wavenumber [m^-1]",
+    "output": "Dimensionless complex longitudinal electron susceptibility",
+    "assumptions": "Collisionless, unmagnetized, non-relativistic isotropic Maxwellian electrons; retarded Landau contour; SI units; electron-only susceptibility (no ion term or FDT fluctuation spectrum).",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.maxwellian_electron_susceptibility",
+      "formula_key": "cts_maxwellian_fried_conte_susceptibility",
+      "input_specs": [
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m/s; real scalar or vector",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1; positive",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg; defaults to electron mass",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "plasma_dispersion_function",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "normalized_phase_velocity",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "thermal_speed_m_s",
+          "unit": "m/s"
+        },
+        {
+          "name": "plasma_frequency_squared_s_minus2",
+          "unit": "s^-2"
+        }
+      ],
+      "prerequisites": [
+        "Positive finite electron density, temperature, wavenumber and mass",
+        "Real finite phase velocity"
+      ],
+      "uncertainty_model": "No uncertainty is inferred. Propagate supplied uncertainties externally through the analytic complex response.",
+      "limitations": [
+        "Collisionless longitudinal electron response only",
+        "No ion susceptibility, dynamic structure factor, FDT, collisions, magnetization, relativistic correction or Full-EM current vertex"
+      ],
+      "test_links": [
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference",
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits"
+      ],
+      "note": "Analytic Fried–Conte response evaluated with the Faddeeva function; independently compared with the full-axis Landau quadrature and cold high-phase-velocity limit. Not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "physical_response_kernel",
+      "input_data_level": "physical_parameters",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Collective Thomson scattering"
+    },
+    "references": [
+      {
+        "title": "The Plasma Dispersion Function: The Hilbert Transform of the Gaussian",
+        "authors": "B. D. Fried and S. D. Conte",
+        "year": 1961,
+        "publisher": "Academic Press",
+        "type": "monograph"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "physical_parameters",
+    "execution_scope": "physical_response_kernel",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_kappa.maxwellian_electron_susceptibility",
+      "function_links": [
+        "tokamak_analysis.cts_kappa.maxwellian_electron_susceptibility"
+      ],
+      "formula_key": "cts_maxwellian_fried_conte_susceptibility",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_matches_landau_quadrature_reference",
+        "tests/test_cts_kappa.py::test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limits"
+      ]
+    }
   }
 ]
