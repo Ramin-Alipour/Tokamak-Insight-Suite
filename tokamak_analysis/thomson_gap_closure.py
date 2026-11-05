@@ -899,12 +899,15 @@ def reconstruct_psf_aware_thomson_profile(
         "gcv_effective_degrees_of_freedom": np.asarray(effective_dof, dtype=float),
         "positive_constraint": bool(positive),
         "noise_model": noise_status,
+        "uncertainty_method": "frequentist_regularized_estimator_sandwich_Jy_Cy_JyT",
+        "measurement_noise_covariance_used": measurement_covariance_matrix.copy(),
+        "measurement_data_sensitivity_jacobian": measurement_sensitivity.copy(),
         "identifiability": {
             "primary": ["latent_profile"] if identifiable else [],
             "conditional": ["regularized_candidate_profile; conditional on supplied PSF, regularization, and noise model"],
             "non_identifiable": ["spatial modes in the data-only null space", "sub-resolution modes not encoded by the supplied mixing operator"],
         },
-        "uncertainty_interpretation": "local regularized linear covariance on the active set; not a posterior interval. PSF covariance is propagated by first-order differentiation of the regularized normal equations. If measurement_spatial_mixing_cross_covariance is supplied, its two cross terms are included after validating the full joint measurement/PSF covariance block as positive semidefinite; higher-order operator effects remain excluded.",
+        "uncertainty_interpretation": "frequentist first-order sampling covariance of the regularized estimator on the active set, computed as J_y C_y J_y.T (not the inverse penalized Hessian and not a posterior interval). PSF covariance and, when supplied, measurement/PSF cross-covariance are propagated by first-order differentiation of the regularized normal equations; higher-order operator effects remain excluded.",
         "experimental_validation": "not_performed",
     }
 
