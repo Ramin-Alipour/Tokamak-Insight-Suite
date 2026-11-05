@@ -8694,8 +8694,9 @@
         },
         {
           "name": "physical_fit_options",
-          "unit": "mapping of native kinetic-fit nuisance and uncertainty inputs",
-          "required": false
+          "unit": "mapping of physical-fit controls and nuisance/uncertainty inputs",
+          "required": false,
+          "description": "For non_collective_maxwellian, include radius_m to invoke the canonical measured-spectrum Maxwellian forward fit; for kappa and relativistic_maxwell_juttner, supplies the native kinetic-fit initial values, nuisance and uncertainty inputs. Gaussian width remains descriptive and is never used as the primary physical likelihood."
         },
         {
           "name": "incident_polarization",

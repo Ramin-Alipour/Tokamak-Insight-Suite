@@ -648,3 +648,8 @@ wave tensor. The numerical resonance-broadening parameter enters kinetic
 resonance denominators only; it does not floor or replace the real frequency.
 An exactly zero frequency shift is currently unavailable because a separately
 derived and converged static-Maxwell limit is not yet implemented.
+
+
+### Spectral-distribution physical-model connection
+
+The descriptive spectral-distribution child analysis may optionally invoke the canonical optical Thomson physical fitter on the exact same calibrated measured spectrum. When `physical_model="non_collective_maxwellian"` and `physical_fit_options` includes the measured channel coordinate `radius_m`, the child forwards the original wavelength bins, spectrum, measured instrument-response operator, supplied spectral uncertainty/covariance, selected geometry and explicit detector-background controls to `analyze_thomson_spectra`. The Gaussian centroid and width remain independent shape diagnostics and are not used as the primary Maxwellian likelihood or promoted to a primary temperature measurement. The canonical fit's own identifiability classification controls whether its physical parameters are reportable. Kappa and relativistic Maxwell-Juttner continue to use their native finite-bin kinetic forward fit.

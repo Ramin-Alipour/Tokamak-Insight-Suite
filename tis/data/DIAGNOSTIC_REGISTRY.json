@@ -8599,7 +8599,7 @@
     "implementation_functions": [
       "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
     ],
-    "implementation_status": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics are implemented for calibrated measured spectra; this entry does not register or expose the separate projected-EVDF inverse.",
+    "implementation_status": "Observed spectral moments and response-convolved Gaussian shape diagnostics are implemented; explicit Kappa and relativistic Maxwell-Juttner selections dispatch to their native physical forward fit with shared measured response and supplied detector-background/uncertainty inputs.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -8691,6 +8691,29 @@
           "name": "model_discrepancy_covariance and systematic_covariance",
           "unit": "positive-semidefinite wavelength-space covariance",
           "required": false
+        },
+        {
+          "name": "physical_fit_options",
+          "unit": "mapping of physical-fit controls and nuisance/uncertainty inputs",
+          "required": false,
+          "description": "For non_collective_maxwellian, include radius_m to invoke the canonical measured-spectrum Maxwellian forward fit; for kappa and relativistic_maxwell_juttner, supplies the native kinetic-fit initial values, nuisance and uncertainty inputs. Gaussian width remains descriptive and is never used as the primary physical likelihood."
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "incident Stokes/Jones polarization for relativistic Maxwell-Juttner",
+          "required": false
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean; explicit recoil model selection",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "physical_background_model",
+          "unit": "registered detector-background basis",
+          "required": false,
+          "default": "linear"
         }
       ],
       "output_specs": [
@@ -8914,7 +8937,7 @@
         },
         {
           "name": "kinetic_physical_inference",
-          "unit": "Kappa or relativistic Maxwell-Juttner physical fit with structured detector background"
+          "unit": "structured; native Kappa/relativistic Maxwell-Juttner fit, identifiability and covariance"
         },
         {
           "name": "joint_parameter_covariance",
