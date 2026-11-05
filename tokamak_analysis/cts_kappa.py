@@ -240,7 +240,7 @@ def maxwellian_electron_susceptibility(
     Uses the Fried-Conte plasma dispersion function
     Z(zeta) = i*sqrt(pi)*wofz(zeta), with
     zeta = v_phase/sqrt(2*k_B*T/m), and
-    chi_e = (omega_pe**2/(k**2*v_th**2)) * (1 + zeta*Z(zeta)).
+    chi_e = (2*omega_pe**2/(k**2*v_th**2)) * (1 + zeta*Z(zeta)).
     The retarded Landau contour is selected by the Faddeeva function for
     real phase velocity. This is an analytic Maxwellian reference kernel,
     not a collisional, magnetized, or electromagnetic CTS model.

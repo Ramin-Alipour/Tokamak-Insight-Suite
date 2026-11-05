@@ -230,7 +230,7 @@ def test_analytic_maxwellian_susceptibility_has_correct_zero_and_high_phase_limi
     )
     omega_pe2 = result["plasma_frequency_squared_s_minus2"]
     sigma2 = result["one_dimensional_velocity_variance_m2_s2"]
-    expected_zero = omega_pe2 / (2.0 * k**2 * sigma2)
+    expected_zero = omega_pe2 / (k**2 * sigma2)
     assert result["electron_susceptibility"].real == pytest.approx(expected_zero, rel=1e-12)
     assert result["electron_susceptibility"].imag == pytest.approx(0.0, abs=1e-14)
 
