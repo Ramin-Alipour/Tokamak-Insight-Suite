@@ -7,6 +7,34 @@ from scipy.interpolate import CubicSpline, PchipInterpolator, make_smoothing_spl
 from .thomson_scattering import _covariance_is_positive_semidefinite
 from .formula_library import thomson_velocity_projection_relativistic_exact
 
+
+
+def fit_gyrotropic_thomson_spectra(wavelength_nm, measured_spectra, *, distribution_model="bi_maxwellian", **kwargs):
+    """Dispatch calibrated multi-view spectra to an explicit gyrotropic model.
+
+    bi_maxwellian preserves the original model; bi_kappa selects the finite-
+    variance (kappa > 3/2) model. No model switching or missing-geometry
+    inference is performed implicitly.
+    """
+    if not isinstance(distribution_model, str):
+        raise ValueError("distribution_model must be 'bi_maxwellian' or 'bi_kappa'")
+    from . import thomson_anisotropic_inference as anisotropic
+    dispatch = {
+        "bi_maxwellian": anisotropic.fit_gyrotropic_bi_maxwellian_thomson,
+        "bi_kappa": anisotropic.fit_gyrotropic_bi_kappa_thomson,
+    }
+    if distribution_model not in dispatch:
+        raise ValueError("distribution_model must be 'bi_maxwellian' or 'bi_kappa'")
+    result = dispatch[distribution_model](wavelength_nm, measured_spectra, **kwargs)
+    if not isinstance(result, dict):
+        raise RuntimeError("Gyrotropic Thomson solver must return a result mapping")
+    result = dict(result)
+    result["selected_distribution_model"] = distribution_model
+    result["analysis_entry_point"] = "fit_gyrotropic_thomson_spectra"
+    result["model_switch_was_automatic"] = False
+    return result
+
+
 def analyze_thomson_spectra(*args, **kwargs):
     """Infer physical plasma parameters directly from measured calibrated spectra.
 
