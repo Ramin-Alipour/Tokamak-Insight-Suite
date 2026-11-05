@@ -261,3 +261,44 @@ def test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen():
             instrument_response_matrix=np.eye(wavelength.size),
             maximum_projected_rms_beta=0.001,
         )
+
+
+def test_bimaxwellian_model_discrepancy_is_not_added_to_a_synthetic_identity_covariance():
+    wavelength, spectra, b, q = _synthetic_spectra()
+    discrepancy = np.eye(spectra.size) * 2.5e-8
+    result = fit_gyrotropic_bi_maxwellian_thomson(
+        wavelength, spectra, laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        model_discrepancy_covariance=discrepancy,
+        initial_temperature_parallel_eV=700.0,
+        initial_temperature_perpendicular_eV=350.0,
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+    )
+    assert result["measurement_covariance"] is None
+    np.testing.assert_array_equal(result["model_discrepancy_covariance"], discrepancy)
+    np.testing.assert_array_equal(result["effective_covariance"], discrepancy)
+    assert result["covariance_provenance"]["effective_covariance_model"] == "model_discrepancy_only"
+    assert result["covariance_provenance"]["parameter_covariance_scale"] == "absolute_model_discrepancy_covariance"
+
+
+def test_bikappa_model_discrepancy_is_not_added_to_a_synthetic_identity_covariance():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    discrepancy = np.eye(spectra.size) * 1.0e-7
+    result = fit_gyrotropic_bi_kappa_thomson(
+        wavelength, spectra, laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        model_discrepancy_covariance=discrepancy,
+        initial_temperature_parallel_eV=750.0,
+        initial_temperature_perpendicular_eV=400.0,
+        initial_kappa=5.0,
+    )
+    np.testing.assert_array_equal(result["effective_covariance"], discrepancy)
+    assert result["covariance_provenance"]["effective_covariance_model"] == "model_discrepancy_only"
+    assert result["covariance_provenance"]["parameter_covariance_scale"] == "absolute_model_discrepancy_covariance"
