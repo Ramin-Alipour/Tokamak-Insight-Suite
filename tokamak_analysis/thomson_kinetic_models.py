@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 import numpy as np
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, lsq_linear
 from scipy.special import gammaln, ndtr, stdtr, kve
 from numpy.polynomial.legendre import leggauss
 
@@ -228,12 +228,28 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         whitened_design_local = np.linalg.solve(chol_local, design)
         whitened_data_local = np.linalg.solve(chol_local, tq)
         information_local = whitened_design_local.T @ whitened_design_local
+        # The unconstrained GLS solution can yield negative T_parallel or
+        # T_perpendicular when noisy directional measurements conflict. Such
+        # values are not physical temperatures. Solve the same GLS objective
+        # with the thermodynamic constraints T_parallel,T_perpendicular > 0.
+        # The lower bound is numerical only; an active bound is reported below
+        # and its local Gaussian covariance must not be read as a symmetric CI.
+        lower_temperature_eV = 1.0e-10
+        solution = lsq_linear(
+            whitened_design_local, whitened_data_local,
+            bounds=(np.full(2, lower_temperature_eV), np.full(2, np.inf)),
+            method="trf", tol=1.0e-12, lsmr_tol="auto", max_iter=1000,
+        )
+        if not solution.success or np.any(~np.isfinite(solution.x)):
+            raise ValueError(
+                "positive-temperature anisotropy GLS failed: " + str(solution.message)
+            )
         covariance_local = np.linalg.inv(information_local)
-        parameters_local = covariance_local @ (whitened_design_local.T @ whitened_data_local)
-        return parameters_local, covariance_local
+        active_local = solution.x <= lower_temperature_eV * (1.0 + 1.0e-6)
+        return solution.x, covariance_local, active_local
 
     effective_covariance = cov.copy()
-    parameters, parameter_covariance = gls_solve(effective_covariance)
+    parameters, parameter_covariance, active_temperature_bounds = gls_solve(effective_covariance)
     geometry_iterations = 0
     if pitch_covariance is not None:
         for geometry_iterations in range(1, 51):
@@ -241,11 +257,12 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
             effective_covariance = (
                 cov + derivative_mu[:, None]*pitch_covariance*derivative_mu[None, :]
             )
-            updated_parameters, updated_covariance = gls_solve(effective_covariance)
+            updated_parameters, updated_covariance, updated_active_bounds = gls_solve(effective_covariance)
             change = np.linalg.norm(updated_parameters-parameters) / max(
                 np.linalg.norm(parameters), np.finfo(float).tiny
             )
             parameters, parameter_covariance = updated_parameters, updated_covariance
+            active_temperature_bounds = updated_active_bounds
             if change < 1e-10:
                 break
         else:
@@ -271,7 +288,24 @@ def infer_gyrotropic_bi_maxwellian_temperatures(
         "identifiability_reason": (
             "Two directional temperatures are separately identifiable from the supplied pitch-angle diversity."
         ),
-        "physicality_status": "positive_temperatures" if physical else "non_positive_GLS_temperature_estimate; no physical temperatures reported",
+        "physicality_status": (
+            "positive_temperatures_at_active_lower_bound"
+            if physical and np.any(active_temperature_bounds)
+            else "positive_temperatures"
+            if physical
+            else "non_positive_GLS_temperature_estimate; no physical temperatures reported"
+        ),
+        "temperature_constraint": "T_perpendicular > 0 and T_parallel > 0 eV",
+        "active_temperature_lower_bounds": {
+            "T_perpendicular": bool(active_temperature_bounds[0]),
+            "T_parallel": bool(active_temperature_bounds[1]),
+        },
+        "temperature_covariance_status": (
+            "local_unconstrained_GLS_curvature_at_active_physical_bound; "
+            "not_a_symmetric_confidence_interval"
+            if np.any(active_temperature_bounds)
+            else "local_GLS_covariance"
+        ),
     }
 
 
