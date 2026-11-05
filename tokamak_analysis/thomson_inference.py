@@ -3824,6 +3824,46 @@ def analyze_thomson_spectra(
                 }
         channel_result["electron_velocity_distribution"] = evdf
         evdf_results.append(evdf)
+        # Reuse the EVDF already reconstructed by the parent API and close its
+        # first two velocity moments against the same-channel measured spectrum.
+        # This avoids a duplicate inverse solve and keeps API/Dashboard output aligned.
+        if (
+            model in {"non_collective_maxwellian", "non_collective_kappa"}
+            and distribution.get("analysis_status") == "completed"
+            and evdf.get("analysis_status") in {"completed", "conditional_regularized_candidate"}
+            and "velocity_parallel_m_s" in evdf
+            and "evdf_parallel_s_per_m" in evdf
+        ):
+            velocity_grid = np.asarray(evdf["velocity_parallel_m_s"], dtype=float)
+            projected_pdf = np.asarray(evdf["evdf_parallel_s_per_m"], dtype=float)
+            if (velocity_grid.ndim == 1 and projected_pdf.shape == velocity_grid.shape
+                    and np.all(np.isfinite(velocity_grid))
+                    and np.all(np.isfinite(projected_pdf)) and np.all(projected_pdf >= 0.0)
+                    and np.all(np.diff(velocity_grid) > 0.0)):
+                evdf_norm = float(trapezoid(projected_pdf, velocity_grid))
+                if np.isfinite(evdf_norm) and evdf_norm > 0.0:
+                    pdf = projected_pdf / evdf_norm
+                    mean_v = float(trapezoid(velocity_grid * pdf, velocity_grid))
+                    variance_v = float(trapezoid((velocity_grid - mean_v)**2 * pdf, velocity_grid))
+                    q = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
+                    if float(np.max(np.abs(velocity_grid))) < 0.1 * C_M_S:
+                        predicted_center = float(laser_wavelength_nm) * (1.0 - q * mean_v / C_M_S)
+                        predicted_variance = (float(laser_wavelength_nm) * q / C_M_S)**2 * variance_v
+                        distribution["projected_evdf_spectral_moment_closure"] = {
+                            "status": "conditional_moment_closure",
+                            "formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
+                            "evdf_mean_velocity_parallel_m_s": mean_v,
+                            "evdf_variance_velocity_parallel_m2_s2": variance_v,
+                            "evdf_predicted_spectral_centroid_nm": predicted_center,
+                            "evdf_predicted_spectral_variance_nm2": predicted_variance,
+                            "measured_spectral_centroid_nm": float(distribution["spectral_centroid_nm"]),
+                            "measured_spectral_variance_nm2": float(distribution["observed_variance_nm2"]),
+                            "centroid_closure_residual_nm": float(distribution["spectral_centroid_nm"] - predicted_center),
+                            "variance_closure_residual_nm2": float(distribution["observed_variance_nm2"] - predicted_variance),
+                            "evdf_status": evdf["analysis_status"],
+                            "interpretation": "Conditional forward-moment consistency check; finite window, background, response and regularization must be considered. It does not convert Gaussian width into a definitive electron temperature.",
+                        }
+        evdf_results.append(evdf)
     output["spectral_distribution"] = spectral_distribution_results
     output["electron_velocity_distribution"] = evdf_results
 
