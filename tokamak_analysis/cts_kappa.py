@@ -306,3 +306,68 @@ def maxwellian_electron_susceptibility(
             "No ion contribution or fluctuation-dissipation spectrum; this is electron susceptibility only.",
         ],
     }
+
+
+def bi_kappa_electron_susceptibility(
+    v, phase_velocity_m_s, *, electron_density_m3,
+    electron_temperature_parallel_eV, electron_temperature_perpendicular_eV,
+    magnetic_field_unit, scattering_vector_unit, kappa,
+    wavenumber_m_inverse, mass_kg=ME,
+    pole_imaginary_part_m_s=None,
+    minimum_velocity_grid_probability_coverage=0.999,
+):
+    r"""Collisionless longitudinal susceptibility of a gyrotropic bi-Kappa EVDF.
+
+    The 3-D distribution is proportional to
+      [1 + v_perp^2/(kappa theta_perp^2)
+         + v_parallel^2/(kappa theta_parallel^2)]^(-(kappa+1)).
+    Integrating over the two velocity coordinates perpendicular to the
+    scattering wavevector gives an exact 1-D Kappa marginal with directional
+    second-moment temperature
+      T_q = T_perp + (T_parallel-T_perp) (b_hat.q_hat)^2.
+    The Landau integral is then evaluated by the existing full-tail analytic
+    Kappa solver. This is a gyrotropic, non-relativistic, unmagnetized
+    longitudinal projection; it is not a magnetized harmonic or Full-EM
+    susceptibility. One view measures T_q, not both temperatures separately.
+    """
+    b = np.asarray(magnetic_field_unit)
+    q = np.asarray(scattering_vector_unit)
+    if (b.dtype.kind not in "iuf" or q.dtype.kind not in "iuf"
+            or b.shape != (3,) or q.shape != (3,)):
+        raise ValueError("magnetic_field_unit and scattering_vector_unit must be real three-component vectors")
+    b = b.astype(float, copy=False)
+    q = q.astype(float, copy=False)
+    if (not np.all(np.isfinite(b)) or not np.all(np.isfinite(q))
+            or not np.isclose(np.linalg.norm(b), 1.0, rtol=1e-8, atol=1e-10)
+            or not np.isclose(np.linalg.norm(q), 1.0, rtol=1e-8, atol=1e-10)):
+        raise ValueError("magnetic_field_unit and scattering_vector_unit must be finite unit vectors")
+    t_parallel = _positive_real_scalar(electron_temperature_parallel_eV, "electron_temperature_parallel_eV")
+    t_perpendicular = _positive_real_scalar(electron_temperature_perpendicular_eV, "electron_temperature_perpendicular_eV")
+    mu = float(np.clip(np.dot(b, q), -1.0, 1.0))
+    t_projected = t_perpendicular + (t_parallel - t_perpendicular) * mu**2
+    result = kappa_electron_susceptibility(
+        v, phase_velocity_m_s,
+        electron_density_m3=electron_density_m3,
+        electron_temperature_eV=t_projected,
+        kappa=kappa, wavenumber_m_inverse=wavenumber_m_inverse,
+        mass_kg=mass_kg,
+        pole_imaginary_part_m_s=pole_imaginary_part_m_s,
+        minimum_velocity_grid_probability_coverage=minimum_velocity_grid_probability_coverage,
+    )
+    result.update({
+        "distribution_model": "gyrotropic_3D_bi_Kappa_exact_1D_directional_marginal",
+        "electron_temperature_parallel_eV": t_parallel,
+        "electron_temperature_perpendicular_eV": t_perpendicular,
+        "projected_temperature_eV": float(t_projected),
+        "magnetic_pitch_cosine": mu,
+        "directional_temperature_relation": "T_q = T_perp + (T_parallel - T_perp)*(b_hat dot q_hat)^2",
+        "separate_parallel_perpendicular_temperatures_identifiable_from_one_view": False,
+        "anisotropy_model": "gyrotropic_bi_Kappa_with_common_kappa_and_zero_drift",
+        "limitations": [
+            "Collisionless unmagnetized longitudinal response only; no cyclotron harmonics or magnetic-field-dependent dielectric tensor.",
+            "Non-relativistic distribution; no relativistic bi-Kappa response.",
+            "One scattering direction identifies only the directional temperature combination T_q.",
+            "No ion susceptibility, fluctuation-dissipation source, collisions, or Full-EM vertex is included.",
+        ],
+    })
+    return result
