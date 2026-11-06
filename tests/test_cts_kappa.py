@@ -394,3 +394,66 @@ def test_explicit_kappa_pole_displacement_retains_finite_pole_mode():
     assert result["landau_contour_method"] == "finite_positive_imaginary_pole_regularization"
     assert result["finite_pole_regularization_used"] is True
     assert result["pole_imaginary_part_m_s"] == 2.0e3
+
+
+def test_kappa_drift_shifts_landau_resonance_to_electron_rest_frame():
+    parameters = args(k=4.5)
+    parameters.pop("pole_imaginary_part_m_s", None)
+    flow = 2.6e5
+    drifting = kappa_electron_susceptibility(
+        **parameters, electron_flow_projection_m_s=flow
+    )
+    rest_frame = kappa_electron_susceptibility(
+        **{**parameters, "phase_velocity_m_s": parameters["phase_velocity_m_s"]-flow}
+    )
+    assert drifting["electron_susceptibility"] == pytest.approx(
+        rest_frame["electron_susceptibility"], rel=2e-12, abs=1e-13
+    )
+    assert drifting["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(
+        rest_frame["susceptibility_phase_velocity_derivative_s_m"], rel=2e-12, abs=1e-13
+    )
+    assert drifting["phase_velocity_in_electron_rest_frame_m_s"] == parameters["phase_velocity_m_s"]-flow
+
+
+def test_maxwellian_drift_shifts_fried_conte_argument_and_derivative():
+    from tokamak_analysis.cts_kappa import maxwellian_electron_susceptibility
+
+    parameters = {
+        "phase_velocity_m_s": np.array([-1.2e6, 0.0, 1.7e6]),
+        "electron_density_m3": 2.0e19,
+        "electron_temperature_eV": 800.0,
+        "wavenumber_m_inverse": 250.0,
+    }
+    flow = -3.1e5
+    drifting = maxwellian_electron_susceptibility(
+        **parameters, electron_flow_projection_m_s=flow
+    )
+    rest_frame = maxwellian_electron_susceptibility(
+        **{**parameters, "phase_velocity_m_s": parameters["phase_velocity_m_s"]-flow}
+    )
+    np.testing.assert_allclose(
+        drifting["electron_susceptibility"], rest_frame["electron_susceptibility"],
+        rtol=2e-13, atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        drifting["susceptibility_phase_velocity_derivative_s_m"],
+        rest_frame["susceptibility_phase_velocity_derivative_s_m"],
+        rtol=2e-13, atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        drifting["phase_velocity_in_electron_rest_frame_m_s"],
+        parameters["phase_velocity_m_s"]-flow,
+    )
+
+
+def test_isotropic_kappa_and_maxwellian_reject_superluminal_flow():
+    from tokamak_analysis.cts_kappa import maxwellian_electron_susceptibility
+
+    parameters = args()
+    with pytest.raises(ValueError, match="strictly subluminal"):
+        kappa_electron_susceptibility(**parameters, electron_flow_projection_m_s=299792458.0)
+    with pytest.raises(ValueError, match="strictly subluminal"):
+        maxwellian_electron_susceptibility(
+            0.0, electron_density_m3=2e19, electron_temperature_eV=800.0,
+            wavenumber_m_inverse=250.0, electron_flow_projection_m_s=299792458.0
+        )
