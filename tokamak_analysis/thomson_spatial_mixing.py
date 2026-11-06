@@ -164,6 +164,24 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
     # profile node before propagating coordinate or PSF uncertainty. Random
     # perturbations must not turn a non-identifiable nominal inverse into a
     # reportable physical profile.
+    column_norms = np.linalg.norm(a, axis=0)
+    scaled_data_operator = a / np.maximum(column_norms, np.finfo(float).tiny)[None, :]
+    data_singular_values = np.linalg.svd(scaled_data_operator, compute_uv=False)
+    data_tolerance = (
+        np.finfo(float).eps * max(scaled_data_operator.shape)
+        * (float(data_singular_values[0]) if data_singular_values.size else 0.0)
+    )
+    data_only_rank = int(np.count_nonzero(data_singular_values > data_tolerance))
+    data_only_condition_number = (
+        float(data_singular_values[0] / data_singular_values[-1])
+        if data_singular_values.size and data_singular_values[-1] > data_tolerance
+        else float("inf")
+    )
+    data_identifiable = (
+        data_only_rank == x.size
+        and np.isfinite(data_only_condition_number)
+        and data_only_condition_number < 1.0e12
+    )
     coordinate_profile_covariance = None
     coordinate_successful_draws = 0
     coordinate_warning = None
@@ -241,24 +259,6 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
     # Regularization stabilizes a numerical candidate; it must never create
     # measurement information in spatial null-space modes. The nominal data-only
     # identifiability decision above is independent of the curvature penalty.
-    column_norms = np.linalg.norm(a, axis=0)
-    scaled_data_operator = a / np.maximum(column_norms, np.finfo(float).tiny)[None, :]
-    data_singular_values = np.linalg.svd(scaled_data_operator, compute_uv=False)
-    data_tolerance = (
-        np.finfo(float).eps * max(scaled_data_operator.shape)
-        * (float(data_singular_values[0]) if data_singular_values.size else 0.0)
-    )
-    data_only_rank = int(np.count_nonzero(data_singular_values > data_tolerance))
-    data_only_condition_number = (
-        float(data_singular_values[0] / data_singular_values[-1])
-        if data_singular_values.size and data_singular_values[-1] > data_tolerance
-        else float("inf")
-    )
-    data_identifiable = (
-        data_only_rank == x.size
-        and np.isfinite(data_only_condition_number)
-        and data_only_condition_number < 1.0e12
-    )
     primary_status = (
         "identified_from_measurement"
         if data_identifiable else "conditional_regularized_candidate"
