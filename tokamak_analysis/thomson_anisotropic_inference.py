@@ -136,30 +136,57 @@ def _apply_response_in_bin_integrated_space(response_matrix, spectral_density, w
 def _fit_covariance_blocks(jacobian, cost, n_observations, flow_indices,
                            measurement_covariance_supplied,
                            discrepancy_supplied):
-    """Preserve covariance for identifiable parameter blocks in rank-deficient fits.
+    """Return full and profiled-flow covariance from the whitened fit Jacobian.
 
-    Temperature anisotropy and Doppler shifts are different inverse subspaces.
-    A null direction confined to (T_parallel, T_perpendicular) must not erase
-    the independently estimable per-view flow covariance.
+    The flow covariance is computed by eliminating all nuisance directions
+    (temperatures, amplitudes and backgrounds) with a Schur-complement /
+    orthogonal-projection construction. It therefore remains available when
+    an unrelated temperature-anisotropy direction is rank deficient.
     """
     jacobian = np.asarray(jacobian, dtype=float)
-    _, singular_values, right_vectors = np.linalg.svd(
-        jacobian, full_matrices=True
-    )
+    singular_values = np.linalg.svd(jacobian, compute_uv=False)
     leading = singular_values[0] if singular_values.size else 0.0
     tolerance = np.finfo(float).eps * max(jacobian.shape) * leading
     rank = int(np.count_nonzero(singular_values > tolerance))
     full_rank = rank == jacobian.shape[1]
     normal_covariance = np.linalg.pinv(jacobian.T @ jacobian, rcond=1e-12)
-    null_basis = right_vectors[rank:, :].T
+
     indices = np.asarray(flow_indices, dtype=int)
-    if indices.ndim != 1 or np.any(indices < 0) or np.any(indices >= jacobian.shape[1]):
+    if indices.ndim != 1 or indices.size == 0 or np.any(indices < 0) or np.any(indices >= jacobian.shape[1]):
         raise ValueError("flow covariance indices are inconsistent with fitted parameters")
-    if null_basis.shape[1] == 0:
-        flow_identifiable = True
+    nuisance_indices = np.setdiff1d(np.arange(jacobian.shape[1]), indices)
+    nuisance_jacobian = jacobian[:, nuisance_indices]
+    flow_jacobian = jacobian[:, indices]
+
+    # Project flow sensitivities orthogonally to the span of every fitted
+    # nuisance parameter. This is the Schur complement of J_nuisance.T J_nuisance.
+    if nuisance_jacobian.shape[1]:
+        nuisance_basis, nuisance_singular, _ = np.linalg.svd(
+            nuisance_jacobian, full_matrices=False
+        )
+        nuisance_leading = nuisance_singular[0] if nuisance_singular.size else 0.0
+        nuisance_tolerance = (
+            np.finfo(float).eps * max(nuisance_jacobian.shape) * nuisance_leading
+        )
+        nuisance_rank = int(np.count_nonzero(nuisance_singular > nuisance_tolerance))
+        nuisance_basis = nuisance_basis[:, :nuisance_rank]
+        profiled_flow_jacobian = (
+            flow_jacobian
+            - nuisance_basis @ (nuisance_basis.T @ flow_jacobian)
+        )
     else:
-        null_projection = np.linalg.norm(null_basis[indices, :], axis=1)
-        flow_identifiable = bool(np.all(null_projection <= 1e-8))
+        profiled_flow_jacobian = flow_jacobian
+
+    flow_singular = np.linalg.svd(profiled_flow_jacobian, compute_uv=False)
+    flow_leading = flow_singular[0] if flow_singular.size else 0.0
+    flow_tolerance = np.finfo(float).eps * max(profiled_flow_jacobian.shape) * flow_leading
+    flow_rank = int(np.count_nonzero(flow_singular > flow_tolerance))
+    flow_identifiable = flow_rank == indices.size
+    flow_covariance = None
+    if flow_identifiable:
+        flow_information = profiled_flow_jacobian.T @ profiled_flow_jacobian
+        flow_covariance = np.linalg.inv(flow_information)
+
     if measurement_covariance_supplied or discrepancy_supplied:
         scale = 1.0
         scale_method = (
@@ -172,11 +199,9 @@ def _fit_covariance_blocks(jacobian, cost, n_observations, flow_indices,
         scale = 2.0 * float(cost) / dof
         scale_method = "unweighted_residual_scaled"
     covariance = normal_covariance * scale
-    flow_covariance = (
-        covariance[np.ix_(indices, indices)].copy() if flow_identifiable else None
-    )
+    if flow_covariance is not None:
+        flow_covariance *= scale
     return singular_values, full_rank, covariance, flow_covariance, scale_method
-
 
 def fit_gyrotropic_bi_maxwellian_thomson(
     wavelength_nm, measured_spectra, *, laser_wavelength_nm,
