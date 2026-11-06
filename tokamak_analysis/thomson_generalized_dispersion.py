@@ -301,6 +301,52 @@ def collective_tabulated_electron_spectral_density(
             ], dtype=complex)
         ion_pdf.append(pdf_i)
         ion_chi.append(chi_i)
+
+    # Derive directional central moments from the supplied projected EVDFs.
+    # These are q-parallel moments, not unrestricted 3-D temperatures.
+    def _projected_moments(grid, density, mass_kg):
+        area = float(_trapezoid(density, grid))
+        normalized = np.asarray(density, dtype=float) / area
+        mean = float(_trapezoid(grid * normalized, grid))
+        centered = grid - mean
+        variance = float(_trapezoid(centered**2 * normalized, grid))
+        if not np.isfinite(variance) or variance <= 0.0:
+            raise ValueError("projected EVDF must have a positive finite second central moment")
+        third = float(_trapezoid(centered**3 * normalized, grid))
+        fourth = float(_trapezoid(centered**4 * normalized, grid))
+        return {
+            "mean_velocity_relative_to_species_frame_m_s": mean,
+            "variance_m2_s2": variance,
+            "directional_second_moment_temperature_eV": float(mass_kg * variance / E_CHARGE),
+            "standardized_skewness": float(third / variance**1.5),
+            "excess_kurtosis": float(fourth / variance**2 - 3.0),
+            "moment_definition": "central_moments_of_normalized_projected_1D_EVDF",
+        }
+
+    electron_moments = _projected_moments(vgrid, fgrid, ME)
+    ion_moments = []
+    for index, item in enumerate(species):
+        if tabulated_ions:
+            moments = _projected_moments(ion_grids[index], ion_distributions[index], item["mass_kg"])
+            moments["distribution_source"] = "researcher_supplied_tabulated_projected_1D_EVDF"
+        else:
+            variance = temperatures[index] * E_CHARGE / item["mass_kg"]
+            moments = {
+                "mean_velocity_relative_to_species_frame_m_s": 0.0,
+                "variance_m2_s2": float(variance),
+                "directional_second_moment_temperature_eV": float(temperatures[index]),
+                "standardized_skewness": 0.0,
+                "excess_kurtosis": 0.0,
+                "moment_definition": "analytic_maxwellian_central_moments",
+                "distribution_source": "Maxwellian_per_species",
+            }
+        moments["species"] = item["name"]
+        moments["bulk_flow_projection_m_s"] = float(ui[index])
+        moments["total_mean_projection_m_s"] = float(ui[index] + moments["mean_velocity_relative_to_species_frame_m_s"])
+        ion_moments.append(moments)
+    electron_moments["bulk_flow_projection_m_s"] = float(ue)
+    electron_moments["total_mean_projection_m_s"] = float(ue + electron_moments["mean_velocity_relative_to_species_frame_m_s"])
+
     ion_sum = np.sum(np.asarray(ion_chi), axis=0)
     dielectric = 1.0 + chi_e + ion_sum
     denominator = np.maximum(np.abs(dielectric)**2, np.finfo(float).tiny)
@@ -320,6 +366,8 @@ def collective_tabulated_electron_spectral_density(
         "dynamic_structure_factor": dynamic_structure,
         "electron_flow_projection_m_s": ue,
         "ion_flow_projections_m_s": ui,
+        "electron_projected_moments": electron_moments,
+        "ion_projected_moments": ion_moments,
         "electron_distribution_model": "researcher_supplied_tabulated_projected_1D_EVDF",
         "ion_distribution_model": (
             "researcher_supplied_tabulated_projected_1D_EVDF_per_species"
