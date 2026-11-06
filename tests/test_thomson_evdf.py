@@ -435,3 +435,41 @@ def test_evdf_allows_systematic_only_weighting_with_explicit_provenance():
     assert out["measurement_uncertainty_model"] == "systematic_only_weighting"
     assert out["systematic_covariance_included"] is True
     assert out["model_discrepancy_covariance_included"] is False
+
+def test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated():
+    wavelength, signal, background = _case()
+    out = _run(
+        wavelength, signal, background,
+        signal_uncertainty=np.full(signal.size, 0.5),
+    )
+    covariance = out["velocity_moment_covariance"]
+    order = out["velocity_moment_covariance_order"]
+    assert covariance.shape == (6, 6)
+    assert order == [
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "skewness",
+        "excess_kurtosis",
+    ]
+    np.testing.assert_allclose(covariance, covariance.T, rtol=1e-10, atol=1e-18)
+    assert np.linalg.eigvalsh(covariance)[0] >= -1e-8 * max(
+        np.max(np.abs(covariance)), 1.0
+    )
+    standard = out["velocity_moment_standard_uncertainty"]
+    assert standard is not None
+    assert all(np.isfinite(value) and value >= 0.0 for value in standard.values())
+    electron_mass = 9.1093837139e-31
+    boltzmann = 1.380649e-23
+    elementary_charge = 1.602176634e-19
+    expected_temperature_variance = (
+        electron_mass / (boltzmann * elementary_charge)
+    ) ** 2 * covariance[1, 1]
+    assert covariance[3, 3] == pytest.approx(
+        expected_temperature_variance, rel=2e-8, abs=1e-18
+    )
+    assert out["velocity_moment_uncertainty_status"] == (
+        "delta_method_propagated_from_normalized_evdf_covariance"
+    )
+
