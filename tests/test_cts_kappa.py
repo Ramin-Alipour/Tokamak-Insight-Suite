@@ -549,3 +549,60 @@ def test_kappa_analytic_pdf_is_not_conditioned_on_velocity_grid_coverage():
         rtol=0.0, atol=0.0,
     )
 
+@pytest.mark.parametrize("eta_fraction", [0.0, 0.17])
+def test_cts_kappa_susceptibility_uses_shared_generalized_dispersion_kernel(eta_fraction):
+    from tokamak_analysis.cts_kappa_dispersion import kappa_dispersion_function
+
+    kappa = 4.3
+    ne = 2.0e18
+    te = 250.0
+    mass = 9.1093837015e-31
+    charge = 1.602176634e-19
+    eps0 = 8.8541878128e-12
+    wave_number = 120.0
+    # The generalized dispersion coordinate is normalized by
+    # sqrt(((2*kappa-3)/kappa) * k_B*T/m), not by the Student-t scale.
+    velocity_scale = np.sqrt(
+        ((2.0*kappa-3.0)/kappa) * charge*te/mass
+    )
+    relative_phase = 0.63*velocity_scale
+    flow = -0.21*velocity_scale
+    eta = eta_fraction*velocity_scale
+    parameters = dict(
+        v=np.linspace(-18.0*velocity_scale, 18.0*velocity_scale, 2401),
+        phase_velocity_m_s=relative_phase+flow,
+        electron_density_m3=ne,
+        electron_temperature_eV=te,
+        kappa=kappa,
+        wavenumber_m_inverse=wave_number,
+        electron_flow_projection_m_s=flow,
+        minimum_velocity_grid_probability_coverage=0.99,
+    )
+    if eta_fraction > 0.0:
+        parameters["pole_imaginary_part_m_s"] = eta
+    result = kappa_electron_susceptibility(**parameters)
+    kernel = kappa_dispersion_function(
+        relative_phase/velocity_scale, eta/velocity_scale, kappa
+    )
+    expected_integral = kernel["kappa_dispersion_integral"]/velocity_scale**2
+    expected_derivative = kernel["kappa_dispersion_integral_derivative"]/velocity_scale**3
+    omega_pe_squared = ne*charge**2/(eps0*mass)
+    expected_susceptibility = -omega_pe_squared/wave_number**2*expected_integral
+    expected_susceptibility_derivative = (
+        -omega_pe_squared/wave_number**2*expected_derivative
+    )
+    assert result["dispersion_kernel"] == "shared_full_tail_generalized_kappa_landau_integral"
+    assert result["normalized_phase_velocity"] == pytest.approx(
+        complex(relative_phase/velocity_scale, eta/velocity_scale)
+    )
+    assert result["integral"] == pytest.approx(expected_integral, rel=2e-11, abs=1e-18)
+    assert result["integral_phase_velocity_derivative_s3_m3"] == pytest.approx(
+        expected_derivative, rel=2e-11, abs=1e-24
+    )
+    assert result["electron_susceptibility"] == pytest.approx(
+        expected_susceptibility, rel=2e-11, abs=1e-14
+    )
+    assert result["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(
+        expected_susceptibility_derivative, rel=2e-11, abs=1e-18
+    )
+
