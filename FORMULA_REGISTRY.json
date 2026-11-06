@@ -8927,9 +8927,9 @@
   },
   {
     "name": "Landau–FDT current-noise propagation to electromagnetic field fluctuations",
-    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E(ω,k) = μ₀²ω² G S_J G†",
+    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E = μ₀²ω² G S_J G†; S_B = (k×/ω) S_E (k×/ω)†; Π = 0.5 Re⟨E×B*⟩",
     "inputs": "ω [rad s⁻¹], k [m⁻¹], εᵣ [dimensionless], S_J [A² m⁻² per rad s⁻¹]",
-    "output": "S_E [(V m⁻¹)² per rad s⁻¹]",
+    "output": "S_E [(V m⁻¹)² per rad s⁻¹], S_B [T² per rad s⁻¹], spectral Poynting flux [W m⁻² per rad s⁻¹]",
     "assumptions": "Local homogeneous linear dielectric; exp(−iωt); frequency-diagonal classical current-noise spectrum; invertible Maxwell operator.",
     "status": "D",
     "category": "Collective Thomson / Full-EM",
@@ -8968,7 +8968,22 @@
         {
           "name": "electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s",
           "unit": "(V/m)^2 per (rad/s)",
-          "description": "Hermitian positive-semidefinite electric-field fluctuation spectral tensor."
+          "description": "Hermitian positive-semidefinite electric-field spectral tensor."
+        },
+        {
+          "name": "magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s",
+          "unit": "T^2 per (rad/s)",
+          "description": "Faraday-propagated magnetic-field spectral tensor."
+        },
+        {
+          "name": "electric_magnetic_cross_spectral_matrix",
+          "unit": "mixed spectral units",
+          "description": "Electric-magnetic cross-spectral tensor."
+        },
+        {
+          "name": "spectral_poynting_flux_W_m2_per_rad_s",
+          "unit": "W m^-2 per (rad/s)",
+          "description": "Frequency-resolved mean Poynting-flux vector."
         },
         {
           "name": "maxwell_green_dyadic_m2",
@@ -8987,9 +9002,10 @@
       ],
       "uncertainty_model": "Input current-noise covariance is propagated linearly through the Maxwell Green dyadic; no cross-frequency covariance is inferred.",
       "test_links": [
-        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_propagates_to_psd_electric_field_fluctuations"
+        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_propagates_to_electric_magnetic_fluctuations_and_poynting_flux",
+        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_rejects_an_undamped_maxwell_pole"
       ],
       "note": "Local Maxwell field-fluctuation propagation only; not a magnetized CTS three-wave vertex, ray solution or calibrated receiver spectrum."
     }
   }
-]\n
+]
