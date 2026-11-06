@@ -306,6 +306,45 @@ def reconstruct_multiview_3d_evdf(
     coefficient_covariance[np.ix_(np.flatnonzero(active), np.flatnonzero(active))] = active_covariance
     jacobian = (np.eye(nvoxel) * norm - np.outer(raw, volume)) / norm**2
     distribution_covariance = jacobian @ coefficient_covariance @ jacobian.T
+
+    # Derive the first and second 3-D velocity moments from the normalized
+    # reconstructed EVDF using the same voxel-volume measure as normalization.
+    # These are distribution moments, not a claim that every velocity-space
+    # degree of freedom is independently identifiable.
+    probability_mass = distribution * volume
+    candidate_mean_velocity = np.einsum("i,ij->j", probability_mass, velocity)
+    centered_velocity = velocity - candidate_mean_velocity[None, :]
+    candidate_velocity_covariance = np.einsum(
+        "i,ij,ik->jk", probability_mass, centered_velocity, centered_velocity
+    )
+    candidate_velocity_covariance = 0.5 * (
+        candidate_velocity_covariance + candidate_velocity_covariance.T
+    )
+    mean_velocity_covariance = None
+    velocity_covariance_tensor_covariance = None
+    if identifiable:
+        mean_jacobian = velocity.T * volume[None, :]
+        covariance_jacobian = np.empty((9, nvoxel), dtype=float)
+        for voxel, vector in enumerate(velocity):
+            derivative = volume[voxel] * (
+                np.outer(vector, vector)
+                - np.outer(vector, candidate_mean_velocity)
+                - np.outer(candidate_mean_velocity, vector)
+            )
+            covariance_jacobian[:, voxel] = derivative.reshape(9)
+        mean_velocity_covariance = (
+            mean_jacobian @ distribution_covariance @ mean_jacobian.T
+        )
+        velocity_covariance_tensor_covariance = (
+            covariance_jacobian @ distribution_covariance @ covariance_jacobian.T
+        )
+        mean_velocity_covariance = 0.5 * (
+            mean_velocity_covariance + mean_velocity_covariance.T
+        )
+        velocity_covariance_tensor_covariance = 0.5 * (
+            velocity_covariance_tensor_covariance
+            + velocity_covariance_tensor_covariance.T
+        )
     return {
         "status": "identified_from_multi_view_measurements" if identifiable else "conditional_regularized_3d_candidate",
         "evdf_velocity_grid_m_s": velocity.copy(),
@@ -316,6 +355,20 @@ def reconstruct_multiview_3d_evdf(
         "fitted_spectra": fitted,
         "residual_spectra": residual,
         "distribution_covariance": distribution_covariance if identifiable else None,
+        "mean_velocity_vector_m_s": candidate_mean_velocity.copy() if identifiable else None,
+        "velocity_covariance_tensor_m2_s2": candidate_velocity_covariance.copy() if identifiable else None,
+        "mean_velocity_covariance_m2_s2": mean_velocity_covariance,
+        "velocity_covariance_tensor_covariance_m4_s4": velocity_covariance_tensor_covariance,
+        "candidate_mean_velocity_vector_m_s": candidate_mean_velocity.copy(),
+        "candidate_velocity_covariance_tensor_m2_s2": candidate_velocity_covariance.copy(),
+        "velocity_moment_definition": (
+            "mean_v=integral(f*v*d3v); covariance_v=integral(f*(v-mean_v)*(v-mean_v)^T*d3v); "
+            "normalization and moments use the supplied voxel-volume quadrature"
+        ),
+        "velocity_moment_status": (
+            "identified_from_multi_view_measurements" if identifiable
+            else "conditional_candidate_only_velocity_moments_not_identified"
+        ),
         "data_only_jacobian_rank": rank,
         "velocity_voxel_count": int(nvoxel),
         "view_count": int(nview),
