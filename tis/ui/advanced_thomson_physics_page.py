@@ -836,6 +836,36 @@ def render_advanced_thomson_physics_page(st) -> None:
             if isinstance(result, Mapping) and "validity_screening" in result:
                 st.subheader("Non-relativistic validity screen")
                 st.json(json_safe(result["validity_screening"]))
+            if isinstance(result, Mapping) and "velocity_moment_covariance_order" in result:
+                st.subheader("Projected EVDF — physical velocity moments")
+                st.latex(
+                    r"T_{e,q}=\\frac{m_e}{e k_B}"
+                    r"\\left[\\langle v_q^2\\rangle-\\langle v_q\\rangle^2\\right]"
+                )
+                st.write({
+                    "mean_velocity_parallel_m_s": result.get("mean_velocity_parallel_m_s"),
+                    "velocity_parallel_standard_deviation_m_s": result.get("velocity_parallel_standard_deviation_m_s"),
+                    "directional_equivalent_temperature_eV": result.get("directional_equivalent_temperature_eV"),
+                    "skewness": result.get("skewness"),
+                    "excess_kurtosis": result.get("excess_kurtosis"),
+                    "uncertainty_status": result.get("velocity_moment_uncertainty_status"),
+                    "standard_uncertainties": result.get("velocity_moment_standard_uncertainty"),
+                })
+                moment_covariance = result.get("velocity_moment_covariance")
+                if moment_covariance is not None:
+                    st.caption(
+                        "Rows/columns follow velocity_moment_covariance_order; off-diagonal terms "
+                        "retain correlations between flow, variance, temperature and shape moments."
+                    )
+                    st.dataframe(
+                        np.asarray(moment_covariance, dtype=float),
+                        use_container_width=True,
+                    )
+                else:
+                    st.warning(
+                        "Physical-moment uncertainty is unavailable because the projected-EVDF "
+                        "covariance did not pass its numerical availability gate."
+                    )
             if isinstance(result, Mapping) and "fourth_moment_exists" in result:
                 st.subheader("Kappa physical moment hierarchy")
                 st.latex(r"\mathrm{Var}(v)=\frac{k_B T_e}{m_e}")
