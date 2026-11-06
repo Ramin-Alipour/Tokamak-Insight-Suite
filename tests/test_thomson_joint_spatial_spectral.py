@@ -845,3 +845,21 @@ def test_joint_spatial_inverse_rejects_unknown_regularization_kind():
             regularization_kind="invented_smoother",
         )
 
+def test_edge_preserving_spatial_regularization_is_available_through_public_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    x, y, r, h, *_ = _synthetic_case()
+    out = run_advanced_thomson_physics(
+        "thomson_joint_spatial_spectra",
+        x, y, r, h,
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        regularization_strength=0.02,
+        regularization_kind="huber_total_variation",
+        tv_huber_scale=0.05,
+    )
+    assert out["public_physics_entrypoint"] == "thomson_joint_spatial_spectra"
+    assert out["regularization"]["edge_preserving"] is True
+
