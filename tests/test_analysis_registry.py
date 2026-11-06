@@ -244,6 +244,7 @@ def test_thomson_formula_registry_contains_traceable_physical_relations():
         "thomson_electron_temperature_from_spectral_width",
         "thomson_velocity_projection",
         "thomson_density_from_scattered_power",
+        "thomson_gaussian_psf_sigma_uncertainty",
     } <= keys
     for item in thomson:
         contract = item["execution_contract"]
