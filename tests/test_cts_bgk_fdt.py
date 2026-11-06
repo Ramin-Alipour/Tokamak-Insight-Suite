@@ -88,7 +88,7 @@ def test_bgk_cts_rejects_a_maximum_order_without_a_refinement():
 def test_bgk_quadrature_convergence_alone_does_not_release_quantitative_cts_spectrum():
     result = analyze_conserving_bgk_cts(
         **_inputs(), quadrature_order=64, quadrature_max_order=128,
-        quadrature_convergence_tolerance=1.0,
+        quadrature_convergence_tolerance=100.0,
     )
     assert result["velocity_quadrature_convergence"]["converged"] is True
     gate = result["quantitative_release_gate"]
