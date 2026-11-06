@@ -8149,5 +8149,345 @@
     },
     "note": "The second-order pole integral is the analytic derivative of the first-order susceptibility with respect to phase velocity at fixed positive retarded displacement. Angular-frequency derivative follows by d/domega=(1/k)d/dv_phase. This is a numerical contour derivative for the declared piecewise-linear, finite-support VDF model.",
     "description": "Generalized longitudinal susceptibility and analytic phase-velocity derivative for a researcher-supplied projected 1-D EVDF."
+  },
+  {
+    "name": "Gyrotropic bi-Kappa directional Landau susceptibility",
+    "equation": "T_q = T_perp + (T_parallel − T_perp)(b_hat·q_hat)^2; χ_e = −(ω_pe²/k²) ∫[f′_q(v)/(v−v_phi−i0⁺)]dv",
+    "inputs": "Electron density [m^-3], T_parallel and T_perpendicular [eV], unit magnetic-field and scattering vectors, κ>3/2, phase velocity [m s^-1], wave number [m^-1].",
+    "output": "Complex longitudinal electron susceptibility, directional temperature T_q, full-tail quadrature errors and analytic phase-velocity derivative.",
+    "assumptions": "Gyrotropic zero-drift 3-D bi-Kappa with common κ; exact 1-D marginal along q; collisionless, unmagnetized, non-relativistic longitudinal response.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.bi_kappa_electron_susceptibility",
+      "formula_key": "cts_gyrotropic_bi_kappa_landau_susceptibility",
+      "input_specs": [
+        {
+          "name": "v",
+          "unit": "m s^-1; increasing velocity grid for analytic-tail coverage gate",
+          "required": true
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s^-1",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "dimensionless 3-vector; unit norm",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "dimensionless 3-vector; unit norm",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; strictly greater than 3/2",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg; defaults to electron mass",
+          "required": false
+        },
+        {
+          "name": "pole_imaginary_part_m_s",
+          "unit": "m s^-1; optional positive Landau-pole regularization",
+          "required": false
+        },
+        {
+          "name": "minimum_velocity_grid_probability_coverage",
+          "unit": "dimensionless; default 0.999",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "projected_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "magnetic_pitch_cosine",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "susceptibility_phase_velocity_derivative_s_m",
+          "unit": "s m^-1"
+        },
+        {
+          "name": "landau_integral_real_absolute_error",
+          "unit": "solver-reported quadrature error"
+        },
+        {
+          "name": "landau_integral_imag_absolute_error",
+          "unit": "solver-reported quadrature error"
+        }
+      ],
+      "prerequisites": [
+        "Supplied magnetic-field and scattering vectors must be normalized and calibrated.",
+        "The exact projected marginal assumes a gyrotropic zero-drift bi-Kappa with common κ.",
+        "The velocity grid is a tail-coverage gate; the analytic Kappa tail is integrated over the full real axis."
+      ],
+      "uncertainty_model": "Adaptive quadrature errors are returned. Uncertainty in temperatures, κ, density and geometry is not inferred by this kernel and must be propagated by the caller.",
+      "limitations": [
+        "One scattering direction identifies T_q only; it cannot independently identify T_parallel and T_perpendicular.",
+        "Collisionless, unmagnetized, non-relativistic longitudinal electron response only.",
+        "No cyclotron harmonics, collisions, ion susceptibility, FDT source or Full-EM current vertex."
+      ],
+      "test_links": [
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_isotropic_limit_matches_existing_kappa_solver",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_directional_temperature_obeys_gyrotropic_projection",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
+      ],
+      "note": "Public solver is exposed through run_advanced_thomson_physics and the advanced physics dashboard. The exact directional marginal is reduced to the existing analytic full-tail Kappa Landau kernel; it is not a full magnetized/Full-EM susceptibility."
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_kappa.bi_kappa_electron_susceptibility",
+      "function_links": [
+        "tokamak_analysis.cts_kappa.bi_kappa_electron_susceptibility"
+      ],
+      "formula_key": "cts_gyrotropic_bi_kappa_landau_susceptibility",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_isotropic_limit_matches_existing_kappa_solver",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_directional_temperature_obeys_gyrotropic_projection",
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
+      ]
+    }
+  },
+  {
+    "name": "Conserving multispecies BGK electrostatic CTS response and classical FDT spectrum",
+    "equation": "R_ab=δn_a/δU_b; V_ab=q_a q_b/(ε₀ k²); ε=I−RV; χ=ε⁻¹R; S=−(2T/ω) Im_H(χ)",
+    "inputs": "ω [rad/s], k [m⁻¹], per-species density [m⁻³], mass [kg], charge [C], common temperature [J], collision frequency [s⁻¹], optional bulk flow [m/s]",
+    "output": "Bare and screened density-response matrices [m⁻³/J], dielectric matrix, classical dynamic-structure-factor matrix [m⁻³ s], quadrature convergence diagnostics",
+    "assumptions": "One-dimensional nonrelativistic isothermal multispecies momentum-conserving BGK closure; common equilibrium temperature and flow; self-consistent electrostatic Poisson screening; classical equilibrium FDT; zero frequency excluded pending analytic low-frequency extrapolation.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_bgk_fdt.analyze_conserving_bgk_cts",
+      "function_links": [
+        "tokamak_analysis.cts_bgk_fdt.analyze_conserving_bgk_cts",
+        "tokamak_analysis.cts_collisional_bgk.conserving_bgk_longitudinal_susceptibility",
+        "tokamak_analysis.cts_fdt.classical_fdt_dynamic_structure_factor"
+      ],
+      "formula_key": "cts_conserving_bgk_fdt",
+      "input_specs": [
+        {
+          "name": "angular_frequency_rad_s",
+          "unit": "rad s^-1",
+          "required": true
+        },
+        {
+          "name": "wave_number_m_inverse",
+          "unit": "m^-1",
+          "required": true
+        },
+        {
+          "name": "species[].density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "species[].mass_kg",
+          "unit": "kg",
+          "required": true
+        },
+        {
+          "name": "species[].charge_C",
+          "unit": "C",
+          "required": true
+        },
+        {
+          "name": "common_temperature_J",
+          "unit": "J",
+          "required": true
+        },
+        {
+          "name": "collision_frequencies_s_inverse",
+          "unit": "s^-1",
+          "required": true
+        },
+        {
+          "name": "bulk_flow_m_s",
+          "unit": "m s^-1",
+          "required": false
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer",
+          "required": false
+        },
+        {
+          "name": "quadrature_max_order",
+          "unit": "integer",
+          "required": false
+        },
+        {
+          "name": "quadrature_convergence_tolerance",
+          "unit": "dimensionless",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "wave_number_m_inverse",
+          "unit": "m^-1"
+        },
+        {
+          "name": "angular_frequency_rad_s",
+          "unit": "rad s^-1"
+        },
+        {
+          "name": "collision_frequencies_s_inverse",
+          "unit": "s^-1"
+        },
+        {
+          "name": "collisionless_species_indices",
+          "unit": "integer indices"
+        },
+        {
+          "name": "collision_regime",
+          "unit": "text"
+        },
+        {
+          "name": "collision_operator",
+          "unit": "text"
+        },
+        {
+          "name": "conservation",
+          "unit": "conservation contract"
+        },
+        {
+          "name": "equilibrium_assumptions",
+          "unit": "equilibrium contract"
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer"
+        },
+        {
+          "name": "cts_integration_status",
+          "unit": "text"
+        },
+        {
+          "name": "bare_density_response_m3_per_J",
+          "unit": "m^-3 J^-1"
+        },
+        {
+          "name": "screened_density_response_m3_per_J",
+          "unit": "m^-3 J^-1"
+        },
+        {
+          "name": "dielectric_matrix",
+          "unit": "dimensionless complex matrix"
+        },
+        {
+          "name": "dielectric_condition_number",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "velocity_quadrature_convergence",
+          "unit": "relative response-change diagnostics"
+        },
+        {
+          "name": "coulomb_interaction_matrix_J_m3",
+          "unit": "J m^3"
+        },
+        {
+          "name": "dynamic_structure_factor_m3_s",
+          "unit": "m^-3 s"
+        },
+        {
+          "name": "fdt_closure",
+          "unit": "text"
+        },
+        {
+          "name": "fdt_positive_semidefinite",
+          "unit": "boolean"
+        },
+        {
+          "name": "screening_model",
+          "unit": "text"
+        },
+        {
+          "name": "cts_model",
+          "unit": "text"
+        },
+        {
+          "name": "integration_status",
+          "unit": "text"
+        },
+        {
+          "name": "quantitative_release_gate",
+          "unit": "validation status"
+        },
+        {
+          "name": "limitations",
+          "unit": "text list"
+        }
+      ],
+      "prerequisites": [
+        "Matched species density/mass/charge/collision arrays",
+        "Common-temperature equilibrium",
+        "Positive finite wave number and nonzero frequency",
+        "Causal response and converged velocity quadrature"
+      ],
+      "uncertainty_model": "This deterministic forward solver does not infer parameter covariance. Measurement, geometry, collision-model and frequency-grid uncertainties require separate propagation; quantitative release remains blocked until collision and frequency convergence and experimental normalization are validated.",
+      "limitations": [
+        "Isothermal BGK does not conserve total energy and is not the velocity-dependent Coulomb Landau operator.",
+        "Electrostatic longitudinal response only; no magnetized gyroharmonics or Full-EM three-wave coupling.",
+        "Classical FDT only; no quantum detailed balance.",
+        "No calibrated receiver/scattering geometry normalization.",
+        "Quadrature convergence is estimated by successive Hermite-order refinement; frequency-grid convergence is not performed internally."
+      ],
+      "test_links": [
+        "tests/test_cts_bgk_fdt.py::test_bgk_cts_connects_bare_response_poisson_screening_and_fdt",
+        "tests/test_cts_bgk_fdt.py::test_bgk_cts_screening_is_the_declared_poisson_matrix_closure",
+        "tests/test_cts_bgk_fdt.py::test_bgk_cts_rejects_zero_frequency_instead_of_fabricating_static_spectrum",
+        "tests/test_cts_collisional_bgk.py::test_conserving_bgk_response_obeys_galilean_frequency_shift",
+        "tests/test_cts_collisional_bgk.py::test_conserving_bgk_response_is_covariant_under_species_permutation"
+      ],
+      "note": "Callable electrostatic CTS model path. The formula is exposed through the Analysis-1 advanced physics API and Dashboard model selector. Analytic/software verification is not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "collisional_isothermal_electrostatic_cts_forward_model",
+      "input_data_level": "physical_parameters_and_species_properties",
+      "analysis_family": "Analysis 1 — Thomson Scattering"
+    }
   }
 ]
