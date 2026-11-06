@@ -9818,6 +9818,18 @@
         {
           "name": "temperature_anisotropy_ratio_parallel_over_perpendicular",
           "unit": "dimensionless"
+        },
+        {
+          "name": "projected_velocity_variance_from_tensor_m2_s2",
+          "unit": "m² s⁻²; q_hat^T Sigma_v q_hat per view"
+        },
+        {
+          "name": "projected_velocity_variance_expected_m2_s2",
+          "unit": "m² s⁻²; e T_q/m_e per view"
+        },
+        {
+          "name": "projected_velocity_variance_relative_residual",
+          "unit": "dimensionless; relative tensor-to-projection closure residual per view"
         }
       ],
       "prerequisites": [
@@ -9830,7 +9842,7 @@
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_tensor_matches_second_moment_physics",
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match"
       ],
-      "note": "The relation is valid for both Maxwellian and finite-variance bi-Kappa closures because T_parallel and T_perpendicular are defined by the second moments. A separate tensor is returned per view to avoid averaging spatially varying magnetic-field axes."
+      "note": "The relation is valid for both Maxwellian and finite-variance bi-Kappa closures because T_parallel and T_perpendicular are defined by the second moments. A separate tensor is returned per view to avoid averaging spatially varying magnetic-field axes. The projected tensor variance q_hat^T Sigma_v q_hat is returned alongside e*T_q/m_e as an internal physical-closure diagnostic; their relative residual should be at floating-point roundoff."
     },
     "references": [
       {
