@@ -105,6 +105,13 @@ MODEL_LABELS = {
 MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_relativistic_exact_flow_projection": (
+        "Exact mono-velocity q-parallel relativistic Doppler inversion. The optional "
+        "input_covariance_nm2_rad2 is the full joint covariance of [fitted centre nm, "
+        "laser wavelength nm, scattering angle rad] and propagates all cross terms "
+        "through J C J^T. Supply either that matrix or the three legacy independent "
+        "standard deviations, never both. This is not a 3-D flow or a broad-EVDF mean."
+    ),
     "thomson_multiview_3d_evdf": (
         "Non-negative 3-D velocity-space inversion from independently measured scattering views. "
         "The stacked spectral kernel is assembled from the supplied view kernels; a data-only "
@@ -279,10 +286,14 @@ EXAMPLES = {
         "fitted_center_nm": 499.9998,
         "laser_wavelength_nm": 500.0,
         "scattering_angle_rad": 1.5707963267948966,
-        "sigma_fitted_center_nm": 1.0e-5,
-        "sigma_laser_wavelength_nm": 2.0e-6,
-        "sigma_scattering_angle_rad": 1.0e-4,
-        "input_covariance_nm2_rad2": null
+        "sigma_fitted_center_nm": null,
+        "sigma_laser_wavelength_nm": null,
+        "sigma_scattering_angle_rad": null,
+        "input_covariance_nm2_rad2": [
+            [1.0e-10, 0.0, 0.0],
+            [0.0, 4.0e-12, 0.0],
+            [0.0, 0.0, 1.0e-8]
+        ]
     },
     "microwave_background": {
         "frequency_Hz": [90.0e9, 100.0e9, 110.0e9],
