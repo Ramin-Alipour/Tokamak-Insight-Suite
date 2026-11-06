@@ -154,6 +154,12 @@ def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     assert joint.disabled is False
     joint.set_value(True).run()
     assert any(item.label.startswith("Fixed measured/researcher-supplied spatial mixing matrix") for item in app.file_uploader)
+    psf_mode = next(item for item in app.selectbox if item.label == "Spatial PSF forward operator")
+    assert psf_mode.options == ["identity", "gaussian_sigma", "measured_matrix"]
+    psf_mode.set_value("gaussian_sigma").run()
+    assert any(item.label.startswith("Gaussian spatial PSF sigma") for item in app.text_input)
+    psf_mode.set_value("measured_matrix").run()
+    assert any(item.label.startswith("Measured spatial PSF matrix") for item in app.file_uploader)
     assert any(item.label.startswith("Spatial curvature regularization strength") for item in app.text_input)
     background_model = next(item for item in app.selectbox if item.label == "Joint detector-background basis")
     assert background_model.options == ["constant", "linear", "polynomial", "cubic_spline", "templates"]
