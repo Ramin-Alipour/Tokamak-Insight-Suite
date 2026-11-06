@@ -291,6 +291,7 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
         "spatial_mixing_induced_profile_covariance":mixing_profile_covariance,
         "spatial_mixing_uncertainty_propagation_status":(
             "not_supplied" if mixing_covariance is None else
+            "suppressed_nonidentifiable_nominal_operator" if not data_identifiable else
             "propagated_by_monte_carlo_with_fixed_selected_regularization"
             if mixing_profile_covariance is not None else "insufficient_valid_draws"
         ),
@@ -299,6 +300,7 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
         "radius_covariance_m2":None if coordinate_covariance is None else coordinate_covariance.copy(),
         "coordinate_uncertainty_propagation_status":(
             "not_supplied" if coordinate_covariance is None else
+            "suppressed_nonidentifiable_nominal_operator" if not data_identifiable else
             "propagated_by_monte_carlo_with_fixed_selected_regularization"
             if coordinate_profile_covariance is not None else "insufficient_valid_draws"
         ),
