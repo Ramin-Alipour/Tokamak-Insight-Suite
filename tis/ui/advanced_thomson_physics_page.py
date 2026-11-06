@@ -131,8 +131,8 @@ MODEL_PHYSICS_NOTES = {
         "magnetized, relativistic, FDT or Full-EM CTS."
     ),
     "maxwellian_electrostatic_susceptibility": (
-        "Exact collisionless unmagnetized longitudinal Maxwellian response: chi_e = (2 omega_pe^2/(k^2 v_th^2)) [1 + zeta Z(zeta)], " 
-        "with v_th=sqrt(2 e T_e/m_e), zeta=v_phase/v_th and Z=i sqrt(pi) wofz(zeta). This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."
+        "Exact collisionless unmagnetized longitudinal Maxwellian response in the electron rest frame, " 
+        "with v_th=sqrt(2 e T_e/m_e), zeta=(v_phase_lab-u_e dot q_hat)/v_th and Z=i sqrt(pi) wofz(zeta). The optional signed electron_flow_projection_m_s shifts the Landau resonance; zero is the default. This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."
     ),
     "gyrotropic_bi_maxwellian_anisotropy": (
         "Uses T_q = T_perp*(1-mu^2) + T_parallel*mu^2 with iterative "
@@ -243,6 +243,7 @@ EXAMPLES = {
     },
     "maxwellian_electrostatic_susceptibility": {
         "phase_velocity_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),
+        "electron_flow_projection_m_s": 1.5e5,
         "electron_density_m3": 2.0e19,
         "electron_temperature_eV": 1000.0,
         "wavenumber_m_inverse": 250.0
@@ -441,6 +442,7 @@ EXAMPLES = {
     "kappa_electrostatic_susceptibility": {
         "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
         "phase_velocity_m_s": 1.0e6,
+        "electron_flow_projection_m_s": 1.5e5,
         "electron_density_m3": 2.0e18,
         "electron_temperature_eV": 250.0,
         "kappa": 4.0,
