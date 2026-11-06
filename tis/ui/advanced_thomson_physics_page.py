@@ -864,6 +864,20 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "projected probability to superluminal velocities. Use the "
                         "relativistic projected-EVDF route before interpreting this fit physically."
                     )
+            if isinstance(result, Mapping) and "relativistic_tail_diagnostic" in result:
+                tail = result["relativistic_tail_diagnostic"]
+                st.subheader("Bi-Kappa relativistic-tail validity")
+                st.latex(
+                    r"P(|v_q|\\geq c)=F_{t_\\nu}((-c-u_q)/s)"
+                    r"+1-F_{t_\\nu}((c-u_q)/s),\\quad \\nu=2\\kappa-1"
+                )
+                st.json(json_safe(tail))
+                if tail.get("requires_relativistic_forward_model", False):
+                    st.warning(
+                        "The fitted non-relativistic Kappa model assigns an excessive "
+                        "projected probability to superluminal velocities. Use the "
+                        "relativistic projected-EVDF route before interpreting this fit physically."
+                    )
             if isinstance(result, Mapping) and "velocity_moment_covariance_order" in result:
                 st.subheader("Projected EVDF — physical velocity moments")
                 st.latex(
