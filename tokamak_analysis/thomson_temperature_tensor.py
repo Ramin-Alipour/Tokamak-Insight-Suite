@@ -14,9 +14,9 @@ _E = 1.602176634e-19
 _M_E = 9.1093837015e-31
 
 
-def _finite_array(value, name, ndim):
+def _finite_array(value, name, ndim=None):
     raw = np.asarray(value)
-    if raw.dtype.kind not in "iuf" or raw.ndim != ndim:
+    if raw.dtype.kind not in "iuf" or (ndim is not None and raw.ndim != ndim):
         raise ValueError(f"{name} must be a real numeric {ndim}-D array")
     result = raw.astype(float, copy=False)
     if result.size == 0 or not np.all(np.isfinite(result)):
