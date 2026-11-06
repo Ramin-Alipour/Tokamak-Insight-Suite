@@ -9429,5 +9429,141 @@
     },
     "uncertainty_model": "Joint GLS covariance from the whitened measured-spectrum Jacobian, retaining cross-covariance among radial temperature, projected flow, amplitude and detector-background nuisance parameters. Optional model-discrepancy and systematic covariance components are each added exactly once to measurement covariance under an explicit mutual-independence assumption; correlated components require cross-covariance blocks. Gaussian PSF-width calibration uncertainty is propagated by refit sensitivity. Regularization-choice spread is reported separately from measurement uncertainty. Identifiability is assessed from the data-only Jacobian, excluding regularization rows.",
     "note": "undefined Independent systematic covariance is accepted as a separate full channel-major component and is propagated through the same GLS weighting and regularization sensitivity refits; no silent cross-covariance assumption is made beyond the explicit independence declaration. Systematic calibration covariance is accepted as a separate channel-major component and propagated through GLS weighting and regularization sensitivity refits. Covariance components are assumed mutually independent unless cross-covariance blocks are explicitly supplied."
+  },
+  {
+    "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
+    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}=m_e/(e k_B)[⟨v²⟩−⟨v⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v⟩,Var(v),σ_v,T_{e,q},skewness,excess kurtosis)",
+    "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
+    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance.",
+    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
+      "formula_key": "optical_thomson_projected_evdf_velocity_moment_covariance",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; increasing calibrated samples",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "calibrated spectral intensity",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; 0 < θ < π",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized wavelength response matrix",
+          "required": true
+        },
+        {
+          "name": "background_signal",
+          "unit": "calibrated spectral intensity",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty or signal_covariance",
+          "unit": "spectral intensity or spectral-intensity covariance",
+          "required": false
+        },
+        {
+          "name": "background_uncertainty or background_covariance",
+          "unit": "spectral intensity or spectral-intensity covariance",
+          "required": false
+        },
+        {
+          "name": "signal_background_cross_covariance",
+          "unit": "spectral-intensity covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance and systematic_covariance",
+          "unit": "spectral-intensity covariance",
+          "required": false
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1; strictly increasing uniform grid",
+          "required": false
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "positive scalar or automatic GCV selection",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "evdf_parallel_s_per_m",
+          "unit": "s m^-1; normalized probability density"
+        },
+        {
+          "name": "mean_velocity_parallel_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "velocity_parallel_standard_deviation_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "directional_equivalent_temperature_eV",
+          "unit": "eV; m_e Var(v_q)/(e k_B)"
+        },
+        {
+          "name": "skewness and excess_kurtosis",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "velocity_moment_covariance",
+          "unit": "6 x 6 covariance in velocity_moment_covariance_order"
+        },
+        {
+          "name": "velocity_moment_standard_uncertainty",
+          "unit": "one-sigma uncertainty for each reported physical moment"
+        }
+      ],
+      "prerequisites": [
+        "A single view identifies only the q-parallel marginal; it cannot identify a general 3-D EVDF or perpendicular velocity components.",
+        "A finite normalized-EVDF covariance is required for delta-method physical-moment uncertainty.",
+        "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified."
+      ],
+      "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation.",
+      "limitations": [
+        "Non-relativistic q·v Doppler approximation; use the separate relativistic projected-EVDF solver outside this domain.",
+        "One scattering view cannot recover unrestricted 3-D anisotropy.",
+        "The covariance is a local delta-method approximation and is not a posterior interval or experimental validation.",
+        "Absolute density is not inferred from the normalized projected EVDF."
+      ],
+      "test_links": [
+        "tests/test_thomson_evdf.py::test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection",
+        "tests/test_thomson_evdf.py::test_evdf_selects_regularization_by_gcv_and_reports_conditional_covariance",
+        "tests/test_thomson_evdf.py::test_evdf_propagates_signal_background_and_cross_covariance",
+        "tests/test_thomson_evdf.py::test_evdf_adds_independent_model_discrepancy_and_systematic_covariance",
+        "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated"
+      ],
+      "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "function_links": [
+        "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
+      ],
+      "execution_scope": "calibrated_optical_thomson_spectrum_to_projected_velocity_distribution_and_moment_covariance",
+      "input_data_level": "calibrated_measured_spectrum_and_measured_response",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson / projected EVDF"
+    }
   }
 ]
