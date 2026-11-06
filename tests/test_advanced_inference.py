@@ -83,6 +83,20 @@ def test_multiview_3d_evdf_requires_data_supported_rank():
     assert one_view["evdf_m3_s3"] is None
 
 
+
+def test_multiview_3d_evdf_rejects_superluminal_velocity_voxels():
+    kernels = np.ones((2, 5, 2))
+    data = np.ones((2, 5))
+    with pytest.raises(ValueError, match="strictly subluminal"):
+        reconstruct_multiview_3d_evdf(
+            kernels, data,
+            np.array([[0.0, 0.0, 0.0], [299792458.0, 0.0, 0.0]]),
+            voxel_volume_m3_s3=np.ones(2),
+            regularization_matrix=np.eye(2),
+            regularization_strength=1e-3,
+        )
+
+
 def test_free_free_and_ece_radiative_transfer():
     nu = np.linspace(90e9, 110e9, 5)
     b = planck_spectral_radiance(nu, 2e7)
