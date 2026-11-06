@@ -9,7 +9,16 @@ def args(k=4.0):
 
 def test_kappa_response_is_finite_and_normalized():
     a=args(); r=kappa_electron_susceptibility(**a)
-    assert np.isclose(np.trapz(r["normalized_probability_density_s_m"],a["v"]),1,rtol=1e-8)
+    # The analytic PDF integrates to the represented probability mass;
+    # only the explicitly named grid-conditioned view is renormalized.
+    assert np.trapz(r["normalized_probability_density_s_m"], a["v"]) == pytest.approx(
+        r["velocity_grid_probability_coverage"], rel=2e-4
+    )
+    assert np.isclose(
+        np.trapz(r["grid_conditioned_probability_density_s_m"], a["v"]),
+        1.0, rtol=2e-4,
+    )
+    assert r["grid_conditioning_applied_to_physical_response"] is False
     assert np.isfinite(r["electron_susceptibility"].real)
     assert r["pole"].imag>0
     assert r["velocity_grid_probability_coverage"] >= 0.999
@@ -510,3 +519,33 @@ def test_bi_kappa_rejects_superluminal_projected_electron_flow():
             kappa=4.0, wavenumber_m_inverse=120.0,
             electron_flow_projection_m_s=299792458.0,
         )
+
+def test_kappa_moment_hierarchy_reports_fourth_moment_only_when_it_exists():
+    finite = kappa_electron_susceptibility(**args(4.0))
+    assert finite["fourth_moment_exists"] is True
+    assert finite["kurtosis"] == pytest.approx(5.0)
+    assert finite["excess_kurtosis"] == pytest.approx(2.0)
+    expected_variance = 1.602176634e-19 * 250.0 / 9.1093837015e-31
+    assert finite["fourth_central_moment_m4_s4"] == pytest.approx(
+        5.0 * expected_variance**2
+    )
+
+    infinite = kappa_electron_susceptibility(**args(2.0))
+    assert infinite["fourth_moment_exists"] is False
+    assert infinite["kurtosis"] is None
+    assert infinite["excess_kurtosis"] is None
+    assert infinite["fourth_central_moment_m4_s4"] is None
+
+
+def test_kappa_analytic_pdf_is_not_conditioned_on_velocity_grid_coverage():
+    narrow = args()
+    narrow["v"] = np.linspace(-2.0e7, 2.0e7, 1001)
+    narrow["minimum_velocity_grid_probability_coverage"] = 0.5
+    result = kappa_electron_susceptibility(**narrow)
+    assert result["velocity_grid_probability_coverage"] < 1.0
+    np.testing.assert_allclose(
+        result["normalized_probability_density_s_m"],
+        result["analytic_kappa_pdf_s_m"],
+        rtol=0.0, atol=0.0,
+    )
+
