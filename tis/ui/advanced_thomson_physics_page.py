@@ -60,7 +60,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 MODEL_LABELS = {
     "thomson_temperature_from_spectral_width": "Optical Thomson — conditional Maxwellian temperature from intrinsic thermal width with joint covariance",
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
-    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from multiple independent measured scattering views",
+    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion with vector flow, velocity-covariance tensor and propagated moment uncertainty from independent measured views",
     "kappa_electrostatic_susceptibility": "CTS — dimensional isotropic-Kappa susceptibility from the shared full-tail Landau kernel, with exact thermal scaling and analytic phase derivative",
     "kappa_dispersion_function": "Optical/CTS kinetic kernel — full-tail generalized Kappa plasma dispersion integral with exact Landau boundary value",
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
