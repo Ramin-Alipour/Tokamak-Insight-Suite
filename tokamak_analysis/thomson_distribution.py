@@ -138,6 +138,12 @@ def analyze_thomson_spectral_distribution(
     signal_background_cross_covariance=None,
     moment_mc_samples: int = 200,
     physical_model: str | None = None,
+    physical_initial=None,
+    incident_polarization=None,
+    include_compton_recoil: bool | None = None,
+    physical_background_model: str | None = None,
+    model_discrepancy_covariance=None,
+    systematic_covariance=None,
     laser_wavelength_nm: float | None = None,
     scattering_angle_rad: float | None = None,
     laser_wavelength_uncertainty_nm: float | None = None,
@@ -572,15 +578,43 @@ def analyze_thomson_spectral_distribution(
         raise ValueError(
             "physical_fit_options requires an explicitly selected physical_model"
         )
+    if physical_model is None and any(value is not None for value in (
+        physical_initial, incident_polarization, include_compton_recoil,
+        physical_background_model, model_discrepancy_covariance, systematic_covariance,
+    )):
+        raise ValueError("physical inference controls require an explicitly selected physical_model")
 
     # Kappa and relativistic Maxwell-Juttner require their own physical
     # forward models. Never map a Gaussian width to these non-Gaussian models.
     if kinetic_solver_model in {"kappa", "relativistic_maxwell_juttner"}:
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError("laser_wavelength_nm and scattering_angle_rad are required for kinetic physical inference")
-        if not isinstance(physical_fit_options, dict):
-            raise ValueError("physical_fit_options must provide physical_initial and the selected model's nuisance/uncertainty inputs")
-        options = dict(physical_fit_options)
+        if physical_fit_options is not None and not isinstance(physical_fit_options, dict):
+            raise ValueError("physical_fit_options must be a mapping when supplied")
+        options = dict(physical_fit_options or {})
+        # Registry-level inputs are first-class API parameters. Merge them into
+        # the native kinetic solver contract while rejecting duplicate sources.
+        direct_options = {
+            "physical_initial": physical_initial,
+            "incident_polarization": incident_polarization,
+            "include_compton_recoil": include_compton_recoil,
+            "background_model": physical_background_model,
+            "model_discrepancy_covariance": model_discrepancy_covariance,
+            "systematic_covariance": systematic_covariance,
+        }
+        for option_name, option_value in direct_options.items():
+            if option_value is None:
+                continue
+            if option_name in options:
+                raise ValueError(
+                    f"{option_name} must be supplied either as a top-level argument "
+                    "or in physical_fit_options, not both"
+                )
+            options[option_name] = option_value
+        if "physical_initial" not in options:
+            raise ValueError(
+                "physical_initial is required as a top-level argument or in physical_fit_options"
+            )
         reserved = {
             "physical_model", "instrument_response", "laser_wavelength_nm",
             "scattering_angle_rad", "wavelength_nm", "measured_spectrum",
@@ -762,6 +796,32 @@ def analyze_thomson_spectral_distribution(
         if not isinstance(physical_fit_options, dict):
             raise ValueError("physical_fit_options must be a mapping for canonical Maxwellian inference")
         options = dict(physical_fit_options)
+        direct_options = {
+            "incident_polarization": incident_polarization,
+            "include_compton_recoil": include_compton_recoil,
+            "background_model": physical_background_model,
+            "model_discrepancy_covariance": model_discrepancy_covariance,
+            "systematic_covariance": systematic_covariance,
+        }
+        for option_name, option_value in direct_options.items():
+            if option_value is None:
+                continue
+            if option_name in options:
+                raise ValueError(
+                    f"{option_name} must be supplied either as a top-level argument "
+                    "or in physical_fit_options, not both"
+                )
+            options[option_name] = option_value
+        if physical_initial is not None:
+            if physical_model == "collective_kappa":
+                if "collective_kappa_initial" in options:
+                    raise ValueError("physical_initial conflicts with physical_fit_options.collective_kappa_initial")
+                options["collective_kappa_initial"] = physical_initial
+            else:
+                raise ValueError(
+                    "physical_initial is supported for Kappa/MJ kinetic fits and collective_kappa; "
+                    "the selected canonical model uses its own initialization contract"
+                )
         if "radius_m" not in options:
             raise ValueError(
                 "physical_fit_options must include radius_m for the canonical measured-spectrum Maxwellian fit"
