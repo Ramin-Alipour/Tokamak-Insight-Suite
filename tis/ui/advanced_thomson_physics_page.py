@@ -78,6 +78,7 @@ MODEL_LABELS = {
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
+    "cts_conserving_bgk_fdt": "CTS — conserving multispecies BGK response + Poisson screening + classical matrix FDT",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated non-negative 3-D EVDF inversion from multiple measured views",
@@ -213,6 +214,16 @@ MODEL_PHYSICS_NOTES = {
         "This does not reconstruct equilibrium or infer flux from R,Z; do not confuse rho_pol with rho_tor."
     ),
 }
+
+MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
+    "Isothermal multispecies momentum-conserving BGK longitudinal response, "
+    "self-consistent Poisson screening, and classical matrix FDT. Requires "
+    "one species record per density/mass/charge and one collision frequency "
+    "per species. Conserves each species particle number and total mixture "
+    "momentum, but not total energy. Electrostatic only; not the magnetized "
+    "Full-EM three-wave vertex. Zero frequency is rejected pending a "
+    "separately converged static-limit extrapolation."
+)
 
 EXAMPLES = {
     "bi_kappa_electrostatic_susceptibility": {
@@ -555,8 +566,20 @@ EXAMPLES = {
         "kx_rad_m": 0.0,
         "ky_rad_m": 0.0
     }
+    "cts_conserving_bgk_fdt": {
+        "angular_frequency_rad_s": [1.0e10, 2.0e10],
+        "wave_number_m_inverse": 200000.0,
+        "species": [
+            {"name": "electrons", "density_m3": 1.0e19, "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
+            {"name": "deuterium", "density_m3": 1.0e19, "mass_kg": 3.3435837724e-27, "charge_C": 1.602176634e-19}
+        ],
+        "common_temperature_J": 1.602176634e-17,
+        "collision_frequencies_s_inverse": [2.0e7, 1.0e5],
+        "bulk_flow_m_s": 0.0,
+        "quadrature_order": 64
+    },
 }
-
+ 
 # Reuse the same explicit physical input contract for the public response alias.
 EXAMPLES["landau_fdt_full_em_response"] = dict(EXAMPLES["landau_fdt_full_em_constitutive"])
 
