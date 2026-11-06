@@ -723,6 +723,7 @@ EXAMPLES["thomson_joint_spatial_spectra"] = {
     "scattering_angle_rad": float(np.pi / 2.0),
     "instrument_response": np.eye(_joint_ts_wavelength.size).tolist(),
     "signal_uncertainty": np.full_like(_joint_ts_spectra, 0.01).tolist(),
+    "systematic_covariance": None,
     "regularization_strength": 0.0,
     "regularization_kind": "curvature",
     "tv_huber_scale": 0.05,
@@ -781,6 +782,8 @@ def render_advanced_thomson_physics_page(st) -> None:
     )
     if model in MODEL_PHYSICS_NOTES:
         st.info(MODEL_PHYSICS_NOTES[model])
+    st.caption(
+        "For joint spatial Thomson inversion, systematic_covariance accepts a full channel-major covariance matrix for independent calibration/systematic errors; it is added to measurement and model-discrepancy covariance, not substituted for either. ";
     st.caption(
         "For joint spatial Thomson inversion, regularization_kind accepts curvature or huber_total_variation. "
         "The latter is an edge-preserving Huber-TV prior on normalized radius; tv_huber_scale controls its dimensionless quadratic-to-linear gradient transition. "
