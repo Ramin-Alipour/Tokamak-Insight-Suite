@@ -546,6 +546,45 @@ def collective_multi_population_tabulated_electron_spectral_density(
             "standardized_skewness": float(_trapezoid((grid-mean)**3*pdf, grid)/variance**1.5),
             "excess_kurtosis": float(_trapezoid((grid-mean)**4*pdf, grid)/variance**2-3.0),
         })
+    # Combine moments in the laboratory frame with the law of total
+    # cumulants; simply averaging component temperatures would omit the
+    # between-population drift/variance contribution.
+    mixture_mean = float(sum(
+        item["density_fraction"] * (
+            item["bulk_flow_projection_m_s"] + moments["mean_velocity_relative_to_population_frame_m_s"]
+        )
+        for item, moments in zip(normalized_populations, population_moments)
+    ))
+    mixture_variance = 0.0
+    mixture_third = 0.0
+    mixture_fourth = 0.0
+    mean_bulk_flow = 0.0
+    for item, moments in zip(normalized_populations, population_moments):
+        alpha = item["density_fraction"]
+        component_mean = item["bulk_flow_projection_m_s"] + moments["mean_velocity_relative_to_population_frame_m_s"]
+        delta = component_mean - mixture_mean
+        variance = moments["directional_second_moment_temperature_eV"] * 1.602176634e-19 / 9.1093837015e-31
+        skew = moments["standardized_skewness"]
+        excess = moments["excess_kurtosis"]
+        third_central = skew * variance**1.5
+        fourth_central = (excess + 3.0) * variance**2
+        mixture_variance += alpha * (variance + delta**2)
+        mixture_third += alpha * (third_central + 3.0*delta*variance + delta**3)
+        mixture_fourth += alpha * (fourth_central + 4.0*delta*third_central
+                                   + 6.0*delta**2*variance + delta**4)
+        mean_bulk_flow += alpha * item["bulk_flow_projection_m_s"]
+    if mixture_variance <= 0.0 or not np.isfinite(mixture_variance):
+        raise ValueError("multi-population electron mixture has a non-positive or non-finite variance")
+    mixture_electron_moments = {
+        "mean_velocity_relative_to_species_frame_m_s": mixture_mean - mean_bulk_flow,
+        "variance_m2_s2": mixture_variance,
+        "directional_second_moment_temperature_eV": float(9.1093837015e-31*mixture_variance/1.602176634e-19),
+        "standardized_skewness": float(mixture_third/mixture_variance**1.5),
+        "excess_kurtosis": float(mixture_fourth/mixture_variance**2-3.0),
+        "bulk_flow_projection_m_s": float(mean_bulk_flow),
+        "total_mean_projection_m_s": float(mixture_mean),
+        "moment_definition": "density-weighted laboratory-frame moments including between-population drift variance",
+    }
     chi_e_populations = np.asarray(chi_e_populations)
     chi_e_total = np.sum(chi_e_populations, axis=0)
     chi_i = np.asarray(result["ion_susceptibility"])
@@ -570,6 +609,8 @@ def collective_multi_population_tabulated_electron_spectral_density(
         "dielectric_function": dielectric,
         "dynamic_structure_factor": dynamic_structure,
         "electron_population_moments": population_moments,
+        "electron_projected_moments": mixture_electron_moments,
+        "electron_flow_projection_m_s": float(mean_bulk_flow),
         "electron_population_density_fractions": fractions.copy(),
         "electron_projected_pdf_at_resonance": electron_source,
         "electron_distribution_model": "multi_population_tabulated_projected_1D_EVDF",
