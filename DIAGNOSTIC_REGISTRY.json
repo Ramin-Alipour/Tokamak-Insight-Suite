@@ -1022,7 +1022,8 @@
       "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_rank_deficient_view_geometry",
       "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_non_positive_definite_measurement_covariance",
       "tests/test_thomson_temperature_tensor.py::test_unweighted_tensor_fit_does_not_claim_a_chi_square_probability",
-      "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher"
+      "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher",
+      "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_enforces_positive_semidefinite_boundary"
     ],
     "subanalyses": [
       {
@@ -1311,7 +1312,7 @@
         "dashboard": "tis.ui.advanced_thomson_physics_page",
         "equation": "T_q = q_hat^T T_eV q_hat; T_eV=(m_e/e)⟨δv δv^T⟩; T_eV ⪰ 0",
         "input_contract": "Directional second-moment temperatures inferred from calibrated multi-view Thomson spectra, unit scattering vectors, and optional full view-temperature covariance.",
-        "identifiability": "Requires six independent view dyads q_hat q_hat^T (rank six); ill-conditioned geometry is rejected. A common tensor requires views mapped to the same plasma volume/time or equilibrium coordinate.",
+        "identifiability": "Requires six independent view dyads q_hat q_hat^T (rank six); ill-conditioned geometry is rejected. A common tensor requires views mapped to the same plasma volume/time or equilibrium coordinate. The tensor is constrained to the PSD cone; if the optimum lies on its boundary, symmetric local parameter covariance is withheld.",
         "scope": "General symmetric positive-semidefinite 3-D second-moment temperature tensor; no gyrotropic magnetic-axis assumption. Does not infer higher EVDF moments, density or flow."
       }
     ]
