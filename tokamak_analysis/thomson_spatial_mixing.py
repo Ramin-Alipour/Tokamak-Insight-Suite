@@ -184,7 +184,10 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
     )
     coordinate_profile_covariance = None
     coordinate_successful_draws = 0
-    coordinate_warning = None
+    coordinate_warning = (
+        "Nominal measured spatial operator is not identifiable; coordinate covariance was not propagated to a primary profile."
+        if coordinate_covariance is not None and not data_identifiable else None
+    )
     if coordinate_covariance is not None and data_identifiable:
         rng = np.random.default_rng(int(radius_mc_seed))
         eigenvalues, eigenvectors = np.linalg.eigh(coordinate_covariance)
@@ -221,7 +224,10 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
             )
     mixing_profile_covariance = None
     mixing_successful_draws = 0
-    mixing_warning = None
+    mixing_warning = (
+        "Nominal measured spatial operator is not identifiable; PSF covariance was not propagated to a primary profile."
+        if mixing_covariance is not None and not data_identifiable else None
+    )
     if mixing_covariance is not None and data_identifiable:
         rng = np.random.default_rng(int(mixing_mc_seed))
         eigenvalues, eigenvectors = np.linalg.eigh(mixing_covariance)
