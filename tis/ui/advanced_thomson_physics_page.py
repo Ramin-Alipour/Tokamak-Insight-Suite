@@ -615,7 +615,11 @@ EXAMPLES = {
         "initial_temperature_perpendicular_eV": 300.0,
         "temperature_bounds_eV": [10.0, 5000.0],
         "flow_bounds_m_s": [-1000000.0, 1000000.0],
-        "maximum_projected_rms_beta": 0.1
+        "maximum_projected_rms_beta": 0.1,
+        "scattering_vector_covariance": None,
+        "projection_geometry_cross_covariance": None,
+        "maximum_geometry_condition_number": 1000.0,
+        "minimum_projection_consistency_p_value": 0.001
     },
     "gyrotropic_bi_kappa_spectral_fit": {
         "wavelength_nm": np.linspace(412.0, 652.0, 181).tolist(),
@@ -635,7 +639,11 @@ EXAMPLES = {
         "kappa_bounds": [1.5001, 100.0],
         "temperature_bounds_eV": [10.0, 5000.0],
         "flow_bounds_m_s": [-1000000.0, 1000000.0],
-        "maximum_projected_rms_beta": 0.1
+        "maximum_projected_rms_beta": 0.1,
+        "scattering_vector_covariance": None,
+        "projection_geometry_cross_covariance": None,
+        "maximum_geometry_condition_number": 1000.0,
+        "minimum_projection_consistency_p_value": 0.001
     },
     "landau_fdt_cts": {
         "angular_frequency_rad_s": [1.0e5, 2.0e5],
