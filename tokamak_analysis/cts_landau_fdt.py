@@ -160,8 +160,9 @@ def build_linearized_landau_fdt(
                     K = K + factor*(D.T @ csr_matrix(U) @ D)
     K = ((K+K.T)*0.5).tocsr()
     metric_diag = np.concatenate(ws)
-    W = diags(metric_diag, format="csr")
-    Winv = diags(1.0/metric_diag, format="csr")
+    # Declare the single main diagonal explicitly for stable SciPy sparse construction.
+    W = diags([metric_diag], offsets=[0], shape=(ndof, ndof), format="csr")
+    Winv = diags([1.0/metric_diag], offsets=[0], shape=(ndof, ndof), format="csr")
     L = (-Winv @ K).tocsr()
     Q = (2.0*Winv @ K @ Winv).tocsr()
 

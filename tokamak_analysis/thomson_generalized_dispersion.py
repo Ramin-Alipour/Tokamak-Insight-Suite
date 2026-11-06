@@ -10,6 +10,14 @@ from __future__ import annotations
 
 import numpy as np
 
+
+def _trapezoid(y, x):
+    """NumPy-version-independent trapezoidal integration."""
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    return integrate(y, x)
+
 from .thomson_kinetic_models import (
     C, E_CHARGE, ME, EPS0, _resolve_ion_species,
     _maxwellian_pdf_and_derivatives, _landau_susceptibility,
@@ -35,7 +43,7 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
         raise ValueError("velocity grid must increase strictly and VDF must be finite and non-negative")
     if not np.isfinite(vp):
         raise ValueError("phase_velocity_m_s must be finite")
-    area = float(np.trapz(f, v))
+    area = float(_trapezoid(f, v))
     if not np.isfinite(area) or area <= 0:
         raise ValueError("tabulated VDF must have positive finite integral")
     f = f / area
@@ -205,7 +213,7 @@ def collective_tabulated_electron_spectral_density(
     # reject non-zero endpoint values here: doing so would silently make the
     # forward model's accepted domain narrower than the corrected Landau
     # integral and would prevent physically explicit compact-support VDFs.
-    evdf_area = float(np.trapz(fgrid, vgrid))
+    evdf_area = float(_trapezoid(fgrid, vgrid))
     if not np.isfinite(evdf_area) or evdf_area <= 0:
         raise ValueError("tabulated electron VDF must have positive finite integral")
     fgrid = fgrid / evdf_area

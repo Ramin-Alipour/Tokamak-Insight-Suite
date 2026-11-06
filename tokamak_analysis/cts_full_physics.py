@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.fft import fft2, ifft2, fftfreq
 
-from .cts_landau_fdt import build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
+from .cts_landau_fdt import LandauFDTSystem, build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
 from .cts_fdt import (
     quantum_fdt_dynamic_structure_factor,
     quantum_unsymmetrized_dynamic_structure_factor,
@@ -121,16 +121,17 @@ def analyze_landau_fdt_cts(
 
 def analyze_landau_fdt_full_em_constitutive(
     angular_frequency_rad_s,
-    normalized_velocity_x,
-    normalized_velocity_y,
-    normalized_velocity_z,
-    species,
+    normalized_velocity_x=None,
+    normalized_velocity_y=None,
+    normalized_velocity_z=None,
+    species=None,
     *,
     common_temperature_J,
     wave_number_m_inverse,
     propagation_direction=(1.0, 0.0, 0.0),
     common_bulk_flow_m_s=(0.0, 0.0, 0.0),
     coulomb_logarithm=15.0,
+    system=None,
 ):
     """Build and apply the Landau--FDT Full-EM constitutive response.
 
@@ -144,12 +145,23 @@ def analyze_landau_fdt_full_em_constitutive(
     is a local constitutive tensor/noise kernel, NOT a Full-EM CTS three-wave
     scattering vertex or a complete measured-spectrum inversion.
     """
-    system = build_linearized_landau_fdt(
-        normalized_velocity_x, normalized_velocity_y, normalized_velocity_z,
-        species, common_temperature_J=common_temperature_J,
-        common_bulk_flow_m_s=common_bulk_flow_m_s,
-        coulomb_logarithm=coulomb_logarithm,
-    )
+    if system is None:
+        if any(value is None for value in (
+            normalized_velocity_x, normalized_velocity_y, normalized_velocity_z, species
+        )):
+            raise ValueError(
+                "supply either a preassembled LandauFDTSystem or all three normalized velocity axes and species"
+            )
+        system = build_linearized_landau_fdt(
+            normalized_velocity_x, normalized_velocity_y, normalized_velocity_z,
+            species, common_temperature_J=common_temperature_J,
+            common_bulk_flow_m_s=common_bulk_flow_m_s,
+            coulomb_logarithm=coulomb_logarithm,
+        )
+    elif not isinstance(system, LandauFDTSystem):
+        raise TypeError("system must be a LandauFDTSystem assembled by build_linearized_landau_fdt")
+    if species is None:
+        raise ValueError("species metadata is required with a preassembled LandauFDTSystem")
     response = landau_full_em_current_response(
         system, angular_frequency_rad_s, species=species,
         common_temperature_J=common_temperature_J,
@@ -474,7 +486,7 @@ def analyze_cts_microwave_background(
     }
 
 
-def run_advanced_thomson_physics(model, **kwargs):
+def run_advanced_thomson_physics(model, *args, **kwargs):
     """Public, explicit dispatcher for the advanced Analysis-1 physics solvers.
 
     Supported models:
@@ -643,7 +655,7 @@ def run_advanced_thomson_physics(model, **kwargs):
             "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, thomson_normalized_poloidal_flux, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
             "no automatic model substitution is performed"
         )
-    result = solver(**kwargs)
+    result = solver(*args, **kwargs)
     if not isinstance(result, Mapping):
         raise TypeError("advanced physics solver must return a mapping")
     return {

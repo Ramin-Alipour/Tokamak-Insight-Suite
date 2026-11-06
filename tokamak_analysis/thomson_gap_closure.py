@@ -7,6 +7,14 @@ outside the measured spectral/spatial bandwidth.
 from __future__ import annotations
 
 import numpy as np
+
+
+def _trapezoid(y, x):
+    """NumPy-version-independent trapezoidal integration."""
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    return integrate(y, x)
 from scipy.optimize import lsq_linear
 
 from .thomson_scattering import _covariance_is_positive_semidefinite
@@ -407,7 +415,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
         # not by power density itself. Normalize this photon-flux measure before
         # integrating the source-resolved scattering kernel.
         source_photon_density = source_density * source_wavelengths
-        source_area = float(np.trapz(source_photon_density, source_wavelengths))
+        source_area = float(_trapezoid(source_photon_density, source_wavelengths))
         if not np.isfinite(source_area) or source_area <= 0.0:
             raise ValueError("laser source spectrum must have positive finite integrated photon flux")
         source_weights = (
