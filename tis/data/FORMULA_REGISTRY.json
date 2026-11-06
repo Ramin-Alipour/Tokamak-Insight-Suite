@@ -9659,9 +9659,10 @@
       "test_links": [
         "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_reports_h_and_b_with_correct_units",
         "tests/test_cts_full_wave_energy.py::test_uniform_lossy_periodic_cell_closes_poynting_energy_balance",
-        "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_is_executable_through_public_analysis_dispatcher"
+        "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_is_executable_through_public_analysis_dispatcher",
+        "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_rejects_weakly_active_dielectric"
       ],
-      "note": "Publicly dispatched as periodic_3d_full_wave and exposed in the Advanced Thomson/CTS Dashboard. The H/B unit distinction, local dissipative power, Poynting vector and periodic-cell source/absorption balance are explicit. Numerical verification is not experimental validation.",
+      "note": "Publicly dispatched as periodic_3d_full_wave and exposed in the Advanced Thomson/CTS Dashboard. H/B units, local dissipative power, Poynting vector and periodic-cell source/absorption balance are explicit. Dielectric passivity is enforced to floating-point tolerance; even weak active gain is rejected. Numerical verification is not experimental validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
