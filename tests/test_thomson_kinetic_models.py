@@ -1003,3 +1003,72 @@ def test_collective_kappa_mixture_withholds_divergent_third_moment_below_kappa_t
     assert moments["velocity_skewness"] is None
     assert "1.5 < kappa <= 2.0" in moments["third_moment_status"]
     assert moments["fourth_moment_finite"] is False
+
+
+def test_thomson_flow_propagates_projection_geometry_cross_covariance_terms():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    directions = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [2**-0.5, 2**-0.5, 0.0],
+    ])
+    expected_velocity = np.array([1.0e5, -2.0e5, 3.0e5])
+    projections = directions @ expected_velocity
+    projection_covariance = np.eye(4) * 1.0e4
+    geometry_covariance = np.eye(12) * 1.0e-6
+    cross_covariance = np.zeros((4, 12))
+    # Correlate each measured q-projection with a tangent component of its
+    # own scattering-vector calibration; the joint block remains PSD.
+    for view in range(4):
+        cross_covariance[view, 3*view + 1] = 1.0e-2
+
+    result = infer_three_dimensional_flow_from_thomson_projections(
+        projections,
+        directions,
+        projection_covariance_m2_s2=projection_covariance,
+        scattering_vector_covariance=geometry_covariance,
+        projection_geometry_cross_covariance=cross_covariance,
+    )
+
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["projection_geometry_cross_covariance_included"] is True
+    assert "cross_terms" in result["geometry_covariance_method"]
+    velocity = result["electron_velocity_vector_m_s"]
+    jacobian = np.zeros((4, 12))
+    for view, direction in enumerate(directions):
+        tangent = np.eye(3) - np.outer(direction, direction)
+        jacobian[view, 3*view:3*view+3] = tangent @ velocity
+    tangent_cross = cross_covariance @ result["tangent_plane_scattering_vector_covariance"].T
+    expected_effective = (
+        projection_covariance
+        + jacobian @ result["tangent_plane_scattering_vector_covariance"] @ jacobian.T
+        + tangent_cross @ jacobian.T
+        + jacobian @ tangent_cross.T
+    )
+    np.testing.assert_allclose(
+        result["effective_projection_covariance_m2_s2"],
+        expected_effective,
+        rtol=2e-8,
+        atol=1e-8,
+    )
+    np.testing.assert_allclose(velocity, expected_velocity, rtol=1e-5, atol=1e-3)
+
+
+def test_thomson_flow_rejects_non_psd_joint_projection_geometry_covariance():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    directions = np.eye(3)
+    with pytest.raises(ValueError, match="joint projection/geometry covariance block"):
+        infer_three_dimensional_flow_from_thomson_projections(
+            [1.0e5, 2.0e5, 3.0e5],
+            directions,
+            projection_covariance_m2_s2=np.eye(3),
+            scattering_vector_covariance=np.eye(9) * 1.0e-6,
+            projection_geometry_cross_covariance=np.ones((3, 9)) * 1.0,
+        )
