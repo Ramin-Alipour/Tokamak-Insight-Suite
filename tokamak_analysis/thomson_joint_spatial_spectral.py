@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.special import gammaln
+from scipy.special import gammaln, ndtr, stdtr
 
 
 _C_M_S = 299792458.0
@@ -26,6 +26,56 @@ def _bin_widths(axis):
     if np.any(widths <= 0):
         raise ValueError("wavelength_nm must define positive bin widths")
     return widths
+
+
+def _wavelength_edges(axis):
+    """Finite-volume wavelength-bin edges for increasing bin centres."""
+    x = np.asarray(axis, dtype=float)
+    if x.ndim != 1 or x.size < 2 or np.any(~np.isfinite(x)) or np.any(np.diff(x) <= 0.0):
+        raise ValueError("wavelength axis must be finite, increasing and contain at least two centres")
+    edges = np.empty(x.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (x[:-1] + x[1:])
+    edges[0] = x[0] - 0.5 * (x[1] - x[0])
+    edges[-1] = x[-1] + 0.5 * (x[-1] - x[-2])
+    return edges
+
+
+def _bin_averaged_maxwellian_spectrum(wavelength_nm, center_nm, sigma_nm, peak_amplitude):
+    """Exact finite-bin average of a Gaussian spectral density."""
+    x = np.asarray(wavelength_nm, dtype=float)
+    center, sigma, amplitude = float(center_nm), float(sigma_nm), float(peak_amplitude)
+    if not np.isfinite(center) or not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("Gaussian centre must be finite and sigma strictly positive")
+    if not np.isfinite(amplitude) or amplitude < 0.0:
+        raise ValueError("Gaussian peak amplitude must be finite and non-negative")
+    edges = _wavelength_edges(x)
+    z = (edges - center) / sigma
+    probability = ndtr(z[1:]) - ndtr(z[:-1])
+    positive_tail = z[:-1] > 0.0
+    probability[positive_tail] = ndtr(-z[:-1][positive_tail]) - ndtr(-z[1:][positive_tail])
+    return amplitude * np.sqrt(2.0 * np.pi) * sigma * probability / np.diff(edges)
+
+
+def _bin_averaged_kappa_spectrum(wavelength_nm, center_nm, sigma_nm, kappa, integrated_amplitude):
+    """Exact finite-bin average of the projected finite-variance 3-D Kappa marginal."""
+    x = np.asarray(wavelength_nm, dtype=float)
+    center, sigma, kap = float(center_nm), float(sigma_nm), float(kappa)
+    amplitude = float(integrated_amplitude)
+    if not np.isfinite(center) or not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("Kappa centre must be finite and sigma strictly positive")
+    if not np.isfinite(kap) or kap <= 1.5:
+        raise ValueError("Kappa index must be finite and greater than 3/2 for finite variance")
+    if not np.isfinite(amplitude) or amplitude < 0.0:
+        raise ValueError("Kappa integrated amplitude must be finite and non-negative")
+    edges = _wavelength_edges(x)
+    degrees = 2.0 * kap - 1.0
+    scale = sigma * np.sqrt((degrees - 2.0) / degrees)
+    z = (edges - center) / scale
+    probability = stdtr(degrees, z[1:]) - stdtr(degrees, z[:-1])
+    positive_tail = z[:-1] > 0.0
+    probability[positive_tail] = stdtr(degrees, -z[:-1][positive_tail]) - stdtr(degrees, -z[1:][positive_tail])
+    probability = np.clip(probability, 0.0, 1.0)
+    return amplitude * probability / np.diff(edges)
 
 
 def _real_array(values, name):
@@ -439,25 +489,20 @@ def reconstruct_joint_thomson_spatial_spectra(
         sigma = 2.0 * laser * np.sqrt(te / _MEC2_EV) * np.sin(angle/2.0)
         center = laser * (1.0 - q * flow / _C_M_S)
         if physical_model == "maxwellian":
-            node_spectra = amp[:, None] * np.exp(
-                -0.5 * ((x[None, :] - center[:, None]) / sigma[:, None])**2
-            )
+            # Integrate the physical Gaussian over each measured wavelength
+            # bin before applying the bin-probability instrument operator.
+            node_spectra = np.vstack([
+                _bin_averaged_maxwellian_spectrum(x, center[node], sigma[node], amp[node])
+                for node in range(r.size)
+            ])
         elif physical_model == "kappa":
-            # The isotropic 3-D finite-variance Kappa marginal along q is a
-            # Student-like 1-D profile with exponent kappa. sigma remains its
-            # standard deviation, so the scale is converted consistently.
-            from scipy.special import gammaln
-            scale = sigma * np.sqrt((2.0*fitted_kappa-3.0)/fitted_kappa)
-            normalization = np.exp(
-                gammaln(fitted_kappa)
-                - 0.5*np.log(np.pi*fitted_kappa)
-                - np.log(scale)
-                - gammaln(fitted_kappa-0.5)
-            )
-            z = (x[None,:]-center[:,None])/scale[:,None]
-            node_spectra = amp[:,None] * normalization[:,None] * (
-                1.0 + z*z/fitted_kappa
-            )**(-fitted_kappa)
+            # The exact q-projected marginal of an isotropic 3-D finite-variance
+            # Kappa is Student-t(nu=2*kappa-1). Integrate its CDF over each
+            # finite wavelength bin; retain genuine finite-window tail loss.
+            node_spectra = np.vstack([
+                _bin_averaged_kappa_spectrum(x, center[node], sigma[node], fitted_kappa, amp[node])
+                for node in range(r.size)
+            ])
         else:
             from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
             node_spectra = np.empty((r.size,x.size),dtype=float)
@@ -716,6 +761,13 @@ def reconstruct_joint_thomson_spatial_spectra(
         ),
         "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
         "instrument_response": "researcher_supplied_fixed_forward_operator",
+        "spectral_bin_integration": (
+            "exact_Gaussian_CDF_finite_volume_bin_averages"
+            if physical_model == "maxwellian" else
+            "exact_Student_t_CDF_finite_volume_bin_averages_nu_2kappa_minus_1"
+            if physical_model == "kappa" else
+            "relativistic_forward_kernel_quadrature_on_measured_wavelength_grid"
+        ),
         "regularization": {"kind": "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude",
                            "strength": lam_reg, "user_selected": True},
         "noise_model": noise_model,
