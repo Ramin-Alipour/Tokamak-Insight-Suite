@@ -135,7 +135,7 @@ def landau_full_em_electric_field_fluctuation_spectrum(
     if not isinstance(constitutive_response, Mapping):
         raise TypeError("constitutive_response must be a mapping from the Landau-FDT Full-EM solver")
     omega = np.asarray(constitutive_response.get("angular_frequency_rad_s"), dtype=float)
-    current_noise = np.asarray(constitutive_response.get("current_fluctuation_spectral_matrix"), dtype=complex)
+    current_noise = np.array(constitutive_response.get("current_fluctuation_spectral_matrix"), dtype=complex, copy=True)
     epsilon = np.asarray(
         relative_dielectric_tensor if relative_dielectric_tensor is not None
         else constitutive_response.get("relative_dielectric_tensor"), dtype=complex
@@ -157,6 +157,21 @@ def landau_full_em_electric_field_fluctuation_spectrum(
     if not np.isfinite(condition_limit) or condition_limit <= 1:
         raise ValueError("condition_limit must be finite and greater than one")
     direction = direction / np.linalg.norm(direction)
+    for index, matrix in enumerate(current_noise):
+        scale = max(float(np.linalg.norm(matrix, ord=2)), np.finfo(float).tiny)
+        if np.linalg.norm(matrix - matrix.conj().T, ord=2) > 1e-10 * scale:
+            raise ValueError(f"current_fluctuation_spectral_matrix[{index}] must be Hermitian")
+        hermitian = 0.5 * (matrix + matrix.conj().T)
+        if np.linalg.eigvalsh(hermitian)[0] < -1e-10 * scale:
+            raise ValueError(f"current_fluctuation_spectral_matrix[{index}] must be positive semidefinite")
+        current_noise[index] = hermitian
+    reference = np.array([0.0, 0.0, 1.0])
+    if abs(float(np.dot(direction, reference))) > 0.9:
+        reference = np.array([0.0, 1.0, 0.0])
+    analyzer_1 = np.cross(direction, reference)
+    analyzer_1 /= np.linalg.norm(analyzer_1)
+    analyzer_2 = np.cross(direction, analyzer_1)
+    analyzer_basis = np.column_stack((analyzer_1, analyzer_2))
     kvec = k * direction
     mu0, c0 = 4.0e-7*np.pi, 299792458.0
     eye = np.eye(3, dtype=complex)
@@ -197,6 +212,16 @@ def landau_full_em_electric_field_fluctuation_spectrum(
         scale = np.maximum(np.max(np.abs(eigenvalues), axis=1), np.finfo(float).tiny)
         if np.any(eigenvalues[:, 0] < -1e-9*scale):
             raise ArithmeticError(f"{name} field fluctuation matrix is not positive semidefinite")
+    coherency = np.einsum("ai,nab,bj->nij", analyzer_basis.conj(), electric_noise, analyzer_basis)
+    coherency = 0.5 * (coherency + np.swapaxes(coherency.conj(), 1, 2))
+    c11, c22 = np.real(coherency[:, 0, 0]), np.real(coherency[:, 1, 1])
+    c12 = coherency[:, 0, 1]
+    stokes = np.column_stack((c11+c22, c11-c22, 2*np.real(c12), 2*np.imag(c12)))
+    intensity = stokes[:, 0]
+    degree = np.divide(np.linalg.norm(stokes[:, 1:], axis=1), intensity,
+        out=np.zeros_like(intensity), where=intensity > 0.0)
+    if np.any(degree > 1.0 + 1e-8):
+        raise ArithmeticError("transverse Stokes vector violates the coherency positivity bound")
     return {
         "angular_frequency_rad_s": omega.copy(),
         "wave_number_m_inverse": k,
@@ -206,6 +231,11 @@ def landau_full_em_electric_field_fluctuation_spectrum(
         "magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s": magnetic_noise,
         "electric_magnetic_cross_spectral_matrix": electric_magnetic_cross,
         "spectral_poynting_flux_W_m2_per_rad_s": poynting,
+        "transverse_analyzer_basis_cartesian": analyzer_basis,
+        "transverse_electric_coherency_spectral_matrix_V2_m2_per_rad_s": coherency,
+        "transverse_stokes_spectral_density_IQUV": stokes,
+        "degree_of_linear_and_circular_polarization": degree,
+        "stokes_convention": "I=C11+C22; Q=C11-C22; U=2 Re(C12); V=2 Im(C12); exp(-i*omega*t)",
         "maxwell_operator_condition_number": conditions,
         "field_fluctuation_relation": "S_E = mu_0^2 omega^2 G S_J G^dagger",
         "magnetic_fluctuation_relation": "S_B = (k_cross/omega) S_E (k_cross/omega)^dagger; B = k x E / omega",

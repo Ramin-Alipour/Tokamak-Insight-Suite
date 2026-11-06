@@ -105,6 +105,12 @@ MODEL_LABELS = {
 # Full-EM response and field-fluctuation routes are explicit Dashboard choices.
 MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
+MODEL_PHYSICS_NOTES["landau_fdt_full_em_field_fluctuations"] = (
+    MODEL_PHYSICS_NOTES.get("landau_fdt_full_em_field_fluctuations", "")
+    + " The solver returns the transverse electric coherency matrix, I/Q/U/V Stokes "
+    "spectral densities and degree of polarization. Convention: V=2 Im(C12) for "
+    "exp(-i omega t). The input current-noise matrix must be Hermitian positive semidefinite."
+)
 
 MODEL_PHYSICS_NOTES = {
     "landau_fdt_full_em_field_fluctuations": (

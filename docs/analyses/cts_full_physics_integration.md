@@ -157,3 +157,22 @@ Dashboard selector and both deployed/source formula registries expose this
 route. It remains a local homogeneous-medium fluctuation calculation, not a
 magnetized CTS three-wave scattering vertex, ray solution or absolute
 receiver spectrum.
+
+
+## Transverse polarization-resolved Full-EM fluctuation observables
+
+Before Maxwell propagation, the Landau--FDT current spectral matrix is
+required to be Hermitian and positive semidefinite. Invalid covariance is
+rejected rather than silently symmetrized.
+
+For a deterministic right-handed transverse analyzer basis e1,e2 perpendicular
+to k, the projected electric coherency matrix is
+C_ab(omega) = e_a^dagger S_E(omega) e_b.
+The exported Stokes spectral densities use
+(I,Q,U,V) = (C11+C22, C11-C22, 2 Re(C12), 2 Im(C12))
+for the solver's exp(-i omega t) convention. The degree of polarization is
+sqrt(Q^2+U^2+V^2)/I, defined as zero when I=0; positivity requires it not to
+exceed one beyond numerical roundoff. These are local polarization-resolved
+spectral observables for downstream receiver modeling. They do not supply
+receiver etendue, absolute calibration, ray tracing, or a magnetized CTS
+three-wave vertex.

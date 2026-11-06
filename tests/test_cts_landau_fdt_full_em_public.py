@@ -139,3 +139,45 @@ def test_landau_current_noise_propagates_to_electric_magnetic_fluctuations_and_p
     levi[0, 2, 1] = levi[2, 1, 0] = levi[1, 0, 2] = -1.0
     expected = 0.5/mu0*np.real(np.einsum("ijk,fjk->fi", levi, result["electric_magnetic_cross_spectral_matrix"]))
     np.testing.assert_allclose(poynting, expected)
+
+
+def test_full_em_field_fluctuations_return_transverse_stokes_and_polarization_bounds():
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    omega = np.array([1.0e5, 2.0e5])
+    response = {
+        "angular_frequency_rad_s": omega,
+        "current_fluctuation_spectral_matrix": np.broadcast_to(
+            np.eye(3, dtype=complex), (2, 3, 3)
+        ).copy(),
+        "relative_dielectric_tensor": np.broadcast_to(
+            2.0*np.eye(3, dtype=complex), (2, 3, 3)
+        ).copy(),
+    }
+    result = landau_full_em_electric_field_fluctuation_spectrum(
+        response, 1.0e-3, propagation_direction=(1.0, 2.0, 0.5)
+    )
+    stokes = result["transverse_stokes_spectral_density_IQUV"]
+    coherency = result["transverse_electric_coherency_spectral_matrix_V2_m2_per_rad_s"]
+    degree = result["degree_of_linear_and_circular_polarization"]
+    assert stokes.shape == (2, 4)
+    assert coherency.shape == (2, 2, 2)
+    assert np.all(stokes[:, 0] >= 0.0)
+    assert np.all((degree >= 0.0) & (degree <= 1.0 + 1e-8))
+    np.testing.assert_allclose(stokes[:, 1:], 0.0, atol=1e-25)
+
+
+@pytest.mark.parametrize("bad_matrix, message", [
+    (np.array([[1.0, 1.0j, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "Hermitian"),
+    (np.diag([1.0, 1.0, -0.1]).astype(complex), "positive semidefinite"),
+])
+def test_full_em_field_fluctuations_reject_nonphysical_current_covariance(bad_matrix, message):
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    response = {
+        "angular_frequency_rad_s": np.array([1.0e5]),
+        "current_fluctuation_spectral_matrix": bad_matrix[None, :, :],
+        "relative_dielectric_tensor": (2.0*np.eye(3, dtype=complex))[None, :, :],
+    }
+    with pytest.raises(ValueError, match=message):
+        landau_full_em_electric_field_fluctuation_spectrum(response, 1.0e-3)
