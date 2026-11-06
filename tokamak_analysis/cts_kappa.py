@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.special import gammaln, betainc, wofz
-from scipy.integrate import quad
 from .cts_kappa_dispersion import kappa_dispersion_function
 
 
@@ -29,34 +28,6 @@ def _positive_real_scalar(value, name):
     if not np.isfinite(result) or result <= 0.0:
         raise ValueError(f"{name} must be a positive finite real scalar")
     return result
-
-
-def _kappa_landau_real_axis_integrals(kappa, normalized_phase_velocity):
-    """Exact retarded Landau integral and phase derivative at eta -> 0+."""
-    kap, xp = float(kappa), float(normalized_phase_velocity)
-    log_norm = gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi)
-    def pdf(x):
-        return np.exp(log_norm-kap*np.log1p(x*x))
-    def first(x):
-        return -2.0*kap*x/(1.0+x*x)*pdf(x)
-    def second(x):
-        return pdf(x)*(-2.0*kap*(1.0-x*x)+4.0*kap*kap*x*x)/(1.0+x*x)**2
-    def third(x):
-        lp=-2.0*kap*x/(1.0+x*x)
-        lpp=-2.0*kap*(1.0-x*x)/(1.0+x*x)**2
-        lppp=4.0*kap*x*(3.0-x*x)/(1.0+x*x)**3
-        return pdf(x)*(lp**3+3.0*lp*lpp+lppp)
-    fp,fpp,fppp=first(xp),second(xp),third(xp)
-    scale=max(1.0,abs(xp))
-    def pv_integrand(x):
-        d=x-xp
-        return fpp+0.5*fppp*d if abs(d)<1e-4*scale else (first(x)-fp)/d
-    def derivative_integrand(x):
-        d=x-xp
-        return 0.5*fppp if abs(d)<2e-4*scale else (first(x)-fp-fpp*d)/(d*d)
-    real,real_error=quad(pv_integrand,-np.inf,np.inf,epsabs=2e-11,epsrel=2e-9,limit=500)
-    derivative,derivative_error=quad(derivative_integrand,-np.inf,np.inf,epsabs=2e-10,epsrel=2e-8,limit=500)
-    return complex(real,np.pi*fp),complex(derivative,np.pi*fpp),float(real_error),float(derivative_error)
 
 
 def kappa_electron_susceptibility(
