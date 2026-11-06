@@ -202,6 +202,7 @@ def collective_tabulated_electron_spectral_density(
     incident_direction, scattered_direction, pole_imaginary_part_m_s=None,
     landau_limit=False, ion_velocity_grids_m_s=None,
     ion_probability_densities_s_m=None,
+    include_electron_phase_velocity_derivative=False,
 ):
     """Unmagnetized electrostatic CTS spectrum with kinetic projected EVDFs.
 
@@ -211,6 +212,8 @@ def collective_tabulated_electron_spectral_density(
     susceptibility integral and finite-support endpoint-jump convention as
     electrons. This remains a 1-D electrostatic forward model.
     """
+    if not isinstance(include_electron_phase_velocity_derivative, (bool, np.bool_)):
+        raise ValueError("include_electron_phase_velocity_derivative must be boolean")
     x = np.asarray(wavelength_nm, dtype=float)
     ne = float(electron_density_m3)
     laser = float(laser_wavelength_nm)
@@ -283,15 +286,25 @@ def collective_tabulated_electron_spectral_density(
     fgrid = fgrid / evdf_area
     electron_pdf = np.interp(vphase-ue, vgrid, fgrid, left=0.0, right=0.0)
     chi_e = np.empty(x.size, dtype=complex)
+    chi_e_phase_derivative = (
+        np.empty(x.size, dtype=complex)
+        if include_electron_phase_velocity_derivative else None
+    )
     ion_chi, ion_pdf = [], []
     omega_pe2 = ne*E_CHARGE**2/(EPS0*ME)
     for j, vp in enumerate(vphase):
-        chi_e[j] = generalized_electron_susceptibility(
+        electron_response = generalized_electron_susceptibility(
             vgrid, fgrid, vp-ue, electron_density_m3=ne,
             wavenumber_m_inverse=k,
             pole_imaginary_part_m_s=pole_imaginary_part_m_s,
             landau_limit=landau_limit,
-        )["electron_susceptibility"]
+            include_phase_velocity_derivative=include_electron_phase_velocity_derivative,
+        )
+        chi_e[j] = electron_response["electron_susceptibility"]
+        if chi_e_phase_derivative is not None:
+            chi_e_phase_derivative[j] = electron_response[
+                "susceptibility_phase_velocity_derivative_s_m"
+            ]
     if tabulated_ions and (ion_velocity_grids_m_s is None or ion_probability_densities_s_m is None):
         raise ValueError("ion_velocity_grids_m_s and ion_probability_densities_s_m must be supplied together")
     if tabulated_ions:
@@ -396,6 +409,12 @@ def collective_tabulated_electron_spectral_density(
     return {
         "spectral_density_per_nm": spectral,
         "electron_susceptibility": chi_e,
+        "electron_susceptibility_phase_velocity_derivative_s_m": chi_e_phase_derivative,
+        "electron_susceptibility_derivative_definition": (
+            "d_chi_e/d_v_phase at fixed k and fixed projected EVDF; "
+            "exact Landau mode uses the Hadamard finite part away from VDF grid knots"
+            if include_electron_phase_velocity_derivative else None
+        ),
         "ion_susceptibility": np.asarray(ion_chi),
         "dielectric_function": dielectric,
         "dynamic_structure_factor": dynamic_structure,
