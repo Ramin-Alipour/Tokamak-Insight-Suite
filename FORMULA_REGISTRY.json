@@ -9294,9 +9294,9 @@
         },
         {
           "name": "tv_huber_scale",
-          "unit": "dimensionless gradient scale for log(Te), flow/1e6 and log(amplitude)",
+          "unit": "dimensionless gradient scale with respect to normalized radius s=(r-r_min)/(r_max-r_min)",
           "required": false,
-          "description": "Positive Huber transition scale; quadratic below the scale and approximately linear above it. Used only for huber_total_variation."
+          "description": "Positive Huber transition scale for derivatives with respect to normalized radius; quadratic below the scale and approximately linear above it. Used only for huber_total_variation."
         }
       ],
       "output_specs": [
@@ -9374,7 +9374,7 @@
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_composes_measured_mixing_with_gaussian_psf",
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_propagates_gaussian_psf_calibration_uncertainty"
       ],
-      "note": "This is the public joint measured-spectrum spatial inverse, not independent channel fits followed by interpolation. It composes measured spatial mixing with the supplied PSF, fits physical spectra at every radial node, and jointly fits detector-space nuisance backgrounds. The public dispatcher and advanced Thomson Dashboard expose this solver. Software verification on synthetic cases is not experimental validation. Optional length-weighted Huber total variation is available to reduce quadratic smoothing bias at steep radial gradients; it is a prior and does not add measurement information.",
+      "note": "This is the public joint measured-spectrum spatial inverse, not independent channel fits followed by interpolation. It composes measured spatial mixing with the supplied PSF, fits physical spectra at every radial node, and jointly fits detector-space nuisance backgrounds. The public dispatcher and advanced Thomson Dashboard expose this solver. Software verification on synthetic cases is not experimental validation. Optional normalized-radius Huber total variation is available to reduce quadratic smoothing bias at steep radial gradients; it is a prior and does not add measurement information.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
       "function_links": [
