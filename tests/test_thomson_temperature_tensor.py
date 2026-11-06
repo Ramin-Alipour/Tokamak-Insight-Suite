@@ -60,3 +60,18 @@ def test_unweighted_tensor_fit_does_not_claim_a_chi_square_probability():
     result = infer_full_temperature_tensor_from_thomson_projections(projected, q)
     assert result["consistency_p_value"] is None
     assert result["consistency_status"] == "not_testable_without_absolute_covariance_or_redundant_views"
+
+
+def test_full_temperature_tensor_enforces_positive_semidefinite_boundary():
+    q = np.array([
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+    ])
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    # The unconstrained six-view solution has eigenvalue -50 eV.
+    projected = np.array([100.0, 100.0, 100.0, 250.0, 100.0, 100.0])
+    result = infer_full_temperature_tensor_from_thomson_projections(projected, q)
+    assert np.min(np.linalg.eigvalsh(result["electron_temperature_tensor_eV"])) >= -1e-10
+    assert result["positive_semidefinite_constraint_active"] is True
+    assert result["parameter_covariance_eV2"] is None
+    assert result["parameter_covariance_status"] == "not_reported_psd_boundary"
