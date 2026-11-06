@@ -245,6 +245,11 @@ def reconstruct_multiview_3d_evdf(
     nview, nfreq, nvoxel = kernels.shape
     if data.shape != (nview, nfreq) or velocity.shape != (nvoxel, 3) or volume.shape != (nvoxel,):
         raise ValueError("multi-view data, 3-D velocity grid and voxel-volume dimensions are inconsistent")
+    # Velocity-space voxels must lie on the physical subluminal mass shell.
+    # A converged non-negative inverse cannot make |v| >= c physical.
+    speed = np.linalg.norm(velocity, axis=1)
+    if np.any(speed >= 299792458.0):
+        raise ValueError("every 3-D EVDF velocity voxel must be strictly subluminal (|v| < c)")
     if np.any(volume <= 0) or np.any(data < 0) or penalty.shape[1] != nvoxel:
         raise ValueError("voxel volumes must be positive, spectra non-negative and regularization columns must match voxels")
     lam = float(regularization_strength)
