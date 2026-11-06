@@ -435,10 +435,12 @@ def multi_population_relativistic_thomson_spectrum(
     wavelength = _vector(wavelength_nm, "wavelength_nm")
     if np.any(wavelength <= 0.0) or np.any(np.diff(wavelength) <= 0.0):
         raise ValueError("wavelength_nm must be positive and strictly increasing")
-    temperatures = _vector(population_temperatures_eV, "population_temperatures_eV")
-    fractions = _vector(population_fractions, "population_fractions")
-    if temperatures.size != fractions.size or temperatures.size < 2:
-        raise ValueError("population temperatures and fractions must have matching length >=2")
+    temperatures = np.asarray(population_temperatures_eV, dtype=float)
+    fractions = np.asarray(population_fractions, dtype=float)
+    if (temperatures.ndim != 1 or fractions.ndim != 1
+            or temperatures.size != fractions.size or temperatures.size < 2
+            or np.any(~np.isfinite(temperatures)) or np.any(~np.isfinite(fractions))):
+        raise ValueError("population temperatures and fractions must be finite matching 1-D vectors of length >=2")
     if np.any(temperatures <= 0.0) or np.any(fractions < 0.0):
         raise ValueError("population temperatures must be positive and fractions non-negative")
     fraction_sum = float(np.sum(fractions))
