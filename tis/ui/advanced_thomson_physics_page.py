@@ -902,6 +902,23 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "The grid-conditioned PDF is a visualization-only conditional density; "
                     "it is not substituted into the Landau susceptibility."
                 )
+            if isinstance(result, Mapping) and "three_dimensional_flow_inference" in result:
+                flow_result = result["three_dimensional_flow_inference"]
+                st.subheader("Joint 3-D electron-flow inference")
+                st.latex(r"u_{q,i}=\hat{\mathbf q}_i\cdot\mathbf u_e")
+                st.write({
+                    "flow_projection_covariance_status": result.get("flow_projection_covariance_status"),
+                    "identifiability": flow_result.get("identifiability"),
+                    "reportable_as_inferred_parameter": flow_result.get("reportable_as_inferred_parameter"),
+                    "electron_velocity_vector_m_s": flow_result.get("electron_velocity_vector_m_s"),
+                    "electron_velocity_covariance_m2_s2": flow_result.get("electron_velocity_covariance_m2_s2"),
+                    "reason": flow_result.get("reason"),
+                })
+                if not flow_result.get("reportable_as_inferred_parameter", False):
+                    st.warning(
+                        "The 3-D flow vector is withheld unless the view directions and "
+                        "fit-derived cross-view flow covariance identify all three components."
+                    )
             st.json(safe)
             st.download_button(
                 "Export advanced physics result (JSON)",
