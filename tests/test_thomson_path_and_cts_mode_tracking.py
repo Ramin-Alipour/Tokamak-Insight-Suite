@@ -125,3 +125,46 @@ def test_coupled_mode_propagation_rejects_missing_or_misaligned_physical_path():
         propagate_cold_plasma_mode_coupling(
             operators, [0.0, 1.0, 1.0], np.ones((3, 3)), [1.0, 0.0, 0.0]
         )
+
+
+def test_path_density_propagates_correlated_optical_profile_covariance():
+    s = np.linspace(0.0, 0.4, 21)
+    incident = np.linspace(1.0, 0.8, s.size)
+    cross = np.full(s.size, 6.0e-29)
+    solid = np.linspace(0.02, 0.03, s.size)
+    efficiency = np.linspace(0.4, 0.5, s.size)
+    integrate = getattr(np, "trapezoid", None) or np.trapz
+    sensitivity = integrate(incident * cross * solid * efficiency, s)
+    density = 2.5e19
+    power = density * sensitivity
+
+    # A common 5% calibration mode correlates every incident-power sample.
+    n = s.size
+    covariance = np.zeros((4*n, 4*n))
+    common_mode = 0.05 * incident
+    covariance[:n, :n] = np.outer(common_mode, common_mode)
+    result = infer_thomson_path_averaged_density(
+        power, s, incident, cross, solid, efficiency,
+        scattered_power_uncertainty_W=0.02*power,
+        optical_profile_covariance=covariance,
+    )
+    assert result["electron_density_optical_profile_uncertainty_m3"] == pytest.approx(
+        0.05*density, rel=1e-10
+    )
+    assert result["electron_density_path_averaged_uncertainty_m3"] == pytest.approx(
+        density*np.sqrt(0.05**2 + 0.02**2), rel=1e-10
+    )
+    assert result["optical_profile_covariance_order"][0] == "incident_power_profile_W"
+
+
+def test_path_density_rejects_non_psd_optical_profile_covariance():
+    s = np.linspace(0.0, 1.0, 4)
+    covariance = np.zeros((4*s.size, 4*s.size))
+    covariance[0, 0] = 1.0
+    covariance[1, 1] = 1.0
+    covariance[0, 1] = covariance[1, 0] = 2.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        infer_thomson_path_averaged_density(
+            1.0, s, np.ones(4), np.ones(4), np.ones(4), np.full(4, 0.5),
+            optical_profile_covariance=covariance,
+        )
