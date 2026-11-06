@@ -24,9 +24,10 @@ def kappa_dispersion_function(
 ):
     """Evaluate the full-tail Kappa Landau dispersion integral and derivative.
 
-    The dimensionless velocity is x=v/sqrt((2*kappa-3)*k_B*T/m), so the
-    kappa->infinity limit is the unit-variance Maxwellian convention
-    f(x)=exp(-x*x)/sqrt(pi).  zeta_imag must be non-negative.  At zero,
+    The dimensionless velocity is x=v/sqrt(((2*kappa-3)/kappa)*k_B*T/m).
+    The normalized marginal has Var(x)=kappa/(2*kappa-3), so this scaling
+    gives Var(v)=k_B*T/m and tends to the Maxwellian thermal scale
+    sqrt(2*k_B*T/m) as kappa->infinity.  zeta_imag must be non-negative. At zero,
     the real part is evaluated as a Cauchy principal value and the imaginary
     part is supplied by Sokhotski-Plemelj: +pi*f'(zeta_real).
 
