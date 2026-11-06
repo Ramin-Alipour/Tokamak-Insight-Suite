@@ -248,3 +248,52 @@ def test_collective_tabulated_evdf_requires_ion_grid_and_density_together():
             scattered_direction=[0.0, 1.0, 0.0],
             ion_velocity_grids_m_s=velocity[None, :],
         )
+
+
+def test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    wavelength = np.linspace(1060.0, 1068.0, 81)
+    te, ti = 120.0, 18.0
+    me, mi, charge = 9.1093837015e-31, 2.0 * 1.66053906660e-27, 1.602176634e-19
+    se, si = np.sqrt(te * charge / me), np.sqrt(ti * charge / mi)
+    ve = np.linspace(-8.0 * se, 8.0 * se, 2401)
+    vi = np.linspace(-8.0 * si, 8.0 * si, 2401)
+    fe, fi = np.exp(-0.5 * (ve / se) ** 2), np.exp(-0.5 * (vi / si) ** 2)
+    result = run_advanced_thomson_physics(
+        "cts_tabulated_evdf_landau", wavelength, 1064.0, np.pi / 2.0,
+        electron_density_m3=1.0e18, electron_velocity_grid_m_s=ve,
+        electron_probability_density_s_m=fe,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.0}],
+        ion_fractions=[1.0], electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]], incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        ion_velocity_grids_m_s=vi[None, :], ion_probability_densities_s_m=fi[None, :],
+    )
+    em, im = result["electron_projected_moments"], result["ion_projected_moments"][0]
+    assert np.isclose(em["directional_second_moment_temperature_eV"], te, rtol=2e-4)
+    assert np.isclose(im["directional_second_moment_temperature_eV"], ti, rtol=2e-4)
+    assert abs(em["standardized_skewness"]) < 1e-10
+    assert abs(im["standardized_skewness"]) < 1e-10
+    assert abs(em["excess_kurtosis"]) < 1e-3
+    assert abs(im["excess_kurtosis"]) < 1e-3
+    assert im["species"] == "D+"
+
+
+def test_maxwellian_ion_moment_output_matches_analytic_temperature():
+    from tokamak_analysis.thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
+
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    velocity = np.linspace(-8.0e6, 8.0e6, 1601)
+    result = collective_tabulated_electron_spectral_density(
+        wavelength, 1064.0, np.pi / 2.0, electron_density_m3=1.0e18,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=np.exp(-0.5 * (velocity / 1.0e6) ** 2),
+        ion_species=[{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        ion_fractions=[1.0], ion_temperature_eV=[12.5],
+        electron_velocity_m_s=[0.0, 0.0, 0.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0], scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+    assert result["ion_projected_moments"][0]["directional_second_moment_temperature_eV"] == 12.5
+    assert result["ion_projected_moments"][0]["standardized_skewness"] == 0.0
