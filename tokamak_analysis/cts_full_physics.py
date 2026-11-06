@@ -17,7 +17,7 @@ from .cts_fdt import (
     quantum_unsymmetrized_dynamic_structure_factor,
 )
 from .cts_landau_em import landau_full_em_current_response, landau_full_em_electric_field_fluctuation_spectrum
-from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
+from .cts_full_wave import (solve_stratified_mode_conversion, solve_stratified_full_wave_oblique, solve_3d_periodic_full_wave)
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
 from .ece_kinetic import (
     relativistic_kinetic_ece_absorption_coefficient,
@@ -528,6 +528,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "landau_fdt_full_em_response",
     "polarized_kinetic_ece",
     "stratified_nonparaxial_vector",
+    "periodic_3d_full_wave",
     "stratified_mode_conversion",
     "relativistic_kinetic_ece_profile",
     "relativistic_kinetic_ece",
@@ -581,6 +582,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - stratified_nonparaxial_vector: 2-D vector-beam propagation through a
         z-stratified anisotropic dielectric using angular-spectrum and
         oblique Berreman solutions.
+      - periodic_3d_full_wave: full-vector 3-D Bloch-periodic Maxwell FDFD solve
+        with tensor dielectric coupling, magnetic fields, Poynting flux and
+        source-to-absorption energy-balance diagnostics.
       - stratified_mode_conversion: coherent Jones reflection/transmission
         matrices for a supplied stratified dielectric.
       - polarized_lte_stokes: exact constant-coefficient Stokes transfer with
@@ -683,6 +687,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = solve_polarized_kinetic_ece_with_mode_conversion
     elif model == "stratified_nonparaxial_vector":
         solver = propagate_stratified_nonparaxial_vector_field
+    elif model == "periodic_3d_full_wave":
+        solver = solve_3d_periodic_full_wave
     elif model == "polarized_lte_stokes":
         solver = propagate_polarized_lte_stokes
     elif model == "stratified_polarized_lte_stokes":
@@ -798,6 +804,7 @@ __all__ = [
     "fit_cts_ion_species_flows",
     "analyze_landau_fdt_full_em_constitutive",
     "propagate_stratified_nonparaxial_vector_field",
+    "solve_3d_periodic_full_wave",
     "solve_polarized_kinetic_ece_with_mode_conversion",
     "propagate_polarized_lte_stokes",
     "propagate_stratified_polarized_lte_stokes",
