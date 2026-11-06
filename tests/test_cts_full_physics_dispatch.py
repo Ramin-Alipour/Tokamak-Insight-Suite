@@ -187,7 +187,7 @@ def test_joint_spatial_spectral_solver_is_selectable_with_a_complete_dashboard_e
 def test_spectral_fit_dispatcher_recovers_3d_flow_when_temperature_anisotropy_is_unidentifiable():
     from tokamak_analysis.thomson_anisotropic_inference import _gaussian_bin_average
 
-    wavelength = np.linspace(499.8, 500.2, 161)
+    wavelength = np.linspace(495.0, 505.0, 1001)
     laser, angle = 500.0, np.pi / 2.0
     magnetic = np.array([0.0, 0.0, 1.0])
     pitch = 0.5
@@ -200,7 +200,7 @@ def test_spectral_fit_dispatcher_recovers_3d_flow_when_temperature_anisotropy_is
     expected_velocity = np.array([1.2e4, -8.0e3, 5.0e3])
     projected_flows = directions @ expected_velocity
     q_factor = 2.0*np.sin(angle/2.0)
-    sigma_velocity = np.sqrt(1.602176634e-19*425.0/9.1093837015e-31)
+    sigma_velocity = np.sqrt(1.602176634e-19*0.875/9.1093837015e-31)
     spectra = []
     for flow in projected_flows:
         centre = laser*(1.0-q_factor*flow/299792458.0)
@@ -217,7 +217,9 @@ def test_spectral_fit_dispatcher_recovers_3d_flow_when_temperature_anisotropy_is
         magnetic_field_unit=magnetic,
         scattering_vector_unit=directions,
         instrument_response_matrix=np.eye(wavelength.size),
-        temperature_bounds_eV=(20.0, 3000.0),
+        initial_temperature_parallel_eV=2.0,
+        initial_temperature_perpendicular_eV=0.5,
+        temperature_bounds_eV=(0.1, 5.0),
         flow_bounds_m_s=(-1.0e6, 1.0e6),
     )
     assert result["anisotropy_identifiability"] == "non_identifiable"
