@@ -9773,5 +9773,130 @@
       ],
       "note": "Quantifies the superluminal tail that an RMS-beta threshold alone does not describe. A projected superluminal particle necessarily has superluminal 3-D speed."
     }
+  },
+  {
+    "name": "General symmetric 3-D electron temperature tensor from Thomson projections",
+    "equation": "T_q = q_hat^T T_eV q_hat; T_eV=(m_e/e)⟨δv δv^T⟩; T_q = q_x²T_xx+q_y²T_yy+q_z²T_zz+2q_xq_yT_xy+2q_xq_zT_xz+2q_yq_zT_yz; T_eV ⪰ 0",
+    "inputs": "At least six linearly independent unit scattering directions q_hat and their projected second-moment temperatures T_q [eV]; optional full covariance of projected temperatures [eV²]",
+    "output": "General symmetric 3×3 electron second-moment temperature tensor [eV], principal temperatures/eigenvectors, residual and identifiability diagnostics",
+    "assumptions": "The measured projected temperatures refer to one common spatial volume and time window; the distribution has finite second moments; no gyrotropy or magnetic-axis alignment is imposed. The tensor describes only second moments and does not determine higher EVDF moments.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.infer_full_temperature_tensor_from_thomson_projections",
+      "formula_key": "optical_thomson_general_temperature_tensor",
+      "input_specs": [
+        {
+          "name": "projected_temperature_eV",
+          "unit": "eV; positive directional second-moment temperature per view",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "dimensionless unit 3-vector per view; at least six independent view dyads",
+          "required": true
+        },
+        {
+          "name": "projected_temperature_covariance_eV2",
+          "unit": "eV²; full positive-definite view covariance",
+          "required": false
+        },
+        {
+          "name": "maximum_geometry_condition_number",
+          "unit": "dimensionless; condition ceiling for view-dyad design",
+          "required": false,
+          "default": 1000000
+        },
+        {
+          "name": "minimum_consistency_p_value",
+          "unit": "dimensionless; chi-square consistency threshold",
+          "required": false,
+          "default": 0.001
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_tensor_eV",
+          "unit": "eV; symmetric positive-semidefinite 3×3 tensor"
+        },
+        {
+          "name": "thermal_velocity_covariance_tensor_m2_s2",
+          "unit": "m² s⁻²; (e/m_e) T_eV"
+        },
+        {
+          "name": "principal_temperature_eigenvalues_eV",
+          "unit": "eV; principal second-moment temperatures"
+        },
+        {
+          "name": "principal_axes_cartesian_columns",
+          "unit": "dimensionless orthonormal eigenvectors"
+        },
+        {
+          "name": "parameter_covariance_eV2",
+          "unit": "eV²; local GLS covariance only in the interior of the PSD cone"
+        },
+        {
+          "name": "view_dyad_rank",
+          "unit": "integer; must equal six"
+        },
+        {
+          "name": "view_dyad_condition_number",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "consistency_p_value",
+          "unit": "dimensionless; chi-square survival probability for overdetermined views"
+        }
+      ],
+      "prerequisites": [
+        "Directional temperatures must be independently inferred from calibrated Thomson spectra.",
+        "All views must sample a common plasma volume/time interval or be mapped to one common equilibrium coordinate.",
+        "At least six independent scattering-view dyads are required for six tensor components."
+      ],
+      "uncertainty_model": "Full supplied positive-definite covariance of directional temperatures is propagated through GLS. If no covariance is supplied, an identity metric is used and the local covariance is residual-scaled. At an active PSD boundary, symmetric local covariance is withheld.",
+      "limitations": [
+        "Does not infer density, bulk flow, heat flux or higher EVDF moments.",
+        "Does not replace the gyrotropic Maxwellian/Kappa raw-spectrum forward fits; it inverts their independently inferred directional second moments.",
+        "A common tensor is invalid if the views sample different spatially varying tensors without a joint spatial model.",
+        "No experimental validation is claimed."
+      ],
+      "test_links": [
+        "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_recovers_non_gyrotropic_tensor_with_gls_covariance",
+        "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_rank_deficient_view_geometry",
+        "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_non_positive_definite_measurement_covariance",
+        "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "derived_calibrated_directional_spectral_inference",
+    "execution_scope": "multi_view_second_moment_tensor_inversion",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — general anisotropic velocity covariance",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.infer_full_temperature_tensor_from_thomson_projections",
+      "function_links": [
+        "tokamak_analysis.thomson_temperature_tensor.infer_full_temperature_tensor_from_thomson_projections",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ],
+      "formula_key": "optical_thomson_general_temperature_tensor",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_recovers_non_gyrotropic_tensor_with_gls_covariance",
+        "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher"
+      ]
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook",
+        "scope": "Thomson-scattering velocity projections and thermal second moments; the symmetric tensor inversion follows from the second-moment projection identity."
+      }
+    ]
   }
 ]
