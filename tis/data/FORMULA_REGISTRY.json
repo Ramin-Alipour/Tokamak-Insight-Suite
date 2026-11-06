@@ -8659,5 +8659,102 @@
       ],
       "note": "Physical forward-operator calibration uncertainty is propagated to fitted plasma/background parameters through local GLS sensitivity; software verification only, not empirical calibration."
     }
+  },
+  {
+    "name": "Relativistic pressure and kinetic-energy moments of a fitted gyrotropic CTS VDF",
+    "equation": "d^3p = 2π p_perp dp_perp dp_parallel; γ = sqrt(1 + (p_perp^2+p_parallel^2)/(m^2 c^2)); v_parallel = p_parallel/(γm); v_perp = p_perp/(γm); <K> = ∫f(γ−1)mc² d³p / ∫f d³p; T_parallel = ∫f p_parallel v_parallel d³p/(e∫f d³p); T_perpendicular = ∫f p_perp v_perp d³p/(2e∫f d³p); A = T_perpendicular/T_parallel",
+    "inputs": "Non-negative fitted or regularized gyrotropic momentum-space distribution; p_perp and p_parallel grids; species mass; cylindrical momentum-space quadrature weights",
+    "output": "Number-normalized mean parallel velocity, mean relativistic kinetic energy, parallel and perpendicular pressure temperatures in eV, and pressure-anisotropy ratio",
+    "assumptions": "Homogeneous gyrotropic distribution; distribution normalized with the cylindrical momentum-space measure 2πp_perp dp_perp dp_parallel; relativistic single-particle energy and velocity; reported moments are conditional on the supplied momentum grid and fixed bulk Full-EM CTS inputs. Candidate moments are not promoted to measured results when the inverse shape is not identifiable.",
+    "status": "D",
+    "category": "Magnetized relativistic collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_full_em.fit_full_em_gyrotropic_population_shape",
+      "formula_key": "cts_relativistic_gyrotropic_vdf_pressure_moments",
+      "input_specs": [
+        {
+          "name": "distribution_kg_m_s_inverse3",
+          "unit": "kg^-3 m^-3 s^3; normalized momentum-space density",
+          "required": true
+        },
+        {
+          "name": "p_perpendicular_kg_m_s",
+          "unit": "kg m s^-1; strictly positive grid",
+          "required": true
+        },
+        {
+          "name": "p_parallel_kg_m_s",
+          "unit": "kg m s^-1; increasing grid",
+          "required": true
+        },
+        {
+          "name": "population_mass_kg",
+          "unit": "kg",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "mean_parallel_velocity_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "mean_kinetic_energy_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "parallel_pressure_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "perpendicular_pressure_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "pressure_anisotropy_Tperp_over_Tparallel",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "Identifiable fitted non-negative gyrotropic momentum-space VDF",
+        "Explicit momentum grids and population mass"
+      ],
+      "uncertainty_model": "These moments inherit the VDF inverse's conditional identifiability and uncertainty status. No moment uncertainty is claimed from a regularized candidate alone.",
+      "test_links": [
+        "tests/test_cts_full_em_gyrotropic_inverse.py::test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward"
+      ],
+      "note": "Pressure temperatures are momentum-flux moments, not temperatures inferred from a Maxwellian fit. For a gyrotropic distribution T_perpendicular is the pressure in either perpendicular direction.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "input_data_level": "fitted_or_regularized_calibrated_spectrum_inverse",
+      "execution_scope": "derived_relativistic_moments_within_a_measured_spectrum_inverse",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
+    },
+    "references": [
+      {
+        "title": "Relativistic kinetic theory: momentum-space moments",
+        "type": "standard relativistic kinetic-theory identity",
+        "scope": "Single-particle relativistic energy and momentum-flux moment definitions."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "fitted_or_regularized_calibrated_spectrum_inverse",
+    "execution_scope": "derived_relativistic_moments_within_a_measured_spectrum_inverse",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_full_em.fit_full_em_gyrotropic_population_shape",
+      "function_links": [
+        "tokamak_analysis.cts_full_em.fit_full_em_gyrotropic_population_shape"
+      ],
+      "formula_key": "cts_relativistic_gyrotropic_vdf_pressure_moments",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_full_em_gyrotropic_inverse.py::test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward"
+      ]
+    }
   }
 ]
