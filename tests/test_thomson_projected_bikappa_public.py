@@ -1,6 +1,7 @@
 """Physical and public-API regressions for the projected gyrotropic bi-Kappa EVDF."""
 import numpy as np
 import pytest
+from scipy.integrate import trapezoid
 
 from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 from tokamak_analysis.thomson_kinetic_models import project_gyrotropic_bi_kappa_electron_vdf
@@ -25,7 +26,7 @@ def test_public_projected_bikappa_recovers_directional_second_moment(mu):
     expected_temperature = 700.0 + (1500.0-700.0)*mu**2
     velocity = result["velocity_grid_m_s"]
     pdf = result["projected_vdf_s_m"]
-    mean = np.trapezoid(velocity*pdf, velocity)
+    mean = trapezoid(velocity*pdf, velocity)
     variance = np.trapezoid((velocity-mean)**2*pdf, velocity)
 
     assert result["model"] == "gyrotropic_finite_variance_bi_kappa_exact_projected_marginal"
