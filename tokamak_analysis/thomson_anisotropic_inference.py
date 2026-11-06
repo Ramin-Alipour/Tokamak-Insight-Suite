@@ -234,6 +234,40 @@ def _fit_covariance_blocks(jacobian, cost, n_observations, flow_indices,
         flow_covariance *= scale
     return singular_values, full_rank, covariance, flow_covariance, scale_method
 
+def _gyrotropic_velocity_covariance_tensors(temperature_parallel_eV, temperature_perpendicular_eV, magnetic_field_unit):
+    r"""Return the 3-D thermal velocity covariance tensor for each view.
+
+    For a gyrotropic distribution with finite second moments,
+    <delta_v delta_v> = (e/m_e) [T_perp I + (T_parallel-T_perp) b b^T].
+    The same second-moment tensor follows for the bi-Kappa closure because
+    its temperatures are defined from the actual variance (kappa > 3/2).
+    A separate tensor is returned per view because the supplied magnetic-field
+    direction may vary spatially; averaging those directions would be unphysical.
+    """
+    if temperature_parallel_eV is None or temperature_perpendicular_eV is None:
+        return None
+    t_parallel = float(temperature_parallel_eV)
+    t_perpendicular = float(temperature_perpendicular_eV)
+    if (not np.all(np.isfinite([t_parallel, t_perpendicular]))
+            or t_parallel <= 0.0 or t_perpendicular <= 0.0):
+        raise ValueError("reportable gyrotropic temperatures must be finite and positive")
+    field = _real_array(magnetic_field_unit, "magnetic_field_unit")
+    if field.ndim == 1:
+        field = field[None, :]
+    if field.ndim != 2 or field.shape[1] != 3:
+        raise ValueError("magnetic_field_unit must have shape (3,) or (n_view, 3)")
+    norms = np.linalg.norm(field, axis=1)
+    if np.any(norms <= 0.0) or not np.allclose(norms, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("magnetic_field_unit rows must be unit vectors")
+    identity = np.eye(3)
+    scale = _E / _ME
+    return np.asarray([
+        scale * (t_perpendicular * identity
+                 + (t_parallel - t_perpendicular) * np.outer(direction, direction))
+        for direction in field
+    ])
+
+
 def fit_gyrotropic_bi_maxwellian_thomson(
     wavelength_nm, measured_spectra, *, laser_wavelength_nm,
     scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
@@ -484,6 +518,11 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         },
         "electron_temperature_parallel_eV": tpar,
         "electron_temperature_perpendicular_eV": tperp,
+        "thermal_velocity_covariance_tensor_per_view_m2_s2": _gyrotropic_velocity_covariance_tensors(tpar, tperp, b),
+        "thermal_velocity_covariance_definition": "(e/m_e) * [T_perp I + (T_parallel-T_perp) b b^T]; temperatures are in eV",
+        "temperature_anisotropy_ratio_parallel_over_perpendicular": (
+            float(tpar / tperp) if tpar is not None and tperp is not None else None
+        ),
         "directional_temperature_eV": directional,
         "captured_spectral_probability": captured_probability,
         "spectral_window_coverage_warning": (
@@ -808,6 +847,17 @@ def fit_gyrotropic_bi_kappa_thomson(
         "temperature_definition": "T_q[eV]=m_e*Var(v_q)/e; theta_q^2=((2*kappa-3)/kappa)*(e*T_q/m_e)",
         "electron_temperature_parallel_eV": float(np.exp(fit.x[0])) if reportable else None,
         "electron_temperature_perpendicular_eV": float(np.exp(fit.x[1])) if reportable else None,
+        "thermal_velocity_covariance_tensor_per_view_m2_s2": _gyrotropic_velocity_covariance_tensors(
+            float(np.exp(fit.x[0])) if reportable else None,
+            float(np.exp(fit.x[1])) if reportable else None, b
+        ),
+        "thermal_velocity_covariance_definition": (
+            "(e/m_e) * [T_perp I + (T_parallel-T_perp) b b^T]; "
+            "bi-Kappa temperatures are variance-defined and require kappa > 3/2"
+        ),
+        "temperature_anisotropy_ratio_parallel_over_perpendicular": (
+            float(np.exp(fit.x[0] - fit.x[1])) if reportable else None
+        ),
         "kappa_index": float(kappa) if full_rank and not projected_tail_exceeds_tolerance else None,
         "kappa_finite_variance_domain": bool(kappa > 1.5),
         "directional_temperature_eV": directional,
