@@ -9727,5 +9727,51 @@
       ],
       "note": "Exposes a nonphysical tail hidden by RMS-beta screening. The projected probability is a rigorous lower bound on the corresponding 3-D superluminal probability; exceeding the configured tolerance requires a relativistic forward model."
     }
+  },
+  {
+    "name": "Projected superluminal-tail probability for anisotropic Maxwellian Thomson inference",
+    "equation": "P(|v_q|≥c)=Φ((-c-u_q)/σ_q)+1−Φ((c-u_q)/σ_q), σ_q=sqrt(e T_q/m_e)",
+    "inputs": "u_q [m s^-1], T_q [eV]",
+    "output": "dimensionless probability; lower bound on the 3-D superluminal probability",
+    "assumptions": "Exact one-dimensional Gaussian marginal of a gyrotropic bi-Maxwellian with non-relativistic elastic-Thomson kinematics; this diagnostic is not a relativistic correction.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference._maxwellian_projected_superluminal_tail_probability",
+      "formula_key": "thomson_bimaxwellian_projected_superluminal_tail_probability",
+      "input_specs": [
+        {
+          "name": "flow_m_s",
+          "unit": "m s^-1",
+          "description": "Fitted q-projected bulk flow u_q.",
+          "required": true
+        },
+        {
+          "name": "sigma_m_s",
+          "unit": "m s^-1",
+          "description": "Projected one-dimensional Maxwellian thermal standard deviation σ_q=sqrt(e T_q/m_e).",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "projected_superluminal_probability_lower_bound",
+          "unit": "1",
+          "description": "Exact Gaussian probability P(|v_q| ≥ c); a lower bound on the corresponding 3-D superluminal probability."
+        }
+      ],
+      "prerequisites": [
+        "Gyrotropic bi-Maxwellian projected marginal",
+        "Subluminal fitted flow"
+      ],
+      "uncertainty_model": "Deterministic diagnostic conditional on fitted flow and projected thermal standard deviation; fit-parameter uncertainty is not folded into this probability.",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_maxwellian_projected_superluminal_tail_uses_stable_gaussian_survival_probability",
+        "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures"
+      ],
+      "note": "Quantifies the superluminal tail that an RMS-beta threshold alone does not describe. A projected superluminal particle necessarily has superluminal 3-D speed."
+    }
   }
 ]
