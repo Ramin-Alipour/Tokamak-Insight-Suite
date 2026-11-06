@@ -123,6 +123,13 @@ def reconstruct_thomson_evdf(
     wavelength-space covariance components. Each is assumed independent of the
     measurement/background components and of the other supplied component; no
     unprovided cross-covariance is invented.
+
+    The conditional active-set covariance of the normalized EVDF is also
+    propagated by the delta method into the correlated covariance of its first
+    through fourth central physical moments, including q-parallel flow, the
+    directional equivalent temperature, skewness and excess kurtosis. This
+    covariance remains conditional on the selected grid, response, background
+    and regularization; it is not a posterior distribution.
     """
     wavelength = _finite_vector(wavelength_nm, "wavelength_nm")
     measured = _finite_vector(signal, "signal")
