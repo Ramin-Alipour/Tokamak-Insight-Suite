@@ -242,6 +242,12 @@ def collective_tabulated_electron_spectral_density(
             or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
             or np.any(np.diff(vgrid) <= 0) or np.any(fgrid < 0)):
         raise ValueError("electron velocity grid and tabulated VDF must be matching finite non-negative arrays")
+    if np.any(np.abs(vgrid) >= C):
+        raise ValueError(
+            "the non-relativistic tabulated-Landau CTS kernel requires the entire "
+            "projected electron velocity support to satisfy |v_parallel| < c; "
+            "use a relativistic kinetic response for superluminal-support grids"
+        )
     # The susceptibility kernel includes the distributional endpoint jumps
     # for the declared zero extension outside [vgrid[0], vgrid[-1]].  Do not
     # reject non-zero endpoint values here: doing so would silently make the
@@ -272,6 +278,11 @@ def collective_tabulated_electron_spectral_density(
                 or np.any(~np.isfinite(ion_grids)) or np.any(~np.isfinite(ion_distributions))
                 or np.any(ion_distributions < 0) or np.any(np.diff(ion_grids, axis=1) <= 0)):
             raise ValueError("tabulated ion grids and distributions must be matching finite arrays shaped (n_ion_species,n_velocity), with increasing grids and non-negative densities")
+        if np.any(np.abs(ion_grids) >= C):
+            raise ValueError(
+                "the non-relativistic tabulated-Landau CTS kernel requires every "
+                "projected ion velocity support to satisfy |v_parallel| < c"
+            )
         ion_areas = np.asarray([_trapezoid(row, grid) for row, grid in zip(ion_distributions, ion_grids)])
         if np.any(~np.isfinite(ion_areas)) or np.any(ion_areas <= 0):
             raise ValueError("each tabulated ion distribution must have positive finite integral")
