@@ -277,7 +277,10 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
     "collision-model, frequency-grid and experimental-normalization checks pass."
 )
 
-EXAMPLES = {\n    "kappa_dispersion_function": {\n        "zeta_real": 0.7, "zeta_imag": 0.35, "kappa": 4.0\n    },
+EXAMPLES = {
+    "kappa_dispersion_function": {
+        "zeta_real": 0.7, "zeta_imag": 0.35, "kappa": 4.0
+    },
     "thomson_projected_bi_kappa_evdf": {
         "velocity_grid_m_s": np.linspace(-1.2e8, 1.2e8, 2401).tolist(),
         "temperature_parallel_eV": 1500.0,
