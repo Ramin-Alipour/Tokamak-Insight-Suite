@@ -160,10 +160,14 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
             conditional[np.ix_(free,free)]=np.linalg.solve(reduced,gram[np.ix_(free,free)])@np.linalg.inv(reduced).T
         pcov=conditional
     measurement_profile_covariance = pcov.copy()
+    # Decide whether the nominal measured operator identifies every latent
+    # profile node before propagating coordinate or PSF uncertainty. Random
+    # perturbations must not turn a non-identifiable nominal inverse into a
+    # reportable physical profile.
     coordinate_profile_covariance = None
     coordinate_successful_draws = 0
     coordinate_warning = None
-    if coordinate_covariance is not None:
+    if coordinate_covariance is not None and data_identifiable:
         rng = np.random.default_rng(int(radius_mc_seed))
         eigenvalues, eigenvectors = np.linalg.eigh(coordinate_covariance)
         root = eigenvectors*np.sqrt(np.maximum(eigenvalues, 0.0))
@@ -200,7 +204,7 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
     mixing_profile_covariance = None
     mixing_successful_draws = 0
     mixing_warning = None
-    if mixing_covariance is not None:
+    if mixing_covariance is not None and data_identifiable:
         rng = np.random.default_rng(int(mixing_mc_seed))
         eigenvalues, eigenvectors = np.linalg.eigh(mixing_covariance)
         root = eigenvectors*np.sqrt(np.maximum(eigenvalues, 0.0))
@@ -235,9 +239,8 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
                 "Too few non-negative, full-rank PSF draws; no PSF covariance contribution was added."
             )
     # Regularization stabilizes a numerical candidate; it must never create
-    # measurement information in spatial null-space modes.  Determine primary
-    # identifiability from the whitened data operator alone, before the
-    # curvature penalty is added.
+    # measurement information in spatial null-space modes. The nominal data-only
+    # identifiability decision above is independent of the curvature penalty.
     column_norms = np.linalg.norm(a, axis=0)
     scaled_data_operator = a / np.maximum(column_norms, np.finfo(float).tiny)[None, :]
     data_singular_values = np.linalg.svd(scaled_data_operator, compute_uv=False)
