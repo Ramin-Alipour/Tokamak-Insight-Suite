@@ -70,6 +70,7 @@ MODEL_LABELS = {
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_susceptibility": "CTS — tabulated projected-EVDF susceptibility and analytic Landau phase derivative",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum (finite-eta or exact Plemelj limit)",
+    "cts_non_gyrotropic_gaussian_tensor_spectrum": "CTS — non-gyrotropic 3-D Gaussian temperature tensor projected exactly onto q and evaluated with the tabulated Landau response",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
@@ -113,6 +114,14 @@ MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
 MODEL_PHYSICS_NOTES = {
+    "cts_non_gyrotropic_gaussian_tensor_spectrum": (
+        "A general symmetric positive-definite 3-D electron temperature tensor is marginalized exactly along "
+        "q_hat=(n_scattered-n_incident)/|...|. The solver uses T_q=q_hat.T @ T_e @ q_hat and "
+        "sigma_q^2=e*T_q/m_e, then evaluates the multispecies electrostatic Landau CTS response. "
+        "The thermal marginal is zero-centred and q_hat dot electron_velocity_m_s supplies the Doppler shift once. "
+        "One view does not identify all six tensor components; use independent scattering geometries for tensor inference. "
+        "The kernel is non-relativistic and rejects insufficient velocity-grid tail coverage."
+    ),
     "cts_collective_kappa_spectrum": (
         "Electron populations may use distribution='bi_kappa' with temperature_parallel_eV, "
         "temperature_perpendicular_eV, kappa and magnetic_field_unit. The electrostatic "
@@ -317,6 +326,20 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "cts_non_gyrotropic_gaussian_tensor_spectrum": {
+        "wavelength_nm": np.linspace(1060.0, 1068.0, 41).tolist(),
+        "laser_wavelength_nm": 1064.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "electron_density_m3": 1.0e18,
+        "electron_temperature_tensor_eV": [[100.0, 20.0, 0.0], [20.0, 180.0, 10.0], [0.0, 10.0, 250.0]],
+        "electron_velocity_m_s": [1.0e5, -0.5e5, 0.2e5],
+        "electron_velocity_grid_m_s": np.linspace(-4.0e7, 4.0e7, 2401).tolist(),
+        "ion_species": [{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        "ion_fractions": [1.0], "ion_temperature_eV": [10.0],
+        "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "incident_direction": [1.0, 0.0, 0.0], "scattered_direction": [0.0, 1.0, 0.0],
+        "pole_imaginary_part_m_s": 100.0, "minimum_velocity_grid_probability": 0.999
+    },
     "periodic_3d_full_wave": {
         "omega_rad_s": 31415926535.89793,
         "x_m": [0.0, 0.01, 0.02],

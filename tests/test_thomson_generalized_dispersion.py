@@ -366,3 +366,59 @@ def test_projected_evdf_moment_formula_registry_is_synchronized_and_executable()
     assert contract["implementation_link_status"] == "mapped"
     assert contract["function_link"] == "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
     assert "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api" in contract["test_links"]
+
+
+def test_non_gyrotropic_gaussian_tensor_cts_uses_exact_q_projection_and_public_api():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    tensor = np.array([[100.0, 20.0, 0.0], [20.0, 180.0, 10.0], [0.0, 10.0, 250.0]])
+    result = run_advanced_thomson_physics(
+        "cts_non_gyrotropic_gaussian_tensor_spectrum",
+        wavelength, 1064.0, np.pi/2.0,
+        electron_density_m3=1.0e18,
+        electron_temperature_tensor_eV=tensor,
+        electron_velocity_m_s=[1.0e5, -0.5e5, 0.2e5],
+        electron_velocity_grid_m_s=np.linspace(-4.0e7, 4.0e7, 2401),
+        ion_species=[{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        ion_fractions=[1.0], ion_temperature_eV=[10.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+    qhat = np.array([-1.0, 1.0, 0.0])/np.sqrt(2.0)
+    expected = float(qhat @ tensor @ qhat)
+    assert np.isclose(result["projected_directional_temperature_eV"], expected, rtol=1e-12)
+    assert np.isclose(result["electron_projected_moments"]["directional_second_moment_temperature_eV"], expected, rtol=2e-3)
+    assert result["electron_distribution_model"] == "non_gyrotropic_3D_Gaussian_temperature_tensor_exact_q_marginal"
+    assert result["single_view_identifiability"]["not_identified"] == ["six independent temperature-tensor components"]
+    assert result["spectral_density_per_nm"].shape == wavelength.shape
+    assert np.all(np.isfinite(result["spectral_density_per_nm"]))
+    assert np.all(result["spectral_density_per_nm"] >= 0.0)
+
+
+def test_non_gyrotropic_gaussian_tensor_rejects_non_positive_tensor_and_inadequate_tails():
+    import pytest
+    from tokamak_analysis.cts_full_physics import collective_non_gyrotropic_gaussian_electron_spectrum
+
+    common = dict(
+        wavelength_nm=np.linspace(1060.0, 1068.0, 41),
+        laser_wavelength_nm=1064.0, scattering_angle_rad=np.pi/2,
+        electron_density_m3=1.0e18,
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        electron_velocity_grid_m_s=np.linspace(-1.0e6, 1.0e6, 101),
+        ion_species=[{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        ion_fractions=[1.0], ion_temperature_eV=[10.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+    )
+    with pytest.raises(ValueError, match="positive definite"):
+        collective_non_gyrotropic_gaussian_electron_spectrum(
+            **common, electron_temperature_tensor_eV=np.diag([100.0, 0.0, 100.0])
+        )
+    with pytest.raises(ValueError, match="captures only"):
+        collective_non_gyrotropic_gaussian_electron_spectrum(
+            **common, electron_temperature_tensor_eV=np.diag([100.0, 100.0, 100.0])
+        )

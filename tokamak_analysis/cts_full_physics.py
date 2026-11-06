@@ -567,6 +567,102 @@ def analyze_cts_microwave_background(
 
 
 
+def collective_non_gyrotropic_gaussian_electron_spectrum(
+    wavelength_nm, laser_wavelength_nm, scattering_angle_rad, *,
+    electron_density_m3, electron_temperature_tensor_eV,
+    electron_velocity_m_s, electron_velocity_grid_m_s,
+    ion_species, ion_fractions, ion_temperature_eV=None,
+    ion_velocity_m_s, incident_direction, scattered_direction,
+    minimum_velocity_grid_probability=0.999,
+    **response_options,
+):
+    """Electrostatic CTS spectrum for a general 3-D Gaussian electron tensor.
+
+    The 3-D Gaussian is marginalized exactly along q_hat=(n_s-n_i)/|n_s-n_i|.
+    Its projected variance is sigma_q^2=(e/m_e) q_hat.T T_e q_hat and its
+    projected mean is q_hat.u_e. The tabulated-VDF Landau solver evaluates
+    the kinetic susceptibility, including finite-support endpoint terms.
+    A single view measures T_q, not all six independent tensor components.
+    """
+    tensor = np.asarray(electron_temperature_tensor_eV, dtype=float)
+    flow = np.asarray(electron_velocity_m_s, dtype=float)
+    velocity = np.asarray(electron_velocity_grid_m_s, dtype=float)
+    incident = np.asarray(incident_direction, dtype=float)
+    scattered = np.asarray(scattered_direction, dtype=float)
+    angle = float(scattering_angle_rad)
+    if tensor.shape != (3, 3) or np.any(~np.isfinite(tensor)):
+        raise ValueError("electron_temperature_tensor_eV must be a finite 3x3 tensor")
+    scale = max(float(np.linalg.norm(tensor, ord=2)), 1.0)
+    if np.linalg.norm(tensor-tensor.T, ord=2) > 1e-10*scale:
+        raise ValueError("electron_temperature_tensor_eV must be symmetric")
+    tensor = 0.5*(tensor+tensor.T)
+    eigenvalues = np.linalg.eigvalsh(tensor)
+    if eigenvalues[0] <= 0.0:
+        raise ValueError("electron_temperature_tensor_eV must be positive definite")
+    if flow.shape != (3,) or np.any(~np.isfinite(flow)) or np.linalg.norm(flow) >= 299792458.0:
+        raise ValueError("electron_velocity_m_s must be a finite subluminal 3-vector")
+    if incident.shape != (3,) or scattered.shape != (3,) or np.any(~np.isfinite(incident)) or np.any(~np.isfinite(scattered)):
+        raise ValueError("incident_direction and scattered_direction must be finite 3-vectors")
+    if np.linalg.norm(incident) == 0.0 or np.linalg.norm(scattered) == 0.0:
+        raise ValueError("incident and scattered directions must be non-zero")
+    incident = incident/np.linalg.norm(incident)
+    scattered = scattered/np.linalg.norm(scattered)
+    measured_angle = float(np.arccos(np.clip(incident @ scattered, -1.0, 1.0)))
+    if not np.isfinite(angle) or angle <= 0.0 or angle > np.pi or not np.isclose(measured_angle, angle, atol=1e-5, rtol=0.0):
+        raise ValueError("scattering_angle_rad must agree with the supplied unit propagation directions")
+    qhat = scattered-incident
+    qhat /= np.linalg.norm(qhat)
+    temperature_q = float(qhat @ tensor @ qhat)
+    sigma_q = float(np.sqrt(1.602176634e-19*temperature_q/9.1093837015e-31))
+    if velocity.ndim != 1 or velocity.size < 9 or np.any(~np.isfinite(velocity)) or np.any(np.diff(velocity) <= 0):
+        raise ValueError("electron_velocity_grid_m_s must be a finite strictly increasing 1-D grid with >=9 points")
+    if np.any(np.abs(velocity) >= 299792458.0):
+        raise ValueError("the non-relativistic Gaussian Landau kernel requires |v_q|<c throughout the supplied grid")
+    # Keep the thermal marginal centred at zero: the public Landau forward
+    # model applies q.u exactly once through its resonant phase velocity.
+    projected_pdf = np.exp(-0.5*(velocity/sigma_q)**2)/(np.sqrt(2.0*np.pi)*sigma_q)
+    captured = float(np.trapz(projected_pdf, velocity))
+    minimum = float(minimum_velocity_grid_probability)
+    if not np.isfinite(minimum) or not 0.0 < minimum < 1.0:
+        raise ValueError("minimum_velocity_grid_probability must lie strictly between zero and one")
+    if not np.isfinite(captured) or captured < minimum:
+        raise ValueError(
+            f"electron_velocity_grid_m_s captures only {captured:.8g} of the projected Gaussian; "
+            f"expand/refine the grid to reach {minimum:.8g} before using the truncated Landau response"
+        )
+    result = collective_tabulated_electron_spectral_density(
+        wavelength_nm, laser_wavelength_nm, scattering_angle_rad,
+        electron_density_m3=electron_density_m3,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=projected_pdf,
+        ion_species=ion_species, ion_fractions=ion_fractions,
+        ion_temperature_eV=ion_temperature_eV,
+        electron_velocity_m_s=flow, ion_velocity_m_s=ion_velocity_m_s,
+        incident_direction=incident, scattered_direction=scattered,
+        **response_options,
+    )
+    result.update({
+        "electron_distribution_model": "non_gyrotropic_3D_Gaussian_temperature_tensor_exact_q_marginal",
+        "electron_temperature_tensor_eV": tensor.copy(),
+        "electron_temperature_tensor_eigenvalues_eV": eigenvalues.copy(),
+        "scattering_vector_unit": qhat.copy(),
+        "projected_directional_temperature_eV": temperature_q,
+        "projected_thermal_standard_deviation_m_s": sigma_q,
+        "projected_flow_velocity_m_s": float(qhat @ flow),
+        "projected_velocity_grid_probability": captured,
+        "single_view_identifiability": {
+            "identified": ["q_projected_mean_velocity", "q_projected_second_moment_temperature"],
+            "not_identified": ["six independent temperature-tensor components"],
+            "reason": "one scattering vector samples q_hat.T @ T_e @ q_hat; tensor reconstruction requires independent geometries",
+        },
+        "projection_relation": "T_q = q_hat.T @ T_e @ q_hat; sigma_q^2 = e*T_q/m_e; f_q(v) = exp(-v^2/(2*sigma_q^2))/sqrt(2*pi*sigma_q^2)",
+        "flow_convention": "thermal marginal is zero-centred; q_hat dot electron_velocity_m_s is applied once as the Doppler shift by the Landau forward model",
+        "relativistic_scope": "non-relativistic Gaussian marginal; use the relativistic projected-EVDF route when thermal or drift beta is not small",
+    })
+    return result
+
+
+
 # Canonical list shared with the advanced Dashboard selector. Keep this set in
 # lockstep with the explicit solver dispatch below; it also drives complete,
 # actionable errors for unsupported model names.
@@ -581,6 +677,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_collective_kappa_inference",
     "cts_tabulated_evdf_susceptibility",
     "cts_tabulated_evdf_landau",
+    "cts_non_gyrotropic_gaussian_tensor_spectrum",
     "cts_multi_ion_flow_inference",
     "cts_electrostatic_measured_spectrum_inference",
     "thomson_projected_evdf",
@@ -629,6 +726,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - cts_multi_ion_flow_inference: conditional fit of independent projected ion
         species flows from a calibrated electrostatic CTS spectrum with fixed
         plasma/composition inputs; the species-flow Jacobian rank gates reporting.
+      - cts_non_gyrotropic_gaussian_tensor_spectrum: exact q-marginal of a general 3-D Gaussian temperature tensor, passed to the tabulated Landau CTS forward solver; a single view identifies only the q-projected temperature.
       - cts_tabulated_evdf_landau: electrostatic CTS dynamic structure spectrum using
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
@@ -733,6 +831,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = generalized_electron_susceptibility
     elif model == "cts_tabulated_evdf_landau":
         solver = collective_tabulated_electron_spectral_density
+    elif model == "cts_non_gyrotropic_gaussian_tensor_spectrum":
+        solver = collective_non_gyrotropic_gaussian_electron_spectrum
     elif model == "cts_electrostatic_measured_spectrum_inference":
         # Dashboard/API contract names the calibrated observation
         # measured_spectrum; the electrostatic fitter's internal keyword is
@@ -900,6 +1000,7 @@ __all__ = [
     "kappa_dispersion_function",
     "maxwellian_electron_susceptibility",
     "collective_tabulated_electron_spectral_density",
+    "collective_non_gyrotropic_gaussian_electron_spectrum",
     "quantum_fdt_dynamic_structure_factor",
     "quantum_unsymmetrized_dynamic_structure_factor",
     "analyze_cts_microwave_background",
