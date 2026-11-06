@@ -9156,5 +9156,182 @@
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Optical Thomson / Collective Thomson — generalized Kappa kinetic kernel"
     }
+  },
+  {
+    "name": "Joint wavelength-resolved spatial Thomson physical-profile inversion",
+    "equation": "μ_{cℓ}(θ)=Σ_j [M P]_{cj} A_j ∫_{Δλℓ} R_c(λ,λ′) S_phys(λ′;T_e,j,u_q,j,model) dλ′/Δλℓ + b_{cℓ}; θ̂=argmin_θ[(y−μ)^T C^{-1}(y−μ)+λ_reg||D²(log T_e,u_q/10^6,log A)||²]",
+    "inputs": "Calibrated measured spectra y[channel,wavelength], wavelength bin centres, radial nodes, measured spatial mixing matrix M, laser wavelength, scattering angle, optional measured instrument-response matrices R, finite-volume Gaussian or measured PSF operator P, channel-major measurement covariance, optional model-discrepancy covariance, selected Maxwellian/Kappa/relativistic Maxwell-Juttner forward model, optional incident polarization and measured laser spectrum.",
+    "output": "Joint radial electron-temperature profile, scattering-vector flow projection profile and relative spectral-amplitude profile; fitted spectra and residuals; parameter covariance and covariance decomposition; data-only rank/conditioning and identifiability; PSF-calibration covariance; optional regularization-strength sensitivity.",
+    "assumptions": "Prepared/calibrated channel-by-wavelength spectra; supplied fixed spatial mixing, PSF and instrument-response operators; one common scattering-vector projection across the fitted profile; detector-space backgrounds fitted jointly as nuisance basis coefficients; finite-volume wavelength-bin integration and non-negative plasma amplitude. Selected physical model is isotropic Maxwellian, isotropic finite-variance Kappa, or relativistic Maxwell-Juttner; Compton recoil is available only on the relativistic branch with incident polarization.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "formula_key": "thomson_joint_wavelength_resolved_spatial_profile_inverse",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing finite-volume bin centres",
+          "required": true
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral intensity; channel x wavelength",
+          "required": true
+        },
+        {
+          "name": "radius_m",
+          "unit": "m; strictly increasing radial nodes",
+          "required": true
+        },
+        {
+          "name": "spatial_mixing_matrix",
+          "unit": "dimensionless; channel x radial-node operator",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; 0 < angle < pi",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "channel-specific wavelength-response operator",
+          "required": false
+        },
+        {
+          "name": "spatial_psf_matrix or spatial_psf_sigma_m",
+          "unit": "dimensionless finite-volume PSF matrix or Gaussian width [m]",
+          "required": false
+        },
+        {
+          "name": "joint_spectral_covariance",
+          "unit": "(channel x wavelength)^2; channel-major ordering",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "(channel x wavelength)^2",
+          "required": false
+        },
+        {
+          "name": "physical_model",
+          "unit": "maxwellian, kappa, or relativistic_maxwell_juttner",
+          "required": false
+        },
+        {
+          "name": "kappa_index and fit_kappa_index",
+          "unit": "dimensionless; κ > 3/2",
+          "required": false
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "non-zero 3-vector; required for relativistic Maxwell-Juttner branch",
+          "required": false
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean; relativistic Maxwell-Juttner branch only",
+          "required": false
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "non-negative scalar",
+          "required": false
+        },
+        {
+          "name": "regularization_sensitivity_strengths",
+          "unit": "strictly increasing positive candidate strengths",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_profile_eV",
+          "unit": "eV; one per radial node"
+        },
+        {
+          "name": "electron_velocity_projection_profile_m_s",
+          "unit": "m s^-1; one per radial node"
+        },
+        {
+          "name": "relative_spectral_amplitude_profile",
+          "unit": "relative fitted amplitude; one per radial node"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "calibrated spectral-intensity units; channel x wavelength"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "joint fitted-parameter covariance"
+        },
+        {
+          "name": "measurement_data_parameter_covariance",
+          "unit": "joint fitted-parameter covariance contribution"
+        },
+        {
+          "name": "psf_calibration_parameter_covariance",
+          "unit": "joint fitted-parameter covariance contribution"
+        },
+        {
+          "name": "data_only_jacobian_rank",
+          "unit": "integer"
+        },
+        {
+          "name": "data_only_scaled_jacobian_condition_number",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "identifiability",
+          "unit": "primary, conditional and non-identifiable parameter classification"
+        },
+        {
+          "name": "regularization_sensitivity",
+          "unit": "optional profile covariance across tested regularization strengths"
+        }
+      ],
+      "prerequisites": [
+        "Measured spectra, wavelength grid and radial nodes must be finite and dimensionally consistent.",
+        "The spatial mixing operator composed with the PSF must have adequate data-only rank and conditioning.",
+        "A full channel-major spectral covariance or pointwise uncertainty may be supplied; measurement and model-discrepancy covariance are combined only under the declared independence assumption.",
+        "The incident polarization is mandatory for relativistic Maxwell-Juttner inference; Compton recoil is restricted to that branch.",
+        "A single scattering direction identifies only the q-parallel flow projection, not the full three-dimensional flow vector."
+      ],
+      "uncertainty_model": "Joint GLS covariance from the whitened measured-spectrum Jacobian, retaining cross-covariance among radial temperature, projected flow, amplitude and detector-background nuisance parameters. Optional model-discrepancy covariance is added once to measurement covariance. Gaussian PSF-width calibration uncertainty is propagated by refit sensitivity. Regularization-choice spread is reported separately from measurement uncertainty. Identifiability is assessed from the data-only Jacobian, excluding regularization rows.",
+      "limitations": [
+        "The function does not calibrate raw detector data, estimate an arbitrary PSF, or infer absolute electron density from relative spectral amplitude.",
+        "Spatial modes in the null space of the supplied mixing/PSF operator and sub-resolution structure are non-identifiable.",
+        "A single scattering geometry cannot recover perpendicular flow components or an unrestricted 3-D EVDF.",
+        "The selected spatial penalty is nonuniform-radius curvature regularization; it does not impose user-specified Dirichlet edge values or guarantee preservation of discontinuous physical fronts.",
+        "The fitted profile is conditional on the supplied fixed spatial and spectral response operators."
+      ],
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_recovers_synthetic_te_and_flow_profiles",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_accepts_full_channel_major_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_regularization_does_not_manufacture_data_identifiability",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_adds_model_discrepancy_covariance_once_to_measurement_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_reports_regularization_choice_sensitivity_separately",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_composes_measured_mixing_with_gaussian_psf",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_propagates_gaussian_psf_calibration_uncertainty"
+      ],
+      "note": "This is the public joint measured-spectrum spatial inverse, not independent channel fits followed by interpolation. It composes measured spatial mixing with the supplied PSF, fits physical spectra at every radial node, and jointly fits detector-space nuisance backgrounds. The public dispatcher and advanced Thomson Dashboard expose this solver. Software verification on synthetic cases is not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "function_links": [
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
+      ],
+      "execution_scope": "measured_calibrated_spectra_to_joint_spatial_physical_inference",
+      "input_data_level": "calibrated_measured_spectra_and_fixed_response_operators",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Spatial profile reconstruction"
+    }
   }
 ]
