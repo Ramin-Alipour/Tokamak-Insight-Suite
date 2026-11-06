@@ -171,6 +171,19 @@ def test_dashboard_source_renders_projected_evdf_profiles_and_uncertainty():
     assert "regularization_sensitivity" in source
 
 
+def test_spectral_distribution_subanalysis_executes_same_spectrum_projected_evdf():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "'analysis_inputs':{" in source
+    assert "'wavelength_nm':wavelengths.copy()" in source
+    assert "'spectra':spectra.copy()" in source
+    assert "Reconstruct projected EVDF from this measured spectrum" in source
+    assert "analyze_thomson_spectral_distribution(" in source
+    assert "_response_for_channel(" in source
+    assert "background_signal=fitted_background" in source
+    assert "projected_evdf_options=evdf_options" in source
+    assert "one-dimensional" in source or "one-dimensional q-parallel" in source
+
+
 def test_dashboard_exposes_conditional_path_integrated_density_inputs():
     frame = pd.DataFrame({
         "channel_id": ["ch0"] * 9,
