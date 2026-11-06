@@ -261,6 +261,9 @@ def test_gaussian_psf_calibration_uncertainty_is_wired_through_dashboard_and_wor
     joint_source = (root / "tokamak_analysis" / "thomson_joint_spatial_spectral.py").read_text(encoding="utf-8")
     assert "ts_infer_spatial_psf_sigma_uncertainty" in dashboard
     assert "kwargs['spatial_psf_sigma_uncertainty_m']" in dashboard
+    assert "'spatial_psf_mode'" in dashboard
+    assert "'spatial_psf_sigma'" in dashboard
+    assert "'spatial_psf_matrix_upload'" in dashboard
     assert "'spatial_psf_sigma_uncertainty_m'" in workflow_source
     assert "spatial_psf_sigma_uncertainty_m=spatial_psf_sigma_uncertainty_m" in joint_source or (
         '"spatial_psf_sigma_uncertainty_m": kwargs.get("spatial_psf_sigma_uncertainty_m")'
@@ -277,6 +280,9 @@ def test_joint_thomson_profile_mode_exposes_data_only_identifiability_contract()
             "incident_polarization", "include_compton_recoil",
             "maximum_recoil_correction_fraction"} <= inputs
     assert "spatial_psf_sigma_uncertainty_m" in inputs
+    outputs = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    assert {"measurement_data_parameter_covariance", "psf_calibration_parameter_covariance",
+            "psf_sigma_parameter_sensitivity"} <= outputs
     assert "relativistic_maxwell_juttner" in contract["algorithm"]
     assert "Klein-Nishina" in contract["algorithm"]
     outputs = {item["name"] for item in contract["output_specs"]}
