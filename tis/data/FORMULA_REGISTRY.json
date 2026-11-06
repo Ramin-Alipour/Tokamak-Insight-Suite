@@ -9374,6 +9374,11 @@
           "name": "systematic_covariance_contribution",
           "unit": "structured metadata",
           "description": "Whether systematic covariance was supplied, its dimensions and trace, and its inclusion in the effective GLS weighting."
+        },
+        {
+          "name": "systematic_covariance_provenance",
+          "unit": "structured metadata",
+          "description": "Supply flag, dimensions, trace, independence assumption and inclusion in the effective GLS metric."
         }
       ],
       "prerequisites": [
@@ -9382,7 +9387,9 @@
         "The incident polarization is mandatory for relativistic Maxwell-Juttner inference; Compton recoil is restricted to that branch.",
         "A single scattering direction identifies only the q-parallel flow projection, not the full three-dimensional flow vector.",
         "Measurement, model-discrepancy and systematic covariance components are assumed mutually independent when summed; correlated sources require externally supplied cross-covariance blocks.",
-        "Systematic covariance is a full channel-major positive-semidefinite matrix and is propagated through the data-only GLS covariance, including regularization-strength refits."
+        "Systematic covariance is a full channel-major positive-semidefinite matrix and is propagated through the data-only GLS covariance, including regularization-strength refits.",
+        "Measurement, model-discrepancy and systematic covariance components are summed only under an explicit mutual-independence assumption; correlated sources require externally supplied cross-covariance blocks.",
+        "Systematic covariance is full channel-major and positive semidefinite, and is passed through regularization-strength sensitivity refits."
       ],
       "uncertainty_model": "Joint GLS covariance from the whitened measured-spectrum Jacobian, retaining cross-covariance among radial temperature, projected flow, amplitude and detector-background nuisance parameters. Optional model-discrepancy covariance is added once to measurement covariance. Gaussian PSF-width calibration uncertainty is propagated by refit sensitivity. Regularization-choice spread is reported separately from measurement uncertainty. Identifiability is assessed from the data-only Jacobian, excluding regularization rows.",
       "limitations": [
@@ -9416,6 +9423,6 @@
       "subanalysis": "Spatial profile reconstruction"
     },
     "uncertainty_model": "Joint GLS covariance from the whitened measured-spectrum Jacobian, retaining cross-covariance among radial temperature, projected flow, amplitude and detector-background nuisance parameters. Optional model-discrepancy and systematic covariance components are each added exactly once to measurement covariance under an explicit mutual-independence assumption; correlated components require cross-covariance blocks. Gaussian PSF-width calibration uncertainty is propagated by refit sensitivity. Regularization-choice spread is reported separately from measurement uncertainty. Identifiability is assessed from the data-only Jacobian, excluding regularization rows.",
-    "note": "undefined Independent systematic covariance is accepted as a separate full channel-major component and is propagated through the same GLS weighting and regularization sensitivity refits; no silent cross-covariance assumption is made beyond the explicit independence declaration."
+    "note": "undefined Independent systematic covariance is accepted as a separate full channel-major component and is propagated through the same GLS weighting and regularization sensitivity refits; no silent cross-covariance assumption is made beyond the explicit independence declaration. Systematic calibration covariance is accepted as a separate channel-major component and propagated through GLS weighting and regularization sensitivity refits. Covariance components are assumed mutually independent unless cross-covariance blocks are explicitly supplied."
   }
 ]
