@@ -113,7 +113,7 @@ MODEL_PHYSICS_NOTES = {
         "information. Supply calibrated kernels and uncertainty for every view."
     ),
     "bi_kappa_electrostatic_susceptibility": (
-        "Gyrotropic 3-D bi-Kappa distribution projected exactly onto the supplied scattering vector. "
+        "Gyrotropic 3-D bi-Kappa distribution projected exactly onto the supplied scattering vector, including electron bulk drift through v_phi,rest = v_phi,lab - u_e dot q_hat. "
         "The directional second-moment temperature is T_q = T_perp + (T_parallel-T_perp)*(b_hat dot q_hat)^2; "
         "the exact full-tail 1-D Kappa Landau integral and analytic phase derivative are then evaluated. "
         "One view identifies T_q only, not T_parallel and T_perpendicular separately. "
@@ -231,6 +231,7 @@ EXAMPLES = {
     "bi_kappa_electrostatic_susceptibility": {
         "v": np.linspace(-2.0e8, 2.0e8, 1601).tolist(),
         "phase_velocity_m_s": 1.0e6,
+        "electron_flow_projection_m_s": 2.0e5,
         "electron_density_m3": 2.0e19,
         "electron_temperature_parallel_eV": 1500.0,
         "electron_temperature_perpendicular_eV": 700.0,
