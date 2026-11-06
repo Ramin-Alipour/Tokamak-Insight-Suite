@@ -863,3 +863,60 @@ def test_edge_preserving_spatial_regularization_is_available_through_public_disp
     assert out["public_physics_entrypoint"] == "thomson_joint_spatial_spectra"
     assert out["regularization"]["edge_preserving"] is True
 
+def test_joint_inverse_propagates_systematic_covariance_into_profile_uncertainty():
+    x, y, r, h, *_ = _synthetic_case()
+    measurement = np.eye(y.size) * 1.0e-4
+    systematic = np.eye(y.size) * 3.0e-4
+    base = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=measurement,
+    )
+    combined = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=measurement,
+        systematic_covariance=systematic,
+    )
+    provenance = combined["spectral_covariance_provenance"]
+    assert combined["noise_model"] == "measurement_plus_systematic_channel_major_covariance"
+    assert provenance["systematic_covariance_supplied"] is True
+    assert provenance["systematic_covariance_shape"] == [y.size, y.size]
+    assert provenance["systematic_covariance_trace"] == pytest.approx(
+        float(np.trace(systematic))
+    )
+    assert provenance["cross_covariance_assumed_zero"] is True
+    np.testing.assert_allclose(
+        combined["parameter_covariance"],
+        4.0 * base["parameter_covariance"],
+        rtol=3.0e-3, atol=1.0e-12,
+    )
+
+
+def test_joint_inverse_rejects_non_psd_systematic_covariance():
+    x, y, r, h, *_ = _synthetic_case()
+    invalid = np.eye(y.size)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="systematic_covariance must be positive semidefinite"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+            signal_uncertainty=np.full_like(y, 0.01),
+            systematic_covariance=invalid,
+        )
+
+
+def test_joint_inverse_carries_systematic_covariance_through_regularization_sensitivity():
+    x, y, r, h, *_ = _synthetic_case()
+    systematic = np.eye(y.size) * 2.0e-5
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0, instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        systematic_covariance=systematic,
+        regularization_strength=1.0e-5,
+        regularization_sensitivity_strengths=[1.0e-7, 1.0e-3],
+    )
+    assert out["spectral_covariance_provenance"]["systematic_covariance_supplied"] is True
+    assert len(out["regularization_sensitivity"]["candidate_diagnostics"]) == 2
+
