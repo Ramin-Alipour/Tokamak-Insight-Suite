@@ -5776,10 +5776,10 @@
   },
   {
     "name": "Three-dimensional electron flow from multi-view Thomson projections",
-    "equation": "v_q=Q v_e; C_eff=C_v+J_Q C_Q J_Q^T+C_vQ J_Q^T+J_Q C_vQ^T; v_hat=(Q^T C_eff^-1 Q)^-1 Q^T C_eff^-1 v_q; report only if rank(L^-1 Q)=3 and cond(L^-1 Q)<=kappa_geom",
+    "equation": "v_q=Q v_e; C_eff=C_v+J_Q C_Q J_Q^T+C_vQ J_Q^T+J_Q C_vQ^T; v_hat=(Q^T C_eff^-1 Q)^-1 Q^T C_eff^-1 v_q; report only if rank(L^-1 Q)=3, cond(L^-1 Q)<=kappa_geom and, for n_views>3, gammaincc((n_views-3)/2, chi2/2)>=p_min",
     "inputs": "Measured directional flow projections [m s^-1], unit scattering-vector directions [1], full positive-definite projection covariance [m² s^-2]; optional full Cartesian scattering-vector covariance C_Q [dimensionless²; 3N×3N]",
-    "output": "Three-component electron flow vector [m s^-1] and 3×3 GLS covariance; withheld for rank-deficient or ill-conditioned geometry (default condition ceiling 1e3) or superluminal speed",
-    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional full direction covariance and projection/geometry cross-covariance projected onto each direction's tangent plane; covariance-whitened design must meet the declared condition-number ceiling.",
+    "output": "Three-component electron flow vector [m s^-1] and 3×3 GLS covariance; withheld for rank-deficient/ill-conditioned geometry, rejected common-flow residual (when overdetermined), or superluminal speed",
+    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional full direction covariance and projection/geometry cross-covariance projected onto each direction's tangent plane; covariance-whitened design must meet the declared condition-number ceiling; more than three views are tested for consistency with the shared-flow hypothesis.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5821,6 +5821,13 @@
           "description": "3-D flow is withheld when the weighted design is rank deficient or exceeds this ceiling; default 1e3.",
           "required": false,
           "default": 1000
+        },
+        {
+          "name": "minimum_projection_consistency_p_value",
+          "unit": "dimensionless; lower-tail rejection threshold for chi-square survival probability",
+          "description": "For overdetermined view sets (n_views > 3), withhold the common-flow vector when the chi-square survival probability falls below this threshold; default 1e-3. Exactly three views cannot test model consistency.",
+          "required": false,
+          "default": 0.001
         }
       ],
       "output_specs": [
@@ -5863,6 +5870,18 @@
         {
           "name": "geometry_condition_status",
           "unit": "well_conditioned, ill_conditioned_vector_withheld, or rank_deficient"
+        },
+        {
+          "name": "cross_view_consistency_p_value",
+          "unit": "dimensionless; chi-square survival probability for n_views > 3; null for exactly three views"
+        },
+        {
+          "name": "cross_view_consistency_status",
+          "unit": "consistent_with_common_flow, common_flow_model_rejected, or not_testable_exactly_three_views"
+        },
+        {
+          "name": "model_adequacy_reason",
+          "unit": "text; reason for withholding a vector when common-flow model is rejected"
         }
       ],
       "prerequisites": [
@@ -5877,9 +5896,12 @@
         "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_inversion_propagates_tangent_plane_geometry_covariance",
         "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance",
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_ill_conditioned_full_rank_geometry",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit"
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_when_views_reject_common_flow",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_marks_exactly_three_views_as_not_testable",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_consistency_threshold"
       ],
-      "note": "A vector is reported only when the covariance-whitened scattering design L^-1 Q has rank three and condition number no greater than the configured ceiling (default 1e3), and the inferred speed is subluminal. A full-rank but ill-conditioned geometry is explicitly withheld. Optional direction covariance and projection/geometry cross-covariance are propagated by iterative tangent-plane GLS. A single scattering view identifies only one projection."
+      "note": "A vector is reported only when the covariance-whitened scattering design L^-1 Q has rank three and condition number no greater than the configured ceiling (default 1e3), the inferred speed is subluminal, and (for more than three views) the common-flow chi-square survival probability is no smaller than the configured threshold (default 1e-3). Exactly three views cannot test common-flow residual consistency. Optional direction covariance and projection/geometry cross-covariance are propagated by iterative tangent-plane GLS."
     },
     "references": [
       {
@@ -5919,7 +5941,7 @@
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
       ]
     },
-    "uncertainty_model": "GLS with supplied full projection covariance; optional full scattering-vector covariance and projection/geometry cross-covariance are propagated by first-order iterative errors-in-variables GLS using J_Q,i=v_e^T(I-q_i q_i^T). Direction perturbations are restricted to the unit-vector tangent plane. The weighted-design condition number is reported and gates vector/covariance publication.",
+    "uncertainty_model": "GLS with supplied full projection covariance; optional full scattering-vector covariance and projection/geometry cross-covariance are propagated by first-order iterative errors-in-variables GLS. SVD is used for the whitened design solve and covariance. The condition number gates vector reporting; for overdetermined views, the chi-square survival probability tests the shared-flow model and gates reporting when inconsistent.",
     "prerequisites": [
       "At least three linearly independent scattering-vector directions with covariance-whitened condition number no greater than the configured ceiling.",
       "All views must sample a common flow vector or a physically justified shared-volume model.",
