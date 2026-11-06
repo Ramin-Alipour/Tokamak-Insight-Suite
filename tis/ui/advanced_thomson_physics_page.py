@@ -66,7 +66,7 @@ MODEL_LABELS = {
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
     "thomson_projected_bi_kappa_evdf": "Optical Thomson — exact projected marginal of a gyrotropic 3-D bi-Kappa EVDF",
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
-    "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
+    "cts_collective_kappa_spectrum": "CTS — collective kinetic Maxwellian/Kappa/gyrotropic bi-Kappa electron and ion mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_susceptibility": "CTS — tabulated projected-EVDF susceptibility and analytic Landau phase derivative",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum (finite-eta or exact Plemelj limit)",
@@ -111,6 +111,13 @@ MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
 MODEL_PHYSICS_NOTES = {
+    "cts_collective_kappa_spectrum": (
+        "Electron populations may use distribution='bi_kappa' with temperature_parallel_eV, "
+        "temperature_perpendicular_eV, kappa and magnetic_field_unit. The electrostatic "
+        "response uses the exact q-projected gyrotropic marginal T_q=T_perp+(T_parallel-T_perp)"
+        "*(b_hat dot q_hat)^2. This is an unmagnetized longitudinal response to an anisotropic "
+        "equilibrium; it is not a magnetized harmonic dielectric or Full-EM CTS vertex."
+    ),
     "thomson_projected_bi_kappa_evdf": (
         "Exact marginal of a gyrotropic 3-D bi-Kappa distribution. For pitch cosine "
         "mu=b_hat dot q_hat, T_q=T_perp+(T_parallel-T_perp)*mu^2 and "

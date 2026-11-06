@@ -1380,7 +1380,17 @@ def collective_kappa_spectral_density(
     electron_populations optionally supplies independently drifting electron
     populations with density_fraction (summing to one), temperature_ratio,
     distribution ('kappa' or 'maxwellian'), Kappa index when selected, and
-    flow_projection_m_s. ion_populations optionally supplies one mapping per
+    flow_projection_m_s. A 'bi_kappa' population instead supplies positive
+    temperature_parallel_eV, temperature_perpendicular_eV, kappa and a unit
+    magnetic_field_unit. Its exact gyrotropic 3-D Kappa marginal along the
+    scattering vector has T_q=T_perp+(T_parallel-T_perp)(b_hat dot q_hat)^2;
+    this directional temperature, not either tensor component alone, enters
+    the longitudinal Landau susceptibility. A 'bi_kappa' population instead supplies positive
+    temperature_parallel_eV, temperature_perpendicular_eV, kappa and a unit
+    magnetic_field_unit. Its exact gyrotropic 3-D Kappa marginal along the
+    scattering vector has T_q=T_perp+(T_parallel-T_perp)(b_hat dot q_hat)^2;
+    this directional temperature, not either tensor component alone, enters
+    the longitudinal Landau susceptibility. ion_populations optionally supplies one mapping per
     ion species with distribution, Kappa index when selected, and projected
     flow; absent ion_populations preserves the Maxwellian-ion default.
 
@@ -1462,15 +1472,54 @@ def collective_kappa_spectral_density(
             if isinstance(raw_flow, (bool, np.bool_)) or not isinstance(raw_flow, (int, float, np.integer, np.floating)):
                 raise ValueError(f"electron_populations[{index}].flow_projection_m_s must be a finite real scalar")
             flow = float(raw_flow)
-            if distribution not in ("kappa", "maxwellian"):
-                raise ValueError(f"electron_populations[{index}].distribution must be 'kappa' or 'maxwellian'")
-            if distribution == "kappa" and (not np.isfinite(population_kappa) or population_kappa <= 1.5):
+            if distribution not in ("kappa", "maxwellian", "bi_kappa"):
+                raise ValueError(
+                    f"electron_populations[{index}].distribution must be 'kappa', 'maxwellian' or 'bi_kappa'"
+                )
+            if distribution in ("kappa", "bi_kappa") and (
+                not np.isfinite(population_kappa) or population_kappa <= 1.5
+            ):
                 raise ValueError(f"electron_populations[{index}].kappa must be finite and > 1.5")
+            projected_temperature = te * ratio
+            pitch_cosine = None
+            if distribution == "bi_kappa":
+                if "temperature_ratio" in population:
+                    raise ValueError(
+                        f"electron_populations[{index}] bi_kappa uses temperature_parallel_eV "
+                        "and temperature_perpendicular_eV, not temperature_ratio"
+                    )
+                t_parallel = _positive(
+                    population.get("temperature_parallel_eV"),
+                    f"electron_populations[{index}].temperature_parallel_eV",
+                )
+                t_perpendicular = _positive(
+                    population.get("temperature_perpendicular_eV"),
+                    f"electron_populations[{index}].temperature_perpendicular_eV",
+                )
+                magnetic_field = np.asarray(population.get("magnetic_field_unit"))
+                if (magnetic_field.dtype.kind not in "iuf" or magnetic_field.shape != (3,)
+                        or np.any(~np.isfinite(magnetic_field))
+                        or not np.isclose(np.linalg.norm(magnetic_field), 1.0, rtol=1e-8, atol=1e-10)):
+                    raise ValueError(
+                        f"electron_populations[{index}].magnetic_field_unit must be a finite unit 3-vector"
+                    )
+                pitch_cosine = float(np.clip(np.dot(magnetic_field, qhat), -1.0, 1.0))
+                projected_temperature = (
+                    t_perpendicular * (1.0 - pitch_cosine**2)
+                    + t_parallel * pitch_cosine**2
+                )
+                ratio = projected_temperature / te
             if not np.isfinite(flow) or abs(flow) >= C:
                 raise ValueError(f"electron_populations[{index}].flow_projection_m_s must be finite and subluminal")
-            populations.append({"density_fraction": fraction, "temperature_ratio": ratio,
-                                "kappa": population_kappa, "distribution": distribution,
-                                "flow_projection_m_s": flow})
+            populations.append({
+                "density_fraction": fraction, "temperature_ratio": ratio,
+                "projected_temperature_eV": projected_temperature,
+                "temperature_parallel_eV": t_parallel if distribution == "bi_kappa" else None,
+                "temperature_perpendicular_eV": t_perpendicular if distribution == "bi_kappa" else None,
+                "magnetic_pitch_cosine": pitch_cosine,
+                "kappa": population_kappa, "distribution": distribution,
+                "flow_projection_m_s": flow,
+            })
         if not np.isclose(sum(item["density_fraction"] for item in populations), 1.0, rtol=1e-6, atol=1e-8):
             raise ValueError("electron population density_fraction values must sum to one")
     # Exact total-mixture moments include thermal spread and between-population drift.
@@ -1547,7 +1596,7 @@ def collective_kappa_spectral_density(
         for item, fraction, temperature in zip(populations, population_fractions, population_temperatures):
             enhancement = (
                 (2.0*item["kappa"]-1.0)/(2.0*item["kappa"]-3.0)
-                if item["distribution"] == "kappa" else 1.0
+                if item["distribution"] in ("kappa", "bi_kappa") else 1.0
             )
             static_screening_weight += fraction*enhancement/temperature
         inverse_debye_squared = ne*E_CHARGE/EPS0*static_screening_weight
@@ -1568,7 +1617,7 @@ def collective_kappa_spectral_density(
         fraction = population["density_fraction"]
         sigma_population = sigma_e*np.sqrt(population["temperature_ratio"])
         shifted_phase = vphase-population["flow_projection_m_s"]
-        if population["distribution"] == "kappa":
+        if population["distribution"] in ("kappa", "bi_kappa"):
             pdf_population, _, _ = _kappa_pdf_and_derivatives(
                 shifted_phase, sigma_population, population["kappa"])
         else:
@@ -1578,8 +1627,8 @@ def collective_kappa_spectral_density(
         for j in range(x.size):
             chi_population[j] = _landau_susceptibility(
                 shifted_phase[j], fraction*omega_pe2, k, sigma_population,
-                distribution=population["distribution"],
-                kappa=population["kappa"] if population["distribution"] == "kappa" else None)
+                distribution=("kappa" if population["distribution"] == "bi_kappa" else population["distribution"]),
+                kappa=population["kappa"] if population["distribution"] in ("kappa", "bi_kappa") else None)
         electron_pdf += fraction*pdf_population
         chi_e += chi_population
         population_pdfs.append(pdf_population)
