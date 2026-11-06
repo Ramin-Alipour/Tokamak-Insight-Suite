@@ -112,3 +112,24 @@ kappa > 2. Therefore mixture skewness is reported only when every Kappa
 component has kappa > 2. The variance threshold remains kappa > 3/2, and the
 fourth-moment/kurtosis threshold remains kappa > 5/2; these are distinct
 existence conditions and are enforced independently.
+
+
+## Maxwell propagation of Landau–FDT current fluctuations
+
+The new public model `landau_fdt_full_em_field_fluctuations` propagates the
+current-noise tensor produced by `landau_fdt_full_em_constitutive` through the
+local Maxwell Green dyadic. With the exp(-i omega t) convention,
+
+```
+D(k,omega) = k^2 I - k k^T - (omega/c)^2 epsilon_r
+G = inverse(D)
+S_E = mu_0^2 omega^2 G S_J G^dagger
+```
+
+The solver preserves Hermitian symmetry and checks positive semidefiniteness
+of the propagated field spectrum. It rejects ill-conditioned undamped
+Maxwell poles instead of returning arbitrarily large finite values. The
+advanced Analysis-1 dispatcher, shared Dashboard selector and formula registry
+expose this physical path. It remains a local homogeneous-medium field
+fluctuation calculation, not a magnetized CTS three-wave scattering vertex,
+ray solution or absolute receiver spectrum.
