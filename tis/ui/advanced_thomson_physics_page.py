@@ -589,7 +589,7 @@ EXAMPLES = {
         "wavenumber_m_inverse": 120.0,
         "minimum_velocity_grid_probability_coverage": 0.999
     },
-    "thomson_full_temperature_tensor": {\n        "projected_temperature_eV": [800.0, 420.0, 260.0, 655.0, 512.5, 340.0, 467.5],\n        "scattering_vector_unit": [[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0],[0.7071067812,0.7071067812,0.0],[0.7071067812,0.0,0.7071067812],[0.0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],\n        "projected_temperature_covariance_eV2": (0.04*np.eye(7)).tolist(),\n        "maximum_geometry_condition_number": 1000.0,\n        "minimum_consistency_p_value": 0.001\n    },\n    "thomson_three_dimensional_flow": {
+    "thomson_full_temperature_tensor": {\n        "projected_temperature_eV": [800.0, 420.0, 260.0, 700.0, 495.0, 395.0, 373.3333333333],\n        "scattering_vector_unit": [[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0],[0.7071067812,0.7071067812,0.0],[0.7071067812,0.0,0.7071067812],[0.0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],\n        "projected_temperature_covariance_eV2": (0.04*np.eye(7)).tolist(),\n        "maximum_geometry_condition_number": 1000.0,\n        "minimum_consistency_p_value": 0.001\n    },\n    "thomson_three_dimensional_flow": {
         "velocity_projection_m_s": [100000.0, 200000.0, 300000.0],
         "scattering_vector_unit": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         "projection_covariance_m2_s2": [[1000000.0, 0.0, 0.0], [0.0, 1000000.0, 0.0], [0.0, 0.0, 1000000.0]],
