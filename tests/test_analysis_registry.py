@@ -252,6 +252,22 @@ def test_thomson_formula_registry_contains_traceable_physical_relations():
         assert contract["function_link"].startswith("tokamak_analysis.")
 
 
+
+def test_gaussian_psf_calibration_uncertainty_is_wired_through_dashboard_and_workflow():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    dashboard = (root / "app.py").read_text(encoding="utf-8")
+    workflow_source = (root / "tokamak_analysis" / "thomson_workflow.py").read_text(encoding="utf-8")
+    joint_source = (root / "tokamak_analysis" / "thomson_joint_spatial_spectral.py").read_text(encoding="utf-8")
+    assert "ts_infer_spatial_psf_sigma_uncertainty" in dashboard
+    assert "kwargs['spatial_psf_sigma_uncertainty_m']" in dashboard
+    assert "'spatial_psf_sigma_uncertainty_m'" in workflow_source
+    assert "spatial_psf_sigma_uncertainty_m=spatial_psf_sigma_uncertainty_m" in joint_source or (
+        '"spatial_psf_sigma_uncertainty_m": kwargs.get("spatial_psf_sigma_uncertainty_m")'
+        in workflow_source
+    )
+    assert "psf_calibration_parameter_covariance" in joint_source
+
 def test_joint_thomson_profile_mode_exposes_data_only_identifiability_contract():
     entry = get_analysis(46)
     contract = entry["execution_contract"]
