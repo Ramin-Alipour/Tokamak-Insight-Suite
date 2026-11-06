@@ -5776,10 +5776,10 @@
   },
   {
     "name": "Three-dimensional electron flow from multi-view Thomson projections",
-    "equation": "v_q=Q v_e; C_eff=C_v+J_Q C_Q J_Q^T+C_vQ J_Q^T+J_Q C_vQ^T; v_hat=(Q^T C_eff^-1 Q)^-1 Q^T C_eff^-1 v_q; report only if rank(L^-1 Q)=3, cond(L^-1 Q)<=kappa_geom and, for n_views>3, gammaincc((n_views-3)/2, chi2/2)>=p_min",
+    "equation": "v_q,i=q̂_i·v_e; C_eff=C_v+J_Q C_Q J_Qᵀ, (J_Q)_i=v_eᵀ(I−q̂_iq̂_iᵀ); v̂_e=(QᵀC_eff⁻¹Q)⁻¹QᵀC_eff⁻¹v_q, iterated when C_Q is supplied",
     "inputs": "Measured directional flow projections [m s^-1], unit scattering-vector directions [1], full positive-definite projection covariance [m² s^-2]; optional full Cartesian scattering-vector covariance C_Q [dimensionless²; 3N×3N]",
-    "output": "Three-component electron flow vector [m s^-1] and 3×3 GLS covariance; withheld for rank-deficient/ill-conditioned geometry, rejected common-flow residual (when overdetermined), or superluminal speed",
-    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional full direction covariance and projection/geometry cross-covariance projected onto each direction's tangent plane; covariance-whitened design must meet the declared condition-number ceiling; more than three views are tested for consistency with the shared-flow hypothesis.",
+    "output": "Three-component electron flow vector [m s^-1] and 3×3 covariance [m² s^-2]; non-identifiable unless Q has rank 3",
+    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional small direction perturbations represented by full covariance and projected onto each direction's tangent plane.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5808,26 +5808,6 @@
           "unit": "dimensionless²; full (3*n_views)×(3*n_views) positive-semidefinite covariance of Cartesian direction components",
           "description": "Optional covariance of all scattering-vector direction components, including cross-view correlations; radial components are projected out to enforce unit-vector geometry.",
           "required": false
-        },
-        {
-          "name": "projection_geometry_cross_covariance",
-          "unit": "m s^-1; dimensionless; n_views × (3*n_views) Cov(v_q,q_xyz)",
-          "description": "Optional full cross-covariance between measured flow projections and Cartesian scattering-vector directions; tangent-plane components are propagated.",
-          "required": false
-        },
-        {
-          "name": "maximum_geometry_condition_number",
-          "unit": "dimensionless; condition-number ceiling for covariance-whitened design L^-1 Q",
-          "description": "3-D flow is withheld when the weighted design is rank deficient or exceeds this ceiling; default 1e3.",
-          "required": false,
-          "default": 1000
-        },
-        {
-          "name": "minimum_projection_consistency_p_value",
-          "unit": "dimensionless; lower-tail rejection threshold for chi-square survival probability",
-          "description": "For overdetermined view sets (n_views > 3), withhold the common-flow vector when the chi-square survival probability falls below this threshold; default 1e-3. Exactly three views cannot test model consistency.",
-          "required": false,
-          "default": 0.001
         }
       ],
       "output_specs": [
@@ -5858,30 +5838,6 @@
         {
           "name": "geometry_covariance_iterations",
           "unit": "count; iterative GLS updates when geometry covariance is supplied"
-        },
-        {
-          "name": "geometry_condition_number",
-          "unit": "dimensionless; condition number of covariance-whitened scattering design L^-1 Q"
-        },
-        {
-          "name": "maximum_geometry_condition_number",
-          "unit": "dimensionless; configured reporting ceiling"
-        },
-        {
-          "name": "geometry_condition_status",
-          "unit": "well_conditioned, ill_conditioned_vector_withheld, or rank_deficient"
-        },
-        {
-          "name": "cross_view_consistency_p_value",
-          "unit": "dimensionless; chi-square survival probability for n_views > 3; null for exactly three views"
-        },
-        {
-          "name": "cross_view_consistency_status",
-          "unit": "consistent_with_common_flow, common_flow_model_rejected, or not_testable_exactly_three_views"
-        },
-        {
-          "name": "model_adequacy_reason",
-          "unit": "text; reason for withholding a vector when common-flow model is rejected"
         }
       ],
       "prerequisites": [
@@ -5894,14 +5850,9 @@
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views",
         "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_inversion_propagates_tangent_plane_geometry_covariance",
-        "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_ill_conditioned_full_rank_geometry",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_when_views_reject_common_flow",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_marks_exactly_three_views_as_not_testable",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_consistency_threshold"
+        "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance"
       ],
-      "note": "A vector is reported only when the covariance-whitened scattering design L^-1 Q has rank three and condition number no greater than the configured ceiling (default 1e3), the inferred speed is subluminal, and (for more than three views) the common-flow chi-square survival probability is no smaller than the configured threshold (default 1e-3). Exactly three views cannot test common-flow residual consistency. Optional direction covariance and projection/geometry cross-covariance are propagated by iterative tangent-plane GLS."
+      "note": "A vector is reported only when the measured projection geometry spans three dimensions and the inferred speed is subluminal. A single scattering view identifies only one projection."
     },
     "references": [
       {
@@ -5938,20 +5889,9 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_ill_conditioned_full_rank_geometry",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_when_views_reject_common_flow",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_marks_exactly_three_views_as_not_testable",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_consistency_threshold"
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
       ]
-    },
-    "uncertainty_model": "GLS with supplied full projection covariance; optional full scattering-vector covariance and projection/geometry cross-covariance are propagated by first-order iterative errors-in-variables GLS. SVD is used for the whitened design solve and covariance. The condition number gates vector reporting; for overdetermined views, the chi-square survival probability tests the shared-flow model and gates reporting when inconsistent.",
-    "prerequisites": [
-      "At least three linearly independent scattering-vector directions with covariance-whitened condition number no greater than the configured ceiling.",
-      "All views must sample a common flow vector or a physically justified shared-volume model.",
-      "Projection covariance and calibrated spectra are supplied; scattering geometry is known."
-    ]
+    }
   },
   {
     "name": "Collisionless isotropic-Kappa CTS Landau susceptibility",
@@ -6314,28 +6254,6 @@
           "unit": "dimensionless; conservative non-relativistic projected thermal-speed validity threshold",
           "required": false,
           "default": 0.1
-        },
-        {
-          "name": "scattering_vector_covariance",
-          "unit": "dimensionless²; optional full (3*n_views) Cartesian covariance for q directions, routed to the derived 3-D flow GLS closure",
-          "required": false
-        },
-        {
-          "name": "projection_geometry_cross_covariance",
-          "unit": "m s^-1; dimensionless; optional Cov(v_q,q_xyz), shape (n_views,3*n_views), routed to derived 3-D flow GLS closure",
-          "required": false
-        },
-        {
-          "name": "maximum_geometry_condition_number",
-          "unit": "dimensionless; whitened-design condition ceiling for derived 3-D flow; default 1e3",
-          "required": false,
-          "default": 1000
-        },
-        {
-          "name": "minimum_projection_consistency_p_value",
-          "unit": "dimensionless; common-flow chi-square survival probability threshold for overdetermined views; default 1e-3",
-          "required": false,
-          "default": 0.001
         }
       ],
       "output_specs": [
@@ -6378,10 +6296,6 @@
         {
           "name": "spectral_bin_integration",
           "unit": "exact Gaussian CDF integration over finite wavelength bins"
-        },
-        {
-          "name": "three_dimensional_flow_inference",
-          "unit": "nested GLS result; vector/covariance withheld for rank deficiency, ill-conditioned geometry, rejected common-flow residual, or superluminal speed"
         }
       ],
       "prerequisites": [
@@ -6396,15 +6310,9 @@
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
         "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen",
-        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen",
-        "tests/test_thomson_anisotropic_inference.py::test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_closure",
-        "tests/test_thomson_anisotropic_inference.py::test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options"
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ],
-      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen. The public advanced-physics dispatcher additionally routes optional scattering-vector covariance, projection/geometry cross-covariance, a whitened-geometry condition ceiling (default 1e3), and a common-flow chi-square p-value threshold (default 1e-3) to the derived 3-D flow closure; these options are not passed into the per-view spectral fitter.",
-      "function_links": [
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
-        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
-      ]
+      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen."
     },
     "references": [
       {
@@ -6427,9 +6335,7 @@
     "implementation_trace": {
       "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
       "function_links": [
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
-        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson"
       ],
       "formula_key": "gyrotropic_bi_maxwellian_optical_thomson_joint_fit",
       "implementation_link_status": "mapped",
@@ -6437,9 +6343,7 @@
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
-        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen",
-        "tests/test_thomson_anisotropic_inference.py::test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_closure",
-        "tests/test_thomson_anisotropic_inference.py::test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options"
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ]
     }
   },
@@ -7745,28 +7649,6 @@
             1.5001,
             200
           ]
-        },
-        {
-          "name": "scattering_vector_covariance",
-          "unit": "dimensionless²; optional full (3*n_views) Cartesian covariance for q directions, routed to the derived 3-D flow GLS closure",
-          "required": false
-        },
-        {
-          "name": "projection_geometry_cross_covariance",
-          "unit": "m s^-1; dimensionless; optional Cov(v_q,q_xyz), shape (n_views,3*n_views), routed to derived 3-D flow GLS closure",
-          "required": false
-        },
-        {
-          "name": "maximum_geometry_condition_number",
-          "unit": "dimensionless; whitened-design condition ceiling for derived 3-D flow; default 1e3",
-          "required": false,
-          "default": 1000
-        },
-        {
-          "name": "minimum_projection_consistency_p_value",
-          "unit": "dimensionless; common-flow chi-square survival probability threshold for overdetermined views; default 1e-3",
-          "required": false,
-          "default": 0.001
         }
       ],
       "output_specs": [
@@ -7813,10 +7695,6 @@
         {
           "name": "kappa_index",
           "unit": "dimensionless; only when the full data Jacobian identifies the Kappa index"
-        },
-        {
-          "name": "three_dimensional_flow_inference",
-          "unit": "nested GLS result; vector/covariance withheld for rank deficiency, ill-conditioned geometry, rejected common-flow residual, or superluminal speed"
         }
       ],
       "prerequisites": [
@@ -7832,11 +7710,7 @@
         "tests/test_thomson_workflow.py::test_registered_gyrotropic_workflow_dispatches_bimaxwellian_and_bikappa_without_fallback",
         "tests/test_thomson_workflow.py::test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback"
       ],
-      "note": "The distribution family and finite-variance domain follow the published additive bi-Kappa formulation. The registered optical Thomson implementation fits its exact projected 1-D marginal and is not a magnetized kinetic dispersion solver. The public advanced-physics dispatcher additionally routes optional scattering-vector covariance, projection/geometry cross-covariance, a whitened-geometry condition ceiling (default 1e3), and a common-flow chi-square p-value threshold (default 1e-3) to the derived 3-D flow closure; these options are not passed into the per-view spectral fitter.",
-      "function_links": [
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
-        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
-      ]
+      "note": "The distribution family and finite-variance domain follow the published additive bi-Kappa formulation. The registered optical Thomson implementation fits its exact projected 1-D marginal and is not a magnetized kinetic dispersion solver."
     },
     "references": [
       {
@@ -7855,8 +7729,7 @@
       "function_link": "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
       "function_links": [
         "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
       ],
       "formula_key": "gyrotropic_anisotropic_kappa_optical_thomson_joint_fit",
       "implementation_link_status": "mapped",
@@ -9899,107 +9772,6 @@
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures"
       ],
       "note": "Quantifies the superluminal tail that an RMS-beta threshold alone does not describe. A projected superluminal particle necessarily has superluminal 3-D speed."
-    }
-  },
-  {
-    "name": "Gyrotropic 3-D thermal velocity covariance tensor from optical Thomson anisotropy fit",
-    "equation": "Σ_v,j = (e/m_e)[T_perp I + (T_parallel−T_perp) b_hat_j b_hat_j^T]; A_T=T_parallel/T_perp; eigenvalues={eT_parallel/m_e,eT_perp/m_e,eT_perp/m_e}",
-    "inputs": "Identifiable T_parallel and T_perpendicular [eV]; unit magnetic-field direction b_hat per spectral view",
-    "output": "Per-view 3×3 thermal velocity covariance tensor [m² s⁻²] and dimensionless temperature anisotropy ratio",
-    "assumptions": "Gyrotropic distribution with zero heat flux and finite second moments; temperatures are second-moment temperatures; each view retains its own magnetic-field direction; no single global tensor is formed by averaging distinct field directions.",
-    "status": "D",
-    "category": "Optical Thomson scattering",
-    "execution_contract": {
-      "schema_version": "1.0",
-      "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
-      "function_links": [
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
-        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
-      ],
-      "formula_key": "optical_thomson_gyrotropic_velocity_covariance_tensor",
-      "input_specs": [
-        {
-          "name": "electron_temperature_parallel_eV",
-          "unit": "eV; positive and identifiable",
-          "required": true
-        },
-        {
-          "name": "electron_temperature_perpendicular_eV",
-          "unit": "eV; positive and identifiable",
-          "required": true
-        },
-        {
-          "name": "magnetic_field_unit",
-          "unit": "unit 3-vector or n_view×3 unit vectors",
-          "required": true
-        }
-      ],
-      "output_specs": [
-        {
-          "name": "thermal_velocity_covariance_tensor_per_view_m2_s2",
-          "unit": "m² s⁻²; n_view×3×3 symmetric positive-definite tensor"
-        },
-        {
-          "name": "temperature_anisotropy_ratio_parallel_over_perpendicular",
-          "unit": "dimensionless"
-        },
-        {
-          "name": "projected_velocity_variance_from_tensor_m2_s2",
-          "unit": "m² s⁻²; q_hat^T Sigma_v q_hat per view"
-        },
-        {
-          "name": "projected_velocity_variance_expected_m2_s2",
-          "unit": "m² s⁻²; e T_q/m_e per view"
-        },
-        {
-          "name": "projected_velocity_variance_relative_residual",
-          "unit": "dimensionless; relative tensor-to-projection closure residual per view"
-        }
-      ],
-      "prerequisites": [
-        "Both gyrotropic temperatures must pass the spectral identifiability gate.",
-        "The selected non-relativistic model must pass its declared validity screen.",
-        "Each magnetic-field direction must be supplied as a normalized 3-vector."
-      ],
-      "uncertainty_model": "The tensor is a deterministic transformation of fitted temperatures and supplied magnetic-field directions. Its covariance is not claimed by this output; use the fitted parameter covariance and geometry covariance for uncertainty propagation.",
-      "test_links": [
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_tensor_matches_second_moment_physics",
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match"
-      ],
-      "note": "The relation is valid for both Maxwellian and finite-variance bi-Kappa closures because T_parallel and T_perpendicular are defined by the second moments. A separate tensor is returned per view to avoid averaging spatially varying magnetic-field axes. The projected tensor variance q_hat^T Sigma_v q_hat is returned alongside e*T_q/m_e as an internal physical-closure diagnostic; their relative residual should be at floating-point roundoff."
-    },
-    "references": [
-      {
-        "title": "Plasma Scattering of Electromagnetic Radiation",
-        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
-        "year": 2011,
-        "publisher": "Academic Press",
-        "type": "textbook",
-        "scope": "Thomson-scattering velocity projections and thermal moments; the tensor relation follows from the gyrotropic second-moment definition."
-      }
-    ],
-    "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": true,
-    "input_data_level": "measured_calibrated_spectrum_plus_magnetic_geometry",
-    "execution_scope": "derived_physical_moment_tensor_from_joint_gyrotropic_spectral_inference",
-    "analysis_family": "Analysis 1 — Thomson scattering",
-    "subanalysis": "Optical Thomson — gyrotropic anisotropic inference",
-    "implementation_trace": {
-      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
-      "function_links": [
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
-        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
-      ],
-      "formula_key": "optical_thomson_gyrotropic_velocity_covariance_tensor",
-      "implementation_link_status": "mapped",
-      "test_links": [
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_tensor_matches_second_moment_physics",
-        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match"
-      ]
     }
   },
   {
