@@ -109,10 +109,15 @@ def integrate_mode_coupled_kinetic_ece_transfer(
     if A.shape != (f.size, lengths.size, 2, 2) or np.any(~np.isfinite(A)):
         raise ValueError("absorption matrix has an invalid shape or non-finite values")
     H = np.zeros_like(A) if mode_coupling_matrix_rad_m is None else np.asarray(mode_coupling_matrix_rad_m, complex)
-    if H.shape == (lengths.size, 2, 2):
+    if H.shape == (2, 2):
+        H = np.broadcast_to(H[None, None, :, :], A.shape).copy()
+    elif H.shape == (lengths.size, 2, 2):
         H = np.broadcast_to(H[None], A.shape).copy()
     if H.shape != A.shape or np.any(~np.isfinite(H)):
-        raise ValueError("mode coupling matrix must match the absorption matrix shape")
+        raise ValueError(
+            "mode coupling matrix shape must be (2,2), (n_segment,2,2), "
+            "or (n_frequency,n_segment,2,2), matching absorption matrix shape"
+        )
     for idx in np.ndindex(A.shape[:2]):
         if not np.allclose(A[idx], A[idx].conj().T, rtol=1e-9, atol=1e-12):
             raise ValueError("absorption matrix must be Hermitian")
