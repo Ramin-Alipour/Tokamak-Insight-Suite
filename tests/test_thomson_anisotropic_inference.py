@@ -61,7 +61,9 @@ def test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures():
         scattering_angle_rad=np.pi/2,
         magnetic_field_unit=b, scattering_vector_unit=q[:1],
         instrument_response_matrix=np.eye(wavelength.size),
-        temperature_bounds_eV=(20.0, 3000.0),
+        initial_temperature_parallel_eV=2.0,
+        initial_temperature_perpendicular_eV=0.5,
+        temperature_bounds_eV=(0.1, 5.0),
         flow_bounds_m_s=(-1.0e6, 1.0e6),
     )
     assert result["anisotropy_identifiability"] == "non_identifiable"
@@ -305,7 +307,7 @@ def test_bikappa_model_discrepancy_is_not_added_to_a_synthetic_identity_covarian
 
 def test_flow_projection_covariance_survives_unidentifiable_temperature_anisotropy():
     """Flow shifts remain estimable when every view has the same magnetic pitch."""
-    wavelength = np.linspace(499.8, 500.2, 161)
+    wavelength = np.linspace(495.0, 505.0, 1001)
     laser, angle = 500.0, np.pi / 2.0
     b = np.array([0.0, 0.0, 1.0])
     pitch = 0.5
@@ -317,7 +319,7 @@ def test_flow_projection_covariance_survives_unidentifiable_temperature_anisotro
     ])
     true_flow = np.array([1.2e4, -8.0e3, 5.0e3])
     projections = q @ true_flow
-    directional_temperature = 425.0
+    directional_temperature = 0.875
     q_factor = 2.0*np.sin(angle/2.0)
     sigma_v = np.sqrt(1.602176634e-19*directional_temperature/9.1093837015e-31)
     spectra = []
@@ -331,7 +333,9 @@ def test_flow_projection_covariance_survives_unidentifiable_temperature_anisotro
         wavelength, np.asarray(spectra), laser_wavelength_nm=laser,
         scattering_angle_rad=angle, magnetic_field_unit=b,
         scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
-        temperature_bounds_eV=(20.0, 3000.0),
+        initial_temperature_parallel_eV=2.0,
+        initial_temperature_perpendicular_eV=0.5,
+        temperature_bounds_eV=(0.1, 5.0),
         flow_bounds_m_s=(-1.0e6, 1.0e6),
     )
     assert result["geometry_design_rank"] == 1
