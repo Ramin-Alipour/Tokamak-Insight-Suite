@@ -65,6 +65,56 @@ def test_collective_tabulated_evdf_forward_model_returns_finite_positive_spectru
     assert result["electron_distribution_model"] == "researcher_supplied_tabulated_projected_1D_EVDF"
 
 
+
+def test_nonrelativistic_collective_tabulated_evdf_rejects_superluminal_support():
+    import pytest
+    from tokamak_analysis.thomson_generalized_dispersion import (
+        collective_tabulated_electron_spectral_density,
+    )
+
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    velocity = np.linspace(-1.01 * 299792458.0, 1.01 * 299792458.0, 101)
+    with pytest.raises(ValueError, match="non-relativistic tabulated-Landau CTS kernel"):
+        collective_tabulated_electron_spectral_density(
+            wavelength, 1064.0, np.pi / 2.0,
+            electron_density_m3=1.0e18,
+            electron_velocity_grid_m_s=velocity,
+            electron_probability_density_s_m=np.exp(-0.5 * (velocity / 1.0e8) ** 2),
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0], ion_temperature_eV=[10.0],
+            electron_velocity_m_s=[0.0, 0.0, 0.0],
+            ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+            incident_direction=[1.0, 0.0, 0.0],
+            scattered_direction=[0.0, 1.0, 0.0],
+        )
+
+
+def test_nonrelativistic_collective_tabulated_evdf_rejects_superluminal_ion_support():
+    import pytest
+    from tokamak_analysis.thomson_generalized_dispersion import (
+        collective_tabulated_electron_spectral_density,
+    )
+
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    electron_velocity = np.linspace(-8.0e6, 8.0e6, 101)
+    ion_velocity = np.linspace(-1.01 * 299792458.0, 1.01 * 299792458.0, 101)
+    with pytest.raises(ValueError, match="projected ion velocity support"):
+        collective_tabulated_electron_spectral_density(
+            wavelength, 1064.0, np.pi / 2.0,
+            electron_density_m3=1.0e18,
+            electron_velocity_grid_m_s=electron_velocity,
+            electron_probability_density_s_m=np.exp(-0.5 * (electron_velocity / 1.0e6) ** 2),
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0],
+            electron_velocity_m_s=[0.0, 0.0, 0.0],
+            ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+            incident_direction=[1.0, 0.0, 0.0],
+            scattered_direction=[0.0, 1.0, 0.0],
+            ion_velocity_grids_m_s=ion_velocity[None, :],
+            ion_probability_densities_s_m=np.exp(-0.5 * (ion_velocity / 1.0e8) ** 2)[None, :],
+        )
+
+
 def test_generalized_landau_integral_supports_higher_order_pole():
     velocity = np.linspace(-10.0, 10.0, 1001)
     distribution = np.exp(-0.5 * velocity**2)
