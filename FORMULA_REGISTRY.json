@@ -10334,6 +10334,11 @@
       ],
       "output_specs": [
         {
+          "name": "spectral_density_per_nm",
+          "unit": "nm^-1",
+          "description": "Cross-section-weighted normalized mixture spectral density."
+        },
+        {
           "name": "population_temperatures_eV",
           "unit": "eV",
           "description": "Ordered fitted component temperatures."
@@ -10354,9 +10359,84 @@
           "description": "Delta-method covariance for all component temperatures, fractions and shared flow."
         },
         {
+          "name": "population_temperature_uncertainties_eV",
+          "unit": "eV",
+          "description": "Marginal standard uncertainties of component temperatures."
+        },
+        {
+          "name": "population_fraction_uncertainties",
+          "unit": "dimensionless",
+          "description": "Marginal standard uncertainties of component number-density fractions."
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "calibrated intensity",
+          "description": "Response-convolved fitted spectrum including profiled background."
+        },
+        {
+          "name": "residual",
+          "unit": "calibrated intensity",
+          "description": "Measured minus fitted spectrum."
+        },
+        {
+          "name": "fitted_signal_amplitude",
+          "unit": "calibrated intensity scale",
+          "description": "Profiled non-negative signal amplitude."
+        },
+        {
+          "name": "fitted_background_coefficients",
+          "unit": "calibrated intensity",
+          "description": "Profiled polynomial detector-background coefficients."
+        },
+        {
+          "name": "population_count",
+          "unit": "dimensionless",
+          "description": "Number of fitted mixture components."
+        },
+        {
           "name": "jacobian_rank",
           "unit": "dimensionless",
-          "description": "Scaled spectral-Jacobian rank used for the identifiability gate."
+          "description": "Scaled spectral-Jacobian rank."
+        },
+        {
+          "name": "jacobian_condition_number",
+          "unit": "dimensionless",
+          "description": "Condition number of the scaled spectral Jacobian."
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "dimensionless",
+          "description": "Residual degrees of freedom after nonlinear and profiled linear parameters."
+        },
+        {
+          "name": "spectral_noise_model",
+          "unit": "text",
+          "description": "Noise weighting used for inference and covariance."
+        },
+        {
+          "name": "optimizer_success",
+          "unit": "boolean",
+          "description": "Whether the bounded nonlinear least-squares solver converged."
+        },
+        {
+          "name": "model",
+          "unit": "text",
+          "description": "Selected physical mixture model."
+        },
+        {
+          "name": "population_fraction_definition",
+          "unit": "text",
+          "description": "Number-density fraction convention."
+        },
+        {
+          "name": "identifiability_status",
+          "unit": "text",
+          "description": "Data-only scaled-Jacobian identifiability status."
+        },
+        {
+          "name": "limitations",
+          "unit": "text[]",
+          "description": "Scope and interpretation limitations."
         }
       ],
       "prerequisites": [
