@@ -614,12 +614,12 @@ EXAMPLES = {
         "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
         "measured_spectra": [
             (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,800.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,500.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,300.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,650.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,550.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,400.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,450.0)).tolist()
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,420.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,260.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,610.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,530.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,340.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,493.3333333333)).tolist()
         ],
         "laser_wavelength_nm": 532.0,
         "scattering_angle_rad": 1.5707963267948966,
@@ -1042,6 +1042,22 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "The 3-D thermal covariance tensor is withheld because both "
                         "temperature components are not both identifiable within the declared model-validity domain."
                     )
+            if isinstance(result, Mapping) and "electron_temperature_tensor_eV" in result:
+                st.subheader("General non-gyrotropic 3-D electron temperature tensor")
+                st.latex(r"T_q=\\hat{\\mathbf q}^{T}\\mathbf T_e\\hat{\\mathbf q},\\qquad \\mathbf T_e=\\mathbf L\\mathbf L^T")
+                st.write({
+                    "temperature_tensor_eV": result.get("electron_temperature_tensor_eV"),
+                    "principal_temperature_eigenvalues_eV": result.get("principal_temperature_eigenvalues_eV"),
+                    "principal_axes_cartesian_columns": result.get("principal_axes_cartesian_columns"),
+                    "projected_temperature_eV": result.get("projected_temperature_eV"),
+                    "view_dyad_rank": result.get("view_dyad_rank"),
+                    "spectral_jacobian_rank": result.get("jacobian_rank"),
+                    "spectral_jacobian_condition_number": result.get("jacobian_condition_number"),
+                    "tensor_covariance_eV2": result.get("temperature_tensor_parameter_covariance_eV2"),
+                    "model_validity_status": result.get("model_validity_status"),
+                })
+                if not result.get("reportable_as_inferred_parameter", False):
+                    st.warning("The tensor is not reportable as a physical inference outside the declared non-relativistic validity domain.")
             st.json(safe)
             st.download_button(
                 "Export advanced physics result (JSON)",
