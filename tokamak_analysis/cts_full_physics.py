@@ -612,7 +612,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "thomson_multiview_3d_evdf":
+    if model == "thomson_path_averaged_density":
+        solver = infer_thomson_path_averaged_density
+    elif model == "thomson_multiview_3d_evdf":
         solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_kinetic_background_fit":
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
