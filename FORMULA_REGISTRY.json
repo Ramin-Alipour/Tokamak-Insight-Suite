@@ -2804,6 +2804,12 @@
           "name": "sigma_scattering_angle_rad",
           "unit": "rad",
           "required": false
+        },
+        {
+          "name": "input_covariance_nm2_rad2",
+          "unit": "mixed: nm^2 and rad^2",
+          "description": "Optional full 3x3 joint covariance ordered [intrinsic_sigma_nm, laser_wavelength_nm, scattering_angle_rad]; includes width/calibration/geometry cross-covariances and is mutually exclusive with the three independent standard deviations.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -2834,6 +2840,16 @@
           "name": "screen_threshold_theta_e",
           "unit": "1",
           "description": "Conservative software screening threshold, not a universal physical validity boundary."
+        },
+        {
+          "name": "temperature_jacobian_eV_per_input_unit",
+          "unit": "eV per mixed input unit",
+          "description": "Analytic Jacobian of the conditional Maxwellian temperature formula with respect to intrinsic width, laser wavelength and scattering angle."
+        },
+        {
+          "name": "variance_electron_temperature_eV2",
+          "unit": "eV^2",
+          "description": "First-order propagated variance using the full supplied joint covariance."
         }
       ],
       "prerequisites": [
@@ -2842,11 +2858,12 @@
         "intrinsic plasma Doppler-width parameter inferred by the measured-response-convolved physical forward fit",
         "known geometry"
       ],
-      "uncertainty_model": "Optional independent uncertainties in intrinsic width, laser wavelength and scattering angle are propagated by first-order linearization. This uncertainty is conditional on the Maxwellian non-relativistic width model.",
+      "uncertainty_model": "Full first-order J C J^T propagation is used when input_covariance_nm2_rad2 is supplied; otherwise the legacy independent standard-deviation route is retained. The estimate remains conditional on the isotropic non-relativistic Maxwellian model.",
       "test_links": [
-        "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
+        "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference",
+        "tests/test_thomson_formula_contracts.py::test_temperature_from_thomson_width_propagates_joint_covariance"
       ],
-      "note": "The helper does not deconvolve the instrument response. The supplied width must be intrinsic to a selected physical spectral fit; outside theta_e<=0.01 the result is screened as requiring a relativistic model.",
+      "note": "The helper does not deconvolve the instrument response. The supplied width must be intrinsic to a selected physical spectral fit; outside theta_e<=0.01 the result is screened as requiring a relativistic model. Full covariance extension is analytically verified; software verification is not empirical tokamak validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
@@ -2931,6 +2948,12 @@
           "name": "sigma_scattering_angle_rad",
           "unit": "rad",
           "required": false
+        },
+        {
+          "name": "input_covariance_nm2_rad2",
+          "unit": "mixed: nm^2 and rad^2",
+          "description": "Optional full 3x3 joint covariance ordered [fitted_center_nm, laser_wavelength_nm, scattering_angle_rad]; retains wavelength and geometry cross terms; mutually exclusive with independent standard deviations.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -2941,17 +2964,28 @@
         {
           "name": "uncertainty_electron_velocity_projection_m_s",
           "unit": "m s^-1"
+        },
+        {
+          "name": "velocity_jacobian_m_s_per_input_unit",
+          "unit": "m s^-1 per mixed input unit",
+          "description": "Analytic Jacobian of the non-relativistic Doppler projection."
+        },
+        {
+          "name": "variance_electron_velocity_projection_m2_s2",
+          "unit": "m^2 s^-2",
+          "description": "First-order propagated variance using the full supplied joint covariance."
         }
       ],
       "prerequisites": [
         "Non-relativistic Doppler mapping",
         "known geometry"
       ],
-      "uncertainty_model": "Independent first-order propagation of centroid, laser-wavelength and angle uncertainties.",
+      "uncertainty_model": "Full first-order J C J^T propagation retains the supplied wavelength/geometry cross terms; otherwise independent standard deviations are propagated.",
       "test_links": [
-        "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
+        "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference",
+        "tests/test_thomson_formula_contracts.py::test_nonrelativistic_thomson_flow_propagates_joint_wavelength_geometry_covariance"
       ],
-      "note": "Analytic software calculation with numerical tests; not empirical validation.",
+      "note": "Analytic software calculation with numerical tests; not empirical validation. Full covariance extension is analytically verified; software verification is not empirical tokamak validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
@@ -3042,6 +3076,12 @@
           "unit": "rad",
           "description": "Optional independent 1-sigma scattering-angle uncertainty.",
           "required": false
+        },
+        {
+          "name": "input_covariance_nm2_rad2",
+          "unit": "mixed: nm^2 and rad^2",
+          "description": "Optional full 3x3 joint covariance ordered [fitted_center_nm, laser_wavelength_nm, scattering_angle_rad]; retains all cross terms and is mutually exclusive with independent standard deviations.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -3064,17 +3104,29 @@
           "name": "identifiability",
           "unit": "text",
           "description": "Explicitly identifies the result as one projected velocity only."
+        },
+        {
+          "name": "velocity_jacobian_m_s_per_input_unit",
+          "unit": "m s^-1 per mixed input unit",
+          "description": "Analytic Jacobian of the exact relativistic projected Doppler inversion."
+        },
+        {
+          "name": "variance_electron_velocity_projection_m2_s2",
+          "unit": "m^2 s^-2",
+          "description": "First-order propagated variance using the full supplied joint covariance."
         }
       ],
       "prerequisites": [
         "A physically fitted intrinsic spectral centre; calibrated laser wavelength and scattering angle."
       ],
-      "uncertainty_model": "First-order independent-error propagation using analytic derivatives with respect to fitted centre, laser wavelength and scattering angle. Cross-covariances are not inferred.",
+      "uncertainty_model": "Full first-order J C J^T propagation retains the supplied wavelength/geometry cross terms; otherwise independent standard deviations are propagated.",
       "test_links": [
         "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty",
-        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs"
+        "tests/test_formula_contracts.py::test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs",
+        "tests/test_thomson_relativistic_flow_api.py::test_exact_relativistic_thomson_flow_propagates_full_correlated_covariance",
+        "tests/test_thomson_relativistic_flow_api.py::test_exact_relativistic_thomson_flow_rejects_non_psd_joint_covariance"
       ],
-      "note": "Exact single-projection relativistic Doppler inversion; not a 3-D velocity reconstruction and not a distribution-mean estimator.",
+      "note": "Exact single-projection relativistic Doppler inversion; not a 3-D velocity reconstruction and not a distribution-mean estimator. Full covariance extension is analytically verified; software verification is not empirical tokamak validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
