@@ -441,3 +441,80 @@ def test_non_gyrotropic_tensor_formula_registry_is_synchronized_and_executable()
     assert contract["implementation_link_status"] == "mapped"
     assert contract["function_link"] == "tokamak_analysis.cts_full_physics.collective_non_gyrotropic_gaussian_electron_spectrum"
     assert "tests/test_thomson_generalized_dispersion.py::test_non_gyrotropic_gaussian_tensor_cts_uses_exact_q_projection_and_public_api" in contract["test_links"]
+
+
+def test_multi_population_tabulated_cts_reduces_to_single_population_limit_through_public_api():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    wavelength = np.linspace(1060.0, 1068.0, 81)
+    velocity = np.linspace(-8.0e6, 8.0e6, 1601)
+    sigma = 1.1e6
+    pdf = np.exp(-0.5*(velocity/sigma)**2)
+    common = dict(
+        electron_density_m3=1.0e18,
+        ion_species=[{"name": "D+", "charge_state": 1.0, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[12.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+    single = run_advanced_thomson_physics(
+        "cts_tabulated_evdf_landau", wavelength, 1064.0, np.pi/2.0,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=pdf,
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        **common,
+    )
+    mixture = run_advanced_thomson_physics(
+        "cts_multi_population_tabulated_evdf_landau",
+        wavelength, 1064.0, np.pi/2.0,
+        electron_populations=[
+            {"velocity_grid_m_s": velocity, "probability_density_s_m": pdf,
+             "density_fraction": 0.35},
+            {"velocity_grid_m_s": velocity, "probability_density_s_m": 4.0*pdf,
+             "density_fraction": 0.65},
+        ],
+        **common,
+    )
+    assert np.allclose(
+        mixture["electron_susceptibility"], single["electron_susceptibility"],
+        rtol=2e-8, atol=1e-12,
+    )
+    assert np.allclose(
+        mixture["dielectric_function"], single["dielectric_function"],
+        rtol=2e-8, atol=1e-12,
+    )
+    assert np.allclose(
+        mixture["spectral_density_per_nm"], single["spectral_density_per_nm"],
+        rtol=2e-8, atol=1e-12,
+    )
+    assert len(mixture["electron_population_moments"]) == 2
+    assert np.isclose(np.sum(mixture["electron_population_density_fractions"]), 1.0)
+
+
+def test_multi_population_tabulated_cts_requires_density_fractions_to_sum_to_one():
+    import pytest
+    from tokamak_analysis.thomson_generalized_dispersion import (
+        collective_multi_population_tabulated_electron_spectral_density,
+    )
+
+    velocity = np.linspace(-5.0e6, 5.0e6, 101)
+    pdf = np.exp(-0.5*(velocity/1.0e6)**2)
+    with pytest.raises(ValueError, match="must sum to one"):
+        collective_multi_population_tabulated_electron_spectral_density(
+            np.linspace(1060.0, 1068.0, 41), 1064.0, np.pi/2.0,
+            electron_density_m3=1.0e18,
+            electron_populations=[
+                {"velocity_grid_m_s": velocity, "probability_density_s_m": pdf,
+                 "density_fraction": 0.4},
+                {"velocity_grid_m_s": velocity, "probability_density_s_m": pdf,
+                 "density_fraction": 0.4},
+            ],
+            ion_species=[{"name": "D+", "charge_state": 1.0, "mass_amu": 2.014}],
+            ion_fractions=[1.0], ion_temperature_eV=[10.0],
+            ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+            incident_direction=[1.0, 0.0, 0.0],
+            scattered_direction=[0.0, 1.0, 0.0],
+        )
