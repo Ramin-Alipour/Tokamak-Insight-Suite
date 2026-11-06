@@ -302,3 +302,43 @@ def test_bikappa_model_discrepancy_is_not_added_to_a_synthetic_identity_covarian
     np.testing.assert_array_equal(result["effective_covariance"], discrepancy)
     assert result["covariance_provenance"]["effective_covariance_model"] == "model_discrepancy_only"
     assert result["covariance_provenance"]["parameter_covariance_scale"] == "absolute_model_discrepancy_covariance"
+
+def test_flow_projection_covariance_survives_unidentifiable_temperature_anisotropy():
+    """Flow shifts remain estimable when every view has the same magnetic pitch."""
+    wavelength = np.linspace(499.8, 500.2, 161)
+    laser, angle = 500.0, np.pi / 2.0
+    b = np.array([0.0, 0.0, 1.0])
+    pitch = 0.5
+    transverse = np.sqrt(1.0 - pitch**2)
+    q = np.array([
+        [transverse, 0.0, pitch],
+        [-0.5*transverse, np.sqrt(3.0)*0.5*transverse, pitch],
+        [-0.5*transverse, -np.sqrt(3.0)*0.5*transverse, pitch],
+    ])
+    true_flow = np.array([1.2e4, -8.0e3, 5.0e3])
+    projections = q @ true_flow
+    directional_temperature = 425.0
+    q_factor = 2.0*np.sin(angle/2.0)
+    sigma_v = np.sqrt(1.602176634e-19*directional_temperature/9.1093837015e-31)
+    spectra = []
+    for flow in projections:
+        centre = laser*(1.0-q_factor*flow/299792458.0)
+        sigma_nm = laser*q_factor*sigma_v/299792458.0
+        feature, _ = _gaussian_bin_average(wavelength, centre, sigma_nm)
+        spectra.append(0.03 + 0.8*feature + 1.0e-4*(wavelength-laser))
+
+    result = fit_gyrotropic_bi_maxwellian_thomson(
+        wavelength, np.asarray(spectra), laser_wavelength_nm=laser,
+        scattering_angle_rad=angle, magnetic_field_unit=b,
+        scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+    )
+    assert result["geometry_design_rank"] == 1
+    assert result["anisotropy_identifiability"] == "non_identifiable"
+    assert result["parameter_covariance"] is None
+    assert result["flow_projection_covariance_status"] == "identified_independently_of_temperature_anisotropy"
+    assert result["flow_projection_covariance_m2_s2"].shape == (3, 3)
+    assert np.all(np.linalg.eigvalsh(result["flow_projection_covariance_m2_s2"]) > 0.0)
+    np.testing.assert_allclose(result["electron_velocity_projection_m_s"], projections, atol=2.0e3)
+
