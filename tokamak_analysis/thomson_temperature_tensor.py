@@ -168,10 +168,22 @@ def infer_full_temperature_tensor_from_thomson_projections(
     parameter_covariance = None
     covariance_status = "not_reported_psd_boundary"
     if not psd_active:
-        parameter_covariance = np.linalg.inv(information)
-        if projected_temperature_covariance_eV2 is None:
-            parameter_covariance *= chi_square / max(1, dof)
-        covariance_status = "local_gls_covariance_interior_psd_cone"
+        if covariance_is_measured:
+            parameter_covariance = np.linalg.inv(information)
+            covariance_status = "absolute_measurement_covariance_gls_interior_psd_cone"
+        elif dof > 0:
+            # With no supplied absolute noise model, estimate a common residual
+            # variance only when redundant views provide positive degrees of
+            # freedom. Exactly six independent projections determine six tensor
+            # components algebraically but cannot estimate their uncertainty.
+            residual_variance = chi_square / dof
+            if residual_variance > 0.0:
+                parameter_covariance = np.linalg.inv(information) * residual_variance
+                covariance_status = "residual_variance_estimated_from_redundant_views"
+            else:
+                covariance_status = "not_reported_zero_residual_variance_unresolved"
+        else:
+            covariance_status = "not_reported_without_absolute_covariance_or_redundant_views"
 
     eigenvalues, eigenvectors = np.linalg.eigh(tensor)
 
