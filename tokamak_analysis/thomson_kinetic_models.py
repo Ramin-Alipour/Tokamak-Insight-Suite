@@ -369,6 +369,7 @@ def infer_three_dimensional_flow_from_thomson_projections(
     velocity_projection_m_s, scattering_vector_unit, *,
     projection_covariance_m2_s2,
     scattering_vector_covariance=None,
+    projection_geometry_cross_covariance=None,
 ):
     """Infer a 3-D bulk-flow vector from independent measured TS projections.
 
@@ -379,6 +380,11 @@ def infer_three_dimensional_flow_from_thomson_projections(
     vectors is propagated by first-order iterative errors-in-variables GLS.
     Direction perturbations are projected onto each vector's tangent plane,
     because a normalized scattering direction has no radial degree of freedom.
+    If projection_geometry_cross_covariance is supplied, it is the full
+    Cov(v_q, q_xyz) block with shape (n_views, 3*n_views). Its tangent-plane
+    projection contributes both cross terms to the effective projection
+    covariance; this matters when wavelength/flow calibration and ray geometry
+    share calibration parameters.
     """
     projections = np.asarray(velocity_projection_m_s)
     directions = np.asarray(scattering_vector_unit)
@@ -432,6 +438,44 @@ def infer_three_dimensional_flow_from_thomson_projections(
         if direction_eigenvalues[0] < -direction_tolerance:
             raise ValueError("scattering_vector_covariance must be positive semidefinite")
         direction_covariance = tangent_projector @ direction_covariance @ tangent_projector.T
+
+    projection_geometry_cross = None
+    if projection_geometry_cross_covariance is not None:
+        if direction_covariance is None:
+            raise ValueError(
+                "projection_geometry_cross_covariance requires scattering_vector_covariance"
+            )
+        raw_cross = np.asarray(projection_geometry_cross_covariance)
+        expected_cross_shape = (projections.size, 3*projections.size)
+        if raw_cross.dtype.kind not in "iuf" or raw_cross.shape != expected_cross_shape:
+            raise ValueError(
+                "projection_geometry_cross_covariance must have shape "
+                "(n_views, 3*n_views) in view-major Cartesian ordering"
+            )
+        if np.any(~np.isfinite(raw_cross)):
+            raise ValueError("projection_geometry_cross_covariance must be finite")
+        # q is constrained to the unit sphere, so only tangent components of
+        # the supplied cross-covariance can contribute to first-order errors.
+        projection_geometry_cross = (
+            raw_cross.astype(float, copy=False) @ tangent_projector.T
+        )
+        joint_covariance = np.block([
+            [covariance, projection_geometry_cross],
+            [projection_geometry_cross.T, direction_covariance],
+        ])
+        joint_scale = max(float(np.max(np.abs(joint_covariance))), np.finfo(float).tiny)
+        joint_eigenvalues = np.linalg.eigvalsh(
+            0.5*(joint_covariance+joint_covariance.T)
+        )
+        joint_tolerance = (
+            np.finfo(float).eps * max(joint_covariance.shape)
+            * max(float(np.max(np.abs(joint_eigenvalues))), joint_scale)
+        )
+        if joint_eigenvalues[0] < -joint_tolerance:
+            raise ValueError(
+                "joint projection/geometry covariance block must be positive semidefinite"
+            )
+
     rank = int(np.linalg.matrix_rank(directions))
     result = {
         "model": "three_dimensional_electron_flow_from_multi_view_thomson_projections",
@@ -441,10 +485,18 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "input_velocity_projection_m_s": projections.copy(),
         "input_projection_covariance_m2_s2": covariance.copy(),
         "geometry_uncertainty_included": direction_covariance is not None,
+        "projection_geometry_cross_covariance_included": projection_geometry_cross is not None,
+        "input_projection_geometry_cross_covariance": (
+            None if projection_geometry_cross is None else projection_geometry_cross.copy()
+        ),
         "input_scattering_vector_covariance": supplied_direction_covariance,
         "tangent_plane_scattering_vector_covariance": direction_covariance,
         "geometry_covariance_method": (
-            "iterative_first_order_tangent_plane_errors_in_variables_GLS"
+            (
+                "iterative_first_order_tangent_plane_errors_in_variables_GLS_with_projection_geometry_cross_terms"
+                if projection_geometry_cross is not None
+                else "iterative_first_order_tangent_plane_errors_in_variables_GLS"
+            )
             if direction_covariance is not None else "not_supplied"
         ),
     }
@@ -476,8 +528,27 @@ def infer_three_dimensional_flow_from_thomson_projections(
                 tangent = np.eye(3)-np.outer(direction, direction)
                 jacobian_geometry[view, 3*view:3*view+3] = tangent @ velocity
             effective_covariance = (
-                covariance + jacobian_geometry @ direction_covariance @ jacobian_geometry.T
+                covariance
+                + jacobian_geometry @ direction_covariance @ jacobian_geometry.T
             )
+            if projection_geometry_cross is not None:
+                effective_covariance += (
+                    projection_geometry_cross @ jacobian_geometry.T
+                    + jacobian_geometry @ projection_geometry_cross.T
+                )
+            effective_covariance = 0.5 * (
+                effective_covariance + effective_covariance.T
+            )
+            effective_eigenvalues = np.linalg.eigvalsh(effective_covariance)
+            effective_tolerance = (
+                np.finfo(float).eps * max(effective_covariance.shape)
+                * max(float(np.max(np.abs(effective_eigenvalues))), np.finfo(float).tiny)
+            )
+            if effective_eigenvalues[0] <= effective_tolerance:
+                raise ValueError(
+                    "effective projection covariance including geometry cross terms "
+                    "must remain positive definite"
+                )
             updated_velocity, updated_covariance = flow_gls_solve(effective_covariance)
             change = np.linalg.norm(updated_velocity-velocity) / max(
                 np.linalg.norm(velocity), 1.0
