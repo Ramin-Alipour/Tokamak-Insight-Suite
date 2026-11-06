@@ -617,3 +617,37 @@ def test_bikappa_accepts_distinct_probability_conserving_response_per_view():
     assert result["electron_temperature_parallel_eV"] == pytest.approx(900.0, rel=3e-2)
     assert result["electron_temperature_perpendicular_eV"] == pytest.approx(320.0, rel=3e-2)
     assert result["kappa_index"] == pytest.approx(4.2, rel=3e-2)
+
+
+def test_bikappa_response_conservation_reaches_public_api_and_dashboard_model():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+    from tis.ui.advanced_thomson_physics_page import MODEL_LABELS, EXAMPLES
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    response = np.broadcast_to(
+        np.eye(wavelength.size),
+        (spectra.shape[0], wavelength.size, wavelength.size),
+    ).copy()
+    model = "gyrotropic_bi_kappa_spectral_fit"
+    assert model in MODEL_LABELS
+    assert model in EXAMPLES
+
+    result = run_advanced_thomson_physics(
+        model,
+        wavelength,
+        spectra,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2,
+        magnetic_field_unit=b,
+        scattering_vector_unit=q,
+        instrument_response_matrix=response,
+        initial_temperature_parallel_eV=750.0,
+        initial_temperature_perpendicular_eV=400.0,
+        initial_kappa=5.0,
+    )
+    assert result["public_physics_entrypoint"] == model
+    assert result["automatic_model_substitution"] is False
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["electron_temperature_parallel_eV"] == pytest.approx(900.0, rel=3e-2)
+    assert result["electron_temperature_perpendicular_eV"] == pytest.approx(320.0, rel=3e-2)
+    assert result["kappa_index"] == pytest.approx(4.2, rel=3e-2)
