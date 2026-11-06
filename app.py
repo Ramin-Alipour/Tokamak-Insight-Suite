@@ -3667,7 +3667,7 @@ elif page=='Advanced Analysis':
                 st.error(f'Two-population Thomson inference failed: {exc}')
     elif workflow=='Analysis 1 / N-population optical Thomson subanalysis':
         from tokamak_analysis.thomson_workflow import fit_n_population_relativistic_thomson_spectrum
-        st.info('Fit a measured calibrated optical Thomson spectrum with an explicitly selected finite mixture of 2–8 isotropic relativistic Maxwell-Juttner populations. Temperatures are ordered to prevent label switching, fractions are constrained to sum to one, and all components share one scattering-vector flow projection. This is a parametric mixture, not an unrestricted EVDF reconstruction.')
+        st.info('Fit a measured calibrated optical Thomson spectrum with an explicitly selected finite mixture of 2–8 isotropic relativistic Maxwell-Juttner populations. Temperatures are ordered to prevent label switching, fractions are constrained to sum to one, and each component can have its own fitted scattering-vector flow projection when independent initial flows are supplied. This is a parametric mixture, not an unrestricted EVDF reconstruction.')
         st.caption('Upload the measured two-column spectrum and its measured response matrix. Supply one initial temperature and one number fraction per population; these are optimizer seeds, not measured values.')
         n_pop_spectrum=st.file_uploader('Measured calibrated spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_npop_spectrum')
         n_pop_response=st.file_uploader('Measured wavelength-response matrix CSV',type=['csv','txt'],key='ts_npop_response')
@@ -3679,7 +3679,8 @@ elif page=='Advanced Analysis':
         n_pop_polarization=st.text_input('Incident polarization (x,y,z in scattering frame)',value='',key='ts_npop_polarization')
         n_pop_temperatures=st.text_input('Initial population temperatures (eV; strictly increasing, comma-separated)',value='',key='ts_npop_temperatures')
         n_pop_fractions=st.text_input('Initial population number fractions (comma-separated; sum to one)',value='',key='ts_npop_fractions')
-        n_pop_flow=st.text_input('Initial flow projection along q (m/s)',value='0',key='ts_npop_flow')
+        n_pop_flow=st.text_input('Initial shared flow projection along q (m/s)',value='0',key='ts_npop_flow')
+        n_pop_independent_flows=st.text_input('Optional independent initial population flows along q (m/s; comma-separated; leave blank for shared flow)',value='',key='ts_npop_independent_flows')
         n_pop_background=st.selectbox('Detector-space background model',['constant','linear','polynomial','cubic_spline'],index=1,key='ts_npop_background')
         n_pop_background_degree=int(st.number_input('Polynomial background degree',min_value=0,max_value=8,value=2,key='ts_npop_background_degree'))
         n_pop_recoil=st.checkbox('Include single-scattering Compton recoil and polarized Klein-Nishina weighting',value=False,key='ts_npop_recoil')
@@ -3712,7 +3713,11 @@ elif page=='Advanced Analysis':
                     population_count=n_pop_count,
                     initial_temperatures_eV=temperatures,
                     initial_fractions=fractions,
-                    initial_flow_projection_m_s=_parse_ts_scalar(n_pop_flow,'Initial flow projection'),
+                    initial_flow_projection_m_s=_parse_ts_scalar(n_pop_flow,'Initial shared flow projection'),
+                    initial_population_flow_projections_m_s=(
+                        [float(v.strip()) for v in n_pop_independent_flows.split(',') if v.strip()]
+                        if n_pop_independent_flows.strip() else None
+                    ),
                     incident_polarization=_parse_ts_vector(n_pop_polarization,'Incident polarization'),
                     background_model=n_pop_background,
                     background_degree=n_pop_background_degree,
@@ -3721,8 +3726,11 @@ elif page=='Advanced Analysis':
                     **optional,
                 )
                 st.success('N-population relativistic Thomson fit completed within its declared model scope.')
-                st.dataframe(pd.DataFrame({'population':np.arange(n_pop_count),'Te (eV)':result['population_temperatures_eV'],'number fraction':result['population_number_fractions']}))
-                st.metric('Scattering-vector flow projection',f"{result['electron_flow_projection_m_s']:.5g} m/s")
+                st.dataframe(pd.DataFrame({'population':np.arange(n_pop_count),'Te (eV)':result['population_temperatures_eV'],'number fraction':result['population_number_fractions'],'q-flow projection (m/s)':result['population_flow_projections_m_s']}))
+                if result['electron_flow_projection_m_s'] is not None:
+                    st.metric('Shared scattering-vector flow projection',f"{result['electron_flow_projection_m_s']:.5g} m/s")
+                else:
+                    st.caption('Independent population flow projections were fitted; no single shared bulk-flow value is reported.')
                 st.json(result)
                 json_download('Export N-population Thomson fit and covariance',result,'tis_thomson_n_population_fit.json')
                 add_report_section('N-population relativistic optical Thomson inference',result)
