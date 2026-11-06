@@ -1,10 +1,9 @@
 """N-population relativistic optical Thomson forward model.
 
 Each population is an isotropic Maxwell-Juttner component with its own
-temperature and number-density fraction. Components share the supplied
-scattering-vector flow projection, polarization and geometry. Mixture power
-is weighted by component differential cross-sections, not temperature averages.
-This is a parametric mixture, not arbitrary-EVDF inversion.
+temperature, number-density fraction and (optionally) scattering-vector flow
+projection. Mixture power is weighted by component differential cross-sections,
+not temperature averages. This is a parametric mixture, not arbitrary-EVDF inversion.
 """
 from __future__ import annotations
 import numpy as np
@@ -18,12 +17,13 @@ def _real_vector(value, name, minimum=1):
     if not np.all(np.isfinite(out)): raise ValueError(f"{name} must contain finite values")
     return out
 
-def n_population_relativistic_thomson_spectrum(wavelength_nm, laser_wavelength_nm, scattering_angle_rad, population_temperatures_eV, population_fractions, *, flow_projection_m_s, incident_polarization, radial_order=36, angular_order=18, maximum_recoil_correction_fraction=0.01, include_compton_recoil=False):
+def n_population_relativistic_thomson_spectrum(wavelength_nm, laser_wavelength_nm, scattering_angle_rad, population_temperatures_eV, population_fractions, *, flow_projection_m_s=None, population_flow_projections_m_s=None, incident_polarization, radial_order=36, angular_order=18, maximum_recoil_correction_fraction=0.01, include_compton_recoil=False):
     """Return a cross-section-weighted N-component relativistic MJ spectrum.
 
     Fractions are number-density fractions and must be non-negative and sum
-    to one. All components share the scattering-vector flow projection.
-    Zero-fraction components are skipped. Absolute density is not inferred.
+    to one. Supply either one shared flow_projection_m_s or one
+    population_flow_projections_m_s value per component. Zero-fraction
+    components are skipped. Absolute density is not inferred.
     """
     wavelength = _real_vector(wavelength_nm, "wavelength_nm", 7)
     temperatures = _real_vector(population_temperatures_eV, "population_temperatures_eV", 2)
@@ -32,33 +32,45 @@ def n_population_relativistic_thomson_spectrum(wavelength_nm, laser_wavelength_n
     if np.any(wavelength <= 0) or np.any(np.diff(wavelength) <= 0): raise ValueError("wavelength_nm must be positive and strictly increasing")
     if np.any(temperatures <= 0): raise ValueError("population temperatures must be positive")
     if np.any(fractions < 0) or not np.isclose(fractions.sum(), 1.0, rtol=1e-9, atol=1e-12): raise ValueError("population fractions must be non-negative and sum to one")
-    laser, angle, flow = float(laser_wavelength_nm), float(scattering_angle_rad), float(flow_projection_m_s)
+    laser, angle = float(laser_wavelength_nm), float(scattering_angle_rad)
     if not np.isfinite(laser) or laser <= 0: raise ValueError("laser wavelength must be positive and finite")
     if not np.isfinite(angle) or not 0 < angle < np.pi: raise ValueError("scattering angle must lie in (0, pi)")
-    if not np.isfinite(flow) or abs(flow) >= C: raise ValueError("flow projection must be finite and subluminal")
+    if (flow_projection_m_s is None) == (population_flow_projections_m_s is None):
+        raise ValueError("supply exactly one of flow_projection_m_s or population_flow_projections_m_s")
+    if population_flow_projections_m_s is None:
+        flow = float(flow_projection_m_s)
+        flows = np.full(temperatures.size, flow, dtype=float)
+    else:
+        flows = _real_vector(population_flow_projections_m_s, "population_flow_projections_m_s", temperatures.size)
+        if flows.shape != temperatures.shape:
+            raise ValueError("population_flow_projections_m_s must match the population count")
+        flow = None
+    if np.any(~np.isfinite(flows)) or np.any(np.abs(flows) >= C):
+        raise ValueError("every population flow projection must be finite and subluminal")
     if not isinstance(include_compton_recoil, (bool, np.bool_)): raise ValueError("include_compton_recoil must be boolean")
     components, weighted, total = [], [], 0.0
-    for i, (temperature, fraction) in enumerate(zip(temperatures, fractions)):
+    for i, (temperature, fraction, population_flow) in enumerate(zip(temperatures, fractions, flows)):
         if fraction == 0:
             components.append({"index": int(i), "temperature_eV": float(temperature), "number_fraction": 0.0, "evaluated": False})
             continue
-        result = relativistic_maxwell_juttner_spectrum(wavelength_nm=wavelength, laser_wavelength_nm=laser, scattering_angle_rad=angle, electron_temperature_eV=float(temperature), flow_projection_m_s=flow, incident_polarization=incident_polarization, radial_order=radial_order, angular_order=angular_order, maximum_recoil_correction_fraction=maximum_recoil_correction_fraction, include_compton_recoil=include_compton_recoil)
+        result = relativistic_maxwell_juttner_spectrum(wavelength_nm=wavelength, laser_wavelength_nm=laser, scattering_angle_rad=angle, electron_temperature_eV=float(temperature), flow_projection_m_s=float(population_flow), incident_polarization=incident_polarization, radial_order=radial_order, angular_order=angular_order, maximum_recoil_correction_fraction=maximum_recoil_correction_fraction, include_compton_recoil=include_compton_recoil)
         cross = float(result["effective_differential_cross_section_m2_sr"])
         if not np.isfinite(cross) or cross <= 0: raise ValueError(f"population {i} has non-positive differential cross-section")
         weight = float(fraction) * cross
         total += weight
         weighted.append(weight * np.asarray(result["spectral_density_per_nm"], dtype=float))
-        components.append({"index": int(i), "temperature_eV": float(temperature), "number_fraction": float(fraction), "power_weight_m2_sr": weight, "effective_differential_cross_section_m2_sr": cross, "evaluated": True})
+        components.append({"index": int(i), "temperature_eV": float(temperature), "number_fraction": float(fraction), "power_weight_m2_sr": weight, "effective_differential_cross_section_m2_sr": cross, "flow_projection_m_s": float(population_flow), "evaluated": True})
     if not np.isfinite(total) or total <= 0: raise ValueError("mixture has no positive scattered-power contribution")
     spectrum = np.sum(weighted, axis=0) / total
     if spectrum.shape != wavelength.shape or not np.all(np.isfinite(spectrum)) or np.any(spectrum < 0): raise ValueError("mixture produced an invalid spectrum")
-    return {"spectral_density_per_nm": spectrum, "effective_differential_cross_section_m2_sr": float(total), "population_temperatures_eV": temperatures.copy(), "population_number_fractions": fractions.copy(), "population_components": components, "population_count": int(temperatures.size), "flow_projection_m_s": flow, "absolute_density_inferred": False, "model": "N-population isotropic relativistic Maxwell-Juttner Thomson mixture", "assumptions": ["Isotropic Maxwell-Juttner components.", "Shared bulk-flow projection along the scattering vector.", "Number fractions weighted by component differential scattered power.", "Not an arbitrary or anisotropic EVDF reconstruction.", "Absolute density is not inferred."]}
+    return {"spectral_density_per_nm": spectrum, "effective_differential_cross_section_m2_sr": float(total), "population_temperatures_eV": temperatures.copy(), "population_number_fractions": fractions.copy(), "population_components": components, "population_count": int(temperatures.size), "flow_projection_m_s": (float(flows[0]) if np.allclose(flows, flows[0]) else None), "population_flow_projections_m_s": flows.copy(), "absolute_density_inferred": False, "model": "N-population isotropic relativistic Maxwell-Juttner Thomson mixture", "assumptions": ["Isotropic Maxwell-Juttner components.", "Each population has its own scattering-vector flow projection when supplied; a shared-flow closure remains available.", "Number fractions weighted by component differential scattered power.", "Not an arbitrary or anisotropic EVDF reconstruction.", "Absolute density is not inferred."]}
 
 
 def fit_n_population_relativistic_thomson_spectrum(
     wavelength_nm, measured_spectrum, laser_wavelength_nm, scattering_angle_rad,
     instrument_response, *, population_count, initial_temperatures_eV,
     initial_fractions, initial_flow_projection_m_s, incident_polarization,
+    initial_population_flow_projections_m_s=None,
     signal_uncertainty=None, spectral_covariance=None,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
@@ -70,10 +82,11 @@ def fit_n_population_relativistic_thomson_spectrum(
 
     Population temperatures are strictly ordered through positive log-gaps;
     number fractions are constrained to the simplex through a softmax
-    parameterization. All populations share one scattering-vector flow
-    projection and one measured response operator. Amplitude and the selected
-    detector-space background basis are fitted jointly. The model is
-    intentionally finite-dimensional and is not an unrestricted EVDF inverse.
+    parameterization. By default all populations share one flow projection;
+    supplying initial_population_flow_projections_m_s fits an independent
+    subluminal projection for every population. The measured response operator,
+    amplitude and detector-space background are fitted jointly. This remains
+    a finite-dimensional parametric mixture, not an unrestricted EVDF inverse.
     """
     from scipy.optimize import least_squares
     from scipy.special import softmax
@@ -98,6 +111,13 @@ def fit_n_population_relativistic_thomson_spectrum(
     laser = float(laser_wavelength_nm)
     angle = float(scattering_angle_rad)
     flow0 = float(initial_flow_projection_m_s)
+    independent_population_flows = initial_population_flow_projections_m_s is not None
+    if independent_population_flows:
+        flow_initial = _real_vector(initial_population_flow_projections_m_s, "initial_population_flow_projections_m_s", count)
+        if flow_initial.shape != (count,) or np.any(np.abs(flow_initial) >= C):
+            raise ValueError("initial_population_flow_projections_m_s must contain one finite subluminal value per population")
+    else:
+        flow_initial = np.full(count, flow0, dtype=float)
     if not np.isfinite(laser) or laser <= 0.0 or not np.isfinite(angle) or not 0.0 < angle < np.pi:
         raise ValueError("laser wavelength must be positive and scattering angle must lie strictly inside (0, pi)")
     if not np.isfinite(flow0) or abs(flow0) >= C:
@@ -156,7 +176,7 @@ def fit_n_population_relativistic_thomson_spectrum(
         noise_model = "full_GLS_covariance" if model_discrepancy_covariance is None else "measurement_plus_model_discrepancy_GLS_covariance"
 
     # Coordinates: log(T0), log-positive temperature gaps, N-1 logits,
-    # atanh(v/c), log(amplitude), and unconstrained background coefficients.
+    # one or N atanh(v_j/c) flow coordinates, log(amplitude), background.
     log_temperatures = np.log(temperatures)
     log_gaps = np.log(np.diff(temperatures))
     fraction_logits = np.log(fractions[:-1] / fractions[-1])
@@ -164,8 +184,8 @@ def fit_n_population_relativistic_thomson_spectrum(
     amplitude0 = max(float(np.max(y) - baseline), np.finfo(float).tiny)
     p0 = np.r_[
         log_temperatures[0], log_gaps, fraction_logits,
-        np.arctanh(flow0 / C), np.log(amplitude0),
-        np.zeros(basis.shape[1]),
+        np.arctanh(flow_initial / C) if independent_population_flows else np.asarray([np.arctanh(flow0 / C)]),
+        np.log(amplitude0), np.zeros(basis.shape[1]),
     ]
 
     def unpack(parameters):
@@ -174,16 +194,21 @@ def fit_n_population_relativistic_thomson_spectrum(
         population_temperatures = np.r_[first_temperature, first_temperature + np.cumsum(gaps)]
         logits = np.r_[parameters[count:count + count - 1], 0.0]
         population_fractions = softmax(logits)
-        flow = float(np.tanh(parameters[2 * count - 1]) * C)
-        amplitude = float(np.exp(np.clip(parameters[2 * count], -700.0, 700.0)))
-        background_coefficients = np.asarray(parameters[2 * count + 1:], dtype=float)
-        return population_temperatures, population_fractions, flow, amplitude, background_coefficients
+        flow_start = 2 * count - 1
+        n_flow = count if independent_population_flows else 1
+        flows = np.tanh(parameters[flow_start:flow_start + n_flow]) * C
+        if not independent_population_flows:
+            flows = np.full(count, float(flows[0]))
+        amplitude_index = flow_start + n_flow
+        amplitude = float(np.exp(np.clip(parameters[amplitude_index], -700.0, 700.0)))
+        background_coefficients = np.asarray(parameters[amplitude_index + 1:], dtype=float)
+        return population_temperatures, population_fractions, flows, amplitude, background_coefficients
 
     def predict(parameters, return_parts=False):
-        temp, frac, flow, amplitude, coefficients = unpack(parameters)
+        temp, frac, flows, amplitude, coefficients = unpack(parameters)
         physical = n_population_relativistic_thomson_spectrum(
             x, laser, angle, temp, frac,
-            flow_projection_m_s=flow, incident_polarization=polarization,
+            population_flow_projections_m_s=flows, incident_polarization=polarization,
             radial_order=radial_order, angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
             include_compton_recoil=include_compton_recoil,
@@ -232,9 +257,10 @@ def fit_n_population_relativistic_thomson_spectrum(
     # Transform the complete covariance to physical parameters and nuisance
     # coordinates with a bound-aware central finite-difference Jacobian.
     def reported_vector(parameters):
-        temp, frac, flow, amplitude, coefficients = unpack(parameters)
-        return np.r_[temp, frac, flow, amplitude, coefficients]
-    physical_jacobian = np.empty((2 * count + 2 + basis.shape[1], fit.x.size))
+        temp, frac, flows, amplitude, coefficients = unpack(parameters)
+        flow_report = flows if independent_population_flows else np.asarray([flows[0]])
+        return np.r_[temp, frac, flow_report, amplitude, coefficients]
+    physical_jacobian = np.empty((2 * count + (count if independent_population_flows else 1) + 1 + basis.shape[1], fit.x.size))
     for index, value in enumerate(fit.x):
         step = np.cbrt(np.finfo(float).eps) * max(1.0, abs(float(value)))
         plus, minus = fit.x.copy(), fit.x.copy()
@@ -245,11 +271,13 @@ def fit_n_population_relativistic_thomson_spectrum(
         ) / (2.0 * step)
     joint_covariance = physical_jacobian @ covariance_internal @ physical_jacobian.T
     fitted, physical, plasma, background = predict(fit.x, return_parts=True)
-    temp, frac, flow, amplitude, coefficients = unpack(fit.x)
+    temp, frac, flows, amplitude, coefficients = unpack(fit.x)
+    flow_report = flows if independent_population_flows else np.asarray([flows[0]])
     parameter_names = (
         [f"population_{i}_temperature_eV" for i in range(count)]
         + [f"population_{i}_number_fraction" for i in range(count)]
-        + ["electron_flow_projection_m_s", "spectral_amplitude"]
+        + ([f"population_{i}_flow_projection_m_s" for i in range(count)] if independent_population_flows else ["electron_flow_projection_m_s"])
+        + ["spectral_amplitude"]
         + [f"background_coefficient_{i}" for i in range(basis.shape[1])]
     )
     return {
@@ -257,7 +285,8 @@ def fit_n_population_relativistic_thomson_spectrum(
         "population_count": count,
         "population_temperatures_eV": temp,
         "population_number_fractions": frac,
-        "electron_flow_projection_m_s": flow,
+        "electron_flow_projection_m_s": (float(flows[0]) if not independent_population_flows else None),
+        "population_flow_projections_m_s": flows.copy(),
         "spectral_amplitude": amplitude,
         "background_model": background_model,
         "background_coefficients": coefficients,
@@ -289,7 +318,7 @@ def fit_n_population_relativistic_thomson_spectrum(
             "Finite N-component isotropic Maxwell-Juttner mixture.",
             "Strictly ordered component temperatures remove label switching.",
             "Number fractions are constrained to the unit simplex.",
-            "All components share one flow projection along the scattering vector.",
+            "A shared flow projection is the default; independent per-population projections are fitted only when explicitly initialized.",
             "Amplitude and detector-space background are nuisance parameters.",
             "A finite-dimensional mixture is not an unrestricted electron velocity distribution.",
         ],
