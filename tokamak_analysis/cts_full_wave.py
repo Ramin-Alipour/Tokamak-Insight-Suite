@@ -429,8 +429,16 @@ def solve_3d_periodic_full_wave(
     dissipative = (eps - np.swapaxes(eps.conj(), -1, -2)) / (2j)
     dissipative = 0.5 * (dissipative + np.swapaxes(dissipative.conj(), -1, -2))
     loss_eigenvalues = np.linalg.eigvalsh(dissipative)
-    if np.min(loss_eigenvalues) < -1e-9 * max(1.0, float(np.max(np.abs(eps)))):
-        raise ValueError("epsilon_r must be passive: its Hermitian dissipative part must be positive semidefinite")
+    passivity_tolerance = (
+        100.0 * np.finfo(float).eps
+        * max(1.0, float(np.max(np.abs(eps))))
+    )
+    if np.min(loss_eigenvalues) < -passivity_tolerance:
+        raise ValueError(
+            "epsilon_r must be passive for exp(-i omega t): "
+            "its Hermitian dissipative part must be positive semidefinite "
+            "up to floating-point roundoff"
+        )
 
     # Flattening order is (z,y,x), so x is the fastest varying coordinate.
     dx, dy, dz = float(x[1]-x[0]), float(y[1]-y[0]), float(z[1]-z[0])
