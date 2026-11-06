@@ -769,6 +769,8 @@ EXAMPLES["thomson_joint_spatial_spectra"] = {
     "measured_spectra": _joint_ts_spectra.tolist(),
     "radius_m": _joint_ts_radius.tolist(),
     "spatial_mixing_matrix": np.eye(3).tolist(),
+    "spatial_mixing_matrix_covariance": None,
+    "spectral_mixing_cross_covariance": None,
     "laser_wavelength_nm": 532.0,
     "scattering_angle_rad": float(np.pi / 2.0),
     "instrument_response": np.eye(_joint_ts_wavelength.size).tolist(),
