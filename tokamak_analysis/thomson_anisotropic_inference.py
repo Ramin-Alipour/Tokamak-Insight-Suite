@@ -133,6 +133,51 @@ def _apply_response_in_bin_integrated_space(response_matrix, spectral_density, w
     return (response @ (density * widths)) / widths
 
 
+def _fit_covariance_blocks(jacobian, cost, n_observations, flow_indices,
+                           measurement_covariance_supplied,
+                           discrepancy_supplied):
+    """Preserve covariance for identifiable parameter blocks in rank-deficient fits.
+
+    Temperature anisotropy and Doppler shifts are different inverse subspaces.
+    A null direction confined to (T_parallel, T_perpendicular) must not erase
+    the independently estimable per-view flow covariance.
+    """
+    jacobian = np.asarray(jacobian, dtype=float)
+    _, singular_values, right_vectors = np.linalg.svd(
+        jacobian, full_matrices=True
+    )
+    leading = singular_values[0] if singular_values.size else 0.0
+    tolerance = np.finfo(float).eps * max(jacobian.shape) * leading
+    rank = int(np.count_nonzero(singular_values > tolerance))
+    full_rank = rank == jacobian.shape[1]
+    normal_covariance = np.linalg.pinv(jacobian.T @ jacobian, rcond=1e-12)
+    null_basis = right_vectors[rank:, :].T
+    indices = np.asarray(flow_indices, dtype=int)
+    if indices.ndim != 1 or np.any(indices < 0) or np.any(indices >= jacobian.shape[1]):
+        raise ValueError("flow covariance indices are inconsistent with fitted parameters")
+    if null_basis.shape[1] == 0:
+        flow_identifiable = True
+    else:
+        null_projection = np.linalg.norm(null_basis[indices, :], axis=1)
+        flow_identifiable = bool(np.all(null_projection <= 1e-8))
+    if measurement_covariance_supplied or discrepancy_supplied:
+        scale = 1.0
+        scale_method = (
+            "absolute_model_discrepancy_covariance"
+            if discrepancy_supplied and not measurement_covariance_supplied
+            else "supplied_absolute_covariance"
+        )
+    else:
+        dof = max(1, int(n_observations) - jacobian.shape[1])
+        scale = 2.0 * float(cost) / dof
+        scale_method = "unweighted_residual_scaled"
+    covariance = normal_covariance * scale
+    flow_covariance = (
+        covariance[np.ix_(indices, indices)].copy() if flow_identifiable else None
+    )
+    return singular_values, full_rank, covariance, flow_covariance, scale_method
+
+
 def fit_gyrotropic_bi_maxwellian_thomson(
     wavelength_nm, measured_spectra, *, laser_wavelength_nm,
     scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
@@ -338,17 +383,16 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "Fitted thermal or bulk-flow speed exceeds the declared non-relativistic "
             "validity screen; use a relativistic forward model."
         )
-    singular = np.linalg.svd(fit.jac, compute_uv=False)
-    tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
-    full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
-    parameter_covariance = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if (full_rank and geometry_rank == 2) else None
-    covariance_scale_method = "supplied_absolute_covariance"
-    if parameter_covariance is not None and not measurement_covariance_supplied and discrepancy is None:
-        dof = max(1, size - fit.x.size)
-        parameter_covariance *= (2.0 * float(fit.cost) / dof)
-        covariance_scale_method = "unweighted_residual_scaled"
-    elif parameter_covariance is not None and discrepancy is not None and not measurement_covariance_supplied:
-        covariance_scale_method = "absolute_model_discrepancy_covariance"
+    flow_indices = 2 + 4 * np.arange(n_view)
+    singular, full_rank, covariance_all, flow_covariance, covariance_scale_method = (
+        _fit_covariance_blocks(
+            fit.jac, fit.cost, size, flow_indices,
+            measurement_covariance_supplied, discrepancy is not None,
+        )
+    )
+    parameter_covariance = (
+        covariance_all.copy() if (full_rank and geometry_rank == 2) else None
+    )
     if parameter_covariance is not None:
         transform = np.eye(fit.x.size)
         transform[0, 0] = np.exp(fit.x[0])
@@ -400,6 +444,12 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         ),
         "effective_covariance": cov,
         "parameter_covariance": parameter_covariance,
+        "flow_projection_covariance_m2_s2": flow_covariance,
+        "flow_projection_covariance_status": (
+            "identified_independently_of_temperature_anisotropy"
+            if flow_covariance is not None else "non_identifiable"
+        ),
+        "flow_projection_parameter_names": [f"flow_projection_view_{i}_m_s" for i in range(n_view)],
         "parameter_order": ["T_parallel_eV", "T_perpendicular_eV"] + [
             item for i in range(n_view) for item in (
                 f"flow_projection_view_{i}_m_s", f"log_amplitude_view_{i}",
@@ -629,17 +679,16 @@ def fit_gyrotropic_bi_kappa_thomson(
             "Fitted thermal or bulk-flow speed exceeds the declared non-relativistic "
             "validity screen; use a relativistic forward model."
         )
-    singular = np.linalg.svd(fit.jac, compute_uv=False)
-    tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
-    full_rank = int(np.count_nonzero(singular > tol)) == fit.x.size
-    parameter_covariance = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if (full_rank and geometry_rank == 2) else None
-    covariance_scale_method = "supplied_absolute_covariance"
-    if parameter_covariance is not None and not measurement_covariance_supplied and discrepancy is None:
-        dof = max(1, size - fit.x.size)
-        parameter_covariance *= (2.0 * float(fit.cost) / dof)
-        covariance_scale_method = "unweighted_residual_scaled"
-    elif parameter_covariance is not None and discrepancy is not None and not measurement_covariance_supplied:
-        covariance_scale_method = "absolute_model_discrepancy_covariance"
+    flow_indices = 3 + 4 * np.arange(n_view)
+    singular, full_rank, covariance_all, flow_covariance, covariance_scale_method = (
+        _fit_covariance_blocks(
+            fit.jac, fit.cost, size, flow_indices,
+            measurement_covariance_supplied, discrepancy is not None,
+        )
+    )
+    parameter_covariance = (
+        covariance_all.copy() if (full_rank and geometry_rank == 2) else None
+    )
     if parameter_covariance is not None:
         transform = np.eye(fit.x.size)
         transform[0, 0] = np.exp(fit.x[0])
@@ -691,6 +740,12 @@ def fit_gyrotropic_bi_kappa_thomson(
         ),
         "effective_covariance": cov,
         "parameter_covariance": parameter_covariance,
+        "flow_projection_covariance_m2_s2": flow_covariance,
+        "flow_projection_covariance_status": (
+            "identified_independently_of_temperature_anisotropy"
+            if flow_covariance is not None else "non_identifiable"
+        ),
+        "flow_projection_parameter_names": [f"flow_projection_view_{i}_m_s" for i in range(n_view)],
         "parameter_order": ["T_parallel_eV", "T_perpendicular_eV", "kappa_minus_1p5"] + [
             item for i in range(n_view) for item in (
                 f"flow_projection_view_{i}_m_s", f"log_amplitude_view_{i}",
