@@ -87,6 +87,28 @@ def test_joint_spatial_dispatch_forwards_relativistic_model_and_compton_selectio
     assert captured["kwargs"]["include_compton_recoil"] is True
 
 
+
+def test_joint_spatial_dispatch_forwards_gaussian_psf_calibration_uncertainty(monkeypatch):
+    captured = {}
+
+    def fake_joint(*args, **kwargs):
+        captured["kwargs"] = kwargs
+        return {"analysis_status": "joint-dispatch-tested"}
+
+    import tokamak_analysis.thomson_joint_spatial_spectral as joint
+    monkeypatch.setattr(joint, "reconstruct_joint_thomson_spatial_spectra", fake_joint)
+    result = workflow.reconstruct_thomson_profile_from_spectra(
+        np.linspace(520.0, 544.0, 9), np.ones((3, 9)), np.array([0.1, 0.2, 0.3]),
+        joint_spatial_spectral=True, spatial_mixing_matrix=np.eye(3),
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(9), model="non_collective_maxwellian",
+        spatial_psf_sigma_m=0.02,
+        spatial_psf_sigma_uncertainty_m=0.003,
+    )
+    assert result["analysis_status"] == "joint-dispatch-tested"
+    assert captured["kwargs"]["spatial_psf_sigma_m"] == pytest.approx(0.02)
+    assert captured["kwargs"]["spatial_psf_sigma_uncertainty_m"] == pytest.approx(0.003)
+
 def test_gls_smoothing_accepts_small_but_positive_covariance_without_rescaling():
     radius = np.linspace(0.0, 1.0, 5)
     values = np.array([1.0, 1.2, 1.1, 1.4, 1.3])
