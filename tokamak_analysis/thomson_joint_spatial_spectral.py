@@ -914,7 +914,7 @@ def reconstruct_joint_thomson_spatial_spectra(
             "uncertainty": (
                 "linearized_GLS_parameter_covariance_propagated_from_external_sigma_calibration_uncertainty"
                 if psf_calibration_covariance_p is not None else
-                "fixed_operator_no_PSf_calibration_covariance_supplied"
+                "fixed_operator_no_PSF_calibration_covariance_supplied"
             ),
         },
         "instrument_response": "researcher_supplied_fixed_forward_operator",
@@ -979,7 +979,7 @@ def reconstruct_joint_thomson_spatial_spectra(
                                  "spatial structures in the null space of the supplied mixing operator",
                                  "sub-resolution spatial structure not encoded by the measured mixing operator",
                                  "unrestricted anisotropic or non-Maxwellian electron distributions"]},
-        "uncertainty_semantics": f"parameter_covariance is the local linearized data-only GLS covariance conditional on the selected {physical_model} model, fixed spatial/spectral response operators and supplied noise model; regularization is excluded. regularized_parameter_covariance is separately exposed for the stabilized numerical candidate. Full cross-covariance among amplitude, Te, flow and spatial nodes is retained.",
+        "uncertainty_semantics": f"parameter_covariance is the local linearized GLS covariance conditional on the selected {physical_model} model and supplied noise model, with optional first-order propagation of external Gaussian PSF-width calibration uncertainty; regularization is excluded. The PSF covariance is conditional on the supplied Gaussian PSF shape and fixed spatial mixing operator. regularized_parameter_covariance is separately exposed for the stabilized numerical candidate. Full cross-covariance among amplitude, Te, flow and spatial nodes is retained.",
         "parameter_identifiability": {
             "primary": ["electron_temperature_profile_eV", "electron_velocity_projection_profile_m_s", "relative_spectral_amplitude_profile"] if data_identifiable else [],
             "conditional": ["absolute electron density requires a separate absolute-power and optical-collection inference with its complete auxiliary inputs"],
