@@ -65,3 +65,27 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
         expected_fitted_mean = float(np.sum(fitted*weights*velocity_parallel))
         assert result["electron_parallel_mean_velocity_m_s"] == expected_fitted_mean
         assert result["electron_parallel_mean_velocity_status"] == "identified_from_fitted_gyrotropic_EVDF"
+
+    from tokamak_analysis.cts_full_em import E_CHARGE
+    velocity_perpendicular = p_perp[:, None] / (gamma*ME)
+    kinetic_energy_eV = (gamma - 1.0)*ME*C**2/E_CHARGE
+    expected_energy = float(np.sum(candidate*weights*kinetic_energy_eV))
+    expected_t_parallel = float(np.sum(candidate*weights*p_parallel[None, :]*velocity_parallel)/E_CHARGE)
+    expected_t_perpendicular = float(
+        0.5*np.sum(candidate*weights*p_perp[:, None]*velocity_perpendicular)/E_CHARGE
+    )
+    moments = result["population_relativistic_moments_candidate"]
+    assert np.isclose(moments["mean_kinetic_energy_eV"], expected_energy, rtol=1e-12)
+    assert np.isclose(moments["parallel_pressure_temperature_eV"], expected_t_parallel, rtol=1e-12)
+    assert np.isclose(moments["perpendicular_pressure_temperature_eV"], expected_t_perpendicular, rtol=1e-12)
+    assert np.isclose(
+        moments["pressure_anisotropy_Tperp_over_Tparallel"],
+        expected_t_perpendicular/expected_t_parallel, rtol=1e-12,
+    )
+    assert moments["mean_parallel_velocity_m_s"] == expected_candidate_mean
+    if result["distribution_kg_m_s_inverse3"] is None:
+        assert result["population_relativistic_moments_identified"] is None
+        assert result["population_relativistic_moment_status"] == "conditional_candidate_only_shape_not_identifiable"
+    else:
+        assert result["population_relativistic_moments_identified"] is not None
+        assert result["population_relativistic_moment_status"] == "identified_from_fitted_distribution"
