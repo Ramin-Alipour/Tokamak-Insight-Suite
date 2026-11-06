@@ -839,8 +839,8 @@ def render_advanced_thomson_physics_page(st) -> None:
             if isinstance(result, Mapping) and "velocity_moment_covariance_order" in result:
                 st.subheader("Projected EVDF — physical velocity moments")
                 st.latex(
-                    r"T_{e,q}=\\frac{m_e}{e k_B}"
-                    r"\\left[\\langle v_q^2\\rangle-\\langle v_q\\rangle^2\\right]"
+                    r"T_{e,q}=\frac{m_e}{e k_B}"
+                    r"\left[\langle v_q^2\rangle-\langle v_q\rangle^2\right]"
                 )
                 st.write({
                     "mean_velocity_parallel_m_s": result.get("mean_velocity_parallel_m_s"),
