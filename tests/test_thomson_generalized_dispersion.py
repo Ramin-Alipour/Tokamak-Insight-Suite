@@ -557,3 +557,50 @@ def test_multi_population_cts_moments_include_between_population_drift_energy():
         rtol=2e-5,
     )
     assert np.isclose(result["electron_flow_projection_m_s"], 0.0, atol=1e-6)
+
+
+
+def test_exact_landau_susceptibility_derivative_matches_phase_velocity_difference():
+    velocity = np.linspace(-12.0, 12.0, 2401)
+    distribution = np.exp(-0.5 * (velocity / 2.3) ** 2)
+    phase_velocity = 0.237  # deliberately away from a tabulated derivative knot
+    step = 2.0e-5
+    common = dict(
+        electron_density_m3=1.7e18,
+        wavenumber_m_inverse=85.0,
+        landau_limit=True,
+    )
+    exact = generalized_electron_susceptibility(
+        velocity, distribution, phase_velocity,
+        include_phase_velocity_derivative=True, **common,
+    )
+    plus = generalized_electron_susceptibility(
+        velocity, distribution, phase_velocity + step, **common,
+    )
+    minus = generalized_electron_susceptibility(
+        velocity, distribution, phase_velocity - step, **common,
+    )
+    finite_difference = (
+        plus["electron_susceptibility"] - minus["electron_susceptibility"]
+    ) / (2.0 * step)
+    np.testing.assert_allclose(
+        exact["susceptibility_phase_velocity_derivative_s_m"],
+        finite_difference, rtol=2.0e-5, atol=2.0e-7,
+    )
+    assert exact["phase_derivative_quadrature"] == (
+        "hadamard_finite_part_second_order_landau_derivative"
+        "_plus_distributional_finite_support_endpoint_jumps"
+    )
+
+
+def test_exact_landau_derivative_rejects_resonance_at_vdf_grid_knot():
+    velocity = np.linspace(-10.0, 10.0, 1001)
+    distribution = np.exp(-0.5 * velocity**2)
+    with np.testing.assert_raises_regex(ValueError, "derivative knot"):
+        generalized_electron_susceptibility(
+            velocity, distribution, 0.0,
+            electron_density_m3=1.0e18,
+            wavenumber_m_inverse=100.0,
+            include_phase_velocity_derivative=True,
+            landau_limit=True,
+        )
