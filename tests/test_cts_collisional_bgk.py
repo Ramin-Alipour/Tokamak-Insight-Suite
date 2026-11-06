@@ -62,3 +62,27 @@ def test_static_zero_flow_limit_recovers_boltzmann_response():
     response = result["density_response_matrix_m3_per_J"][0]
     expected = -np.diag([1.0e19, 2.0e18]) / (100.0 * 1.602176634e-19)
     assert np.allclose(response, expected, rtol=2e-5, atol=1e-12 * np.max(np.abs(expected)))
+
+
+def test_zero_collision_frequency_recovers_collisionless_streaming_limit():
+    common = dict(
+        wave_number_m_inverse=2.0e5,
+        angular_frequency_rad_s=np.array([1.0e5, 4.0e5]),
+        species_densities_m3=[1.0e19, 1.0e19],
+        species_masses_kg=[9.1093837015e-31, 1.67262192369e-27],
+        common_temperature_J=100.0 * 1.602176634e-19,
+        quadrature_order=64,
+    )
+    mixed = conserving_bgk_longitudinal_susceptibility(
+        **common, collision_frequencies_s_inverse=[0.0, 1.0e5]
+    )
+    assert mixed["collision_regime"] == "mixed_collisionless_collisional_bgk"
+    assert mixed["collisionless_species_indices"].tolist() == [0]
+    assert np.all(np.isfinite(mixed["density_response_matrix_m3_per_J"]))
+
+    collisionless = conserving_bgk_longitudinal_susceptibility(
+        **common, collision_frequencies_s_inverse=[0.0, 0.0]
+    )
+    assert collisionless["collision_regime"] == "collisionless_vlasov_limit"
+    assert collisionless["collisionless_species_indices"].tolist() == [0, 1]
+    assert np.all(np.isfinite(collisionless["density_response_matrix_m3_per_J"]))
