@@ -6042,6 +6042,21 @@
           "name": "fourth_central_moment_m4_s4",
           "unit": "m^4 s^-4",
           "description": "Kurtosis times (k_B T_e/m_e)^2 when κ>5/2; null when divergent."
+        },
+        {
+          "name": "normalized_phase_velocity",
+          "unit": "dimensionless complex",
+          "description": "Retarded Landau pole normalized by sqrt(((2*kappa-3)/kappa)*k_B*T_e/m_e), after subtracting the supplied electron drift."
+        },
+        {
+          "name": "dispersion_velocity_scale_m_s",
+          "unit": "m s^-1",
+          "description": "Second-moment-consistent velocity scale used to transform the shared generalized Kappa dispersion integral into dimensional susceptibility."
+        },
+        {
+          "name": "dispersion_kernel",
+          "unit": "text",
+          "description": "Canonical full-tail generalized Kappa Landau integral shared with the standalone dispersion API."
         }
       ],
       "prerequisites": [
@@ -6052,7 +6067,7 @@
         "tests/test_cts_kappa.py::test_kappa_landau_susceptibility_integrates_the_analytic_tail_not_the_finite_grid",
         "tests/test_cts_kappa.py::test_kappa_response_is_finite_and_normalized"
       ],
-      "note": "Mapped to the public advanced-physics dispatcher and dashboard. This is not a conserving collisional Kappa operator, FDT noise closure, magnetized dielectric, relativistic Kappa response or Full-EM CTS vertex."
+      "note": "The dimensional CTS susceptibility and its phase derivative are obtained from the shared full-tail generalized Kappa Landau dispersion kernel. The exact conversion uses v_* = sqrt(((2*kappa-3)/kappa) k_B T_e/m_e), chi_e = -(omega_pe^2/k^2 v_*^2) I_kappa(zeta), and d chi_e/d v_phi = -(omega_pe^2/k^2 v_*^3) I'_kappa(zeta). The finite velocity grid is used only for analytic probability-coverage gating, never as a truncated susceptibility integral. This remains a collisionless unmagnetized longitudinal kernel, not a conserving collisional, magnetized, relativistic or Full-EM closure."
     }
   },
   {
