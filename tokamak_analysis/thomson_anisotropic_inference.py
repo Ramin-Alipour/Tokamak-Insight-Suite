@@ -541,6 +541,7 @@ def fit_gyrotropic_bi_kappa_thomson(
     temperature_bounds_eV=(1.0e-3, 1.0e7),
     flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
     maximum_projected_rms_beta=0.1,
+    maximum_projected_superluminal_tail_probability=1.0e-8,
     max_nfev=6000,
 ):
     r"""Fit a gyrotropic anisotropic 3-D Kappa distribution to multi-view spectra.
@@ -671,6 +672,9 @@ def fit_gyrotropic_bi_kappa_thomson(
     beta_limit = float(maximum_projected_rms_beta)
     if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
         raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
+    projected_tail_tolerance = float(maximum_projected_superluminal_tail_probability)
+    if not np.isfinite(projected_tail_tolerance) or not 0.0 < projected_tail_tolerance < 1.0:
+        raise ValueError("maximum_projected_superluminal_tail_probability must lie strictly between zero and one")
     flow_lo, flow_hi = map(float, flow_bounds_m_s)
     if not np.isfinite(flow_lo + flow_hi) or flow_lo >= flow_hi or flow_lo <= -_C or flow_hi >= _C:
         raise ValueError("flow_bounds_m_s must be ordered and strictly subluminal")
@@ -741,7 +745,6 @@ def fit_gyrotropic_bi_kappa_thomson(
         for flow, theta in zip(fitted_flows, projected_kappa_theta)
     ])
     # RMS-beta alone hides the algebraic tail of the unbounded Newtonian Kappa PDF.
-    projected_tail_tolerance = 1.0e-8
     projected_tail_exceeds_tolerance = bool(
         np.max(projected_superluminal_tail_lower_bound) > projected_tail_tolerance
     )
