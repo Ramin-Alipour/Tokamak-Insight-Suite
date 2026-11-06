@@ -1077,3 +1077,62 @@ def test_thomson_flow_rejects_non_psd_joint_projection_geometry_covariance():
             scattering_vector_covariance=np.eye(9) * 1.0e-6,
             projection_geometry_cross_covariance=np.ones((3, 9)) * 1.0,
         )
+
+
+def test_thomson_three_dimensional_flow_withholds_ill_conditioned_full_rank_geometry():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    # The third view technically restores rank three, but only through a tiny
+    # out-of-plane component. The inversion would amplify its noise severely.
+    epsilon = 1.0e-5
+    directions = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [1.0, 1.0, epsilon],
+    ])
+    directions /= np.linalg.norm(directions, axis=1)[:, None]
+    expected = np.array([1.0e5, -2.0e5, 3.0e5])
+    projections = directions @ expected
+
+    guarded = infer_three_dimensional_flow_from_thomson_projections(
+        projections,
+        directions,
+        projection_covariance_m2_s2=np.eye(3) * 1.0e4,
+    )
+    assert guarded["design_rank"] == 3
+    assert guarded["geometry_condition_number"] > 1.0e3
+    assert guarded["geometry_condition_status"] == "ill_conditioned_vector_withheld"
+    assert guarded["identifiability"] == "ill_conditioned_three_dimensional_view_geometry"
+    assert guarded["reportable_as_inferred_parameter"] is False
+    assert guarded["electron_velocity_vector_m_s"] is None
+    assert guarded["electron_velocity_covariance_m2_s2"] is None
+
+    explicitly_relaxed = infer_three_dimensional_flow_from_thomson_projections(
+        projections,
+        directions,
+        projection_covariance_m2_s2=np.eye(3) * 1.0e4,
+        maximum_geometry_condition_number=1.0e7,
+    )
+    assert explicitly_relaxed["reportable_as_inferred_parameter"] is True
+    np.testing.assert_allclose(
+        explicitly_relaxed["electron_velocity_vector_m_s"],
+        expected,
+        rtol=1.0e-8,
+        atol=1.0e-3,
+    )
+
+
+def test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    with pytest.raises(ValueError, match="maximum_geometry_condition_number"):
+        infer_three_dimensional_flow_from_thomson_projections(
+            [1.0, 2.0, 3.0],
+            np.eye(3),
+            projection_covariance_m2_s2=np.eye(3),
+            maximum_geometry_condition_number=1.0,
+        )
