@@ -98,34 +98,59 @@ def kappa_dispersion_function(
         derivative_error = float(derivative_real_error)
         method = "full_tail_cauchy_pv_and_analytic_derivative_plus_sokhotski_plemelj"
     else:
-        def integrand(x):
-            return derivative_pdf(x)/(x-zeta)
+        # Resolve the narrow Landau pole explicitly. Direct adaptive integration
+        # over the entire real line can miss a sharply peaked resonance when
+        # Im(zeta) is small. Map the central +/-50 eta interval to t in [-50,50]
+        # and integrate the analytic tails separately.
+        def outer_integrand(x):
+            return derivative_pdf(x)/(complex(x, 0.0)-zeta)
 
-        real, real_error = quad(
-            lambda x: float(np.real(integrand(x))), -np.inf, np.inf,
-            epsabs=epsabs, epsrel=epsrel, limit=500,
-        )
-        imag, imag_error = quad(
-            lambda x: float(np.imag(integrand(x))), -np.inf, np.inf,
-            epsabs=epsabs, epsrel=epsrel, limit=500,
-        )
-        integral = complex(real, imag)
+        def central_integrand(t):
+            x = xr + yi*t
+            return derivative_pdf(x)/complex(t, -1.0)
 
-        def derivative_integrand(x):
-            return derivative_pdf(x)/(x-zeta)**2
+        def outer_derivative_integrand(x):
+            return derivative_pdf(x)/(complex(x, 0.0)-zeta)**2
 
-        derivative_real, derivative_real_error = quad(
-            lambda x: float(np.real(derivative_integrand(x))), -np.inf, np.inf,
-            epsabs=epsabs, epsrel=epsrel, limit=500,
+        def central_derivative_integrand(t):
+            x = xr + yi*t
+            return derivative_pdf(x)/(yi*complex(t, -1.0)**2)
+
+        def integrate_component(component, central, outer):
+            centre, centre_error = quad(
+                lambda t: float(component(central(t))), -50.0, 50.0,
+                epsabs=epsabs, epsrel=epsrel, limit=500,
+            )
+            left, left_error = quad(
+                lambda x: float(component(outer(x))), -np.inf, xr-50.0*yi,
+                epsabs=epsabs, epsrel=epsrel, limit=500,
+            )
+            right, right_error = quad(
+                lambda x: float(component(outer(x))), xr+50.0*yi, np.inf,
+                epsabs=epsabs, epsrel=epsrel, limit=500,
+            )
+            return centre+left+right, centre_error+left_error+right_error
+
+        integral_real, integral_real_error = integrate_component(
+            np.real, central_integrand, outer_integrand
         )
-        derivative_imag, derivative_imag_error = quad(
-            lambda x: float(np.imag(derivative_integrand(x))), -np.inf, np.inf,
-            epsabs=epsabs, epsrel=epsrel, limit=500,
+        integral_imag, integral_imag_error = integrate_component(
+            np.imag, central_integrand, outer_integrand
+        )
+        integral = complex(integral_real, integral_imag)
+
+        derivative_real, derivative_real_error = integrate_component(
+            np.real, central_derivative_integrand, outer_derivative_integrand
+        )
+        derivative_imag, derivative_imag_error = integrate_component(
+            np.imag, central_derivative_integrand, outer_derivative_integrand
         )
         derivative = complex(derivative_real, derivative_imag)
-        derivative_error = float(np.hypot(derivative_real_error, derivative_imag_error))
-        real_error = float(np.hypot(real_error, imag_error))
-        method = "full_tail_complex_quadrature_upper_half_plane"
+        derivative_error = float(np.hypot(
+            derivative_real_error, derivative_imag_error
+        ))
+        real_error = float(np.hypot(integral_real_error, integral_imag_error))
+        method = "full_tail_pole_resolved_complex_quadrature_upper_half_plane"
 
     if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
         raise ArithmeticError("Kappa dispersion integral is non-finite")
