@@ -183,7 +183,8 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
                 )
             except (ValueError, np.linalg.LinAlgError):
                 continue
-            if (sampled.get("primary_output_reportable") is True\n                    and sampled.get("profile") is not None\n                    and np.all(np.isfinite(sampled["profile"]))):
+            if (sampled.get("primary_output_reportable") is True
+                    and sampled.get("profile") is not None\n                    and np.all(np.isfinite(sampled["profile"]))):
                 profile_draws.append(np.asarray(sampled["profile"], dtype=float))
         coordinate_successful_draws = len(profile_draws)
         minimum_draws = max(20, int(np.ceil(0.8*int(radius_mc_samples))))
@@ -216,7 +217,8 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
                 )
             except (ValueError, np.linalg.LinAlgError):
                 continue
-            if (sampled.get("primary_output_reportable") is True\n                    and sampled.get("profile") is not None\n                    and np.all(np.isfinite(sampled["profile"]))):
+            if (sampled.get("primary_output_reportable") is True
+                    and sampled.get("profile") is not None\n                    and np.all(np.isfinite(sampled["profile"]))):
                 profile_draws.append(np.asarray(sampled["profile"], dtype=float))
         mixing_successful_draws = len(profile_draws)
         minimum_draws = max(20, int(np.ceil(0.8*int(mixing_mc_samples))))
