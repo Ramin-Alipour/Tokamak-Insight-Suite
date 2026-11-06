@@ -129,6 +129,20 @@ def infer_full_temperature_tensor_from_thomson_projections(
         parameters = unconstrained
         tensor = tensor_unconstrained
 
+    # Remove only round-off-scale negative eigenvalues left by the constrained
+    # optimizer. Recompute the six components so all reported projections and
+    # residuals correspond to the returned PSD tensor.
+    eigenvalues_psd, eigenvectors_psd = np.linalg.eigh(tensor)
+    if eigenvalues_psd[0] < 0.0:
+        if eigenvalues_psd[0] < -1e-7 * scale:
+            raise ArithmeticError("temperature tensor solver returned a materially non-PSD tensor")
+        tensor = (eigenvectors_psd * np.maximum(eigenvalues_psd, 0.0)) @ eigenvectors_psd.T
+        parameters = np.array([
+            tensor[0, 0], tensor[1, 1], tensor[2, 2],
+            tensor[0, 1], tensor[0, 2], tensor[1, 2],
+        ])
+        psd_active = True
+
     predicted = design @ parameters
     residual = temperature - predicted
     whitened_residual = np.linalg.solve(chol, residual)
