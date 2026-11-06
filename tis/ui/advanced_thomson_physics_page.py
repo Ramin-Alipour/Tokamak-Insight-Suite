@@ -1044,7 +1044,7 @@ def render_advanced_thomson_physics_page(st) -> None:
                     )
             if isinstance(result, Mapping) and "electron_temperature_tensor_eV" in result:
                 st.subheader("General non-gyrotropic 3-D electron temperature tensor")
-                st.latex(r"T_q=\\hat{\\mathbf q}^{T}\\mathbf T_e\\hat{\\mathbf q},\\qquad \\mathbf T_e=\\mathbf L\\mathbf L^T")
+                st.latex(r"T_q=\hat{\mathbf q}^{T}\mathbf T_e\hat{\mathbf q},\qquad \mathbf T_e=\mathbf L\mathbf L^T")
                 st.write({
                     "temperature_tensor_eV": result.get("electron_temperature_tensor_eV"),
                     "principal_temperature_eigenvalues_eV": result.get("principal_temperature_eigenvalues_eV"),
