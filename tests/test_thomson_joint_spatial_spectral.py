@@ -575,3 +575,46 @@ def test_full_rank_but_ill_conditioned_data_inverse_is_not_reported_as_primary()
     assert out["electron_velocity_projection_profile_m_s"] is None
     assert out["parameter_covariance"] is None
     assert out["identifiability"]["data_condition_number_limit"] == 1.0
+
+
+def test_finite_bin_maxwellian_average_conserves_gaussian_area_on_nonuniform_grid():
+    from tokamak_analysis.thomson_joint_spatial_spectral import _bin_averaged_maxwellian_spectrum, _wavelength_edges
+    from scipy.special import ndtr
+    x = np.array([529.0, 530.0, 531.4, 533.2, 536.0, 540.0])
+    center, sigma, peak = 533.1, 1.7, 2.4
+    averaged = _bin_averaged_maxwellian_spectrum(x, center, sigma, peak)
+    edges = _wavelength_edges(x)
+    exact_area = peak*np.sqrt(2.0*np.pi)*sigma*(ndtr((edges[-1]-center)/sigma)-ndtr((edges[0]-center)/sigma))
+    assert np.sum(averaged*np.diff(edges)) == pytest.approx(exact_area, rel=2e-13)
+
+
+def test_finite_bin_kappa_average_matches_projected_student_t_and_area():
+    from scipy.special import stdtr
+    from tokamak_analysis.thomson_joint_spatial_spectral import _bin_averaged_kappa_spectrum, _wavelength_edges
+    x = np.array([529.0, 530.0, 531.4, 533.2, 536.0, 540.0])
+    center, sigma, kappa, area = 533.1, 1.7, 3.2, 4.5
+    averaged = _bin_averaged_kappa_spectrum(x, center, sigma, kappa, area)
+    edges = _wavelength_edges(x)
+    nu = 2.0*kappa-1.0
+    scale = sigma*np.sqrt((nu-2.0)/nu)
+    probability = stdtr(nu, (edges[1:]-center)/scale)-stdtr(nu, (edges[:-1]-center)/scale)
+    positive = ((edges[:-1]-center)/scale) > 0.0
+    probability[positive] = stdtr(nu, -(edges[:-1][positive]-center)/scale)-stdtr(nu, -(edges[1:][positive]-center)/scale)
+    np.testing.assert_allclose(averaged, area*probability/np.diff(edges), rtol=2e-13, atol=1e-14)
+    assert np.sum(averaged*np.diff(edges)) == pytest.approx(area*probability.sum(), rel=2e-13)
+
+
+def test_joint_inverse_declares_exact_finite_bin_forward_physics_for_maxwellian_and_kappa():
+    x, y, r, h, *_ = _synthetic_case()
+    maxwellian = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(x.size), signal_uncertainty=np.full_like(y, 0.01),
+        regularization_strength=0.0,
+    )
+    assert maxwellian["spectral_bin_integration"] == "exact_Gaussian_CDF_finite_volume_bin_averages"
+    kappa = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(x.size), signal_uncertainty=np.full_like(y, 0.01),
+        regularization_strength=0.0, physical_model="kappa", kappa_index=4.0,
+    )
+    assert kappa["spectral_bin_integration"] == "exact_Student_t_CDF_finite_volume_bin_averages_nu_2kappa_minus_1"
