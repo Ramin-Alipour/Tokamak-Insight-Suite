@@ -62,19 +62,36 @@ def kappa_dispersion_function(
         slope_derivative = -2.0*(1.0 - x*x/kap)/(denominator*denominator)
         return (slope_derivative + logarithmic_slope*logarithmic_slope)*pdf(x)
 
-    zeta = complex(xr, yi)
-    if yi == 0.0:
-        real, real_error = quad(
-            derivative_pdf, -np.inf, np.inf, weight="cauchy", wvar=xr,
+    def principal_value_over_real_line(function, pole):
+        # Map x in (-inf, inf) to t=atan(x) in (-pi/2, pi/2).
+        # The transformed Cauchy weight is finite-interval, as required by
+        # QUADPACK's weighted principal-value integrator.
+        pole_angle = float(np.arctan(pole))
+
+        def transformed_numerator(angle):
+            if abs(angle - pole_angle) < 1.0e-7:
+                return float(function(pole))
+            x = float(np.tan(angle))
+            return float(
+                function(x) * (1.0 + x*x)
+                * (angle - pole_angle) / (x - pole)
+            )
+
+        return quad(
+            transformed_numerator, -0.5*np.pi, 0.5*np.pi,
+            weight="cauchy", wvar=pole_angle,
             epsabs=epsabs, epsrel=epsrel, limit=500,
         )
+
+    zeta = complex(xr, yi)
+    if yi == 0.0:
+        real, real_error = principal_value_over_real_line(derivative_pdf, xr)
         integral = complex(real, np.pi*derivative_pdf(xr))
         # Integration by parts converts the finite-part second-order pole
         # integral into a first-order Cauchy principal value of f'':
         # d/dz PV int f'(x)/(x-z) dx = PV int f''(x)/(x-z) dx.
-        derivative_real, derivative_real_error = quad(
-            second_derivative_pdf, -np.inf, np.inf, weight="cauchy", wvar=xr,
-            epsabs=epsabs, epsrel=epsrel, limit=500,
+        derivative_real, derivative_real_error = principal_value_over_real_line(
+            second_derivative_pdf, xr
         )
         derivative = complex(derivative_real, np.pi*second_derivative_pdf(xr))
         derivative_error = float(derivative_real_error)
