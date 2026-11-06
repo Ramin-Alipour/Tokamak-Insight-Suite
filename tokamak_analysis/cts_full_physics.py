@@ -843,6 +843,6 @@ __all__ = [
     "infer_gyrotropic_bi_maxwellian_temperatures",
     "fit_gyrotropic_bi_maxwellian_thomson",
     "fit_gyrotropic_bi_kappa_thomson",
-    "infer_three_dimensional_flow_from_thomson_projections",
+    "infer_three_dimensional_flow_from_thomson_projections",\n    "infer_full_temperature_tensor_from_thomson_projections",
     "run_advanced_thomson_physics",
 ]
