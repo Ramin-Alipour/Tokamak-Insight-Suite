@@ -379,6 +379,7 @@ def collective_tabulated_electron_spectral_density(
         "ion_flow_projections_m_s": ui,
         "electron_projected_moments": electron_moments,
         "ion_projected_moments": ion_moments,
+        "ion_projected_pdf_at_resonance": np.asarray(ion_pdf),
         "electron_distribution_model": "researcher_supplied_tabulated_projected_1D_EVDF",
         "ion_distribution_model": (
             "researcher_supplied_tabulated_projected_1D_EVDF_per_species"
@@ -407,3 +408,175 @@ def collective_tabulated_electron_spectral_density(
         ],
         "experimental_validation": "not_performed",
     }
+
+
+
+def collective_multi_population_tabulated_electron_spectral_density(
+    wavelength_nm, laser_wavelength_nm, scattering_angle_rad, *,
+    electron_density_m3, electron_populations, **common_plasma_geometry,
+):
+    """Electrostatic CTS spectrum for an arbitrary finite mixture of projected electron EVDFs.
+
+    Each population contributes its own density-weighted Landau susceptibility
+    and its own Klimontovich fluctuation source.  The total dielectric is
+    epsilon=1+sum_j(chi_ej)+sum_i(chi_ii), while the electron source is
+    sum_j(alpha_j f_j(v_phase-u_j)); replacing this by one averaged EVDF is
+    generally incorrect because susceptibility and fluctuation source enter
+    the dynamic structure factor differently.
+
+    Population mappings require velocity_grid_m_s, probability_density_s_m,
+    and density_fraction. bulk_velocity_m_s is an optional 3-vector. The
+    distributions are rest-frame 1-D marginals along the scattering vector.
+    This is an unmagnetized, non-relativistic, electrostatic forward model;
+    it does not infer the component fractions or unrestricted 3-D EVDFs.
+    """
+    if not isinstance(electron_populations, (list, tuple)) or len(electron_populations) < 2:
+        raise ValueError("electron_populations must contain at least two explicit electron populations")
+    ne = float(electron_density_m3)
+    if not np.isfinite(ne) or ne <= 0.0:
+        raise ValueError("electron_density_m3 must be positive and finite")
+    x = np.asarray(wavelength_nm, dtype=float)
+    laser = float(laser_wavelength_nm)
+    angle = float(scattering_angle_rad)
+    if x.ndim != 1 or x.size < 9 or np.any(~np.isfinite(x)) or np.any(x <= 0.0) or np.any(np.diff(x) <= 0.0):
+        raise ValueError("wavelength_nm must be a positive, finite, strictly increasing vector with at least 9 bins")
+    if not np.isfinite(laser) or laser <= 0.0 or not np.isfinite(angle) or not 0.0 < angle <= np.pi:
+        raise ValueError("laser wavelength and scattering angle are invalid")
+    incident = np.asarray(common_plasma_geometry.get("incident_direction"), dtype=float)
+    scattered = np.asarray(common_plasma_geometry.get("scattered_direction"), dtype=float)
+    if incident.shape != (3,) or scattered.shape != (3,) or np.any(~np.isfinite(incident)) or np.any(~np.isfinite(scattered)):
+        raise ValueError("incident_direction and scattered_direction must be finite 3-vectors")
+    if np.linalg.norm(incident) == 0.0 or np.linalg.norm(scattered) == 0.0:
+        raise ValueError("incident and scattered directions must be non-zero")
+    incident /= np.linalg.norm(incident)
+    scattered /= np.linalg.norm(scattered)
+    measured_angle = float(np.arccos(np.clip(np.dot(incident, scattered), -1.0, 1.0)))
+    if not np.isclose(measured_angle, angle, rtol=0.0, atol=1e-5):
+        raise ValueError("scattering_angle_rad is inconsistent with incident/scattered directions")
+    qhat = scattered - incident
+    qhat /= np.linalg.norm(qhat)
+    c_light = 299792458.0
+    fractions = []
+    normalized_populations = []
+    for index, population in enumerate(electron_populations):
+        if not isinstance(population, Mapping):
+            raise ValueError(f"electron_populations[{index}] must be a mapping")
+        fraction = float(population.get("density_fraction", np.nan))
+        grid = np.asarray(population.get("velocity_grid_m_s"), dtype=float)
+        pdf = np.asarray(population.get("probability_density_s_m"), dtype=float)
+        bulk = np.asarray(population.get("bulk_velocity_m_s", (0.0, 0.0, 0.0)), dtype=float)
+        if not np.isfinite(fraction) or fraction <= 0.0:
+            raise ValueError(f"electron_populations[{index}].density_fraction must be positive and finite")
+        if grid.ndim != 1 or grid.size < 9 or pdf.shape != grid.shape:
+            raise ValueError(f"electron_populations[{index}] requires matching 1-D velocity and probability-density arrays with >=9 samples")
+        if np.any(~np.isfinite(grid)) or np.any(~np.isfinite(pdf)) or np.any(np.diff(grid) <= 0.0) or np.any(pdf < 0.0):
+            raise ValueError(f"electron_populations[{index}] velocity grid must increase and its PDF must be finite and non-negative")
+        if bulk.shape != (3,) or np.any(~np.isfinite(bulk)) or np.linalg.norm(bulk) >= c_light:
+            raise ValueError(f"electron_populations[{index}].bulk_velocity_m_s must be a finite subluminal 3-vector")
+        drift = float(np.dot(bulk, qhat))
+        if np.any(np.abs(grid + drift) >= c_light):
+            raise ValueError("the non-relativistic multi-population Landau kernel requires all lab-frame projected supports to satisfy |v_parallel| < c")
+        area = float(_trapezoid(pdf, grid))
+        if not np.isfinite(area) or area <= 0.0:
+            raise ValueError(f"electron_populations[{index}] PDF must have positive finite integral")
+        fractions.append(fraction)
+        normalized_populations.append({
+            "velocity_grid_m_s": grid,
+            "probability_density_s_m": pdf / area,
+            "density_fraction": fraction,
+            "bulk_velocity_m_s": bulk,
+            "bulk_flow_projection_m_s": drift,
+        })
+    fractions = np.asarray(fractions, dtype=float)
+    if not np.isclose(np.sum(fractions), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("electron population density_fraction values must sum to one")
+    # The single-population call supplies the common ion response, ion
+    # fluctuation PDFs, wavelength mapping and validated composition contract.
+    seed = normalized_populations[0]
+    common = dict(common_plasma_geometry)
+    if "electron_velocity_m_s" in common:
+        raise ValueError("electron bulk flows belong in each electron_populations entry, not electron_velocity_m_s")
+    result = collective_tabulated_electron_spectral_density(
+        x, laser, angle,
+        electron_density_m3=ne,
+        electron_velocity_grid_m_s=seed["velocity_grid_m_s"],
+        electron_probability_density_s_m=seed["probability_density_s_m"],
+        electron_velocity_m_s=(0.0, 0.0, 0.0),
+        **common,
+    )
+    k = 4.0*np.pi*np.sin(angle/2.0)/(laser*1e-9)
+    phase_velocity = -c_light*(x-laser)/(2.0*laser*np.sin(angle/2.0))
+    chi_e_populations = []
+    electron_source = np.zeros(x.size, dtype=float)
+    population_moments = []
+    for index, population in enumerate(normalized_populations):
+        drift = population["bulk_flow_projection_m_s"]
+        susceptibility = np.asarray([
+            generalized_electron_susceptibility(
+                population["velocity_grid_m_s"],
+                population["probability_density_s_m"],
+                phase_velocity_value - drift,
+                electron_density_m3=ne*population["density_fraction"],
+                wavenumber_m_inverse=k,
+                pole_imaginary_part_m_s=common.get("pole_imaginary_part_m_s"),
+                landau_limit=bool(common.get("landau_limit", False)),
+            )["electron_susceptibility"]
+            for phase_velocity_value in phase_velocity
+        ], dtype=complex)
+        chi_e_populations.append(susceptibility)
+        electron_source += population["density_fraction"] * np.interp(
+            phase_velocity - drift,
+            population["velocity_grid_m_s"],
+            population["probability_density_s_m"],
+            left=0.0, right=0.0,
+        )
+        grid = population["velocity_grid_m_s"]
+        pdf = population["probability_density_s_m"]
+        mean = float(_trapezoid(grid*pdf, grid))
+        variance = float(_trapezoid((grid-mean)**2*pdf, grid))
+        if variance <= 0.0 or not np.isfinite(variance):
+            raise ValueError(f"electron population {index} must have a positive finite second central moment")
+        population_moments.append({
+            "population_index": index,
+            "density_fraction": float(population["density_fraction"]),
+            "bulk_flow_projection_m_s": float(drift),
+            "mean_velocity_relative_to_population_frame_m_s": mean,
+            "total_mean_projection_m_s": float(drift+mean),
+            "directional_second_moment_temperature_eV": float(9.1093837015e-31*variance/1.602176634e-19),
+            "standardized_skewness": float(_trapezoid((grid-mean)**3*pdf, grid)/variance**1.5),
+            "excess_kurtosis": float(_trapezoid((grid-mean)**4*pdf, grid)/variance**2-3.0),
+        })
+    chi_e_populations = np.asarray(chi_e_populations)
+    chi_e_total = np.sum(chi_e_populations, axis=0)
+    chi_i = np.asarray(result["ion_susceptibility"])
+    chi_i_total = np.sum(chi_i, axis=0)
+    dielectric = 1.0 + chi_e_total + chi_i_total
+    denominator = np.maximum(np.abs(dielectric)**2, np.finfo(float).tiny)
+    electron_term = np.abs(1.0+chi_i_total)**2/denominator*electron_source
+    ion_term = np.zeros(x.size, dtype=float)
+    ion_pdf = np.asarray(result["ion_projected_pdf_at_resonance"])
+    ion_fractions = np.asarray(common["ion_fractions"], dtype=float)
+    ion_species = _resolve_ion_species(common["ion_species"])
+    for index, item in enumerate(ion_species):
+        ion_term += item["charge_state"]*ion_fractions[index]*np.abs(chi_e_total)**2/denominator*ion_pdf[index]
+    dynamic_structure = (2.0*np.pi/k)*(electron_term+ion_term)
+    spectral = np.maximum(dynamic_structure, 0.0)*(2.0*np.pi*c_light*1e9/(x*x))
+    if np.any(~np.isfinite(spectral)) or not np.any(spectral > 0.0):
+        raise ValueError("multi-population CTS model produced a non-finite or zero spectrum")
+    result.update({
+        "spectral_density_per_nm": spectral,
+        "electron_susceptibility": chi_e_total,
+        "electron_population_susceptibility": chi_e_populations,
+        "dielectric_function": dielectric,
+        "dynamic_structure_factor": dynamic_structure,
+        "electron_population_moments": population_moments,
+        "electron_population_density_fractions": fractions.copy(),
+        "electron_projected_pdf_at_resonance": electron_source,
+        "electron_distribution_model": "multi_population_tabulated_projected_1D_EVDF",
+        "model": "unmagnetized electrostatic CTS with density-weighted multi-population projected electron EVDFs and species-resolved ion response",
+        "limitations": list(result["limitations"]) + [
+            "electron population fractions and component EVDFs are supplied inputs, not inferred by this forward model",
+            "only 1-D projected non-relativistic electron marginals are supported; no unrestricted 3-D or relativistic population inversion",
+        ],
+    })
+    return result
