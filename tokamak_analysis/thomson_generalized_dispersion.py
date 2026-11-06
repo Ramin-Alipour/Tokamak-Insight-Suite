@@ -490,10 +490,18 @@ def collective_multi_population_tabulated_electron_spectral_density(
     fractions = np.asarray(fractions, dtype=float)
     if not np.isclose(np.sum(fractions), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("electron population density_fraction values must sum to one")
+    # Use one common retarded-pole displacement for every electron component
+    # and the ion response. Letting each differently sampled EVDF choose its
+    # own default eta would introduce a spurious population-dependent damping.
+    common = dict(common_plasma_geometry)
+    if not bool(common.get("landau_limit", False)) and common.get("pole_imaginary_part_m_s") is None:
+        common["pole_imaginary_part_m_s"] = 1.0e-6 * min(
+            float(np.median(np.diff(item["velocity_grid_m_s"])))
+            for item in normalized_populations
+        )
     # The single-population call supplies the common ion response, ion
     # fluctuation PDFs, wavelength mapping and validated composition contract.
     seed = normalized_populations[0]
-    common = dict(common_plasma_geometry)
     if "electron_velocity_m_s" in common:
         raise ValueError("electron bulk flows belong in each electron_populations entry, not electron_velocity_m_s")
     result = collective_tabulated_electron_spectral_density(
