@@ -74,6 +74,10 @@ def test_multiview_3d_evdf_requires_data_supported_rank():
     )
     assert result["status"] == "identified_from_multi_view_measurements"
     assert result["evdf_m3_s3"] is not None
+    assert result["mean_velocity_vector_m_s"].shape == (3,)
+    assert result["velocity_covariance_tensor_m2_s2"].shape == (3, 3)
+    assert result["mean_velocity_covariance_m2_s2"].shape == (3, 3)
+    assert result["velocity_covariance_tensor_covariance_m4_s4"].shape == (9, 9)
     expected_probability = true * volume / np.sum(true * volume)
     expected_mean = expected_probability @ np.arange(18).reshape(6, 3)
     centered = np.arange(18).reshape(6, 3) - expected_mean
