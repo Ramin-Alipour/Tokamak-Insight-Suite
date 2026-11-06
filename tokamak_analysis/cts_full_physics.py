@@ -66,6 +66,7 @@ from .thomson_gap_closure import (
 from .thomson_kinetic_models import (
     infer_gyrotropic_bi_maxwellian_temperatures,
     infer_three_dimensional_flow_from_thomson_projections,
+    project_gyrotropic_bi_kappa_electron_vdf,
     collective_kappa_spectral_density,
     fit_collective_kappa,
 )
@@ -508,6 +509,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_multi_ion_flow_inference",
     "cts_electrostatic_measured_spectrum_inference",
     "thomson_projected_evdf",
+    "thomson_projected_bi_kappa_evdf",
     "thomson_temperature_from_spectral_width",
     "thomson_relativistic_exact_flow_projection",
     "thomson_relativistic_projected_evdf",
@@ -699,6 +701,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = thomson_velocity_projection_relativistic_exact
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
+    elif model == "thomson_projected_bi_kappa_evdf":
+        solver = project_gyrotropic_bi_kappa_electron_vdf
     elif model == "thomson_relativistic_projected_evdf":
         solver = reconstruct_relativistic_projected_thomson_evdf
     elif model == "thomson_psf_profile_inverse":
