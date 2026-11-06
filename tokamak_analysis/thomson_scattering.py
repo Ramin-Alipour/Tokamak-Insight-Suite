@@ -357,6 +357,7 @@ def infer_thomson_path_averaged_density(
     optical_efficiency_profile,
     *,
     scattered_power_uncertainty_W=None,
+    optical_profile_covariance=None,
 ):
     """Infer the measurement-kernel-weighted electron density along a sightline.
 
