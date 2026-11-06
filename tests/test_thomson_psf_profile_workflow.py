@@ -78,3 +78,31 @@ def test_joint_spatial_workflow_forwards_structured_background_contract(monkeypa
     assert captured["background_model"] == "templates"
     np.testing.assert_array_equal(captured["background_templates"], templates)
     assert captured["regularization_strength"] == pytest.approx(0.02)
+
+
+def test_psf_profile_does_not_promote_underdetermined_regularized_candidate(monkeypatch):
+    from tokamak_analysis.thomson_spatial_mixing import reconstruct_profile_with_spatial_mixing
+
+    # Three measured channels cannot identify four independent latent nodes.
+    # The curvature penalty makes the numerical normal equations invertible,
+    # but it does not add a fourth independent measurement constraint.
+    radius = np.linspace(0.1, 0.4, 4)
+    mixing = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ])
+    result = reconstruct_profile_with_spatial_mixing(
+        np.array([3.0, 2.0, 1.0]), mixing, radius,
+        uncertainty=np.full(3, 0.1), positive=True,
+        regularization_strength=1e-2,
+    )
+    assert result["analysis_status"] == "conditional_regularized_candidate"
+    assert result["primary_result_status"] == "conditional_regularized_candidate"
+    assert result["primary_output_reportable"] is False
+    assert result["data_only_rank"] == 3
+    assert result["latent_node_count"] == 4
+    assert result["profile"] is None
+    assert result["profile_covariance"] is None
+    assert result["regularized_candidate_profile"].shape == (4,)
+    assert result["regularized_candidate_covariance"].shape == (4, 4)

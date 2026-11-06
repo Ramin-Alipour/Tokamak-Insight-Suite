@@ -230,10 +230,48 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
             mixing_warning = (
                 "Too few non-negative, full-rank PSF draws; no PSF covariance contribution was added."
             )
+    # Regularization stabilizes a numerical candidate; it must never create
+    # measurement information in spatial null-space modes.  Determine primary
+    # identifiability from the whitened data operator alone, before the
+    # curvature penalty is added.
+    column_norms = np.linalg.norm(a, axis=0)
+    scaled_data_operator = a / np.maximum(column_norms, np.finfo(float).tiny)[None, :]
+    data_singular_values = np.linalg.svd(scaled_data_operator, compute_uv=False)
+    data_tolerance = (
+        np.finfo(float).eps * max(scaled_data_operator.shape)
+        * (float(data_singular_values[0]) if data_singular_values.size else 0.0)
+    )
+    data_only_rank = int(np.count_nonzero(data_singular_values > data_tolerance))
+    data_only_condition_number = (
+        float(data_singular_values[0] / data_singular_values[-1])
+        if data_singular_values.size and data_singular_values[-1] > data_tolerance
+        else float("inf")
+    )
+    data_identifiable = (
+        data_only_rank == x.size
+        and np.isfinite(data_only_condition_number)
+        and data_only_condition_number < 1.0e12
+    )
+    primary_status = (
+        "identified_from_measurement"
+        if data_identifiable else "conditional_regularized_candidate"
+    )
+    candidate_uncertainty = np.sqrt(np.maximum(np.diag(pcov), 0.0))
     return {
-        "analysis_status":"completed","parameter_name":str(parameter_name),"parameter_unit":str(parameter_unit),
-        "radius_m":x.copy(),"profile":solution,"profile_uncertainty":np.sqrt(np.maximum(np.diag(pcov),0)),
-        "profile_covariance":pcov,
+        "analysis_status": "completed" if data_identifiable else "conditional_regularized_candidate",
+        "primary_result_status": primary_status,
+        "primary_output_reportable": bool(data_identifiable),
+        "data_only_rank": data_only_rank,
+        "latent_node_count": int(x.size),
+        "data_only_condition_number": data_only_condition_number,
+        "parameter_name":str(parameter_name),"parameter_unit":str(parameter_unit),
+        "radius_m":x.copy(),
+        "profile":solution.copy() if data_identifiable else None,
+        "profile_uncertainty":candidate_uncertainty.copy() if data_identifiable else None,
+        "profile_covariance":pcov.copy() if data_identifiable else None,
+        "regularized_candidate_profile":solution.copy(),
+        "regularized_candidate_uncertainty":candidate_uncertainty.copy(),
+        "regularized_candidate_covariance":pcov.copy(),
         "measurement_conditional_profile_covariance":measurement_profile_covariance,
         "coordinate_induced_profile_covariance":coordinate_profile_covariance,
         "spatial_mixing_covariance":None if mixing_covariance is None else mixing_covariance.copy(),
