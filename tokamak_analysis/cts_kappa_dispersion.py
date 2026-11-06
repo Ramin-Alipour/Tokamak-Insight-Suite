@@ -56,6 +56,12 @@ def kappa_dispersion_function(
     def derivative_pdf(x):
         return (-2.0*x/(1.0 + x*x/kap))*pdf(x)
 
+    def second_derivative_pdf(x):
+        denominator = 1.0 + x*x/kap
+        logarithmic_slope = -2.0*x/denominator
+        slope_derivative = -2.0*(1.0 - x*x/kap)/(denominator*denominator)
+        return (slope_derivative + logarithmic_slope*logarithmic_slope)*pdf(x)
+
     zeta = complex(xr, yi)
     if yi == 0.0:
         real, real_error = quad(
@@ -63,9 +69,16 @@ def kappa_dispersion_function(
             epsabs=epsabs, epsrel=epsrel, limit=500,
         )
         integral = complex(real, np.pi*derivative_pdf(xr))
-        derivative = None
-        derivative_error = None
-        method = "full_tail_cauchy_principal_value_plus_sokhotski_plemelj"
+        # Integration by parts converts the finite-part second-order pole
+        # integral into a first-order Cauchy principal value of f'':
+        # d/dz PV int f'(x)/(x-z) dx = PV int f''(x)/(x-z) dx.
+        derivative_real, derivative_real_error = quad(
+            second_derivative_pdf, -np.inf, np.inf, weight="cauchy", wvar=xr,
+            epsabs=epsabs, epsrel=epsrel, limit=500,
+        )
+        derivative = complex(derivative_real, np.pi*second_derivative_pdf(xr))
+        derivative_error = float(derivative_real_error)
+        method = "full_tail_cauchy_pv_and_analytic_derivative_plus_sokhotski_plemelj"
     else:
         def integrand(x):
             return derivative_pdf(x)/(x-zeta)
