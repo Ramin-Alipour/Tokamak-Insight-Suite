@@ -702,9 +702,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     """
     if not isinstance(model, str):
         raise ValueError("model must be an explicit supported model name")
-    if model == "landau_fdt_full_em_spectrum":
-        solver = analyze_landau_fdt_full_em_spectrum
-    elif model == "thomson_path_averaged_density":
+    if model == "landau_fdt_full_em_spectrum":\n        solver = analyze_landau_fdt_full_em_spectrum\n    elif model == "thomson_path_averaged_density":
         solver = infer_thomson_path_averaged_density
     elif model == "thomson_multiview_3d_evdf":
         solver = reconstruct_multiview_3d_evdf
@@ -905,8 +903,7 @@ __all__ = [
     "analyze_cts_microwave_background",
     "analyze_landau_fdt_cts",
     "fit_cts_ion_species_flows",
-    "analyze_landau_fdt_full_em_constitutive",
-    "analyze_landau_fdt_full_em_spectrum",
+    "analyze_landau_fdt_full_em_constitutive",\n    "analyze_landau_fdt_full_em_spectrum",
     "propagate_stratified_nonparaxial_vector_field",
     "solve_3d_periodic_full_wave",
     "solve_polarized_kinetic_ece_with_mode_conversion",

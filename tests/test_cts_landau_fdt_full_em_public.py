@@ -200,7 +200,6 @@ def test_end_to_end_landau_fdt_full_em_spectrum_chains_operator_noise_and_maxwel
     for key in (
         "electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s",
         "magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s",
-        "electric_magnetic_cross_spectral_matrix",
     ):
         tensor = np.asarray(result[key])
         assert tensor.shape == (2, 3, 3)
@@ -210,6 +209,8 @@ def test_end_to_end_landau_fdt_full_em_spectrum_chains_operator_noise_and_maxwel
             assert np.linalg.eigvalsh(matrix).min() >= -1e-9 * max(
                 np.linalg.norm(matrix, ord=2), np.finfo(float).tiny
             )
+    assert result["electric_magnetic_cross_spectral_matrix"].shape == (2, 3, 3)
+    assert np.all(np.isfinite(result["electric_magnetic_cross_spectral_matrix"]))
     assert result["transverse_stokes_spectral_density_IQUV"].shape == (2, 4)
     assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
     assert result["quantitative_release_gate"]["magnetized_response_required_for_magnetized_plasma"] is True
@@ -222,5 +223,6 @@ def test_end_to_end_landau_fdt_full_em_spectrum_rejects_undamped_green_pole():
     with pytest.raises(np.linalg.LinAlgError, match="ill-conditioned"):
         run_advanced_thomson_physics(
             "landau_fdt_full_em_spectrum", **inputs,
+            relative_dielectric_tensor=np.eye(3, dtype=complex),
             propagation_direction=(1.0, 0.0, 0.0),
         )
