@@ -8927,7 +8927,7 @@
   },
   {
     "name": "Landau–FDT current-noise propagation to electromagnetic field fluctuations",
-    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E = μ₀²ω² G S_J G†; S_B = (k×/ω) S_E (k×/ω)†; Π = (1/2μ₀) Re⟨E×B*⟩",
+    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E = μ₀²ω² G S_J G†; S_B = (k×/ω) S_E (k×/ω)†; Π = (1/2μ₀)Re⟨E×B*⟩; C_ab=e_a†S_Ee_b; (I,Q,U,V)=(C11+C22,C11−C22,2ReC12,2ImC12)",
     "inputs": "ω [rad s⁻¹], k [m⁻¹], εᵣ [dimensionless], S_J [A² m⁻² per rad s⁻¹]",
     "output": "S_E [(V m⁻¹)² per rad s⁻¹], S_B [T² per rad s⁻¹], spectral Poynting flux [W m⁻² per rad s⁻¹]",
     "assumptions": "Local homogeneous linear dielectric; exp(−iωt); frequency-diagonal classical current-noise spectrum; invertible Maxwell operator.",
@@ -8986,6 +8986,21 @@
           "description": "Frequency-resolved mean Poynting-flux vector."
         },
         {
+          "name": "transverse_electric_coherency_spectral_matrix_V2_m2_per_rad_s",
+          "unit": "(V/m)^2 per (rad/s)",
+          "description": "2x2 Hermitian coherency matrix C_ab=e_a^dagger S_E e_b in the deterministic transverse analyzer basis."
+        },
+        {
+          "name": "transverse_stokes_spectral_density_IQUV",
+          "unit": "(V/m)^2 per (rad/s)",
+          "description": "Frequency-resolved transverse I,Q,U,V spectral densities; V=2 Im(C12) for exp(-i omega t)."
+        },
+        {
+          "name": "degree_of_linear_and_circular_polarization",
+          "unit": "1",
+          "description": "sqrt(Q^2+U^2+V^2)/I, zero when I=0 and bounded by one for a positive coherency matrix."
+        },
+        {
           "name": "maxwell_green_dyadic_m2",
           "unit": "m^2",
           "description": "Inverse local Maxwell wave operator."
@@ -9003,9 +9018,11 @@
       "uncertainty_model": "Input current-noise covariance is propagated linearly through the Maxwell Green dyadic; no cross-frequency covariance is inferred.",
       "test_links": [
         "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_propagates_to_electric_magnetic_fluctuations_and_poynting_flux",
-        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_rejects_an_undamped_maxwell_pole"
+        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_rejects_an_undamped_maxwell_pole",
+        "tests/test_cts_landau_fdt_full_em_public.py::test_full_em_field_fluctuations_return_transverse_stokes_and_polarization_bounds",
+        "tests/test_cts_landau_fdt_full_em_public.py::test_full_em_field_fluctuations_reject_nonphysical_current_covariance"
       ],
-      "note": "Local Maxwell field-fluctuation propagation only; not a magnetized CTS three-wave vertex, ray solution or calibrated receiver spectrum."
+      "note": "Local Maxwell field-fluctuation propagation with transverse Stokes observables; not a magnetized CTS three-wave vertex, ray solution or calibrated receiver spectrum."
     }
   }
 ]
