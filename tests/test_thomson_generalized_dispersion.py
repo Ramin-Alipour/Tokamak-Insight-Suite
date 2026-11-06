@@ -140,3 +140,54 @@ def test_tabulated_evdf_phase_derivative_formula_registry_is_synchronized():
     assert len(matches) == 1
     assert formula == packaged
     assert matches[0]["execution_contract"]["function_link"] == "tokamak_analysis.thomson_generalized_dispersion.generalized_electron_susceptibility"
+
+
+def test_exact_sokhotski_plemelj_landau_limit_matches_principal_value_and_resonance():
+    velocity = np.linspace(-12.0, 12.0, 2401)
+    distribution = np.exp(-0.5*(velocity/2.0)**2)
+    phase_velocity = 0.73
+    result = generalized_landau_integral(velocity, distribution, phase_velocity, landau_limit=True)
+    normalized = result["normalized_probability_density_s_m"]
+    slopes = np.diff(normalized)/np.diff(velocity)
+    interval = np.searchsorted(velocity, phase_velocity)-1
+    assert result["pole_imaginary_part_m_s"] == 0.0
+    assert np.isclose(result["integral"].imag, np.pi*slopes[interval], rtol=1e-12, atol=1e-14)
+    assert result["landau_limit"] is True
+    assert "sokhotski_plemelj" in result["quadrature"]
+
+
+def test_exact_landau_limit_rejects_derivative_knots_and_higher_order_poles():
+    import pytest
+    velocity = np.linspace(-5.0, 5.0, 101)
+    distribution = np.exp(-0.5*velocity**2)
+    with pytest.raises(ValueError, match="derivative knot"):
+        generalized_landau_integral(velocity, distribution, 0.0, landau_limit=True)
+    with pytest.raises(ValueError, match="first-order"):
+        generalized_landau_integral(velocity, distribution, 0.37, landau_limit=True, pole_order=2)
+
+
+def test_exact_landau_limit_is_connected_to_electron_susceptibility():
+    velocity = np.linspace(-12.0, 12.0, 2401)
+    distribution = np.exp(-0.5*(velocity/2.0)**2)
+    result = generalized_electron_susceptibility(
+        velocity, distribution, 0.73, electron_density_m3=2.0e18,
+        wavenumber_m_inverse=120.0, landau_limit=True,
+    )
+    assert result["landau_limit"] is True
+    assert np.isfinite(result["electron_susceptibility"].real)
+    assert np.isfinite(result["electron_susceptibility"].imag)
+    assert result["electron_susceptibility"].imag != 0.0
+
+
+def test_exact_landau_limit_is_exposed_by_public_advanced_cts_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+    velocity = np.linspace(-12.0, 12.0, 2401)
+    distribution = np.exp(-0.5*(velocity/2.0)**2)
+    result = run_advanced_thomson_physics(
+        "cts_tabulated_evdf_susceptibility", velocity_grid_m_s=velocity,
+        probability_density_s_m=distribution, phase_velocity_m_s=0.73,
+        electron_density_m3=1.0e18, wavenumber_m_inverse=100.0, landau_limit=True,
+    )
+    assert result["landau_limit"] is True
+    assert np.isfinite(result["electron_susceptibility"].real)
+    assert np.isfinite(result["electron_susceptibility"].imag)

@@ -8140,7 +8140,7 @@
     "equation": "χ_e=−(ω_pe²/k²)I_1; ∂χ_e/∂v_φ=−(ω_pe²/k²)I_2; I_p=∫_L f'(v)/(v−v_φ−iη)^p dv; ∂χ_e/∂ω=(1/k)∂χ_e/∂v_φ",
     "inputs": "Finite velocity grid, non-negative tabulated projected 1-D EVDF, phase velocity, electron density, wavenumber and positive retarded pole displacement",
     "output": "Complex longitudinal susceptibility and optional analytic phase-velocity/angular-frequency derivatives",
-    "assumptions": "Piecewise-linear projected VDF, explicit zero extension outside finite support with distributional endpoint jumps, collisionless unmagnetized longitudinal response, fixed positive Landau-pole displacement.",
+    "assumptions": "Piecewise-linear projected VDF, explicit zero extension outside finite support with distributional endpoint jumps, collisionless unmagnetized longitudinal response, fixed positive Landau-pole displacement. Optional exact Landau-limit mode uses Sokhotski-Plemelj and removes finite pole broadening.",
     "status": "D",
     "category": "Collective Thomson scattering",
     "execution_contract": {
@@ -8183,6 +8183,11 @@
           "name": "include_phase_velocity_derivative",
           "unit": "boolean",
           "required": false
+        },
+        {
+          "name": "landau_limit",
+          "unit": "boolean; exact first-order Sokhotski-Plemelj boundary value",
+          "required": false
         }
       ],
       "output_specs": [
@@ -8205,13 +8210,15 @@
       ],
       "prerequisites": [
         "Tabulated VDF is normalized internally for susceptibility; finite support is interpreted as zero outside the supplied interval.",
-        "Derivative is evaluated from the second-order Landau kernel at the same positive pole displacement as the susceptibility; no finite difference is used."
+        "Derivative is evaluated from the second-order Landau kernel at the same positive pole displacement as the susceptibility; no finite difference is used.",
+        "With landau_limit=true, pole_imaginary_part_m_s must be omitted or zero; exact PV + i*pi*f'(v_phase) is used and derivative knots are rejected. The second-order pole derivative is unavailable in this mode."
       ],
       "uncertainty_model": "No physical-parameter uncertainty is inferred. The derivative is evaluated by adaptive full-axis quadrature; separate real and imaginary quadrature error estimates are returned. The derivative is conditional on the supplied positive pole displacement.",
       "limitations": [
         "Collisionless, unmagnetized, non-relativistic longitudinal electron response only",
         "No ion susceptibility, FDT spectrum, collisions, magnetization, relativistic response or Full-EM current vertex",
-        "Finite velocity grid is used only for the probability-coverage gate; the analytic Kappa tail is integrated over the complete real axis"
+        "Finite velocity grid is used only for the probability-coverage gate; the analytic Kappa tail is integrated over the complete real axis",
+        "Exact first-order Landau limit is not implemented for higher-order poles or at tabulated derivative knots."
       ],
       "test_links": [
         "tests/test_thomson_generalized_dispersion.py::test_tabulated_evdf_susceptibility_analytic_phase_derivative_matches_finite_difference"

@@ -67,7 +67,7 @@ MODEL_LABELS = {
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_susceptibility": "CTS — tabulated projected-EVDF susceptibility and analytic Landau phase derivative",
-    "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum",
+    "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum (finite-eta or exact Plemelj limit)",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
@@ -106,6 +106,18 @@ MODEL_LABELS = {
 MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
 
 MODEL_PHYSICS_NOTES = {
+    "cts_tabulated_evdf_susceptibility": (
+        "Tabulated projected 1-D EVDF susceptibility. landau_limit=true evaluates "
+        "the exact first-order retarded boundary value using PV integral + i*pi*f'(v_phase), "
+        "rather than an artificial finite pole displacement. It rejects phase velocities "
+        "at derivative knots and does not expose the second-order pole derivative in this mode."
+    ),
+    "cts_tabulated_evdf_landau": (
+        "Electrostatic CTS spectrum from a supplied projected 1-D electron EVDF and Maxwellian ion species. "
+        "Set landau_limit=true to use the exact first-order Sokhotski-Plemelj response; otherwise "
+        "pole_imaginary_part_m_s selects a finite retarded displacement. Exact-limit samples "
+        "coincident with EVDF grid knots are rejected rather than regularized silently."
+    ),
     "thomson_temperature_from_spectral_width": (
         "Conditional Te estimator: Te = (sigma_lambda/lambda_0)^2 m_e c^2 / "
         "[4 sin^2(theta/2)]. Valid only for an intrinsic instrument-response-fitted "
@@ -243,6 +255,24 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "cts_tabulated_evdf_susceptibility": {
+        "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
+        "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/1.0e6)**2).tolist(),
+        "phase_velocity_m_s": 0.73e6, "electron_density_m3": 1.0e18,
+        "wavenumber_m_inverse": 120.0, "landau_limit": True
+    },
+    "cts_tabulated_evdf_landau": {
+        "wavelength_nm": np.linspace(1060.0, 1068.0, 41).tolist(),
+        "laser_wavelength_nm": 1064.0, "scattering_angle_rad": 1.5707963267948966,
+        "electron_density_m3": 1.0e18,
+        "electron_velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
+        "electron_probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/1.0e6)**2).tolist(),
+        "ion_species": [{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        "ion_fractions": [1.0], "ion_temperature_eV": [10.0],
+        "electron_velocity_m_s": [0.0, 0.0, 0.0], "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "incident_direction": [1.0, 0.0, 0.0], "scattered_direction": [0.0, 1.0, 0.0],
+        "landau_limit": False, "pole_imaginary_part_m_s": 100.0
+    },
     "thomson_temperature_from_spectral_width": {
         "intrinsic_sigma_nm": 0.02,
         "laser_wavelength_nm": 532.0,
