@@ -222,7 +222,10 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
     "per species. Conserves each species particle number and total mixture "
     "momentum, but not total energy. Electrostatic only; not the magnetized "
     "Full-EM three-wave vertex. Zero frequency is rejected pending a "
-    "separately converged static-limit extrapolation."
+    "separately converged static-limit extrapolation. The velocity integral "
+    "is refined by doubled Gauss-Hermite orders and reports its relative "
+    "response change; quantitative CTS release remains blocked until "
+    "collision-model, frequency-grid and experimental-normalization checks pass."
 )
 
 EXAMPLES = {
