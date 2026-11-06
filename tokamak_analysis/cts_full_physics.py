@@ -737,7 +737,23 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
             f"model must be one of: {supported}; "
             "no automatic model substitution is performed"
         )
-    result = solver(*args, **kwargs)
+    # Geometry-covariance and reporting-gate inputs belong to the derived
+    # 3-D flow closure, not to the per-view spectral forward-fit signature.
+    # Split them at this public API boundary so they reach the correct solver.
+    flow_geometry_options = {}
+    solver_kwargs = kwargs
+    if model in {"gyrotropic_bi_maxwellian_spectral_fit", "gyrotropic_bi_kappa_spectral_fit"}:
+        solver_kwargs = dict(kwargs)
+        for option_name in (
+            "scattering_vector_covariance",
+            "projection_geometry_cross_covariance",
+            "maximum_geometry_condition_number",
+            "minimum_projection_consistency_p_value",
+        ):
+            if option_name in solver_kwargs:
+                flow_geometry_options[option_name] = solver_kwargs.pop(option_name)
+
+    result = solver(*args, **solver_kwargs)
     if not isinstance(result, Mapping):
         raise TypeError("advanced physics solver must return a mapping")
     result = dict(result)
@@ -771,9 +787,15 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
                         projections,
                         directions,
                         projection_covariance_m2_s2=projection_covariance,
-                        scattering_vector_covariance=kwargs.get("scattering_vector_covariance"),
-                        projection_geometry_cross_covariance=kwargs.get(
+                        scattering_vector_covariance=flow_geometry_options.get("scattering_vector_covariance"),
+                        projection_geometry_cross_covariance=flow_geometry_options.get(
                             "projection_geometry_cross_covariance"
+                        ),
+                        maximum_geometry_condition_number=flow_geometry_options.get(
+                            "maximum_geometry_condition_number", 1.0e3
+                        ),
+                        minimum_projection_consistency_p_value=flow_geometry_options.get(
+                            "minimum_projection_consistency_p_value", 1.0e-3
                         ),
                     )
                 except (ValueError, np.linalg.LinAlgError) as exc:
