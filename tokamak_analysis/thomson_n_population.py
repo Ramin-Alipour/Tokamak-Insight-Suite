@@ -17,7 +17,7 @@ def _real_vector(value, name, minimum=1):
     if not np.all(np.isfinite(out)): raise ValueError(f"{name} must contain finite values")
     return out
 
-def n_population_relativistic_thomson_spectrum(wavelength_nm, laser_wavelength_nm, scattering_angle_rad, population_temperatures_eV, population_fractions, *, flow_projection_m_s=None, population_flow_projections_m_s=None, incident_polarization, radial_order=36, angular_order=18, maximum_recoil_correction_fraction=0.01, include_compton_recoil=False):
+def n_population_relativistic_thomson_spectrum(wavelength_nm, laser_wavelength_nm, scattering_angle_rad, population_temperatures_eV, population_fractions, *, incident_polarization, flow_projection_m_s=None, population_flow_projections_m_s=None, radial_order=36, angular_order=18, maximum_recoil_correction_fraction=0.01, include_compton_recoil=False):
     """Return a cross-section-weighted N-component relativistic MJ spectrum.
 
     Fractions are number-density fractions and must be non-negative and sum
