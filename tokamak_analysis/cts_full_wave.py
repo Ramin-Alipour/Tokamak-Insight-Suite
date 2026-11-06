@@ -484,17 +484,37 @@ def solve_3d_periodic_full_wave(
     magnetic = np.stack([
         curl_e[a].reshape(shape) / (1j * omega * MU0) for a in range(3)
     ], axis=-1)
-    # Time-averaged local material absorption for the exp(-i omega t) convention.
+    # Distinguish H [A/m] from magnetic flux density B [T].  The
+    # time-averaged Poynting vector and source work close the global
+    # electromagnetic energy balance for the periodic unit cell.
+    magnetic_flux_density = MU0 * magnetic
+    poynting = 0.5 * np.real(np.cross(electric, magnetic.conj()))
+    # For exp(-i omega t), a passive dielectric has
+    # q_abs = (omega*eps0/2) E* . Im_H(epsilon_r) . E.
     absorption = 0.5 * omega * EPS0 * np.real(np.einsum(
         "...i,...ij,...j->...", electric.conj(), dissipative, electric
     ))
+    cell_volume = dx * dy * dz
+    integrated_absorption = float(np.sum(absorption) * cell_volume)
+    source_power = float(-0.5 * np.real(np.sum(
+        np.einsum("...i,...i->...", electric, current.conj())
+    ) * cell_volume))
+    balance_scale = max(abs(integrated_absorption), abs(source_power), np.finfo(float).tiny)
+    energy_balance_relative_residual = float(
+        abs(integrated_absorption - source_power) / balance_scale
+    )
     return {
         "x_m": x.copy(), "y_m": y.copy(), "z_m": z.copy(),
         "electric_field_V_m": electric,
         "magnetic_field_A_m": magnetic,
+        "magnetic_field_intensity_A_m": magnetic,
+        "magnetic_flux_density_T": magnetic_flux_density,
+        "time_averaged_poynting_vector_W_m2": poynting,
         "epsilon_r": eps,
         "local_absorbed_power_density_W_m3": absorption,
-        "integrated_absorbed_power_W": float(np.sum(absorption) * dx * dy * dz),
+        "integrated_absorbed_power_W": integrated_absorption,
+        "integrated_impressed_source_power_W": source_power,
+        "global_energy_balance_relative_residual": energy_balance_relative_residual,
         "relative_linear_system_residual": relative_residual,
         "grid_shape_nz_ny_nx": shape,
         "boundary_condition": "three_dimensional_bloch_periodic",
