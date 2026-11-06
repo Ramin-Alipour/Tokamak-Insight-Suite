@@ -229,13 +229,15 @@ def optical_model_validity(
     electron_velocity_projection_m_s: float | None,
     kappa_index: float | None = None,
 ) -> dict:
-    """Return explicit, machine-readable optical model-domain diagnostics.
+    """Return strict, machine-readable optical model-domain diagnostics.
 
-    The non-relativistic screens are conservative software diagnostics, not
-    universal physical boundaries. The relativistic Maxwell-Juttner model is
-    not incorrectly subjected to those non-relativistic asymptotic screens.
+    Invalid physical inputs are distinguished from missing diagnostics and from
+    conservative non-relativistic asymptotic warnings. A warning never triggers
+    automatic model substitution; a hard domain failure makes the fit ineligible
+    for quantitative physical reporting.
     """
     import math
+    import numbers
 
     c = 299_792_458.0
     electron_rest_energy_eV = 510_998.95069
@@ -246,97 +248,124 @@ def optical_model_validity(
         "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
     }
-    if model not in supported:
+    if not isinstance(model, str) or model not in supported:
         return {
             "model": model,
             "status": "not_applicable_to_optical_noncollective_model",
             "checks": [],
             "automatic_model_switch": False,
+            "quantitative_reporting_allowed": False,
+            "reason": "The selected model has no registered optical validity contract.",
         }
 
+    def parse_optional(value, name, *, strictly_positive=False):
+        if value is None:
+            return None, None
+        if isinstance(value, (bool,)) or not isinstance(value, numbers.Real):
+            return None, f"{name} must be a finite real scalar"
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            return None, f"{name} must be finite"
+        if strictly_positive and parsed <= 0.0:
+            return None, f"{name} must be strictly positive"
+        return parsed, None
+
+    temperature, temperature_error = parse_optional(
+        electron_temperature_eV, "electron_temperature_eV", strictly_positive=True
+    )
+    flow, flow_error = parse_optional(
+        electron_velocity_projection_m_s, "electron_velocity_projection_m_s"
+    )
+    kappa, kappa_error = parse_optional(kappa_index, "kappa_index")
+    errors = [e for e in (temperature_error, flow_error) if e]
+    if model == "non_collective_kappa" and kappa_error:
+        errors.append(kappa_error)
+
     checks = []
-    temperature = None if electron_temperature_eV is None else float(electron_temperature_eV)
-    flow = None if electron_velocity_projection_m_s is None else float(electron_velocity_projection_m_s)
-    if temperature is None or not math.isfinite(temperature):
-        checks.append({
-            "name": "thermal_relativistic_parameter",
-            "status": "unavailable_no_finite_fitted_temperature",
-        })
+    if temperature_error:
+        checks.append({"name": "thermal_relativistic_parameter", "status": "invalid_input", "reason": temperature_error})
+    elif temperature is None:
+        checks.append({"name": "thermal_relativistic_parameter", "status": "unavailable_no_finite_fitted_temperature"})
     else:
         theta = temperature / electron_rest_energy_eV
         if model == "non_collective_relativistic_maxwell_juttner":
             checks.append({
-                "name": "thermal_relativistic_parameter",
-                "value": theta,
+                "name": "thermal_relativistic_parameter", "value": theta,
                 "status": "included_in_relativistic_maxwell_juttner_model",
                 "interpretation": "Thermal relativistic effects are represented by the selected Maxwell-Juttner momentum distribution.",
             })
         else:
             checks.append({
-                "name": "thermal_relativistic_parameter",
-                "value": theta,
-                "screen": theta_limit,
+                "name": "thermal_relativistic_parameter", "value": theta, "screen": theta_limit,
                 "status": "within_asymptotic_screen" if theta <= theta_limit else "screen_exceeded",
-                "interpretation": "theta_e=kT_e/(m_e c^2); leading omitted thermal relativistic corrections are O(theta_e)",
+                "interpretation": "theta_e=kT_e/(m_e c^2); leading omitted thermal relativistic corrections are O(theta_e).",
             })
-    if flow is None or not math.isfinite(flow):
-        checks.append({
-            "name": "bulk_flow_beta",
-            "status": "unavailable_no_finite_fitted_projection",
-        })
+
+    if flow_error:
+        checks.append({"name": "bulk_flow_beta", "status": "invalid_input", "reason": flow_error})
+    elif flow is None:
+        checks.append({"name": "bulk_flow_beta", "status": "unavailable_no_finite_fitted_projection"})
     else:
         beta = abs(flow) / c
-        if model == "non_collective_relativistic_maxwell_juttner":
+        if beta >= 1.0:
             checks.append({
-                "name": "bulk_flow_beta",
-                "value": beta,
-                "status": "within_lorentz_boost_domain" if beta < 1.0 else "outside_lorentz_boost_domain",
+                "name": "bulk_flow_beta", "value": beta,
+                "status": "outside_lorentz_boost_domain",
+                "interpretation": "A projected physical flow must be strictly subluminal.",
+            })
+        elif model == "non_collective_relativistic_maxwell_juttner":
+            checks.append({
+                "name": "bulk_flow_beta", "value": beta,
+                "status": "within_lorentz_boost_domain",
                 "interpretation": "The selected relativistic model uses an exact Lorentz boost along the scattering-vector projection.",
             })
         else:
             checks.append({
-                "name": "bulk_flow_beta",
-                "value": beta,
-                "screen": beta_limit,
+                "name": "bulk_flow_beta", "value": beta, "screen": beta_limit,
                 "status": "within_asymptotic_screen" if beta <= beta_limit else "screen_exceeded",
-                "interpretation": "absolute scattering-vector flow projection divided by c; leading omitted kinematic corrections are O(beta^2)",
+                "interpretation": "Leading omitted non-relativistic kinematic corrections scale as beta squared.",
             })
+
     if model == "non_collective_kappa":
-        kappa = None if kappa_index is None else float(kappa_index)
-        if kappa is None or not math.isfinite(kappa):
-            checks.append({
-                "name": "finite_variance_kappa_domain",
-                "status": "unavailable_no_finite_fitted_kappa_index",
-            })
+        if kappa_error:
+            checks.append({"name": "finite_variance_kappa_domain", "status": "invalid_input", "reason": kappa_error})
+        elif kappa is None:
+            checks.append({"name": "finite_variance_kappa_domain", "status": "unavailable_no_finite_fitted_kappa_index"})
         else:
-            finite_variance = kappa > 1.5
             checks.append({
-                "name": "finite_variance_kappa_domain",
-                "value": kappa,
-                "required": "> 3/2",
-                "status": "within_declared_domain" if finite_variance else "outside_declared_domain",
-                "interpretation": "The selected isotropic Student-t projected family is restricted to finite variance.",
+                "name": "finite_variance_kappa_domain", "value": kappa, "required": "> 3/2",
+                "status": "within_declared_domain" if kappa > 1.5 else "outside_declared_domain",
+                "interpretation": "The selected isotropic Student-t projected family requires finite variance.",
             })
+
     statuses = {item.get("status") for item in checks}
-    hard_domain_failure = bool(statuses & {"outside_declared_domain", "outside_lorentz_boost_domain"})
+    hard_domain_failure = bool(statuses & {
+        "invalid_input", "outside_declared_domain", "outside_lorentz_boost_domain"
+    })
     asymptotic_exceeded = "screen_exceeded" in statuses
-    complete = all(
-        status in {
-            "within_asymptotic_screen", "within_declared_domain",
-            "included_in_relativistic_maxwell_juttner_model",
-            "within_lorentz_boost_domain",
-        }
-        for status in statuses
+    required_available = not any(str(s).startswith("unavailable_") for s in statuses)
+    complete = required_available and all(status in {
+        "within_asymptotic_screen", "within_declared_domain",
+        "included_in_relativistic_maxwell_juttner_model",
+        "within_lorentz_boost_domain",
+    } for status in statuses)
+    status = (
+        "outside_declared_model_domain" if hard_domain_failure else
+        "asymptotic_screen_exceeded" if asymptotic_exceeded else
+        "within_declared_screen" if complete else "incomplete_domain_diagnostics"
     )
     return {
         "model": model,
-        "status": (
-            "outside_declared_model_domain" if hard_domain_failure else
-            "asymptotic_screen_exceeded" if asymptotic_exceeded else
-            "within_declared_screen" if complete else "incomplete_domain_diagnostics"
-        ),
+        "status": status,
         "checks": checks,
+        "domain_assessment_complete": bool(required_available and not hard_domain_failure),
+        "quantitative_reporting_allowed": not hard_domain_failure,
+        "requires_scope_warning": bool(asymptotic_exceeded),
         "screens_are_universal_physical_boundaries": False,
         "automatic_model_switch": False,
-        "reporting_rule": "A non-relativistic screen exceedance is reported as a model-scope warning; it is not repaired by silently selecting another model.",
+        "reporting_rule": (
+            "Hard input/domain failures invalidate quantitative physical reporting. "
+            "Non-relativistic asymptotic-screen exceedance remains reportable only with "
+            "an explicit model-scope warning; no automatic model substitution is performed."
+        ),
     }
