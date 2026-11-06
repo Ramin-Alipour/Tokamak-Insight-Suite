@@ -8152,10 +8152,10 @@
   },
   {
     "name": "Gyrotropic bi-Kappa directional Landau susceptibility",
-    "equation": "T_q = T_perp + (T_parallel − T_perp)(b_hat·q_hat)^2; χ_e = −(ω_pe²/k²) ∫[f′_q(v)/(v−v_phi−i0⁺)]dv",
-    "inputs": "Electron density [m^-3], T_parallel and T_perpendicular [eV], unit magnetic-field and scattering vectors, κ>3/2, phase velocity [m s^-1], wave number [m^-1].",
+    "equation": "T_q = T_perp + (T_parallel − T_perp)(b_hat·q_hat)^2; v_phi,rest = v_phi,lab − u_e·q_hat; χ_e = −(ω_pe²/k²) ∫[f′_q(v)/(v−v_phi,rest−i0⁺)]dv",
+    "inputs": "Electron density [m^-3], T_parallel and T_perpendicular [eV], unit magnetic-field and scattering vectors, κ>3/2, phase velocity [m s^-1], wave number [m^-1]. Projected electron bulk-flow velocity u_e·q_hat [m s^-1].",
     "output": "Complex longitudinal electron susceptibility, directional temperature T_q, full-tail quadrature errors and analytic phase-velocity derivative.",
-    "assumptions": "Gyrotropic zero-drift 3-D bi-Kappa with common κ; exact 1-D marginal along q; collisionless, unmagnetized, non-relativistic longitudinal response.",
+    "assumptions": "Gyrotropic drifting 3-D bi-Kappa with common κ; exact 1-D marginal along q; Landau resonance evaluated in the electron bulk rest frame using v_phi,rest=v_phi,lab-u_e dot q_hat; collisionless, unmagnetized, non-relativistic longitudinal response.",
     "status": "D",
     "category": "Optical Thomson scattering",
     "execution_contract": {
@@ -8223,6 +8223,12 @@
           "name": "minimum_velocity_grid_probability_coverage",
           "unit": "dimensionless; default 0.999",
           "required": false
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; signed electron bulk-flow projection along scattering vector; strictly subluminal",
+          "required": false,
+          "default": 0
         }
       ],
       "output_specs": [
@@ -8249,25 +8255,34 @@
         {
           "name": "landau_integral_imag_absolute_error",
           "unit": "solver-reported quadrature error"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; supplied projected bulk flow"
+        },
+        {
+          "name": "phase_velocity_in_electron_rest_frame_m_s",
+          "unit": "m s^-1; v_phi,lab - u_e dot q_hat"
         }
       ],
       "prerequisites": [
         "Supplied magnetic-field and scattering vectors must be normalized and calibrated.",
-        "The exact projected marginal assumes a gyrotropic zero-drift bi-Kappa with common κ.",
-        "The velocity grid is a tail-coverage gate; the analytic Kappa tail is integrated over the full real axis."
+        "The velocity grid is a tail-coverage gate; the analytic Kappa tail is integrated over the full real axis.",
+        "Optional signed electron bulk-flow projection is applied through the Galilean shift of the Landau resonant phase velocity; the projected speed must be subluminal."
       ],
       "uncertainty_model": "Adaptive quadrature errors are returned. Uncertainty in temperatures, κ, density and geometry is not inferred by this kernel and must be propagated by the caller.",
       "limitations": [
-        "One scattering direction identifies T_q only; it cannot independently identify T_parallel and T_perpendicular.",
         "Collisionless, unmagnetized, non-relativistic longitudinal electron response only.",
         "No cyclotron harmonics, collisions, ion susceptibility, FDT source or Full-EM current vertex."
       ],
       "test_links": [
         "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_isotropic_limit_matches_existing_kappa_solver",
         "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_directional_temperature_obeys_gyrotropic_projection",
-        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry",
+        "tests/test_bi_kappa_susceptibility.py::test_drifting_bi_kappa_uses_electron_rest_frame_landau_resonance",
+        "tests/test_bi_kappa_susceptibility.py::test_drifting_bi_kappa_rejects_superluminal_projected_flow"
       ],
-      "note": "Public solver is exposed through run_advanced_thomson_physics and the advanced physics dashboard. The exact directional marginal is reduced to the existing analytic full-tail Kappa Landau kernel; it is not a full magnetized/Full-EM susceptibility."
+      "note": "The exact directional marginal is reduced to the existing analytic full-tail Kappa Landau kernel. A supplied projected electron drift shifts the resonance to v_phi-u_e dot q_hat, preserving the susceptibility and its analytic phase derivative in the electron rest frame. This is not a full magnetized/Full-EM susceptibility."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
@@ -8284,7 +8299,9 @@
       "test_links": [
         "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_isotropic_limit_matches_existing_kappa_solver",
         "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_directional_temperature_obeys_gyrotropic_projection",
-        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
+        "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry",
+        "tests/test_bi_kappa_susceptibility.py::test_drifting_bi_kappa_uses_electron_rest_frame_landau_resonance",
+        "tests/test_bi_kappa_susceptibility.py::test_drifting_bi_kappa_rejects_superluminal_projected_flow"
       ]
     }
   },
