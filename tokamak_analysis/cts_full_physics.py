@@ -71,7 +71,7 @@ from .thomson_kinetic_models import (
     collective_kappa_spectral_density,
     fit_collective_kappa,
 )
-from .cts_magnetoionic import (
+from .thomson_temperature_tensor import infer_full_temperature_tensor_from_thomson_projections\nfrom .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
     cold_plasma_absorbed_power_density,
