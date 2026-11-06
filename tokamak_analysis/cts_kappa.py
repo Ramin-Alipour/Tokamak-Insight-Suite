@@ -242,6 +242,13 @@ def kappa_electron_susceptibility(
         "kappa": kap,
         "theta_m_s": float(np.sqrt(theta_squared)),
         "second_moment_m2_s2": float(E * te / mass),
+        "fourth_moment_exists": bool(kap > 2.5),
+        "kurtosis": float(3.0 * (2.0 * kap - 3.0) / (2.0 * kap - 5.0)) if kap > 2.5 else None,
+        "excess_kurtosis": float(6.0 / (2.0 * kap - 5.0)) if kap > 2.5 else None,
+        "fourth_central_moment_m4_s4": (
+            float(3.0 * (2.0 * kap - 3.0) / (2.0 * kap - 5.0) * (E * te / mass)**2)
+            if kap > 2.5 else None
+        ),
         "velocity_grid_probability_coverage": grid_coverage,
         "finite_support_probability_mass": grid_coverage,
         "minimum_velocity_grid_probability_coverage": minimum_coverage,
