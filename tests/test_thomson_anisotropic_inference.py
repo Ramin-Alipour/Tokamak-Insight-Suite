@@ -560,3 +560,59 @@ def test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options():
         rtol=3.0e-2,
         atol=2.0e3,
     )
+
+
+def test_bikappa_response_normalization_is_checked_independently_for_each_view():
+    from tokamak_analysis.thomson_anisotropic_inference import (
+        fit_gyrotropic_bi_kappa_thomson,
+    )
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    response = np.broadcast_to(
+        np.eye(wavelength.size),
+        (spectra.shape[0], wavelength.size, wavelength.size),
+    ).copy()
+    # A pooled sum over views is exactly identity, but neither diagnostic is
+    # probability-conserving: each true wavelength bin loses 60%/40% of its
+    # photons. The old axis=0 check incorrectly accepted this pair.
+    response[0] *= 0.4
+    response[1] *= 0.6
+    with pytest.raises(ValueError, match="independently per view"):
+        fit_gyrotropic_bi_kappa_thomson(
+            wavelength, spectra[:2], laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+            scattering_vector_unit=q[:2],
+            instrument_response_matrix=response[:2],
+        )
+
+
+def test_bikappa_accepts_distinct_probability_conserving_response_per_view():
+    from tokamak_analysis.thomson_anisotropic_inference import (
+        fit_gyrotropic_bi_kappa_thomson,
+        _apply_response_in_bin_integrated_space,
+    )
+
+    wavelength, intrinsic_spectra, b, q = _synthetic_bi_kappa_spectra()
+    n = wavelength.size
+    identity = np.eye(n)
+    # A non-symmetric, finite-volume column-stochastic redistribution kernel.
+    blurred = 0.90 * identity
+    blurred[1:, :-1] += 0.10 * np.eye(n - 1)
+    response = np.stack((identity, blurred, identity))
+    measured = intrinsic_spectra.copy()
+    measured[1] = _apply_response_in_bin_integrated_space(
+        blurred, intrinsic_spectra[1] - (3.0 + 0.2*(wavelength-500.0)), wavelength
+    ) + 3.0 + 0.2*(wavelength-500.0)
+
+    result = fit_gyrotropic_bi_kappa_thomson(
+        wavelength, measured, laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q, instrument_response_matrix=response,
+        initial_temperature_parallel_eV=750.0,
+        initial_temperature_perpendicular_eV=400.0,
+        initial_kappa=5.0,
+    )
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["electron_temperature_parallel_eV"] == pytest.approx(900.0, rel=3e-2)
+    assert result["electron_temperature_perpendicular_eV"] == pytest.approx(320.0, rel=3e-2)
+    assert result["kappa_index"] == pytest.approx(4.2, rel=3e-2)

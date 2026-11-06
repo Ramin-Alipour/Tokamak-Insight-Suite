@@ -686,8 +686,19 @@ def fit_gyrotropic_bi_kappa_thomson(
         response = np.broadcast_to(response, (n_view, n_bin, n_bin)).copy()
     if response.shape != (n_view, n_bin, n_bin) or np.any(response < 0.0):
         raise ValueError("instrument_response_matrix must be non-negative with shape (n_bin,n_bin) or (n_view,n_bin,n_bin)")
-    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
-        raise ValueError("measured response columns must sum to one; response is never silently renormalized")
+    # response has shape (view, measured_bin, true_bin). Each view is
+    # an independent probability kernel P(measured_bin | true_bin), so
+    # probability conservation is per view and per true/input wavelength:
+    #     sum_measured response[view, measured_bin, true_bin] = 1.
+    # Summing axis=0 mixes different diagnostics and can hide channel losses
+    # (e.g. 0.4*I and 0.6*I falsely appear normalized when pooled).
+    response_column_sums = response.sum(axis=1)
+    if (np.any(response_column_sums <= 0.0)
+            or not np.allclose(response_column_sums, 1.0, rtol=1e-8, atol=1e-10)):
+        raise ValueError(
+            "each measured response matrix must have unit column sums independently per view; "
+            "response is never silently renormalized"
+        )
     if measurement_covariance is not None and signal_uncertainty is not None:
         raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
     size = n_view * n_bin
