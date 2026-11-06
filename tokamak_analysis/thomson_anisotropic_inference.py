@@ -110,6 +110,27 @@ def _kappa_bin_average(wavelength_nm, laser_wavelength_nm, scattering_q_factor,
     return probability / widths, probability
 
 
+def _kappa_projected_superluminal_tail_probability(flow_m_s, theta_m_s, kappa):
+    r"""Exact projected Kappa probability outside the speed-of-light boundary.
+
+    The projected random velocity w=v_q-u_q is Student-t with nu=2*kappa-1
+    and scale theta*sqrt(kappa/nu). Since |v_q| <= |v|, this is a rigorous
+    lower bound on the 3-D probability assigned to superluminal speeds by
+    the non-relativistic Kappa closure. It is a validity diagnostic, not a
+    relativistic correction.
+    """
+    flow, theta, kappa_value = map(float, (flow_m_s, theta_m_s, kappa))
+    if (not np.all(np.isfinite([flow, theta, kappa_value]))
+            or abs(flow) >= _C or theta <= 0.0 or kappa_value <= 1.5):
+        raise ValueError("projected Kappa tail requires subluminal flow, positive theta and kappa > 3/2")
+    degrees_of_freedom = 2.0 * kappa_value - 1.0
+    scale = theta * np.sqrt(kappa_value / degrees_of_freedom)
+    lower = (-_C - flow) / scale
+    upper = (_C - flow) / scale
+    probability = stdtr(degrees_of_freedom, lower) + stdtr(degrees_of_freedom, -upper)
+    return float(np.clip(probability, 0.0, 1.0))
+
+
 def _apply_response_in_bin_integrated_space(response_matrix, spectral_density, wavelength_nm):
     """Apply a measured bin-probability response while conserving spectral power.
 
@@ -448,7 +469,19 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "maximum_fitted_projected_rms_beta": float(np.max(projected_rms_beta)),
             "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
             "status": "within_declared_nonrelativistic_screen",
-            "interpretation": "Conservative software screening threshold, not a universal physical boundary."
+            "interpretation": "RMS speed screening is not sufficient for an unbounded Kappa distribution; inspect the exact projected-tail lower bound."
+        },
+        "relativistic_tail_diagnostic": {
+            "definition": "P(|v_q| >= c) from the exact Student-t projected marginal; a lower bound on the 3-D superluminal probability",
+            "projected_superluminal_probability_lower_bound": projected_superluminal_tail_lower_bound,
+            "maximum_projected_superluminal_probability_lower_bound": float(np.max(projected_superluminal_tail_lower_bound)),
+            "tolerance": projected_tail_tolerance,
+            "status": "exceeds_tolerance_use_relativistic_model" if projected_tail_exceeds_tolerance else "below_projected_tail_tolerance",
+            "requires_relativistic_forward_model": projected_tail_exceeds_tolerance,
+            "warning": (
+                "The non-relativistic Kappa closure assigns more than the projected-tail tolerance to superluminal projected velocities; do not interpret this fit as a relativistic EVDF."
+                if projected_tail_exceeds_tolerance else None
+            ),
         },
         "spectral_bin_integration": "exact_Gaussian_CDF_probability_per_finite_wavelength_bin",
         "magnetic_pitch_cosine": mu,
@@ -698,7 +731,20 @@ def fit_gyrotropic_bi_kappa_thomson(
         raise RuntimeError(f"gyrotropic bi-Kappa Thomson fit failed: {fit.message}")
     fitted, directional, kappa, captured_probability, projected_velocity_grid, projected_velocity_pdf = predict(fit.x)
     projected_rms_beta = np.sqrt(_E*directional/_ME)/_C
-    fitted_flow_beta = np.abs(fit.x[3::4])/_C
+    fitted_flows = fit.x[3::4].copy()
+    fitted_flow_beta = np.abs(fitted_flows)/_C
+    projected_kappa_theta = np.sqrt(
+        ((2.0*kappa - 3.0)/kappa) * (_E*directional/_ME)
+    )
+    projected_superluminal_tail_lower_bound = np.asarray([
+        _kappa_projected_superluminal_tail_probability(flow, theta, kappa)
+        for flow, theta in zip(fitted_flows, projected_kappa_theta)
+    ])
+    # RMS-beta alone hides the algebraic tail of the unbounded Newtonian Kappa PDF.
+    projected_tail_tolerance = 1.0e-8
+    projected_tail_exceeds_tolerance = bool(
+        np.max(projected_superluminal_tail_lower_bound) > projected_tail_tolerance
+    )
     if np.max(projected_rms_beta) >= beta_limit or np.max(fitted_flow_beta) >= 0.1:
         raise ValueError(
             "Fitted thermal or bulk-flow speed exceeds the declared non-relativistic "
