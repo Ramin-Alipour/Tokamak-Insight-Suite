@@ -1032,6 +1032,11 @@ elif page=='Spectral Analysis':
                         value='',key='ts_infer_spatial_psf_sigma',
                         help='The finite-volume Gaussian maps true radial nodes into observed radial bins. Probability outside the finite radial domain is retained as edge loss, not renormalized.',
                     )
+                    spatial_psf_sigma_uncertainty_text=st.text_input(
+                        'Gaussian spatial PSF sigma uncertainty (m; 1-sigma calibration uncertainty, optional)',
+                        value='',key='ts_infer_spatial_psf_sigma_uncertainty',
+                        help='Propagated through the measured-spectrum inverse using the local GLS sensitivity to PSF width. This is external calibration uncertainty, not inferred from plasma spectra.',
+                    )
                 elif spatial_psf_mode=='measured_matrix':
                     spatial_psf_upload=st.file_uploader(
                         'Measured spatial PSF matrix CSV (observed radial bins × true radial nodes)',
@@ -1338,6 +1343,11 @@ elif page=='Spectral Analysis':
                             kwargs['spatial_psf_sigma_m']=_parse_ts_scalar(
                                 spatial_psf_sigma_text,'Gaussian spatial PSF sigma',minimum=0.0
                             )
+                            if spatial_psf_sigma_uncertainty_text.strip():
+                                kwargs['spatial_psf_sigma_uncertainty_m']=_parse_ts_scalar(
+                                    spatial_psf_sigma_uncertainty_text,
+                                    'Gaussian spatial PSF sigma uncertainty',minimum=0.0
+                                )
                         elif spatial_psf_mode=='measured_matrix':
                             if spatial_psf_upload is None:
                                 raise ValueError('Upload the measured spatial PSF matrix when measured_matrix mode is selected.')
