@@ -18,16 +18,22 @@ def fit_gyrotropic_thomson_spectra(wavelength_nm, measured_spectra, *, distribut
     """
     if not isinstance(distribution_model, str):
         raise ValueError("distribution_model must be 'bi_maxwellian' or 'bi_kappa'")
-    from . import thomson_anisotropic_inference as anisotropic
-    dispatch = {
-        "bi_maxwellian": anisotropic.fit_gyrotropic_bi_maxwellian_thomson,
-        "bi_kappa": anisotropic.fit_gyrotropic_bi_kappa_thomson,
-    }
-    if distribution_model not in dispatch:
+    if distribution_model not in {"bi_maxwellian", "bi_kappa"}:
         raise ValueError("distribution_model must be 'bi_maxwellian' or 'bi_kappa'")
-    result = dispatch[distribution_model](wavelength_nm, measured_spectra, **kwargs)
+    # Route through the public Analysis-1 dispatcher so optional geometry
+    # covariance and 3-D flow acceptance thresholds reach the derived flow
+    # closure instead of being rejected by the per-view spectral fitter.
+    from .cts_full_physics import run_advanced_thomson_physics
+    model = (
+        "gyrotropic_bi_maxwellian_spectral_fit"
+        if distribution_model == "bi_maxwellian"
+        else "gyrotropic_bi_kappa_spectral_fit"
+    )
+    result = run_advanced_thomson_physics(
+        model, wavelength_nm, measured_spectra, **kwargs
+    )
     if not isinstance(result, dict):
-        raise RuntimeError("Gyrotropic Thomson solver must return a result mapping")
+        raise RuntimeError("Gyrotropic Thomson workflow must return a result mapping")
     result = dict(result)
     result["selected_distribution_model"] = distribution_model
     result["analysis_entry_point"] = "fit_gyrotropic_thomson_spectra"
