@@ -750,23 +750,22 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         directions = kwargs.get("scattering_vector_unit")
         if directions is not None:
             projections = np.asarray(result.get("electron_velocity_projection_m_s"), dtype=float)
-            order = list(result.get("parameter_order") or [])
-            parameter_covariance = result.get("parameter_covariance")
-            flow_names = [f"flow_projection_view_{i}_m_s" for i in range(projections.size)]
-            if parameter_covariance is None or any(name not in order for name in flow_names):
+            projection_covariance = result.get("flow_projection_covariance_m2_s2")
+            if projection_covariance is None:
                 result["three_dimensional_flow_inference"] = {
                     "identifiability": "not_reported",
                     "reportable_as_inferred_parameter": False,
                     "electron_velocity_vector_m_s": None,
                     "electron_velocity_covariance_m2_s2": None,
-                    "reason": "A finite full-rank joint spectral-fit covariance is required to propagate correlated view-projection uncertainty.",
+                    "reason": (
+                        "The spectral-fit Jacobian nullspace overlaps one or more "
+                        "view-flow projections; correlated flow uncertainty is not identifiable."
+                    ),
                 }
             else:
-                covariance = np.asarray(parameter_covariance, dtype=float)
-                indices = [order.index(name) for name in flow_names]
-                if covariance.shape != (len(order), len(order)):
-                    raise ValueError("gyrotropic fit parameter covariance does not match parameter_order")
-                projection_covariance = covariance[np.ix_(indices, indices)]
+                projection_covariance = np.asarray(projection_covariance, dtype=float)
+                if projection_covariance.shape != (projections.size, projections.size):
+                    raise ValueError("gyrotropic fit flow-projection covariance does not match the fitted views")
                 try:
                     result["three_dimensional_flow_inference"] = infer_three_dimensional_flow_from_thomson_projections(
                         projections,
