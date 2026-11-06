@@ -359,7 +359,7 @@ def optical_model_validity(
         "status": status,
         "checks": checks,
         "domain_assessment_complete": bool(required_available and not hard_domain_failure),
-        "quantitative_reporting_allowed": not hard_domain_failure,
+        "quantitative_reporting_allowed": bool(not hard_domain_failure and required_available),
         "requires_scope_warning": bool(asymptotic_exceeded),
         "screens_are_universal_physical_boundaries": False,
         "automatic_model_switch": False,
