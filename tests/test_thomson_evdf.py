@@ -352,6 +352,11 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
     assert result["absolute_density_identified"] is False
     assert result["evdf_parallel_s_per_m"].shape == result["velocity_parallel_m_s"].shape
     assert np.trapz(result["evdf_parallel_s_per_m"], result["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
+    assert result["velocity_moment_covariance"].shape == (6, 6)
+    assert result["velocity_moment_standard_uncertainty"] is not None
+    assert result["velocity_moment_uncertainty_status"] == (
+        "delta_method_propagated_from_normalized_evdf_covariance"
+    )
 
 
 def test_relativistic_projected_evdf_and_psf_profile_are_dashboard_api_routes():
