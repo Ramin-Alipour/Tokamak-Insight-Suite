@@ -756,6 +756,8 @@ def reconstruct_joint_thomson_spatial_spectra(
                       "jacobian_condition_number": optimizer_condition,
                       "data_only_jacobian_rank": data_rank,
                       "data_only_scaled_jacobian_condition_number": data_condition,
+                      "maximum_data_condition_number": maximum_data_condition_number,
+                      "data_condition_number_acceptable": condition_identifiable,
                       "regularization_rows_excluded_from_identifiability": True,
                       "degrees_of_freedom": dof},
         "identifiability": {
