@@ -647,6 +647,13 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     elif model == "cts_tabulated_evdf_landau":
         solver = collective_tabulated_electron_spectral_density
     elif model == "cts_electrostatic_measured_spectrum_inference":
+        # Dashboard/API contract names the calibrated observation
+        # measured_spectrum; the electrostatic fitter's internal keyword is
+        # spectrum. Normalize the alias once at this public boundary.
+        if "measured_spectrum" in kwargs and "spectrum" in kwargs:
+            raise ValueError("Supply the measured CTS spectrum once, as 'measured_spectrum' or 'spectrum', not both")
+        if "measured_spectrum" in kwargs:
+            kwargs["spectrum"] = kwargs.pop("measured_spectrum")
         solver = analyze_cts_spectrum
     elif model == "cts_multi_ion_flow_inference":
         solver = fit_cts_ion_species_flows
