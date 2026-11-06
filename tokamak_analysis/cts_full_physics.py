@@ -16,7 +16,7 @@ from .cts_fdt import (
     quantum_fdt_dynamic_structure_factor,
     quantum_unsymmetrized_dynamic_structure_factor,
 )
-from .cts_landau_em import landau_full_em_current_response
+from .cts_landau_em import landau_full_em_current_response, landau_full_em_electric_field_fluctuation_spectrum
 from .cts_full_wave import solve_stratified_mode_conversion, solve_stratified_full_wave_oblique
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
 from .ece_kinetic import (
@@ -520,6 +520,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_conserving_bgk_fdt",
     "landau_fdt_cts",
     "landau_fdt_full_em_constitutive",
+    "landau_fdt_full_em_field_fluctuations",
     "landau_fdt_full_em_response",
     "polarized_kinetic_ece",
     "stratified_nonparaxial_vector",
@@ -663,6 +664,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         # Keep the documented response alias executable through the same
         # assembled Landau-operator + matching-FDT constitutive solver.
         solver = analyze_landau_fdt_full_em_constitutive
+    elif model == "landau_fdt_full_em_field_fluctuations":
+        solver = landau_full_em_electric_field_fluctuation_spectrum
     elif model == "polarized_kinetic_ece":
         solver = solve_polarized_kinetic_ece_with_mode_conversion
     elif model == "stratified_nonparaxial_vector":
