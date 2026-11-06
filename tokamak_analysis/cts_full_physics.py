@@ -508,6 +508,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_multi_ion_flow_inference",
     "cts_electrostatic_measured_spectrum_inference",
     "thomson_projected_evdf",
+    "thomson_temperature_from_spectral_width",
     "thomson_relativistic_exact_flow_projection",
     "thomson_relativistic_projected_evdf",
     "thomson_psf_profile_inverse",
