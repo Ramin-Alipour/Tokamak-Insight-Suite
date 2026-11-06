@@ -717,6 +717,63 @@ def test_joint_spatial_spectral_inverse_composes_measured_mixing_with_gaussian_p
     )
 
 
+
+def test_joint_spatial_spectral_inverse_propagates_gaussian_psf_calibration_uncertainty():
+    from tokamak_analysis.thomson_joint_spatial_spectral import (
+        gaussian_spatial_psf_matrix,
+    )
+
+    wavelength, _, radius, mixing, te, flow = _synthetic_case()
+    psf_sigma = 0.05
+    psf = gaussian_spatial_psf_matrix(radius, psf_sigma)
+    sigma = 2.0 * 532.0 * np.sqrt(te / 510998.95069) * np.sin(np.pi / 4.0)
+    center = 532.0 * (
+        1.0 - 2.0 * np.sin(np.pi / 4.0) * flow / 299792458.0
+    )
+    intrinsic = np.exp(
+        -0.5 * ((wavelength[None, :] - center[:, None]) / sigma[:, None]) ** 2
+    )
+    measured = mixing @ psf @ intrinsic + 0.01
+    common = dict(
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(measured, 0.01),
+        regularization_strength=0.0,
+        spatial_psf_sigma_m=psf_sigma,
+    )
+    nominal = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing, **common
+    )
+    propagated = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing,
+        spatial_psf_sigma_uncertainty_m=0.005, **common
+    )
+    psf_covariance = propagated["psf_calibration_parameter_covariance"]
+    assert psf_covariance is not None
+    assert psf_covariance.shape == propagated["parameter_covariance"].shape
+    assert np.all(np.isfinite(psf_covariance))
+    assert np.min(np.linalg.eigvalsh(0.5 * (psf_covariance + psf_covariance.T))) >= -1e-10
+    np.testing.assert_allclose(
+        propagated["parameter_covariance"],
+        nominal["parameter_covariance"] + psf_covariance,
+        rtol=2e-5, atol=1e-12,
+    )
+    assert propagated["spatial_psf_contract"]["sigma_uncertainty_m"] == 0.005
+    assert "linearized_GLS_parameter_covariance" in propagated["spatial_psf_contract"]["uncertainty"]
+    assert propagated["psf_sigma_parameter_sensitivity"] is not None
+
+
+def test_joint_spatial_spectral_inverse_rejects_unattached_psf_width_uncertainty():
+    wavelength, spectra, radius, mixing, *_ = _synthetic_case()
+    with pytest.raises(ValueError, match="requires spatial_psf_sigma_m"):
+        reconstruct_joint_thomson_spatial_spectra(
+            wavelength, spectra, radius, mixing,
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+            instrument_response=np.eye(wavelength.size),
+            spatial_psf_sigma_uncertainty_m=0.005,
+        )
+
 def test_joint_spatial_spectral_inverse_validates_measured_psf_contract():
     wavelength, spectra, radius, mixing, *_ = _synthetic_case()
     invalid = np.eye(radius.size)
