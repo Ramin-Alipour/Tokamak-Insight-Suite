@@ -274,6 +274,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
     spatial_psf_matrix=None, spatial_psf_sigma_m=None,
     spatial_psf_sigma_uncertainty_m=None,
+    spatial_mixing_matrix_covariance=None,
+    spectral_mixing_cross_covariance=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
     model_discrepancy_covariance=None, systematic_covariance=None,
@@ -347,6 +349,24 @@ def reconstruct_joint_thomson_spatial_spectra(
     m, nlam = y.shape
     if h.shape != (m, r.size) or not np.all(np.isfinite(h)) or np.any(h < 0):
         raise ValueError("spatial_mixing_matrix must be finite, non-negative, and shaped (n_channels,n_nodes)")
+    mixing_covariance = None
+    if spatial_mixing_matrix_covariance is not None:
+        mixing_covariance = _real_array(
+            spatial_mixing_matrix_covariance, "spatial_mixing_matrix_covariance"
+        )
+        expected_mixing_covariance_shape = (m*r.size, m*r.size)
+        if (mixing_covariance.shape != expected_mixing_covariance_shape
+                or not np.allclose(mixing_covariance, mixing_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "spatial_mixing_matrix_covariance must be a finite symmetric "
+                "(n_channels*n_nodes)-square covariance in row-major operator order"
+            )
+        mixing_covariance = 0.5 * (mixing_covariance + mixing_covariance.T)
+        mixing_eigenvalues = np.linalg.eigvalsh(mixing_covariance)
+        mixing_scale = max(float(np.max(np.abs(mixing_eigenvalues))), np.finfo(float).tiny)
+        if mixing_eigenvalues[0] < -1e-10 * mixing_scale:
+            raise ValueError("spatial_mixing_matrix_covariance must be positive semidefinite")
     if spatial_psf_matrix is not None and spatial_psf_sigma_m is not None:
         raise ValueError("supply spatial_psf_matrix or spatial_psf_sigma_m, not both")
     psf_sigma = None
@@ -438,6 +458,39 @@ def reconstruct_joint_thomson_spatial_spectra(
             raise ValueError("signal_uncertainty must be positive, finite, and match measured_spectra")
         measurement_covariance = np.diag(np.square(sigma.reshape(-1)))
         measurement_covariance_source = "independent_pointwise_spectral_uncertainty"
+
+    mixing_cross_covariance = None
+    if spectral_mixing_cross_covariance is not None:
+        if mixing_covariance is None:
+            raise ValueError(
+                "spectral_mixing_cross_covariance requires spatial_mixing_matrix_covariance"
+            )
+        if measurement_covariance is None:
+            raise ValueError(
+                "spectral_mixing_cross_covariance requires measured signal_uncertainty "
+                "or joint_spectral_covariance; discrepancy/systematic covariance is not a substitute"
+            )
+        mixing_cross_covariance = _real_array(
+            spectral_mixing_cross_covariance, "spectral_mixing_cross_covariance"
+        )
+        if mixing_cross_covariance.shape != (m*nlam, m*r.size):
+            raise ValueError(
+                "spectral_mixing_cross_covariance must have shape "
+                "(n_channels*n_wavelengths, n_channels*n_nodes) in channel-major/row-major order"
+            )
+        joint_measurement_mixing_covariance = np.block([
+            [measurement_covariance, mixing_cross_covariance],
+            [mixing_cross_covariance.T, mixing_covariance],
+        ])
+        joint_measurement_mixing_covariance = 0.5 * (
+            joint_measurement_mixing_covariance + joint_measurement_mixing_covariance.T
+        )
+        joint_eigenvalues = np.linalg.eigvalsh(joint_measurement_mixing_covariance)
+        joint_scale = max(float(np.max(np.abs(joint_eigenvalues))), np.finfo(float).tiny)
+        if joint_eigenvalues[0] < -1e-10 * joint_scale:
+            raise ValueError(
+                "joint measured-spectrum/spatial-mixing covariance block must be positive semidefinite"
+            )
 
     discrepancy = None
     if model_discrepancy_covariance is not None:
@@ -639,7 +692,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     if maximum_data_condition_number < 1.0:
         raise ValueError("maximum_data_condition_number must be >= 1")
 
-    def predict(p, psf_sigma_override=None):
+    def predict(p, psf_sigma_override=None, mixing_matrix_override=None, return_node_spectra=False):
         amp = np.exp(p[:r.size])
         te = np.exp(p[r.size:2*r.size])
         flow = p[2*r.size:3*r.size] * 1e6
@@ -706,16 +759,17 @@ def reconstruct_joint_thomson_spatial_spectra(
                         )
                         node_spectrum += float(source_weight) * source_bin_average
                 node_spectra[node] = amp[node] * node_spectrum
-        effective_mixing = (
-            h if psf_sigma_override is None
-            else nominal_mixing @ gaussian_spatial_psf_matrix(r, psf_sigma_override)
-        )
+        selected_mixing = nominal_mixing if mixing_matrix_override is None else mixing_matrix_override
+        selected_psf = psf if psf_sigma_override is None else gaussian_spatial_psf_matrix(r, psf_sigma_override)
+        effective_mixing = selected_mixing @ selected_psf
         mixed = effective_mixing @ node_spectra
         predicted = np.empty_like(y)
         for channel in range(m):
             # Response acts on spectral density through bin-integrated power.
             convolved = (response[channel] @ (mixed[channel] * widths)) / widths
             predicted[channel] = convolved + detector_background[channel]
+        if return_node_spectra:
+            return predicted, te, flow, amp, fitted_kappa, node_spectra
         return predicted, te, flow, amp, fitted_kappa
 
     def residual(p):
@@ -743,8 +797,10 @@ def reconstruct_joint_thomson_spatial_spectra(
     # Assess identifiability from measured spectral data alone.  The optimizer
     # Jacobian also contains optional regularization rows; counting those rows
     # as independent measurements would let smoothing manufacture rank.
-    def data_residual_only(parameters, psf_sigma_override=None):
-        return whiten(y - predict(parameters, psf_sigma_override)[0])
+    def data_residual_only(parameters, psf_sigma_override=None, mixing_matrix_override=None):
+        return whiten(y - predict(
+            parameters, psf_sigma_override, mixing_matrix_override
+        )[0])
 
     parameter_count = int(fit.x.size)
     background_start = 3*r.size + kappa_parameter_count
@@ -825,6 +881,9 @@ def reconstruct_joint_thomson_spatial_spectra(
     spectral_covariance_parameter_components_p = {}
     psf_calibration_covariance_p = None
     psf_sigma_parameter_sensitivity = None
+    mixing_calibration_covariance_p = None
+    mixing_cross_covariance_parameter_p = None
+    mixing_parameter_sensitivity = None
     if data_identifiable:
         data_information = data_jacobian.T @ data_jacobian
         data_covariance_p = np.linalg.pinv(data_information)
@@ -856,6 +915,54 @@ def reconstruct_joint_thomson_spatial_spectra(
                 spectral_covariance_parameter_components_p[label] = (
                     0.5 * (contribution + contribution.T)
                 )
+        if mixing_covariance is not None:
+            # Propagate calibration covariance of the measured spatial mixing
+            # operator through the same physical spectral forward model. The
+            # derivative is analytic in each operator element: d(H P S)/dH_cj
+            # is the PSF-blurred spectrum from true node j in detector channel c.
+            _, _, _, _, _, fitted_node_spectra = predict(
+                fit.x, return_node_spectra=True
+            )
+            mixing_residual_jacobian = np.zeros(
+                (m*nlam, m*r.size), dtype=float
+            )
+            for channel in range(m):
+                for node in range(r.size):
+                    blurred_node_spectrum = psf[node] @ fitted_node_spectra
+                    detector_derivative = (
+                        response[channel] @ (blurred_node_spectrum * widths)
+                    ) / widths
+                    derivative = np.zeros((m, nlam), dtype=float)
+                    derivative[channel] = -detector_derivative
+                    mixing_residual_jacobian[:, channel*r.size+node] = whiten(
+                        derivative.reshape(-1)
+                    )
+            mixing_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                data_jacobian.T @ mixing_residual_jacobian
+            )
+            mixing_calibration_covariance_p = (
+                mixing_parameter_sensitivity @ mixing_covariance
+                @ mixing_parameter_sensitivity.T
+            )
+            mixing_calibration_covariance_p = 0.5 * (
+                mixing_calibration_covariance_p + mixing_calibration_covariance_p.T
+            )
+            data_covariance_p = data_covariance_p + mixing_calibration_covariance_p
+            if mixing_cross_covariance is not None:
+                whitening_matrix = np.linalg.solve(
+                    spectral_covariance_cholesky, np.eye(m*nlam)
+                )
+                measurement_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                    data_jacobian.T @ whitening_matrix
+                )
+                mixing_cross_covariance_parameter_p = (
+                    measurement_parameter_sensitivity @ mixing_cross_covariance
+                    @ mixing_parameter_sensitivity.T
+                )
+                mixing_cross_covariance_parameter_p += mixing_cross_covariance_parameter_p.T
+                data_covariance_p = data_covariance_p + mixing_cross_covariance_parameter_p
+            data_covariance_p = 0.5 * (data_covariance_p + data_covariance_p.T)
+
         if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0:
             # Differentiate the complete measured-spectrum residual with respect
             # to the calibrated PSF width, then use implicit GLS sensitivity
@@ -980,6 +1087,18 @@ def reconstruct_joint_thomson_spatial_spectra(
             transform @ psf_calibration_covariance_p @ transform.T
             if psf_calibration_covariance_p is not None else None
         ),
+        "spatial_mixing_calibration_parameter_covariance": (
+            transform @ mixing_calibration_covariance_p @ transform.T
+            if mixing_calibration_covariance_p is not None else None
+        ),
+        "spatial_mixing_cross_covariance_parameter_contribution": (
+            transform @ mixing_cross_covariance_parameter_p @ transform.T
+            if mixing_cross_covariance_parameter_p is not None else None
+        ),
+        "spatial_mixing_parameter_sensitivity": (
+            transform @ mixing_parameter_sensitivity
+            if mixing_parameter_sensitivity is not None else None
+        ),
         "psf_sigma_parameter_sensitivity": (
             transform @ psf_sigma_parameter_sensitivity
             if psf_sigma_parameter_sensitivity is not None else None
@@ -998,6 +1117,8 @@ def reconstruct_joint_thomson_spatial_spectra(
                                        [f"flow_projection_{i}_m_s" for i in range(n)]),
             "cross_covariance_retained_between_amplitude_temperature_flow_and_spatial_nodes": physical_covariance is not None,
             "data_and_external_operator_covariance_available": data_covariance_p is not None and data_identifiable,
+            "spatial_mixing_calibration_covariance_available": mixing_calibration_covariance_p is not None,
+            "spatial_mixing_measurement_cross_covariance_available": mixing_cross_covariance_parameter_p is not None,
             "unweighted_residual_scale": residual_scale,
         },
         "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
@@ -1018,8 +1139,28 @@ def reconstruct_joint_thomson_spatial_spectra(
             fitted_background_coefficients[:, 1].copy()
             * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
         ),
-        "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
+        "spatial_mixing_operator": (
+            "researcher_supplied_operator_with_linearized_calibration_covariance"
+            if mixing_covariance is not None else
+            "researcher_supplied_fixed_forward_operator"
+        ),
         "spatial_mixing_matrix_nominal": nominal_mixing.copy(),
+        "spatial_mixing_covariance_contract": {
+            "supplied": mixing_covariance is not None,
+            "parameter_order": "row_major_channel_then_true_spatial_node",
+            "covariance_shape": list(mixing_covariance.shape) if mixing_covariance is not None else None,
+            "cross_covariance_with_measured_spectra_supplied": mixing_cross_covariance is not None,
+            "propagation": (
+                "implicit_data_only_GLS_sensitivity_with_full_operator_covariance"
+                if mixing_calibration_covariance_p is not None else
+                "fixed_operator_no_calibration_covariance_supplied"
+            ),
+            "cross_term": (
+                "included_from_joint_measurement_operator_covariance"
+                if mixing_cross_covariance_parameter_p is not None else
+                "zero_or_not_supplied"
+            ),
+        },
         "effective_spatial_mixing_matrix": h.copy(),
         "spatial_psf_matrix": psf.copy(),
         "spatial_psf_contract": {
