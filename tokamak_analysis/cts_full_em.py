@@ -2380,18 +2380,60 @@ def fit_full_em_gyrotropic_population_shape(
     candidate_distribution = result["regularized_candidate_distribution"].reshape(pp.size, pa.size)
     inferred_parallel_velocity_m_s = None
     candidate_parallel_velocity_m_s = None
-    if population_kind == "electron":
-        momentum_magnitude = np.sqrt(pp[:, None]**2 + pa[None, :]**2)
-        gamma = np.sqrt(1.0 + (momentum_magnitude / (ME * C))**2)
-        parallel_velocity = pa[None, :] / (gamma * ME)
-        candidate_parallel_velocity_m_s = float(
-            np.sum(candidate_distribution * weights * parallel_velocity)
+    population_mass_kg = (
+        ME if population_kind == "electron" else population_mass * AMU
+    )
+    momentum_magnitude = np.sqrt(pp[:, None]**2 + pa[None, :]**2)
+    gamma = np.sqrt(1.0 + (momentum_magnitude / (population_mass_kg * C))**2)
+    parallel_velocity = pa[None, :] / (gamma * population_mass_kg)
+    perpendicular_velocity = pp[:, None] / (gamma * population_mass_kg)
+
+    def relativistic_population_moments(distribution):
+        """Number-normalized relativistic moments on the solver's p-space measure."""
+        density_measure = np.asarray(distribution, dtype=float) * weights
+        normalization = float(np.sum(density_measure))
+        if not np.isfinite(normalization) or normalization <= 0.0:
+            raise ValueError("inferred population distribution has non-positive normalization")
+        probability = density_measure / normalization
+        kinetic_energy_eV = (
+            (gamma - 1.0) * population_mass_kg * C**2 / E_CHARGE
         )
-        if result["distribution"] is not None:
-            fitted_distribution = result["distribution"].reshape(pp.size, pa.size)
-            inferred_parallel_velocity_m_s = float(
-                np.sum(fitted_distribution * weights * parallel_velocity)
-            )
+        mean_parallel_velocity = float(np.sum(probability * parallel_velocity))
+        mean_kinetic_energy = float(np.sum(probability * kinetic_energy_eV))
+        # For a gyrotropic distribution P_perp is the pressure in either
+        # perpendicular direction; P_parallel is the pressure along B.
+        temperature_parallel_eV = float(np.sum(
+            probability * pa[None, :] * parallel_velocity
+        ) / E_CHARGE)
+        temperature_perpendicular_eV = float(0.5 * np.sum(
+            probability * pp[:, None] * perpendicular_velocity
+        ) / E_CHARGE)
+        return {
+            "mean_parallel_velocity_m_s": mean_parallel_velocity,
+            "mean_kinetic_energy_eV": mean_kinetic_energy,
+            "parallel_pressure_temperature_eV": temperature_parallel_eV,
+            "perpendicular_pressure_temperature_eV": temperature_perpendicular_eV,
+            "pressure_anisotropy_Tperp_over_Tparallel": (
+                temperature_perpendicular_eV / temperature_parallel_eV
+                if temperature_parallel_eV > 0.0 else None
+            ),
+            "moment_definition": (
+                "relativistic kinetic moments of the normalized gyrotropic "
+                "distribution using d^3p=2*pi*p_perp*dp_perp*dp_parallel; "
+                "T_parallel=integral(f*p_parallel*v_parallel)/e and "
+                "T_perpendicular=integral(f*p_perp*v_perp)/(2e)"
+            ),
+        }
+
+    candidate_population_moments = relativistic_population_moments(candidate_distribution)
+    identified_population_moments = None
+    if result["distribution"] is not None:
+        fitted_distribution = result["distribution"].reshape(pp.size, pa.size)
+        identified_population_moments = relativistic_population_moments(fitted_distribution)
+    if population_kind == "electron":
+        candidate_parallel_velocity_m_s = candidate_population_moments["mean_parallel_velocity_m_s"]
+        if identified_population_moments is not None:
+            inferred_parallel_velocity_m_s = identified_population_moments["mean_parallel_velocity_m_s"]
     result.update({
         "model": "magnetized_full_electromagnetic_CTS_relativistic_gyrotropic_Vlasov_inverse",
         "population_kind": population_kind,
@@ -2414,6 +2456,13 @@ def fit_full_em_gyrotropic_population_shape(
             else "conditional_candidate_only_shape_not_identifiable"
             if population_kind == "electron"
             else "not_applicable_fast_ion_population"
+        ),
+        "population_relativistic_moments_candidate": candidate_population_moments,
+        "population_relativistic_moments_identified": identified_population_moments,
+        "population_relativistic_moment_status": (
+            "identified_from_fitted_distribution"
+            if identified_population_moments is not None
+            else "conditional_candidate_only_shape_not_identifiable"
         ),
         "electron_parallel_velocity_definition": (
             "integral(2*pi*p_perp*f*p_parallel/(gamma*m_e) dp_perp dp_parallel); "
