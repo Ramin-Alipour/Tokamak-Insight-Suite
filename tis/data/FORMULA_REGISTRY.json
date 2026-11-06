@@ -10025,5 +10025,136 @@
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validates_joint_block"
       ]
     }
+  },
+  {
+    "name": "Non-gyrotropic 3-D Thomson temperature-tensor spectral model",
+    "equation": "T_q = qhat^T T_e qhat; sigma_lambda = lambda_L q_s sqrt(e T_q/m_e)/c; lambda_c = lambda_L(1 - q_s u_q/c)",
+    "inputs": "Calibrated multi-view spectra, unit scattering directions, laser wavelength, scattering angle, measured bin-response matrices",
+    "output": "General symmetric positive-definite electron second-moment temperature tensor [eV], per-view q-parallel flow [m/s], fitted spectra and joint covariance",
+    "assumptions": "Single-scattering, non-relativistic elastic Thomson limit; Gaussian 3-D electron velocity distribution; fixed measured geometry and response.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra",
+      "formula_key": "thomson_general_3d_temperature_tensor_spectral_forward_model",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true,
+          "description": "Strictly increasing measured wavelength-bin centres."
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral density; view x wavelength",
+          "required": true,
+          "description": "At least six calibrated independent scattering views."
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "unit vector per view",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "bin-probability matrix",
+          "required": true,
+          "description": "Common or per-view matrix; each input-bin column sums to one."
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "channel-major covariance",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "spectral-density standard uncertainty",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "channel-major covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "channel-major covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_tensor_eV",
+          "unit": "eV; symmetric positive-definite 3x3 tensor"
+        },
+        {
+          "name": "principal_temperature_eigenvalues_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m/s per view"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "residual_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "temperature_tensor_parameter_covariance_eV2",
+          "unit": "covariance of six symmetric tensor components"
+        },
+        {
+          "name": "jacobian_rank",
+          "unit": "integer"
+        },
+        {
+          "name": "jacobian_condition_number",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "model_validity_status",
+          "unit": "non-relativistic validity gate"
+        }
+      ],
+      "prerequisites": [
+        "At least six independent scattering-vector dyads spanning all six symmetric tensor components.",
+        "Calibrated multi-view spectra and measured wavelength response."
+      ],
+      "uncertainty_model": "Full channel-major GLS from supplied measurement covariance plus optional model-discrepancy and systematic covariance; residual-scaled covariance is labelled when no absolute covariance is supplied.",
+      "algorithm": "Parameterize the positive-definite tensor as Theta=L L^T. For each view, Tq=q^T Theta q and the projected Gaussian Doppler spectrum has centre lambda_c=lambda_L(1-q_s u_q/c) and width sigma_lambda=lambda_L q_s sqrt(e Tq/me)/c. Integrate Gaussian probability exactly over finite wavelength bins, apply the measured response to bin-integrated spectral power, and jointly fit tensor, per-view flow, amplitude and affine background. Require rank-six geometry and a full-rank well-conditioned spectral Jacobian.",
+      "limitations": [
+        "Non-relativistic elastic Thomson closure; results are withheld outside declared thermal/flow beta limits.",
+        "Gaussian second-moment tensor only; does not reconstruct non-Gaussian higher EVDF moments.",
+        "At least six independent scattering-view dyads are required.",
+        "Experimental validation is not claimed."
+      ],
+      "function_links": [
+        "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ],
+      "raw_data_to_physics": true,
+      "calibrated_measurements_to_physics": true,
+      "test_links": [
+        "tests/test_thomson_temperature_tensor.py::test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor",
+        "tests/test_thomson_temperature_tensor.py::test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry"
+      ],
+      "note": "Raw-spectrum physical forward fit, distinct from the algebraic projection-only tensor inversion."
+    }
   }
 ]

@@ -717,6 +717,14 @@
           "name": "spatial_mixing_parameter_sensitivity",
           "unit": "physical profile parameter covariance/sensitivity",
           "description": "Propagated from supplied spatial mixing calibration covariance and optional measured-spectrum/operator cross-covariance."
+        },
+        {
+          "name": "electron_temperature_tensor_eV",
+          "unit": "eV; optional non-gyrotropic Gaussian second-moment tensor from raw multi-view spectral fit"
+        },
+        {
+          "name": "temperature_tensor_parameter_covariance_eV2",
+          "unit": "eV^2; optional covariance of six symmetric tensor components"
         }
       ],
       "assumptions": [
@@ -762,7 +770,8 @@
         "Gyrotropic bi-Kappa optical fitting uses non-relativistic elastic-Thomson Doppler mapping; it does not include relativistic cross-section/recoil corrections or unrestricted 3-D EVDF inversion.",
         "Kappa index and separate parallel/perpendicular temperatures are reported only when the spectral Jacobian and multi-view pitch-angle geometry identify them.",
         "The anisotropic bi-Kappa fitter screens projected thermal rms beta and bulk-flow beta before reporting a non-relativistic fit; the configurable threshold is a conservative software error-budget screen, not a universal physical validity boundary.",
-        "The anisotropic Kappa fitter returns only the one-dimensional velocity marginal along each supplied scattering vector; it does not reconstruct the full 3-D EVDF."
+        "The anisotropic Kappa fitter returns only the one-dimensional velocity marginal along each supplied scattering vector; it does not reconstruct the full 3-D EVDF.",
+        "The raw-spectrum non-gyrotropic tensor closure is limited to a Gaussian 3-D EVDF and the non-relativistic elastic-Thomson regime."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -780,7 +789,8 @@
         "tokamak_analysis.thomson_joint_inference.reconstruct_profiles_regularization_sensitivity",
         "tokamak_analysis.thomson_joint_inference.sample_reference_basis_uncertainty",
         "tokamak_analysis.thomson_joint_inference.propagate_geometry_ensemble",
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected. Joint covariance, profile-regularization sensitivity, reference-library PCA uncertainty and correlated geometry-ensemble operators are exposed by tokamak_analysis.thomson_joint_inference.",
@@ -945,7 +955,8 @@
           ],
           "identifiability": "A regularized solution with a rank-deficient data-only Jacobian is explicitly classified non-identifiable; Ti additionally requires an ion-sensitive spectral feature in the supplied forward model."
         }
-      ]
+      ],
+      "method": "undefined A separate non-gyrotropic Gaussian closure fits the full symmetric positive-definite 3-D temperature tensor directly to six or more calibrated raw spectra, using T_q=q_hat^T T_e q_hat, exact finite-bin Gaussian Doppler probabilities, measured bin-response operators and joint per-view flow/amplitude/background nuisance parameters."
     },
     "scientific_references": [
       {
