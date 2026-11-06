@@ -249,6 +249,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix, *,
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
     spatial_psf_matrix=None, spatial_psf_sigma_m=None,
+    spatial_psf_sigma_uncertainty_m=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
     model_discrepancy_covariance=None, regularization_sensitivity_strengths=None,
@@ -333,6 +334,18 @@ def reconstruct_joint_thomson_spatial_spectra(
     else:
         psf = np.eye(r.size, dtype=float)
         psf_source = "identity_no_additional_psf_operator"
+    psf_sigma_uncertainty = None
+    if spatial_psf_sigma_uncertainty_m is not None:
+        if psf_sigma is None:
+            raise ValueError(
+                "spatial_psf_sigma_uncertainty_m requires spatial_psf_sigma_m; "
+                "matrix-PSF covariance is not represented by a scalar width uncertainty"
+            )
+        psf_sigma_uncertainty = _finite_real_scalar(
+            spatial_psf_sigma_uncertainty_m, "spatial_psf_sigma_uncertainty_m"
+        )
+        if psf_sigma_uncertainty < 0.0:
+            raise ValueError("spatial_psf_sigma_uncertainty_m must be non-negative")
     nominal_mixing = h.copy()
     h = nominal_mixing @ psf
     if not np.all(np.isfinite(h)) or np.linalg.matrix_rank(h) < min(h.shape):
@@ -556,7 +569,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     if maximum_data_condition_number < 1.0:
         raise ValueError("maximum_data_condition_number must be >= 1")
 
-    def predict(p):
+    def predict(p, psf_sigma_override=None):
         amp = np.exp(p[:r.size])
         te = np.exp(p[r.size:2*r.size])
         flow = p[2*r.size:3*r.size] * 1e6
@@ -623,7 +636,11 @@ def reconstruct_joint_thomson_spatial_spectra(
                         )
                         node_spectrum += float(source_weight) * source_bin_average
                 node_spectra[node] = amp[node] * node_spectrum
-        mixed = h @ node_spectra
+        effective_mixing = (
+            h if psf_sigma_override is None
+            else nominal_mixing @ gaussian_spatial_psf_matrix(r, psf_sigma_override)
+        )
+        mixed = effective_mixing @ node_spectra
         predicted = np.empty_like(y)
         for channel in range(m):
             # Response acts on spectral density through bin-integrated power.
@@ -648,8 +665,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     # Assess identifiability from measured spectral data alone.  The optimizer
     # Jacobian also contains optional regularization rows; counting those rows
     # as independent measurements would let smoothing manufacture rank.
-    def data_residual_only(parameters):
-        return whiten(y - predict(parameters)[0])
+    def data_residual_only(parameters, psf_sigma_override=None):
+        return whiten(y - predict(parameters, psf_sigma_override)[0])
 
     parameter_count = int(fit.x.size)
     background_start = 3*r.size + kappa_parameter_count
@@ -726,11 +743,43 @@ def reconstruct_joint_thomson_spatial_spectra(
     # result is required; otherwise no finite data-identified covariance is
     # published, even if regularization made the optimizer Hessian invertible.
     data_covariance_p = None
+    psf_calibration_covariance_p = None
+    psf_sigma_parameter_sensitivity = None
     if data_identifiable:
         data_information = data_jacobian.T @ data_jacobian
         data_covariance_p = np.linalg.pinv(data_information)
         if residual_scale is not None:
             data_covariance_p *= residual_scale
+        if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0:
+            # Differentiate the complete measured-spectrum residual with respect
+            # to the calibrated PSF width, then use implicit GLS sensitivity
+            # dp/dsigma = -(J_data.T J_data)^-1 J_data.T (dr/dsigma).
+            # This propagates calibration uncertainty through the physical
+            # forward model and refitted plasma/background parameters; it does
+            # not treat the PSF width as an inferred plasma parameter.
+            derivative_step = max(
+                abs(float(psf_sigma)) * 1.0e-4,
+                psf_sigma_uncertainty * 1.0e-3,
+                np.sqrt(np.finfo(float).eps) * max(abs(float(psf_sigma)), 1.0e-8),
+            )
+            sigma_low = max(0.0, float(psf_sigma) - derivative_step)
+            sigma_high = float(psf_sigma) + derivative_step
+            if sigma_high <= sigma_low:
+                raise RuntimeError("PSF-width sensitivity step is numerically degenerate")
+            residual_sigma_low = data_residual_only(fit.x, sigma_low)
+            residual_sigma_high = data_residual_only(fit.x, sigma_high)
+            residual_sigma_derivative = (
+                residual_sigma_high - residual_sigma_low
+            ) / (sigma_high - sigma_low)
+            psf_sigma_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                data_jacobian.T @ residual_sigma_derivative
+            )
+            psf_calibration_covariance_p = (
+                np.outer(psf_sigma_parameter_sensitivity,
+                         psf_sigma_parameter_sensitivity)
+                * psf_sigma_uncertainty**2
+            )
+            data_covariance_p = data_covariance_p + psf_calibration_covariance_p
 
     transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
                               np.array([fitted_kappa-1.5]) if kappa_parameter_count else np.empty(0),
@@ -813,8 +862,17 @@ def reconstruct_joint_thomson_spatial_spectra(
         "parameter_covariance": physical_covariance,
         "profile_parameter_covariance": profile_parameter_covariance,
         "regularized_parameter_covariance": regularized_parameter_covariance,
+        "psf_calibration_parameter_covariance": (
+            transform @ psf_calibration_covariance_p @ transform.T
+            if psf_calibration_covariance_p is not None else None
+        ),
+        "psf_sigma_parameter_sensitivity": (
+            transform @ psf_sigma_parameter_sensitivity
+            if psf_sigma_parameter_sensitivity is not None else None
+        ),
         "covariance_decomposition": {
-            "reported_parameter_covariance": "data_only_GLS_covariance_excluding_regularization_penalty",
+            "reported_parameter_covariance": "data_only_GLS_plus_linearized_external_PSF_calibration_covariance_excluding_regularization_penalty",
+            "psf_calibration_covariance": "implicit_GLS_parameter_sensitivity_to_scalar_Gaussian_PSF_sigma_uncertainty; conditional on fixed PSF shape and mixing operator",
             "regularized_parameter_covariance": "optimizer_local_covariance_including_selected_regularization_penalty",
             "profile_parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                                        [f"Te_{i}_eV" for i in range(n)] +
@@ -852,7 +910,12 @@ def reconstruct_joint_thomson_spatial_spectra(
             "column_probability_mass": np.sum(psf, axis=0),
             "finite_domain_edge_loss_preserved": True,
             "renormalized": False,
-            "uncertainty": "fixed_operator; no PSF covariance supplied to this inverse",
+            "sigma_uncertainty_m": psf_sigma_uncertainty,
+            "uncertainty": (
+                "linearized_GLS_parameter_covariance_propagated_from_external_sigma_calibration_uncertainty"
+                if psf_calibration_covariance_p is not None else
+                "fixed_operator_no_PSf_calibration_covariance_supplied"
+            ),
         },
         "instrument_response": "researcher_supplied_fixed_forward_operator",
         "spectral_bin_integration": (
@@ -939,6 +1002,7 @@ def reconstruct_joint_thomson_spatial_spectra(
                 instrument_response=instrument_response,
                 spatial_psf_matrix=spatial_psf_matrix,
                 spatial_psf_sigma_m=spatial_psf_sigma_m,
+                spatial_psf_sigma_uncertainty_m=spatial_psf_sigma_uncertainty_m,
                 laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
                 laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
                 signal_uncertainty=signal_uncertainty,
