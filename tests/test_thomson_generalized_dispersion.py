@@ -297,3 +297,22 @@ def test_maxwellian_ion_moment_output_matches_analytic_temperature():
     )
     assert result["ion_projected_moments"][0]["directional_second_moment_temperature_eV"] == 12.5
     assert result["ion_projected_moments"][0]["standardized_skewness"] == 0.0
+
+
+def test_projected_evdf_moment_formula_registry_is_synchronized_and_executable():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    assert formula == packaged
+    matches = [
+        item for item in formula
+        if item.get("execution_contract", {}).get("formula_key") == "cts_tabulated_evdf_projected_moments"
+    ]
+    assert len(matches) == 1
+    contract = matches[0]["execution_contract"]
+    assert contract["implementation_link_status"] == "mapped"
+    assert contract["function_link"] == "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
+    assert "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api" in contract["test_links"]
