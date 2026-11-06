@@ -15,6 +15,7 @@ from scipy.integrate import quad
 E = 1.602176634e-19
 EPS0 = 8.8541878128e-12
 ME = 9.1093837015e-31
+C = 299792458.0  # exact SI speed of light, m s^-1
 
 
 def _positive_real_scalar(value, name):
