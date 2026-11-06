@@ -89,3 +89,31 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
     else:
         assert result["population_relativistic_moments_identified"] is not None
         assert result["population_relativistic_moment_status"] == "identified_from_fitted_distribution"
+
+
+def test_relativistic_gyrotropic_cts_inverse_is_connected_to_dashboard_and_registries():
+    from pathlib import Path
+    import json
+
+    root = Path(__file__).resolve().parents[1]
+    dashboard = (root / "app.py").read_text(encoding="utf-8")
+    assert "'full_em_gyrotropic_vdf_shape'" in dashboard
+    assert "analyze_cts_spectrum_model(model='full_em_gyrotropic_vdf_shape'" in dashboard
+    assert "population_relativistic_moments_identified" in dashboard
+
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_formula = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "cts_relativistic_gyrotropic_vdf_pressure_moments"
+    assert formula == packaged_formula
+    assert sum(item.get("execution_contract", {}).get("formula_key") == key for item in formula) == 1
+
+    diagnostics = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_diagnostics = json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    assert diagnostics == packaged_diagnostics
+    cts = next(item for item in diagnostics if item["diagnostic"] == "Collective Thomson / coherent scattering (CTS)")
+    output_names = {item["name"] for item in cts["execution_contract"]["output_specs"]}
+    assert {
+        "population_relativistic_moments_candidate",
+        "population_relativistic_moments_identified",
+        "population_relativistic_moment_status",
+    } <= output_names
