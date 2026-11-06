@@ -174,7 +174,7 @@ def collective_tabulated_electron_spectral_density(
     wavelength_nm, laser_wavelength_nm, scattering_angle_rad, *,
     electron_density_m3, electron_velocity_grid_m_s,
     electron_probability_density_s_m, ion_species, ion_fractions,
-    ion_temperature_eV, electron_velocity_m_s, ion_velocity_m_s,
+    ion_temperature_eV=None, electron_velocity_m_s=None, ion_velocity_m_s=None,
     incident_direction, scattered_direction, pole_imaginary_part_m_s=None,
     landau_limit=False, ion_velocity_grids_m_s=None,
     ion_probability_densities_s_m=None,
@@ -214,15 +214,23 @@ def collective_tabulated_electron_spectral_density(
     ue = float(np.dot(ue_vec, qhat))
     species = _resolve_ion_species(ion_species)
     fractions = np.asarray(ion_fractions, dtype=float)
-    temperatures = np.asarray(np.atleast_1d(ion_temperature_eV), dtype=float)
+    tabulated_ions = ion_velocity_grids_m_s is not None or ion_probability_densities_s_m is not None
+    temperatures = None if ion_temperature_eV is None else np.asarray(np.atleast_1d(ion_temperature_eV), dtype=float)
     vi = np.asarray(ion_velocity_m_s, dtype=float)
-    if fractions.shape != (len(species),) or temperatures.shape != (len(species),):
-        raise ValueError("ion_fractions and ion_temperature_eV must provide one value per species")
-    if (np.any(~np.isfinite(fractions)) or np.any(~np.isfinite(temperatures))
-            or np.any(fractions <= 0)
-            or not np.isclose(np.sum(fractions), 1.0, rtol=1e-6, atol=1e-8)
-            or np.any(temperatures <= 0)):
-        raise ValueError("ion fractions must be finite, positive and sum to one; ion temperatures must be finite and positive")
+    if fractions.shape != (len(species),):
+        raise ValueError("ion_fractions must provide one value per species")
+    if (np.any(~np.isfinite(fractions)) or np.any(fractions <= 0)
+            or not np.isclose(np.sum(fractions), 1.0, rtol=1e-6, atol=1e-8)):
+        raise ValueError("ion fractions must be finite, positive and sum to one")
+    if not tabulated_ions:
+        if temperatures is None or temperatures.shape != (len(species),):
+            raise ValueError("ion_temperature_eV must provide one value per species for the Maxwellian ion closure")
+        if np.any(~np.isfinite(temperatures)) or np.any(temperatures <= 0):
+            raise ValueError("Maxwellian ion temperatures must be finite and positive")
+    elif temperatures is not None and (
+        temperatures.shape != (len(species),) or np.any(~np.isfinite(temperatures)) or np.any(temperatures <= 0)
+    ):
+        raise ValueError("optional ion_temperature_eV, when supplied with tabulated ions, must be finite, positive and species-sized")
     if vi.shape == (3,) and len(species) == 1:
         vi = vi.reshape(1, 3)
     if vi.shape != (len(species), 3) or np.any(~np.isfinite(vi)) or np.any(np.linalg.norm(vi, axis=1) >= C):
@@ -254,7 +262,6 @@ def collective_tabulated_electron_spectral_density(
             pole_imaginary_part_m_s=pole_imaginary_part_m_s,
             landau_limit=landau_limit,
         )["electron_susceptibility"]
-    tabulated_ions = ion_velocity_grids_m_s is not None or ion_probability_densities_s_m is not None
     if tabulated_ions and (ion_velocity_grids_m_s is None or ion_probability_densities_s_m is None):
         raise ValueError("ion_velocity_grids_m_s and ion_probability_densities_s_m must be supplied together")
     if tabulated_ions:
@@ -323,7 +330,11 @@ def collective_tabulated_electron_spectral_density(
             if tabulated_ions else "Maxwellian normalized analytically"
         ),
         "electron_distribution_normalization": "normalized internally for susceptibility and spectral shape; absolute density is supplied separately",
-        "model": "unmagnetized electrostatic collective Thomson scattering with generalized tabulated electron VDF and Maxwellian ions",
+        "model": (
+            "unmagnetized electrostatic collective Thomson scattering with generalized tabulated electron and species-resolved tabulated ion VDFs"
+            if tabulated_ions else
+            "unmagnetized electrostatic collective Thomson scattering with generalized tabulated electron VDF and Maxwellian ions"
+        ),
         "pole_quadrature": "piecewise_linear_first_order_Landau_pole_with_distributional_finite_support_edges",
         "velocity_support_extension": "zero_outside_supplied_interval; endpoint jumps included in susceptibility",
         "pole_imaginary_part_m_s": 0.0 if landau_limit else pole_imaginary_part_m_s,
