@@ -41,3 +41,15 @@ def test_full_em_response_name_reaches_landau_fdt_constitutive_solver(monkeypatc
     assert captured["kwargs"]["common_temperature_J"] == 1.0
     assert result["response_tensor"].shape == (3, 3)
     assert result["public_physics_entrypoint"] == "landau_fdt_full_em_response"
+
+
+def test_path_averaged_thomson_density_is_reachable_through_public_dispatcher():
+    path = np.linspace(0.0, 0.2, 21)
+    result = physics.run_advanced_thomson_physics(
+        "thomson_path_averaged_density",
+        1.0e-12, path, np.ones(path.size), np.full(path.size, 6.0e-29),
+        np.full(path.size, 0.02), np.full(path.size, 0.5),
+    )
+    assert result["electron_density_path_averaged_m3"] > 0.0
+    assert result["public_physics_entrypoint"] == "thomson_path_averaged_density"
+    assert result["automatic_model_substitution"] is False
