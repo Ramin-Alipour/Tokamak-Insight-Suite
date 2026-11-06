@@ -86,6 +86,7 @@ MODEL_LABELS = {
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
     "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
+    "periodic_3d_full_wave": "CTS — 3-D Bloch-periodic full-vector Maxwell solve with Poynting/energy closure",
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",
     "relativistic_kinetic_ece_profile": "ECE — segment-resolved relativistic gyrotropic kinetic absorption (supplied ray and modes)",
     "relativistic_kinetic_ece": "ECE — local relativistic gyrotropic Vlasov absorption kernel",
@@ -278,6 +279,19 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "periodic_3d_full_wave": {
+        "omega_rad_s": 31415926535.89793,
+        "x_m": [0.0, 0.01, 0.02],
+        "y_m": [0.0, 0.01, 0.02],
+        "z_m": [0.0, 0.01, 0.02],
+        "epsilon_r": {
+            "real": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            "imag": [[0.05, 0.0, 0.0], [0.0, 0.05, 0.0], [0.0, 0.0, 0.05]]
+        },
+        "impressed_current_density_A_m2": np.pad(
+            np.ones((3, 3, 3, 1)), ((0, 0), (0, 0), (0, 0), (0, 2))
+        ).tolist()
+    },
     "kappa_dispersion_function": {
         "zeta_real": 0.7, "zeta_imag": 0.35, "kappa": 4.0
     },
