@@ -594,6 +594,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = multispecies_thermal_coulomb_collision_matrix
     elif model == "landau_fdt_cts":
         solver = analyze_landau_fdt_cts
+    elif model == "cts_conserving_bgk_fdt":
+        solver = analyze_conserving_bgk_cts
     elif model == "quantum_fdt":
         solver = quantum_fdt_dynamic_structure_factor
     elif model == "quantum_fdt_unsymmetrized":
