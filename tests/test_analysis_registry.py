@@ -259,6 +259,7 @@ def test_joint_thomson_profile_mode_exposes_data_only_identifiability_contract()
             "spatial_regularization_strength", "kappa_index", "fit_kappa_index",
             "incident_polarization", "include_compton_recoil",
             "maximum_recoil_correction_fraction"} <= inputs
+    assert "spatial_psf_sigma_uncertainty_m" in inputs
     assert "relativistic_maxwell_juttner" in contract["algorithm"]
     assert "Klein-Nishina" in contract["algorithm"]
     outputs = {item["name"] for item in contract["output_specs"]}
