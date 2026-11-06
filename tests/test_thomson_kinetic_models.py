@@ -1136,3 +1136,63 @@ def test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit
             projection_covariance_m2_s2=np.eye(3),
             maximum_geometry_condition_number=1.0,
         )
+
+
+def test_thomson_three_dimensional_flow_withholds_vector_when_views_reject_common_flow():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    directions = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [2**-0.5, 2**-0.5, 0.0],
+    ])
+    expected = np.array([1.0e5, -2.0e5, 3.0e5])
+    projections = directions @ expected
+    projections[-1] += 2.0e4  # incompatible fourth view, far above stated noise
+
+    result = infer_three_dimensional_flow_from_thomson_projections(
+        projections,
+        directions,
+        projection_covariance_m2_s2=np.eye(4) * 1.0e4,
+    )
+    assert result["design_rank"] == 3
+    assert result["geometry_condition_status"] == "well_conditioned"
+    assert result["cross_view_consistency_p_value"] < 1.0e-3
+    assert result["cross_view_consistency_status"] == "common_flow_model_rejected"
+    assert result["reportable_as_inferred_parameter"] is False
+    assert result["electron_velocity_vector_m_s"] is None
+    assert result["electron_velocity_covariance_m2_s2"] is None
+
+
+def test_thomson_three_dimensional_flow_marks_exactly_three_views_as_not_testable():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    directions = np.eye(3)
+    expected = np.array([1.0e5, -2.0e5, 3.0e5])
+    result = infer_three_dimensional_flow_from_thomson_projections(
+        directions @ expected,
+        directions,
+        projection_covariance_m2_s2=np.eye(3) * 1.0e4,
+    )
+    assert result["cross_view_consistency_p_value"] is None
+    assert result["cross_view_consistency_status"] == "not_testable_exactly_three_views"
+    assert result["reportable_as_inferred_parameter"] is True
+
+
+def test_thomson_three_dimensional_flow_rejects_invalid_consistency_threshold():
+    from tokamak_analysis.thomson_kinetic_models import (
+        infer_three_dimensional_flow_from_thomson_projections,
+    )
+
+    with pytest.raises(ValueError, match="minimum_projection_consistency_p_value"):
+        infer_three_dimensional_flow_from_thomson_projections(
+            [1.0, 2.0, 3.0],
+            np.eye(3),
+            projection_covariance_m2_s2=np.eye(3),
+            minimum_projection_consistency_p_value=0.0,
+        )
