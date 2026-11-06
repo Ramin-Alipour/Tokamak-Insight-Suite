@@ -40,6 +40,35 @@ def _wavelength_edges(axis):
     return edges
 
 
+def gaussian_spatial_psf_matrix(radius_m, sigma_m):
+    """Finite-volume Gaussian PSF mapping true radial nodes to observed nodes.
+
+    Matrix columns correspond to a point source at each true radius; rows are
+    observed radial bins. Probability outside the finite reconstruction domain
+    is deliberately lost (sub-stochastic edge columns) and is never renormalized.
+    """
+    radius = _real_array(radius_m, "radius_m")
+    sigma = _finite_real_scalar(sigma_m, "spatial_psf_sigma_m")
+    if radius.ndim != 1 or radius.size < 3 or np.any(np.diff(radius) <= 0.0):
+        raise ValueError("radius_m must be a finite, strictly increasing vector with at least three nodes")
+    if sigma < 0.0:
+        raise ValueError("spatial_psf_sigma_m must be finite and non-negative")
+    if sigma == 0.0:
+        return np.eye(radius.size, dtype=float)
+    edges = np.empty(radius.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (radius[:-1] + radius[1:])
+    edges[0] = radius[0] - 0.5 * (radius[1] - radius[0])
+    edges[-1] = radius[-1] + 0.5 * (radius[-1] - radius[-2])
+    upper = (edges[1:, None] - radius[None, :]) / sigma
+    lower = (edges[:-1, None] - radius[None, :]) / sigma
+    probability = ndtr(upper) - ndtr(lower)
+    probability = np.maximum(probability, 0.0)
+    column_mass = np.sum(probability, axis=0)
+    if np.any(~np.isfinite(probability)) or np.any(column_mass <= 0.0) or np.any(column_mass > 1.0 + 1e-10):
+        raise ValueError("Gaussian spatial PSF produced invalid finite-domain probability columns")
+    return probability
+
+
 def _bin_averaged_maxwellian_spectrum(wavelength_nm, center_nm, sigma_nm, peak_amplitude):
     """Exact finite-bin average of a Gaussian spectral density."""
     x = np.asarray(wavelength_nm, dtype=float)
@@ -219,6 +248,7 @@ def _curvature(axis):
 def reconstruct_joint_thomson_spatial_spectra(
     wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix, *,
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
+    spatial_psf_matrix=None, spatial_psf_sigma_m=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
     model_discrepancy_covariance=None, regularization_sensitivity_strengths=None,
@@ -283,8 +313,30 @@ def reconstruct_joint_thomson_spatial_spectra(
     m, nlam = y.shape
     if h.shape != (m, r.size) or not np.all(np.isfinite(h)) or np.any(h < 0):
         raise ValueError("spatial_mixing_matrix must be finite, non-negative, and shaped (n_channels,n_nodes)")
-    if np.linalg.matrix_rank(h) < min(h.shape):
-        raise ValueError("spatial_mixing_matrix is rank deficient")
+    if spatial_psf_matrix is not None and spatial_psf_sigma_m is not None:
+        raise ValueError("supply spatial_psf_matrix or spatial_psf_sigma_m, not both")
+    psf_sigma = None
+    if spatial_psf_sigma_m is not None:
+        psf_sigma = _finite_real_scalar(spatial_psf_sigma_m, "spatial_psf_sigma_m")
+        if psf_sigma < 0.0:
+            raise ValueError("spatial_psf_sigma_m must be finite and non-negative")
+        psf = gaussian_spatial_psf_matrix(r, psf_sigma)
+        psf_source = "finite_volume_gaussian_psf_from_sigma"
+    elif spatial_psf_matrix is not None:
+        psf = _real_array(spatial_psf_matrix, "spatial_psf_matrix")
+        if psf.shape != (r.size, r.size) or np.any(psf < 0.0):
+            raise ValueError("spatial_psf_matrix must be finite, non-negative and shaped (n_nodes,n_nodes)")
+        psf_mass = np.sum(psf, axis=0)
+        if np.any(psf_mass <= 0.0) or np.any(psf_mass > 1.0 + 1e-10):
+            raise ValueError("spatial_psf_matrix columns must have positive mass no greater than one; finite-domain losses are not renormalized")
+        psf_source = "researcher_supplied_measured_psf_matrix"
+    else:
+        psf = np.eye(r.size, dtype=float)
+        psf_source = "identity_no_additional_psf_operator"
+    nominal_mixing = h.copy()
+    h = nominal_mixing @ psf
+    if not np.all(np.isfinite(h)) or np.linalg.matrix_rank(h) < min(h.shape):
+        raise ValueError("effective spatial operator (mixing matrix composed with PSF) is rank deficient")
     laser = _finite_real_scalar(laser_wavelength_nm, "laser_wavelength_nm")
     angle = _finite_real_scalar(scattering_angle_rad, "scattering_angle_rad")
     lam_reg = _finite_real_scalar(regularization_strength, "regularization_strength")
@@ -789,7 +841,23 @@ def reconstruct_joint_thomson_spatial_spectra(
             fitted_background_coefficients[:, 1].copy()
             * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
         ),
-        "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
+        "spatial_mixing_operator": (
+            "researcher_supplied_fixed_forward_operator_composed_with_spatial_psf"
+            if psf_source != "identity_no_additional_psf_operator"
+            else "researcher_supplied_fixed_forward_operator"
+        ),
+        "spatial_mixing_matrix_nominal": nominal_mixing.copy(),
+        "effective_spatial_mixing_matrix": h.copy(),
+        "spatial_psf_matrix": psf.copy(),
+        "spatial_psf_contract": {
+            "source": psf_source,
+            "sigma_m": psf_sigma,
+            "mapping": "true_radial_nodes_to_observed_radial_bins",
+            "column_probability_mass": np.sum(psf, axis=0),
+            "finite_domain_edge_loss_preserved": True,
+            "renormalized": False,
+            "uncertainty": "fixed_operator; no PSF covariance supplied to this inverse",
+        },
         "instrument_response": "researcher_supplied_fixed_forward_operator",
         "spectral_bin_integration": (
             "exact_Gaussian_CDF_finite_volume_bin_averages"
@@ -873,6 +941,8 @@ def reconstruct_joint_thomson_spatial_spectra(
                 laser_wavelength_nm=laser_wavelength_nm,
                 scattering_angle_rad=scattering_angle_rad,
                 instrument_response=instrument_response,
+                spatial_psf_matrix=spatial_psf_matrix,
+                spatial_psf_sigma_m=spatial_psf_sigma_m,
                 laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
                 laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
                 signal_uncertainty=signal_uncertainty,
