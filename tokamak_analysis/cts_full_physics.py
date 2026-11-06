@@ -518,6 +518,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_psf_profile_inverse",
     "thomson_joint_spatial_spectra",
     "thomson_three_dimensional_flow",
+    "thomson_full_temperature_tensor",
     "gyrotropic_bi_maxwellian_anisotropy",
     "gyrotropic_bi_maxwellian_spectral_fit",
     "gyrotropic_bi_kappa_spectral_fit",
@@ -729,6 +730,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = fit_gyrotropic_bi_kappa_thomson
     elif model == "thomson_three_dimensional_flow":
         solver = infer_three_dimensional_flow_from_thomson_projections
+    elif model == "thomson_full_temperature_tensor":
+        solver = infer_full_temperature_tensor_from_thomson_projections
     elif model == "plasma_charge_state_moments":
         solver = plasma_charge_state_moments
     else:
