@@ -77,3 +77,19 @@ def test_two_population_fit_uses_automatic_deterministic_initialization():
     assert result["optimizer_multistart_count"] == 3
     assert result["optimizer_seed_parameters_are_not_inferred_outputs"] is True
     assert np.all(np.isfinite(result["fit_covariance"]))
+
+
+def test_relativistic_maxwell_juttner_radial_quadrature_matches_analytic_partition():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(100.0, 1100.0, 401)
+    result = relativistic_maxwell_juttner_spectrum(
+        wavelength, 532.0, np.pi/2.0, 5000.0,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=12, angular_order=8,
+    )
+    assert result["quadrature"]["radial_scheme"] == (
+        "generalized_Gauss_Laguerre_alpha_1_over_2_in_dimensionless_kinetic_energy_on_infinite_domain"
+    )
+    assert result["quadrature_to_analytic_normalization_ratio"] == pytest.approx(1.0, rel=1e-10)
+    assert result["momentum_probability_coverage"] == pytest.approx(1.0, abs=1e-10)

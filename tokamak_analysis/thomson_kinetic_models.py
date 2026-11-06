@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import least_squares, lsq_linear
 from scipy.integrate import trapezoid
-from scipy.special import gammaln, ndtr, stdtr, kve
+from scipy.special import gammaln, ndtr, stdtr, kve, roots_genlaguerre
 from numpy.polynomial.legendre import leggauss
 
 E_CHARGE = 1.602176634e-19
@@ -655,10 +655,18 @@ def relativistic_maxwell_juttner_spectrum(
         raise ValueError("incident_polarization must be transverse to incident_direction")
     polarization = polarization/np.linalg.norm(polarization)
 
-    radial_nodes, radial_weights = leggauss(int(radial_order))
-    umax = max(12.0*np.sqrt(theta)+12.0*theta, 1e-5)
-    u = 0.5*umax*(radial_nodes+1.0)
-    wu = 0.5*umax*radial_weights
+    # Transform the Maxwell-Juttner radial integral to dimensionless kinetic
+    # energy t=(gamma-1)/theta. Then u=sqrt(theta*t*(theta*t+2)) and
+    # u^2 du = theta*u*(theta*t+1) dt. The remaining endpoint behavior is
+    # proportional to sqrt(t), so generalized Gauss-Laguerre alpha=1/2
+    # integrates exp(-t)*sqrt(t) times a smooth factor on [0,infinity).
+    # Unlike a finite uniform-u cutoff, this resolves the full relativistic
+    # momentum tail without truncation or post-hoc renormalization.
+    radial_nodes, radial_weights = roots_genlaguerre(int(radial_order), 0.5)
+    u = np.sqrt(theta*radial_nodes*(theta*radial_nodes+2.0))
+    radial_jacobian_over_sqrt_t = (
+        theta*np.sqrt(theta*(theta*radial_nodes+2.0))*(theta*radial_nodes+1.0)
+    )
     mu, wmu = leggauss(int(angular_order))
     nphi = max(16, 2*int(angular_order))
     phi = 2.0*np.pi*np.arange(nphi)/nphi
@@ -751,8 +759,8 @@ def relativistic_maxwell_juttner_spectrum(
         /(gamma_lab*gamma_lab*np.square(1.0-ns_dot))
     )
     radial_weight = (
-        wu[:, None, None]*u[:, None, None]**2
-        * np.exp(-(GAMMA_REST-1.0)/theta)
+        radial_weights[:, None, None]
+        * radial_jacobian_over_sqrt_t[:, None, None]
     )
     distribution_quadrature_weight = (
         radial_weight*wmu[None, :, None]*(2.0*np.pi/nphi)
@@ -882,7 +890,7 @@ def relativistic_maxwell_juttner_spectrum(
             "within_user_selected_fractional_correction_limit"
         ),
         "polarization_model": "supplied incident polarization Lorentz-transformed to the electron rest frame",
-        "quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order), "gyrophase_points": nphi},
+        "quadrature": {"radial_order": int(radial_order), "radial_scheme": "generalized_Gauss_Laguerre_alpha_1_over_2_in_dimensionless_kinetic_energy_on_infinite_domain", "angular_order": int(angular_order), "gyrophase_points": nphi},
     }
 
 

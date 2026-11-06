@@ -176,3 +176,19 @@ exceed one beyond numerical roundoff. These are local polarization-resolved
 spectral observables for downstream receiver modeling. They do not supply
 receiver etendue, absolute calibration, ray tracing, or a magnetized CTS
 three-wave vertex.
+
+
+## Relativistic optical Thomson momentum quadrature
+
+The isotropic Maxwell--Juttner radial integral is evaluated after changing
+variables from dimensionless momentum u to dimensionless kinetic energy
+t=(sqrt(1+u^2)-1)/theta. With
+u=sqrt(theta*t*(theta*t+2)), the radial measure becomes
+u^2 du = theta*u*(theta*t+1) dt. Generalized Gauss--Laguerre quadrature with
+weight exp(-t)*sqrt(t) therefore integrates the complete semi-infinite
+momentum domain, including the relativistic tail, without a finite momentum
+cutoff or renormalization of omitted particles. The numerical partition
+integral is checked against theta*K_2(1/theta), evaluated with the scaled
+modified Bessel function. Angular and gyrophase convergence remain separate
+requirements; this change does not remove the wavelength-window capture gate
+or establish experimental validation.
