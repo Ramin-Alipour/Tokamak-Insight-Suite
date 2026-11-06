@@ -62,6 +62,7 @@ MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from multiple independent measured scattering views",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility and analytic phase-velocity derivative",
+    "kappa_dispersion_function": "Optical/CTS kinetic kernel — full-tail generalized Kappa plasma dispersion integral with exact Landau boundary value",
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
     "thomson_projected_bi_kappa_evdf": "Optical Thomson — exact projected marginal of a gyrotropic 3-D bi-Kappa EVDF",
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
@@ -276,7 +277,7 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
     "collision-model, frequency-grid and experimental-normalization checks pass."
 )
 
-EXAMPLES = {
+EXAMPLES = {\n    "kappa_dispersion_function": {\n        "zeta_real": 0.7, "zeta_imag": 0.35, "kappa": 4.0\n    },
     "thomson_projected_bi_kappa_evdf": {
         "velocity_grid_m_s": np.linspace(-1.2e8, 1.2e8, 2401).tolist(),
         "temperature_parallel_eV": 1500.0,

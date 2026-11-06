@@ -33,6 +33,7 @@ from .cts_em_background import (
 )
 from .cts_kappa import kappa_electron_susceptibility, bi_kappa_electron_susceptibility
 from .cts_kappa import maxwellian_electron_susceptibility
+from .cts_kappa_dispersion import kappa_dispersion_function
 from .thomson_generalized_dispersion import (
     collective_tabulated_electron_spectral_density,
     generalized_electron_susceptibility,
@@ -500,6 +501,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_kinetic_background_fit",
     "thomson_multiview_3d_evdf",
     "kappa_electrostatic_susceptibility",
+    "kappa_dispersion_function",
     "bi_kappa_electrostatic_susceptibility",
     "maxwellian_electrostatic_susceptibility",
     "cts_collective_kappa_spectrum",
@@ -638,6 +640,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = maxwellian_electron_susceptibility
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "kappa_dispersion_function":
+        solver = kappa_dispersion_function
     elif model == "bi_kappa_electrostatic_susceptibility":
         solver = bi_kappa_electron_susceptibility
     elif model == "cts_collective_kappa_spectrum":
@@ -784,6 +788,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
 
 __all__ = [
     "kappa_electron_susceptibility",
+    "kappa_dispersion_function",
     "maxwellian_electron_susceptibility",
     "collective_tabulated_electron_spectral_density",
     "quantum_fdt_dynamic_structure_factor",
