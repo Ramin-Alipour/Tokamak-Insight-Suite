@@ -10092,6 +10092,16 @@
           "name": "systematic_covariance",
           "unit": "channel-major covariance",
           "required": false
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3; independent density measurement",
+          "required": false
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3; independent 1-sigma uncertainty",
+          "required": false
         }
       ],
       "output_specs": [
@@ -10130,13 +10140,21 @@
         {
           "name": "model_validity_status",
           "unit": "non-relativistic validity gate"
+        },
+        {
+          "name": "electron_pressure_tensor_Pa",
+          "unit": "Pa; returned only with independent electron density"
+        },
+        {
+          "name": "electron_pressure_parameter_covariance_Pa2",
+          "unit": "Pa²; delta-method propagation of tensor and density uncertainty"
         }
       ],
       "prerequisites": [
         "At least six independent scattering-vector dyads spanning all six symmetric tensor components.",
         "Calibrated multi-view spectra and measured wavelength response."
       ],
-      "uncertainty_model": "Full channel-major GLS from supplied measurement covariance plus optional model-discrepancy and systematic covariance; residual-scaled covariance is labelled when no absolute covariance is supplied.",
+      "uncertainty_model": "Full channel-major GLS from supplied measurement covariance plus optional model-discrepancy and systematic covariance; residual-scaled covariance is labelled when no absolute covariance is supplied. If independent density and density uncertainty are supplied, pressure covariance follows P=n_e e T and adds the independent density term by the delta method.",
       "algorithm": "Parameterize the positive-definite tensor as Theta=L L^T. For each view, Tq=q^T Theta q and the projected Gaussian Doppler spectrum has centre lambda_c=lambda_L(1-q_s u_q/c) and width sigma_lambda=lambda_L q_s sqrt(e Tq/me)/c. Integrate Gaussian probability exactly over finite wavelength bins, apply the measured response to bin-integrated spectral power, and jointly fit tensor, per-view flow, amplitude and affine background. Require rank-six geometry and a full-rank well-conditioned spectral Jacobian.",
       "limitations": [
         "Non-relativistic elastic Thomson closure; results are withheld outside declared thermal/flow beta limits.",

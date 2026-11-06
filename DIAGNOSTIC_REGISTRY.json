@@ -725,6 +725,10 @@
         {
           "name": "temperature_tensor_parameter_covariance_eV2",
           "unit": "eV^2; optional covariance of six symmetric tensor components"
+        },
+        {
+          "name": "electron_pressure_tensor_Pa",
+          "unit": "Pa; optional density-conditioned pressure tensor from raw-spectrum tensor inference"
         }
       ],
       "assumptions": [

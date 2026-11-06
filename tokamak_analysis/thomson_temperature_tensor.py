@@ -294,6 +294,8 @@ def fit_general_temperature_tensor_thomson_spectra(
     maximum_projected_rms_beta=0.1,
     maximum_flow_beta=0.1,
     maximum_jacobian_condition_number=1.0e12,
+    electron_density_m3=None,
+    electron_density_uncertainty_m3=None,
     max_nfev=5000,
 ):
     r"""Jointly infer a general PSD 3-D Gaussian electron temperature tensor from raw TS spectra.
@@ -487,6 +489,30 @@ def fit_general_temperature_tensor_thomson_spectra(
             tensor_jac[:,j]=(components(unpack(plus))-components(unpack(minus)))/(2*step)
         tensor_covariance=tensor_jac@parameter_covariance[:6,:6]@tensor_jac.T
     projected=np.einsum("vi,ij,vj->v",directions,tensor,directions)
+    density=None
+    density_uncertainty=None
+    pressure_tensor=None
+    pressure_covariance=None
+    pressure_covariance_status="not_available_without_independent_electron_density"
+    tensor_components=np.array([tensor[0,0],tensor[1,1],tensor[2,2],tensor[0,1],tensor[0,2],tensor[1,2]])
+    if electron_density_m3 is None and electron_density_uncertainty_m3 is not None:
+        raise ValueError("electron_density_uncertainty_m3 requires electron_density_m3")
+    if electron_density_m3 is not None:
+        density=float(electron_density_m3)
+        if not np.isfinite(density) or density<=0.0:
+            raise ValueError("electron_density_m3 must be finite and strictly positive")
+        if electron_density_uncertainty_m3 is not None:
+            density_uncertainty=float(electron_density_uncertainty_m3)
+            if not np.isfinite(density_uncertainty) or density_uncertainty<0.0:
+                raise ValueError("electron_density_uncertainty_m3 must be finite and non-negative")
+        pressure_tensor=density*_E*tensor
+        if tensor_covariance is not None:
+            pressure_covariance=(density*_E)**2*tensor_covariance
+            if density_uncertainty is not None:
+                pressure_covariance += (_E*density_uncertainty)**2*np.outer(tensor_components,tensor_components)
+                pressure_covariance_status="independent_tensor_GLS_and_density_uncertainty_delta_method"
+            else:
+                pressure_covariance_status="tensor_GLS_only_density_treated_as_exact"
     thermal_beta=float(np.sqrt(_E*np.max(eigenvalues)/_M_E)/299792458.0)
     flows=fit.x[6::4].copy()
     flow_beta=float(np.max(np.abs(flows))/299792458.0)
@@ -516,6 +542,12 @@ def fit_general_temperature_tensor_thomson_spectra(
         "parameter_covariance":parameter_covariance,
         "parameter_covariance_order":["L_xx_log","L_yx","L_yy_log","L_zx","L_zy","L_zz_log"]+[name for i in range(n_view) for name in (f"flow_q_{i}_m_s",f"log_amplitude_{i}",f"background_offset_{i}",f"background_slope_{i}")],
         "temperature_tensor_parameter_covariance_eV2":tensor_covariance,
+        "electron_density_m3":density,
+        "electron_density_uncertainty_m3":density_uncertainty,
+        "electron_pressure_tensor_Pa":pressure_tensor,
+        "electron_pressure_parameter_covariance_Pa2":pressure_covariance,
+        "electron_pressure_covariance_status":pressure_covariance_status,
+        "electron_pressure_equation":"P_e_Pa = n_e_m-3 * elementary_charge_C * T_e_eV",
         "covariance_provenance":covariance_source,
         "covariance_status":covariance_status,
         "thermal_rms_beta":thermal_beta,

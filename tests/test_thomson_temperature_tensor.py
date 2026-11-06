@@ -157,6 +157,8 @@ def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
         instrument_response_matrix=np.eye(wavelength.size),
         signal_uncertainty=np.full((len(q),len(wavelength)),2e-4),
         initial_temperature_tensor_eV=np.eye(3)*500.0,
+        electron_density_m3=2.0e19,
+        electron_density_uncertainty_m3=0.1e19,
         maximum_projected_rms_beta=0.1,
     )
     np.testing.assert_allclose(result["electron_temperature_tensor_eV"],expected,rtol=2e-3,atol=0.5)
@@ -166,6 +168,8 @@ def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
     assert result["reportable_as_inferred_parameter"] is True
     assert np.max(np.abs(result["residual_spectra"]))<1e-8
     assert result["temperature_tensor_parameter_covariance_eV2"].shape==(6,6)
+    np.testing.assert_allclose(result["electron_pressure_tensor_Pa"],2.0e19*1.602176634e-19*expected,rtol=2e-3,atol=1e-5)
+    assert result["electron_pressure_parameter_covariance_Pa2"].shape==(6,6)
 
 
 def test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry():
