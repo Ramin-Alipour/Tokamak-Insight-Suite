@@ -1253,10 +1253,11 @@
         "function_link": "tokamak_analysis.thomson_kinetic_models.infer_three_dimensional_flow_from_thomson_projections",
         "formula_key": "thomson_three_dimensional_flow_from_projections",
         "dashboard": "tis.ui.advanced_thomson_physics_page",
-        "equation": "v_q,i = q_hat_i dot v_e",
-        "input_contract": "Flow projections extracted from calibrated Thomson spectra across views, unit scattering vectors and full projection covariance.",
-        "identifiability": "Requires rank-3 scattering-vector geometry; otherwise the 3-D vector is withheld.",
-        "scope": "Common subluminal bulk-flow vector across views; geometry covariance is not included."
+        "equation": "v_q,i = q_hat_i dot v_e; GLS with C_eff including projection, geometry and cross-covariance; report only when rank(L^-1 Q)=3 and cond(L^-1 Q) <= maximum_geometry_condition_number.",
+        "input_contract": "Flow projections extracted from calibrated Thomson spectra across views, unit scattering vectors, full projection covariance, optional full scattering-vector covariance and projection/geometry cross-covariance, and a maximum geometry condition-number threshold.",
+        "identifiability": "Requires rank-3 covariance-whitened scattering-vector design L^-1 Q and condition number no greater than the configured ceiling (default 1e3); rank-3 but ill-conditioned geometry withholds the vector and covariance.",
+        "scope": "Common subluminal bulk-flow vector across views; optional full scattering-vector covariance and projection/geometry cross-covariance are propagated by iterative tangent-plane errors-in-variables GLS.",
+        "maximum_geometry_condition_number": 1000
       },
       {
         "model": "gyrotropic_bi_maxwellian_spectral_fit",
