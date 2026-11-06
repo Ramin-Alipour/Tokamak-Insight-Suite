@@ -365,3 +365,25 @@ def test_profile_registry_exposes_joint_spatial_operator_covariance_inputs_and_o
         "spatial_mixing_mc_seed",
     } <= set(inputs)
     assert "spatial_mixing_uncertainty" in outputs
+
+
+def test_n_population_relativistic_thomson_inverse_is_connected_to_api_dashboard_and_formula_registry():
+    import json
+    from pathlib import Path
+    from tokamak_analysis.cts_full_physics import ADVANCED_THOMSON_PHYSICS_MODELS
+
+    root = Path(__file__).resolve().parents[1]
+    model = "thomson_n_population_relativistic_fit"
+    assert model in ADVANCED_THOMSON_PHYSICS_MODELS
+    dashboard = (root/"tis"/"ui"/"advanced_thomson_physics_page.py").read_text(encoding="utf-8")
+    assert model in dashboard
+    root_formula = json.loads((root/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_formula = json.loads((root/"tis"/"data"/"FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "thomson_multi_population_relativistic_mixture"
+    matches = [item for item in root_formula if item.get("execution_contract", {}).get("formula_key") == key]
+    assert len(matches) == 1
+    assert matches[0]["execution_contract"]["function_link"] == (
+        "tokamak_analysis.thomson_n_population.fit_n_population_relativistic_thomson_spectrum"
+    )
+    assert matches[0]["execution_contract"]["implementation_link_status"] == "mapped"
+    assert root_formula == packaged_formula
