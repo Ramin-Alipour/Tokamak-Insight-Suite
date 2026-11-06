@@ -6007,6 +6007,41 @@
         {
           "name": "electron_flow_projection_m_s",
           "unit": "m s^-1; supplied signed projected electron bulk velocity"
+        },
+        {
+          "name": "normalized_probability_density_s_m",
+          "unit": "s m^-1",
+          "description": "Exact normalized analytic Kappa marginal over the full real velocity axis; finite-grid integral equals the reported probability coverage, not unity unless the grid is complete."
+        },
+        {
+          "name": "grid_conditioned_probability_density_s_m",
+          "unit": "s m^-1",
+          "description": "Optional visualization-only density conditioned on the supplied finite velocity interval; never used in the physical susceptibility integral."
+        },
+        {
+          "name": "grid_conditioning_applied_to_physical_response",
+          "unit": "boolean",
+          "description": "False; the susceptibility uses the unconditioned analytic Kappa distribution over the full velocity axis."
+        },
+        {
+          "name": "fourth_moment_exists",
+          "unit": "boolean",
+          "description": "True only for kappa > 5/2; the fourth central moment diverges otherwise."
+        },
+        {
+          "name": "kurtosis",
+          "unit": "dimensionless",
+          "description": "3(2κ−3)/(2κ−5) for κ>5/2; null when the fourth moment does not exist."
+        },
+        {
+          "name": "excess_kurtosis",
+          "unit": "dimensionless",
+          "description": "6/(2κ−5) for κ>5/2; null when the fourth moment does not exist."
+        },
+        {
+          "name": "fourth_central_moment_m4_s4",
+          "unit": "m^4 s^-4",
+          "description": "Kurtosis times (k_B T_e/m_e)^2 when κ>5/2; null when divergent."
         }
       ],
       "prerequisites": [
