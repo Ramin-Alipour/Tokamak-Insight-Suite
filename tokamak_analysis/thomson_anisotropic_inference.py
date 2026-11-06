@@ -285,6 +285,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
     instrument_response_matrix, measurement_covariance=None,
     signal_uncertainty=None, model_discrepancy_covariance=None,
+    systematic_covariance=None,
     initial_temperature_parallel_eV=1000.0,
     initial_temperature_perpendicular_eV=1000.0,
     temperature_bounds_eV=(1.0e-3, 1.0e7),
@@ -313,6 +314,8 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         Pointwise standard uncertainties; mutually exclusive with covariance.
     model_discrepancy_covariance : optional full channel-major covariance
         Independent additive PSD model-discrepancy covariance.
+    systematic_covariance : optional full channel-major covariance
+        Independent additive PSD calibration/geometry/systematic covariance.
 
     The wavelength mapping uses lambda_s/lambda_0 ~= 1 - q_hat.v/c and is
     therefore a non-relativistic elastic-Thomson approximation. The projected
@@ -397,18 +400,43 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         if eig[0] < -1e-10 * max(float(np.max(np.abs(eig))), 1e-300):
             raise ValueError("model_discrepancy_covariance must be positive semidefinite")
 
+    systematic = None
+    if systematic_covariance is not None:
+        systematic = _real_array(systematic_covariance, "systematic_covariance", 2)
+        if (systematic.shape != (size, size)
+                or not np.allclose(
+                    systematic, systematic.T, rtol=1e-10,
+                    atol=1e-12 * max(float(np.max(np.abs(systematic))), 1e-300)
+                )):
+            raise ValueError("systematic_covariance must be symmetric and channel-major")
+        systematic = 0.5 * (systematic + systematic.T)
+        systematic_eigenvalues = np.linalg.eigvalsh(systematic)
+        if systematic_eigenvalues[0] < -1e-10 * max(
+            float(np.max(np.abs(systematic_eigenvalues))), 1e-300
+        ):
+            raise ValueError("systematic_covariance must be positive semidefinite")
+
     covariance_components = [
-        component for component in (measurement_covariance_only, discrepancy)
-        if component is not None
+        component for component in (
+            measurement_covariance_only, discrepancy, systematic
+        ) if component is not None
     ]
     if covariance_components:
         cov = np.sum(covariance_components, axis=0)
-        covariance_model = (
-            "measurement_plus_model_discrepancy"
-            if measurement_covariance_only is not None and discrepancy is not None
-            else "measurement_only" if measurement_covariance_only is not None
-            else "model_discrepancy_only"
-        )
+        covariance_labels = [
+            label for label, supplied in (
+                ("measurement", measurement_covariance_only is not None),
+                ("model_discrepancy", discrepancy is not None),
+                ("systematic", systematic is not None),
+            ) if supplied
+        ]
+        covariance_model = "_plus_".join(covariance_labels)
+        if covariance_model == "measurement":
+            covariance_model = "measurement_only"
+        elif covariance_model == "model_discrepancy":
+            covariance_model = "model_discrepancy_only"
+        elif covariance_model == "systematic":
+            covariance_model = "systematic_only"
     else:
         # Unit weighting is an optimizer convention, not a measured covariance.
         cov = np.eye(size)
@@ -502,7 +530,8 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     singular, full_rank, covariance_all, flow_covariance, covariance_scale_method = (
         _fit_covariance_blocks(
             fit.jac, fit.cost, size, flow_indices,
-            measurement_covariance_supplied, discrepancy is not None,
+            measurement_covariance_supplied,
+            discrepancy is not None or systematic is not None,
         )
     )
     parameter_covariance = (
@@ -594,6 +623,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         "model_discrepancy_covariance": (
             None if discrepancy is None else discrepancy.copy()
         ),
+        "systematic_covariance": (
+            None if systematic is None else systematic.copy()
+        ),
         "effective_covariance": cov,
         "parameter_covariance": parameter_covariance,
         "flow_projection_covariance_m2_s2": flow_covariance,
@@ -618,7 +650,8 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "effective_covariance_model": covariance_model,
             "parameter_covariance_scale": covariance_scale_method,
             "model_discrepancy_supplied": discrepancy is not None,
-            "combination": "C_effective is the sum of only supplied covariance components; an identity metric is used only when neither component is supplied",
+            "systematic_supplied": systematic is not None,
+            "combination": "C_effective = C_measurement + C_model_discrepancy + C_systematic, including only supplied components; an identity metric is used only when none is supplied",
         },
         "experimental_validation": "not_performed",
     }
@@ -629,6 +662,7 @@ def fit_gyrotropic_bi_kappa_thomson(
     scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
     instrument_response_matrix, measurement_covariance=None,
     signal_uncertainty=None, model_discrepancy_covariance=None,
+    systematic_covariance=None,
     initial_temperature_parallel_eV=1000.0,
     initial_temperature_perpendicular_eV=1000.0,
     initial_kappa=4.0, kappa_bounds=(1.5001, 200.0),
@@ -649,7 +683,9 @@ def fit_gyrotropic_bi_kappa_thomson(
     where theta_q^2 = (2*kappa-3)/kappa * e*T_q/m_e (T_q in eV).
     This parameterization makes T_q the actual second-moment temperature
     (m_e <(v_q-u_q)^2>/e, with T_q in eV), not the Kappa core/scale temperature.
-    The finite-variance domain kappa>3/2 is enforced.
+    The finite-variance domain kappa>3/2 is enforced. Measurement,
+    model-discrepancy and systematic covariance components are added in the
+    channel-major GLS metric before parameter-covariance evaluation.
 
     Only the non-relativistic elastic-Thomson wavelength mapping is used.
     T_parallel and T_perpendicular are reported only when the independent
@@ -744,18 +780,43 @@ def fit_gyrotropic_bi_kappa_thomson(
         if eig[0] < -1e-10 * max(float(np.max(np.abs(eig))), 1e-300):
             raise ValueError("model_discrepancy_covariance must be positive semidefinite")
 
+    systematic = None
+    if systematic_covariance is not None:
+        systematic = _real_array(systematic_covariance, "systematic_covariance", 2)
+        if (systematic.shape != (size, size)
+                or not np.allclose(
+                    systematic, systematic.T, rtol=1e-10,
+                    atol=1e-12 * max(float(np.max(np.abs(systematic))), 1e-300)
+                )):
+            raise ValueError("systematic_covariance must be symmetric and channel-major")
+        systematic = 0.5 * (systematic + systematic.T)
+        systematic_eigenvalues = np.linalg.eigvalsh(systematic)
+        if systematic_eigenvalues[0] < -1e-10 * max(
+            float(np.max(np.abs(systematic_eigenvalues))), 1e-300
+        ):
+            raise ValueError("systematic_covariance must be positive semidefinite")
+
     covariance_components = [
-        component for component in (measurement_covariance_only, discrepancy)
-        if component is not None
+        component for component in (
+            measurement_covariance_only, discrepancy, systematic
+        ) if component is not None
     ]
     if covariance_components:
         cov = np.sum(covariance_components, axis=0)
-        covariance_model = (
-            "measurement_plus_model_discrepancy"
-            if measurement_covariance_only is not None and discrepancy is not None
-            else "measurement_only" if measurement_covariance_only is not None
-            else "model_discrepancy_only"
-        )
+        covariance_labels = [
+            label for label, supplied in (
+                ("measurement", measurement_covariance_only is not None),
+                ("model_discrepancy", discrepancy is not None),
+                ("systematic", systematic is not None),
+            ) if supplied
+        ]
+        covariance_model = "_plus_".join(covariance_labels)
+        if covariance_model == "measurement":
+            covariance_model = "measurement_only"
+        elif covariance_model == "model_discrepancy":
+            covariance_model = "model_discrepancy_only"
+        elif covariance_model == "systematic":
+            covariance_model = "systematic_only"
     else:
         cov = np.eye(size)
         covariance_model = "unweighted_identity_metric_residual_scaled"
@@ -862,7 +923,8 @@ def fit_gyrotropic_bi_kappa_thomson(
     singular, full_rank, covariance_all, flow_covariance, covariance_scale_method = (
         _fit_covariance_blocks(
             fit.jac, fit.cost, size, flow_indices,
-            measurement_covariance_supplied, discrepancy is not None,
+            measurement_covariance_supplied,
+            discrepancy is not None or systematic is not None,
         )
     )
     parameter_covariance = (
@@ -958,6 +1020,9 @@ def fit_gyrotropic_bi_kappa_thomson(
         "model_discrepancy_covariance": (
             None if discrepancy is None else discrepancy.copy()
         ),
+        "systematic_covariance": (
+            None if systematic is None else systematic.copy()
+        ),
         "effective_covariance": cov,
         "parameter_covariance": parameter_covariance,
         "flow_projection_covariance_m2_s2": flow_covariance,
@@ -982,7 +1047,8 @@ def fit_gyrotropic_bi_kappa_thomson(
             "effective_covariance_model": covariance_model,
             "parameter_covariance_scale": covariance_scale_method,
             "model_discrepancy_supplied": discrepancy is not None,
-            "combination": "C_effective is the sum of only supplied covariance components; an identity metric is used only when neither component is supplied",
+            "systematic_supplied": systematic is not None,
+            "combination": "C_effective = C_measurement + C_model_discrepancy + C_systematic, including only supplied components; an identity metric is used only when none is supplied",
         },
         "model_validity": {
             "kinematics": "non-relativistic elastic Thomson mapping",
