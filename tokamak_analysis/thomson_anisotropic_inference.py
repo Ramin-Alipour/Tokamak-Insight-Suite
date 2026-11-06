@@ -467,7 +467,10 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         transform[0, 0] = np.exp(fit.x[0])
         transform[1, 1] = np.exp(fit.x[1])
         parameter_covariance = transform @ parameter_covariance @ transform.T
-    reportable_anisotropy = geometry_rank == 2 and full_rank
+    spectrally_identifiable_anisotropy = geometry_rank == 2 and full_rank
+    reportable_anisotropy = (
+        spectrally_identifiable_anisotropy and not projected_tail_exceeds_tolerance
+    )
     tpar = float(np.exp(fit.x[0])) if reportable_anisotropy else None
     tperp = float(np.exp(fit.x[1])) if reportable_anisotropy else None
     return {
@@ -792,7 +795,8 @@ def fit_gyrotropic_bi_kappa_thomson(
         transform[1, 1] = np.exp(fit.x[1])
         transform[2, 2] = np.exp(fit.x[2])
         parameter_covariance = transform @ parameter_covariance @ transform.T
-    reportable = geometry_rank == 2 and full_rank
+    spectrally_identifiable = geometry_rank == 2 and full_rank
+    reportable = spectrally_identifiable and not projected_tail_exceeds_tolerance
     return {
         "model": "gyrotropic_bi_kappa_nonrelativistic_optical_thomson",
         "distribution_definition": "f3(v) proportional to [1 + v_parallel^2/(kappa*theta_parallel^2) + v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1))",
@@ -800,7 +804,7 @@ def fit_gyrotropic_bi_kappa_thomson(
         "temperature_definition": "T_q[eV]=m_e*Var(v_q)/e; theta_q^2=((2*kappa-3)/kappa)*(e*T_q/m_e)",
         "electron_temperature_parallel_eV": float(np.exp(fit.x[0])) if reportable else None,
         "electron_temperature_perpendicular_eV": float(np.exp(fit.x[1])) if reportable else None,
-        "kappa_index": float(kappa) if full_rank else None,
+        "kappa_index": float(kappa) if full_rank and not projected_tail_exceeds_tolerance else None,
         "kappa_finite_variance_domain": bool(kappa > 1.5),
         "directional_temperature_eV": directional,
         "captured_spectral_probability": captured_probability,
@@ -836,6 +840,10 @@ def fit_gyrotropic_bi_kappa_thomson(
         "anisotropy_identifiability": "identified" if reportable else "non_identifiable",
         "kappa_identifiability": "identified" if full_rank else "non_identifiable",
         "reportable_as_inferred_parameter": bool(reportable and full_rank),
+        "parameter_reporting_status": (
+            "model_outside_nonrelativistic_validity_domain" if projected_tail_exceeds_tolerance
+            else "identified" if reportable else "not_identifiable"
+        ),
         "non_identifiability_reason": None if reportable else "Distinct squared magnetic pitch angles and a full-rank spectral Jacobian are required to identify both temperatures; kappa also requires a full-rank spectral Jacobian.",
         "electron_velocity_projection_m_s": fit.x[3::4].copy(),
         "fitted_spectra": fitted,
