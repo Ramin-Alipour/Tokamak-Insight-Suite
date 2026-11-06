@@ -8551,5 +8551,51 @@
       "input_data_level": "physical_parameters_and_species_properties",
       "analysis_family": "Analysis 1 — Thomson Scattering"
     }
+  },
+  {
+    "name": "Finite-volume Gaussian spatial PSF operator for Thomson profile inversion",
+    "equation": "P_ij = Φ((r_{i+1/2}−r_j)/σ_PSF) − Φ((r_{i−1/2}−r_j)/σ_PSF); H_eff = H P",
+    "inputs": "Strictly increasing radial node centres r_j [m], Gaussian spatial PSF standard deviation σ_PSF [m]",
+    "output": "Dimensionless spatial probability matrix P (observed radial bins × true radial nodes)",
+    "assumptions": "Gaussian shift-invariant PSF in the supplied radial coordinate. Finite-domain probability outside the reconstruction interval is lost, not renormalized. σ_PSF=0 returns the identity operator. The PSF is a fixed calibrated input and is not inferred from plasma spectra.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.gaussian_spatial_psf_matrix",
+      "formula_key": "thomson_gaussian_spatial_psf_matrix",
+      "input_specs": [
+        {
+          "name": "radius_m",
+          "unit": "m",
+          "required": true,
+          "description": "Finite, strictly increasing radial node centres; at least three nodes."
+        },
+        {
+          "name": "sigma_m",
+          "unit": "m",
+          "required": true,
+          "description": "Finite non-negative Gaussian PSF standard deviation."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spatial_psf_matrix",
+          "unit": "dimensionless",
+          "description": "Observed-bin by true-node finite-volume probability matrix; columns may be sub-stochastic at finite-domain edges."
+        }
+      ],
+      "prerequisites": [
+        "A calibrated radial coordinate and an externally measured or selected Gaussian PSF width.",
+        "A fixed detector-channel-to-radial-node mixing matrix for composition H_eff=H P."
+      ],
+      "uncertainty_model": "The PSF width is a fixed external calibration input in this implementation. Its covariance is not inferred from plasma spectra or propagated by this function; callers must not interpret the returned operator as uncertainty-free calibration evidence.",
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_gaussian_spatial_psf_is_finite_volume_and_preserves_edge_loss",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_composes_measured_mixing_with_gaussian_psf"
+      ],
+      "note": "Numerical implementation of the finite-volume Gaussian CDF operator; analytic/software verification only, not empirical PSF calibration."
+    }
   }
 ]
