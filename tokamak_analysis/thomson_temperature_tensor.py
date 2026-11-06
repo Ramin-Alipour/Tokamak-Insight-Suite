@@ -134,7 +134,17 @@ def infer_full_temperature_tensor_from_thomson_projections(
     whitened_residual = np.linalg.solve(chol, residual)
     chi_square = float(whitened_residual @ whitened_residual)
     dof = n - 6
-    # A chi-square survival probability is meaningful only when the supplied\n    # covariance is an absolute measurement-noise model. The identity metric\n    # used for unweighted least squares is not a noise estimate.\n    covariance_is_measured = projected_temperature_covariance_eV2 is not None\n    p_value = float(chi2.sf(chi_square, dof)) if covariance_is_measured and dof > 0 else None\n    if p_value is not None and p_value < p_limit:\n        consistency = "inconsistent_with_single_common_temperature_tensor"\n    elif p_value is None:\n        consistency = "not_testable_without_absolute_covariance_or_redundant_views"\n    else:\n        consistency = "consistent_with_single_common_temperature_tensor"
+    # A chi-square survival probability is meaningful only when the supplied
+    # covariance is an absolute measurement-noise model. The identity metric
+    # used for unweighted least squares is not a noise estimate.
+    covariance_is_measured = projected_temperature_covariance_eV2 is not None
+    p_value = float(chi2.sf(chi_square, dof)) if covariance_is_measured and dof > 0 else None
+    if p_value is not None and p_value < p_limit:
+        consistency = "inconsistent_with_single_common_temperature_tensor"
+    elif p_value is None:
+        consistency = "not_testable_without_absolute_covariance_or_redundant_views"
+    else:
+        consistency = "consistent_with_single_common_temperature_tensor"
 
     # The usual local GLS covariance is valid only in the interior of the PSD
     # cone. At an active eigenvalue boundary, symmetric Gaussian errors are not
