@@ -5776,10 +5776,10 @@
   },
   {
     "name": "Three-dimensional electron flow from multi-view Thomson projections",
-    "equation": "v_q,i=q̂_i·v_e; C_eff=C_v+J_Q C_Q J_Qᵀ, (J_Q)_i=v_eᵀ(I−q̂_iq̂_iᵀ); v̂_e=(QᵀC_eff⁻¹Q)⁻¹QᵀC_eff⁻¹v_q, iterated when C_Q is supplied",
+    "equation": "v_q=Q v_e; C_eff=C_v+J_Q C_Q J_Q^T+C_vQ J_Q^T+J_Q C_vQ^T; v_hat=(Q^T C_eff^-1 Q)^-1 Q^T C_eff^-1 v_q; report only if rank(L^-1 Q)=3 and cond(L^-1 Q)<=kappa_geom",
     "inputs": "Measured directional flow projections [m s^-1], unit scattering-vector directions [1], full positive-definite projection covariance [m² s^-2]; optional full Cartesian scattering-vector covariance C_Q [dimensionless²; 3N×3N]",
-    "output": "Three-component electron flow vector [m s^-1] and 3×3 covariance [m² s^-2]; non-identifiable unless Q has rank 3",
-    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional small direction perturbations represented by full covariance and projected onto each direction's tangent plane.",
+    "output": "Three-component electron flow vector [m s^-1] and 3×3 GLS covariance; withheld for rank-deficient or ill-conditioned geometry (default condition ceiling 1e3) or superluminal speed",
+    "assumptions": "Single common bulk-flow vector over all views; calibrated optical Thomson spectra; known nominal unit scattering-vector directions; optional full direction covariance and projection/geometry cross-covariance projected onto each direction's tangent plane; covariance-whitened design must meet the declared condition-number ceiling.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5808,6 +5808,19 @@
           "unit": "dimensionless²; full (3*n_views)×(3*n_views) positive-semidefinite covariance of Cartesian direction components",
           "description": "Optional covariance of all scattering-vector direction components, including cross-view correlations; radial components are projected out to enforce unit-vector geometry.",
           "required": false
+        },
+        {
+          "name": "projection_geometry_cross_covariance",
+          "unit": "m s^-1; dimensionless; n_views × (3*n_views) Cov(v_q,q_xyz)",
+          "description": "Optional full cross-covariance between measured flow projections and Cartesian scattering-vector directions; tangent-plane components are propagated.",
+          "required": false
+        },
+        {
+          "name": "maximum_geometry_condition_number",
+          "unit": "dimensionless; condition-number ceiling for covariance-whitened design L^-1 Q",
+          "description": "3-D flow is withheld when the weighted design is rank deficient or exceeds this ceiling; default 1e3.",
+          "required": false,
+          "default": 1000
         }
       ],
       "output_specs": [
@@ -5838,6 +5851,18 @@
         {
           "name": "geometry_covariance_iterations",
           "unit": "count; iterative GLS updates when geometry covariance is supplied"
+        },
+        {
+          "name": "geometry_condition_number",
+          "unit": "dimensionless; condition number of covariance-whitened scattering design L^-1 Q"
+        },
+        {
+          "name": "maximum_geometry_condition_number",
+          "unit": "dimensionless; configured reporting ceiling"
+        },
+        {
+          "name": "geometry_condition_status",
+          "unit": "well_conditioned, ill_conditioned_vector_withheld, or rank_deficient"
         }
       ],
       "prerequisites": [
@@ -5850,9 +5875,11 @@
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views",
         "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_inversion_propagates_tangent_plane_geometry_covariance",
-        "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance"
+        "tests/test_thomson_anisotropic_projection.py::test_three_dimensional_flow_rejects_non_psd_scattering_geometry_covariance",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_ill_conditioned_full_rank_geometry",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit"
       ],
-      "note": "A vector is reported only when the measured projection geometry spans three dimensions and the inferred speed is subluminal. A single scattering view identifies only one projection."
+      "note": "A vector is reported only when the covariance-whitened scattering design L^-1 Q has rank three and condition number no greater than the configured ceiling (default 1e3), and the inferred speed is subluminal. A full-rank but ill-conditioned geometry is explicitly withheld. Optional direction covariance and projection/geometry cross-covariance are propagated by iterative tangent-plane GLS. A single scattering view identifies only one projection."
     },
     "references": [
       {
@@ -5891,7 +5918,13 @@
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
       ]
-    }
+    },
+    "uncertainty_model": "GLS with supplied full projection covariance; optional full scattering-vector covariance and projection/geometry cross-covariance are propagated by first-order iterative errors-in-variables GLS using J_Q,i=v_e^T(I-q_i q_i^T). Direction perturbations are restricted to the unit-vector tangent plane. The weighted-design condition number is reported and gates vector/covariance publication.",
+    "prerequisites": [
+      "At least three linearly independent scattering-vector directions with covariance-whitened condition number no greater than the configured ceiling.",
+      "All views must sample a common flow vector or a physically justified shared-volume model.",
+      "Projection covariance and calibrated spectra are supplied; scattering geometry is known."
+    ]
   },
   {
     "name": "Collisionless isotropic-Kappa CTS Landau susceptibility",
