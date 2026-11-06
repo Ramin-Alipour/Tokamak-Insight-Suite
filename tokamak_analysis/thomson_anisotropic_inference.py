@@ -519,7 +519,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "model_outside_nonrelativistic_validity_domain" if projected_tail_exceeds_tolerance
             else "identified" if reportable_anisotropy else "not_identifiable"
         ),
-        "non_identifiability_reason": None if reportable_anisotropy else "Distinct squared magnetic pitch angles and a full-rank spectral fit are required to identify both T_parallel and T_perpendicular.",
+        "non_identifiability_reason": None if spectrally_identifiable_anisotropy else "Distinct squared magnetic pitch angles and a full-rank spectral fit are required to identify both T_parallel and T_perpendicular.",
         "electron_velocity_projection_m_s": fit.x[2::4].copy(),
         "fitted_spectra": fitted,
         "residual_spectra": spectra - fitted,
@@ -841,14 +841,14 @@ def fit_gyrotropic_bi_kappa_thomson(
         "magnetic_pitch_cosine": mu,
         "magnetic_pitch_cosine_squared": mu2,
         "geometry_design_rank": geometry_rank,
-        "anisotropy_identifiability": "identified" if reportable else "non_identifiable",
+        "anisotropy_identifiability": "identified" if spectrally_identifiable else "non_identifiable",
         "kappa_identifiability": "identified" if full_rank else "non_identifiable",
         "reportable_as_inferred_parameter": bool(reportable and full_rank),
         "parameter_reporting_status": (
             "model_outside_nonrelativistic_validity_domain" if projected_tail_exceeds_tolerance
             else "identified" if reportable else "not_identifiable"
         ),
-        "non_identifiability_reason": None if reportable else "Distinct squared magnetic pitch angles and a full-rank spectral Jacobian are required to identify both temperatures; kappa also requires a full-rank spectral Jacobian.",
+        "non_identifiability_reason": None if spectrally_identifiable else "Distinct squared magnetic pitch angles and a full-rank spectral Jacobian are required to identify both temperatures; kappa also requires a full-rank spectral Jacobian.",
         "electron_velocity_projection_m_s": fit.x[3::4].copy(),
         "fitted_spectra": fitted,
         "residual_spectra": spectra - fitted,
