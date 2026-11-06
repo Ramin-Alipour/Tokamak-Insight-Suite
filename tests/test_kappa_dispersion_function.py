@@ -59,3 +59,24 @@ def test_real_axis_kappa_dispersion_derivative_matches_boundary_finite_differenc
     )
     assert result["derivative_absolute_quadrature_error_estimate"] >= 0.0
 
+def test_small_positive_landau_pole_is_resolved_and_converges_to_exact_boundary():
+    real_axis = kappa_dispersion_function(0.73, 0.0, 3.8)
+    narrow_pole = kappa_dispersion_function(0.73, 2.0e-6, 3.8)
+    assert narrow_pole["quadrature_method"] == (
+        "full_tail_pole_resolved_complex_quadrature_upper_half_plane"
+    )
+    np.testing.assert_allclose(
+        narrow_pole["kappa_dispersion_integral"],
+        real_axis["kappa_dispersion_integral"],
+        rtol=2.0e-5,
+        atol=2.0e-7,
+    )
+    np.testing.assert_allclose(
+        narrow_pole["kappa_dispersion_integral_derivative"],
+        real_axis["kappa_dispersion_integral_derivative"],
+        rtol=2.0e-4,
+        atol=2.0e-6,
+    )
+    assert narrow_pole["absolute_quadrature_error_estimate"] >= 0.0
+    assert narrow_pole["derivative_absolute_quadrature_error_estimate"] >= 0.0
+
