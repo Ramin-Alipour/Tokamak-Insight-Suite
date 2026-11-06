@@ -66,7 +66,8 @@ jobs:
           root = pathlib.Path(sys.argv[2])
           diagnostics = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text())
           formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text())
-          assert len(diagnostics) == 80, f"Expected 80 diagnostic entries, got {len(diagnostics)}"
+          canonical_diagnostics = json.loads(pathlib.Path("DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+          assert diagnostics == canonical_diagnostics, "Exported diagnostics differ from the canonical diagnostic registry"
           expected_formulas = json.loads(pathlib.Path("FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
           assert formulas == expected_formulas, "Exported formulas differ from the canonical formula registry"
           assert all(item.get("execution_contract") for item in formulas), "Formula contract missing"
@@ -80,19 +81,32 @@ jobs:
           test -s "$RUNNER_TEMP/tis-qc-smoke.json"
           test -s "$RUNNER_TEMP/tis-fft-smoke.csv"
           test -s "$RUNNER_TEMP/tis-fft-smoke_welch_psd.csv"
-      - name: Verify all 80 registered analysis entry points
+      - name: Verify all registered analysis entry points and diagnostic catalog mappings
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+
           diagnostics = json.loads(Path("DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
-          assert len(ANALYSES) == 80, f"Expected 80 analysis entries, got {len(ANALYSES)}"
-          assert [item["id"] for item in ANALYSES] == list(range(1, 81))
-          assert [item["name"] for item in ANALYSES] == [item["diagnostic"] for item in diagnostics]
+          analysis_ids = [item["id"] for item in ANALYSES]
+          assert analysis_ids == sorted(set(analysis_ids)), "Analysis IDs must be unique and ordered"
+
+          analysis_by_name = {item["name"]: item for item in ANALYSES}
+          diagnostic_names = [item["diagnostic"] for item in diagnostics]
+          assert len(diagnostic_names) == len(set(diagnostic_names)), "Diagnostic catalog names must be unique"
+          missing = [name for name in diagnostic_names if name not in analysis_by_name]
+          assert not missing, f"Diagnostic catalog entries lack analysis entry points: {missing}"
+
           for item in ANALYSES:
               assert callable(resolve_analysis(item["id"])), item["id"]
-          print("All 80 analysis IDs, names, ordering, and entry points verified.")
+          for name in diagnostic_names:
+              assert callable(resolve_analysis(analysis_by_name[name]["id"])), name
+
+          print(
+              f"Verified {len(ANALYSES)} analysis entry points and "
+              f"{len(diagnostics)} diagnostic catalog mappings."
+          )
           PY
       - name: Exercise every workspace page with Streamlit AppTest
         run: |
