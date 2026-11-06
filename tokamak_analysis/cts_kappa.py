@@ -187,7 +187,7 @@ def kappa_electron_susceptibility(
     derivative_real_error = derivative_error
     derivative_imag_error = derivative_error if eta > 0.0 else 0.0
     zeta = complex(phase_velocity, eta)
-    quadrature = dispersion["quadrature_method"]
+    quadrature = dispersion["quadrature_method"] + "_minus_infinity_to_infinity"
     contour_method = (
         "exact_eta_to_zero_plus" if eta == 0.0
         else "finite_positive_imaginary_pole_regularization"
