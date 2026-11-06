@@ -1635,8 +1635,14 @@ def collective_kappa_spectral_density(
         population_susceptibilities.append(chi_population)
     if ion_populations is None:
         resolved_ion_populations = [
-            {"distribution": "maxwellian", "kappa": None,
-             "flow_projection_m_s": float(ui[index])}
+            {
+                "distribution": "maxwellian", "kappa": None,
+                "flow_projection_m_s": float(ui[index]),
+                "projected_temperature_eV": float(temperatures[index]),
+                "temperature_parallel_eV": None,
+                "temperature_perpendicular_eV": None,
+                "magnetic_pitch_cosine": None,
+            }
             for index in range(len(species))
         ]
     else:
