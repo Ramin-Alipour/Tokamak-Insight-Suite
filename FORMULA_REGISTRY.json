@@ -8287,5 +8287,135 @@
         "tests/test_bi_kappa_susceptibility.py::test_bi_kappa_rejects_non_unit_geometry"
       ]
     }
+  },
+  {
+    "name": "Conserving multispecies BGK electrostatic CTS response and classical FDT spectrum",
+    "equation": "R_ab=δn_a/δU_b; V_ab=q_a q_b/(ε₀ k²); ε=I−RV; χ=ε⁻¹R; S=−(2T/ω) Im_H(χ)",
+    "inputs": "ω [rad/s], k [m⁻¹], per-species density [m⁻³], mass [kg], charge [C], common temperature [J], collision frequency [s⁻¹], optional bulk flow [m/s]",
+    "output": "Bare and screened density-response matrices [m⁻³/J], dielectric matrix, classical dynamic-structure-factor matrix [m⁻³ s], quadrature convergence diagnostics",
+    "assumptions": "One-dimensional nonrelativistic isothermal multispecies momentum-conserving BGK closure; common equilibrium temperature and flow; self-consistent electrostatic Poisson screening; classical equilibrium FDT; zero frequency excluded pending analytic low-frequency extrapolation.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_bgk_fdt.analyze_conserving_bgk_cts",
+      "function_links": [
+        "tokamak_analysis.cts_bgk_fdt.analyze_conserving_bgk_cts",
+        "tokamak_analysis.cts_collisional_bgk.conserving_bgk_longitudinal_susceptibility",
+        "tokamak_analysis.cts_fdt.classical_fdt_dynamic_structure_factor"
+      ],
+      "formula_key": "cts_conserving_bgk_fdt",
+      "input_specs": [
+        {
+          "name": "angular_frequency_rad_s",
+          "unit": "rad s^-1",
+          "required": true
+        },
+        {
+          "name": "wave_number_m_inverse",
+          "unit": "m^-1",
+          "required": true
+        },
+        {
+          "name": "species[].density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "species[].mass_kg",
+          "unit": "kg",
+          "required": true
+        },
+        {
+          "name": "species[].charge_C",
+          "unit": "C",
+          "required": true
+        },
+        {
+          "name": "common_temperature_J",
+          "unit": "J",
+          "required": true
+        },
+        {
+          "name": "collision_frequencies_s_inverse",
+          "unit": "s^-1",
+          "required": true
+        },
+        {
+          "name": "bulk_flow_m_s",
+          "unit": "m s^-1",
+          "required": false
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer",
+          "required": false
+        },
+        {
+          "name": "quadrature_max_order",
+          "unit": "integer",
+          "required": false
+        },
+        {
+          "name": "quadrature_convergence_tolerance",
+          "unit": "dimensionless",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "bare_density_response_m3_per_J",
+          "unit": "m^-3 J^-1"
+        },
+        {
+          "name": "screened_density_response_m3_per_J",
+          "unit": "m^-3 J^-1"
+        },
+        {
+          "name": "dielectric_matrix",
+          "unit": "dimensionless complex matrix"
+        },
+        {
+          "name": "dynamic_structure_factor_m3_s",
+          "unit": "m^-3 s"
+        },
+        {
+          "name": "velocity_quadrature_convergence",
+          "unit": "relative response-change diagnostics"
+        },
+        {
+          "name": "quantitative_release_gate",
+          "unit": "validation status"
+        }
+      ],
+      "prerequisites": [
+        "Matched species density/mass/charge/collision arrays",
+        "Common-temperature equilibrium",
+        "Positive finite wave number and nonzero frequency",
+        "Causal response and converged velocity quadrature"
+      ],
+      "uncertainty_model": "This deterministic forward solver does not infer parameter covariance. Measurement, geometry, collision-model and frequency-grid uncertainties require separate propagation; quantitative release remains blocked until collision and frequency convergence and experimental normalization are validated.",
+      "limitations": [
+        "Isothermal BGK does not conserve total energy and is not the velocity-dependent Coulomb Landau operator.",
+        "Electrostatic longitudinal response only; no magnetized gyroharmonics or Full-EM three-wave coupling.",
+        "Classical FDT only; no quantum detailed balance.",
+        "No calibrated receiver/scattering geometry normalization.",
+        "Quadrature convergence is estimated by successive Hermite-order refinement; frequency-grid convergence is not performed internally."
+      ],
+      "test_links": [
+        "tests/test_cts_bgk_fdt.py::test_bgk_cts_connects_bare_response_poisson_screening_and_fdt",
+        "tests/test_cts_bgk_fdt.py::test_bgk_cts_screening_is_the_declared_poisson_matrix_closure",
+        "tests/test_cts_bgk_fdt.py::test_bgk_cts_rejects_zero_frequency_instead_of_fabricating_static_spectrum",
+        "tests/test_cts_collisional_bgk.py::test_conserving_bgk_response_obeys_galilean_frequency_shift",
+        "tests/test_cts_collisional_bgk.py::test_conserving_bgk_response_is_covariant_under_species_permutation"
+      ],
+      "note": "Callable electrostatic CTS model path. The formula is exposed through the Analysis-1 advanced physics API and Dashboard model selector. Analytic/software verification is not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "collisional_isothermal_electrostatic_cts_forward_model",
+      "input_data_level": "physical_parameters_and_species_properties",
+      "analysis_family": "Analysis 1 — Thomson Scattering"
+    }
   }
 ]
