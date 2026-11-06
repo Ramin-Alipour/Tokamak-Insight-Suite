@@ -139,3 +139,22 @@ def test_drifting_bi_kappa_rejects_superluminal_projected_flow():
         assert "strictly subluminal" in str(exc)
     else:
         raise AssertionError("superluminal projected flow must be rejected")
+
+
+def test_public_advanced_dispatch_forwards_drifting_bi_kappa_physics():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    args = _common()
+    flow = -2.4e5
+    result = run_advanced_thomson_physics(
+        "bi_kappa_electrostatic_susceptibility",
+        **args,
+        electron_temperature_parallel_eV=1500.0,
+        electron_temperature_perpendicular_eV=500.0,
+        magnetic_field_unit=[0.0, 0.0, 1.0],
+        scattering_vector_unit=[0.0, 0.0, 1.0],
+        electron_flow_projection_m_s=flow,
+    )
+    assert result["public_physics_entrypoint"] == "bi_kappa_electrostatic_susceptibility"
+    assert result["electron_flow_projection_m_s"] == flow
+    assert result["phase_velocity_in_electron_rest_frame_m_s"] == args["phase_velocity_m_s"] - flow
