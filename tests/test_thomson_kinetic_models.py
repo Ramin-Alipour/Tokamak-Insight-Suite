@@ -1042,7 +1042,12 @@ def test_thomson_flow_propagates_projection_geometry_cross_covariance_terms():
     for view, direction in enumerate(directions):
         tangent = np.eye(3) - np.outer(direction, direction)
         jacobian[view, 3*view:3*view+3] = tangent @ velocity
-    tangent_cross = cross_covariance @ result["tangent_plane_scattering_vector_covariance"].T
+    tangent_projector = np.zeros((12, 12))
+    for view, direction in enumerate(directions):
+        tangent_projector[3*view:3*view+3, 3*view:3*view+3] = (
+            np.eye(3) - np.outer(direction, direction)
+        )
+    tangent_cross = cross_covariance @ tangent_projector.T
     expected_effective = (
         projection_covariance
         + jacobian @ result["tangent_plane_scattering_vector_covariance"] @ jacobian.T
