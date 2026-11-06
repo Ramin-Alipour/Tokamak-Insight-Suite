@@ -523,10 +523,20 @@ def infer_three_dimensional_flow_from_thomson_projections(
         chol_local = np.linalg.cholesky(data_covariance)
         whitened_design_local = np.linalg.solve(chol_local, directions)
         whitened_data_local = np.linalg.solve(chol_local, projections)
-        information_local = whitened_design_local.T @ whitened_design_local
-        covariance_local = np.linalg.inv(information_local)
-        velocity_local = covariance_local @ (whitened_design_local.T @ whitened_data_local)
-        condition_local = float(np.linalg.cond(whitened_design_local))
+        left_vectors, singular_values, right_vectors_t = np.linalg.svd(
+            whitened_design_local, full_matrices=False
+        )
+        if singular_values.size != 3 or singular_values[-1] <= 0.0:
+            raise ValueError("covariance-whitened scattering geometry is numerically rank deficient")
+        condition_local = float(singular_values[0] / singular_values[-1])
+        velocity_local = right_vectors_t.T @ (
+            (left_vectors.T @ whitened_data_local) / singular_values
+        )
+        # SVD covariance avoids squaring the design condition number through
+        # explicit inversion of Q.T C_eff^-1 Q.
+        covariance_local = (
+            right_vectors_t.T / (singular_values**2)[None, :]
+        ) @ right_vectors_t
         return velocity_local, covariance_local, condition_local
 
     effective_covariance = covariance.copy()
