@@ -119,7 +119,7 @@ MODEL_PHYSICS_NOTES = {
         "coincident with EVDF grid knots are rejected rather than regularized silently. "
         "For non-Maxwellian ions, supply ion_velocity_grids_m_s and ion_probability_densities_s_m "
         "as matching (n_ion_species, n_velocity) arrays in each species rest frame; "
-        "ion_temperature_eV is optional for that branch."
+        "ion_temperature_eV is optional for that branch. The output also reports projected means, second-moment directional temperatures, skewness and excess kurtosis."
     ),
     "thomson_temperature_from_spectral_width": (
         "Conditional Te estimator: Te = (sigma_lambda/lambda_0)^2 m_e c^2 / "
