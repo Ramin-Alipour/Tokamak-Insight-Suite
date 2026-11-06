@@ -272,3 +272,47 @@ def test_dashboard_routes_landau_fdt_maxwell_electric_magnetic_fluctuations():
     assert result["magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s"].shape == (2, 3, 3)
     assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
     assert result["cts_three_wave_vertex_connected"] is False
+
+
+def test_general_tensor_raw_spectrum_solver_is_exposed_through_advanced_api_and_dashboard():
+    from tis.ui.advanced_thomson_physics_page import MODEL_LABELS, EXAMPLES
+    from tokamak_analysis.cts_full_physics import (
+        ADVANCED_THOMSON_PHYSICS_MODELS, run_advanced_thomson_physics,
+    )
+    model = "thomson_full_temperature_tensor_spectral_fit"
+    assert model in MODEL_LABELS
+    assert model in EXAMPLES
+    assert model in ADVANCED_THOMSON_PHYSICS_MODELS
+
+    wavelength = np.linspace(529.0, 535.0, 121)
+    q = np.array([
+        [1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,-1,1]
+    ], dtype=float)
+    q /= np.linalg.norm(q, axis=1)[:,None]
+    tensor = np.array([[500.0,35.0,-20.0],[35.0,350.0,18.0],[-20.0,18.0,220.0]])
+    c,e,me,laser,angle=299792458.0,1.602176634e-19,9.1093837015e-31,532.0,np.pi/2
+    qfactor=2*np.sin(angle/2)
+    edges=np.empty(wavelength.size+1)
+    edges[1:-1]=0.5*(wavelength[:-1]+wavelength[1:])
+    edges[0]=wavelength[0]-0.5*(wavelength[1]-wavelength[0])
+    edges[-1]=wavelength[-1]+0.5*(wavelength[-1]-wavelength[-2])
+    from scipy.special import ndtr
+    spectra=[]
+    for direction in q:
+        tq=float(direction@tensor@direction)
+        sigma=laser*qfactor*np.sqrt(e*tq/me)/c
+        z=(edges-laser)/sigma
+        probability=ndtr(z[1:])-ndtr(z[:-1])
+        positive=z[:-1]>0
+        probability[positive]=ndtr(-z[:-1][positive])-ndtr(-z[1:][positive])
+        spectra.append(1.5*probability/np.diff(edges)+0.01)
+    result=run_advanced_thomson_physics(
+        model,wavelength,np.asarray(spectra),laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full((len(q),len(wavelength)),1e-4),
+        initial_temperature_tensor_eV=np.eye(3)*350.0,
+    )
+    assert result["public_physics_entrypoint"]==model
+    assert result["reportable_as_inferred_parameter"] is True
+    np.testing.assert_allclose(result["electron_temperature_tensor_eV"],tensor,rtol=3e-3,atol=0.5)
