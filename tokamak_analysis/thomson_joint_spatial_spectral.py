@@ -841,11 +841,7 @@ def reconstruct_joint_thomson_spatial_spectra(
             fitted_background_coefficients[:, 1].copy()
             * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
         ),
-        "spatial_mixing_operator": (
-            "researcher_supplied_fixed_forward_operator_composed_with_spatial_psf"
-            if psf_source != "identity_no_additional_psf_operator"
-            else "researcher_supplied_fixed_forward_operator"
-        ),
+        "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
         "spatial_mixing_matrix_nominal": nominal_mixing.copy(),
         "effective_spatial_mixing_matrix": h.copy(),
         "spatial_psf_matrix": psf.copy(),
