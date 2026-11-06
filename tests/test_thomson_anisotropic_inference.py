@@ -644,10 +644,63 @@ def test_bikappa_response_conservation_reaches_public_api_and_dashboard_model():
         initial_temperature_parallel_eV=750.0,
         initial_temperature_perpendicular_eV=400.0,
         initial_kappa=5.0,
+        systematic_covariance=np.eye(spectra.size) * 2.0e-8,
     )
+    assert result["systematic_covariance"].shape == (spectra.size, spectra.size)
+    assert result["covariance_provenance"]["systematic_supplied"] is True
     assert result["public_physics_entrypoint"] == model
     assert result["automatic_model_substitution"] is False
     assert result["reportable_as_inferred_parameter"] is True
     assert result["electron_temperature_parallel_eV"] == pytest.approx(900.0, rel=3e-2)
     assert result["electron_temperature_perpendicular_eV"] == pytest.approx(320.0, rel=3e-2)
     assert result["kappa_index"] == pytest.approx(4.2, rel=3e-2)
+
+
+def test_bikappa_gls_adds_measurement_discrepancy_and_systematic_covariance():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    size = spectra.size
+    measurement = np.eye(size) * 4.0e-8
+    discrepancy = np.eye(size) * 1.0e-8
+    systematic = np.eye(size) * 2.0e-8
+    result = fit_gyrotropic_bi_kappa_thomson(
+        wavelength, spectra, laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
+        measurement_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        initial_temperature_parallel_eV=750.0,
+        initial_temperature_perpendicular_eV=400.0,
+        initial_kappa=5.0,
+    )
+    np.testing.assert_allclose(
+        result["effective_covariance"], measurement + discrepancy + systematic,
+        rtol=0.0, atol=1.0e-20,
+    )
+    np.testing.assert_array_equal(result["systematic_covariance"], systematic)
+    assert result["covariance_provenance"]["systematic_supplied"] is True
+    assert result["covariance_provenance"]["effective_covariance_model"] == (
+        "measurement_plus_model_discrepancy_plus_systematic"
+    )
+    assert result["covariance_provenance"]["parameter_covariance_scale"] == (
+        "supplied_absolute_covariance"
+    )
+    assert result["reportable_as_inferred_parameter"] is True
+
+
+def test_bikappa_gls_rejects_non_psd_systematic_covariance():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    invalid = np.eye(spectra.size)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="systematic_covariance must be positive semidefinite"):
+        fit_gyrotropic_bi_kappa_thomson(
+            wavelength, spectra, laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+            scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            systematic_covariance=invalid,
+        )
