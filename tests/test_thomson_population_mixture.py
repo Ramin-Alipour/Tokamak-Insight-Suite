@@ -140,3 +140,35 @@ def test_general_multi_population_forward_uses_number_density_simplex():
             flow_projection_m_s=0.0, incident_polarization=[0.0, 0.0, 1.0],
             radial_order=12, angular_order=8,
         )
+
+
+def test_multi_population_fit_is_reachable_through_public_physics_dispatcher():
+    from tokamak_analysis.cts_full_physics import (
+        ADVANCED_THOMSON_PHYSICS_MODELS, run_advanced_thomson_physics,
+    )
+    from tokamak_analysis.thomson_population_mixture import (
+        multi_population_relativistic_thomson_spectrum,
+    )
+    wavelength = np.linspace(350.0, 750.0, 101)
+    angle = np.pi/2.0
+    truth = multi_population_relativistic_thomson_spectrum(
+        wavelength, 532.0, angle, [60.0, 900.0], [0.82, 0.18],
+        flow_projection_m_s=1.0e5,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=12, angular_order=8,
+    )
+    measured = 1.5e4*truth["spectral_density_per_nm"] + 0.4
+    assert "thomson_multi_population_relativistic_fit" in ADVANCED_THOMSON_PHYSICS_MODELS
+    result = run_advanced_thomson_physics(
+        "thomson_multi_population_relativistic_fit",
+        wavelength, measured, 532.0, angle, np.eye(wavelength.size),
+        population_count=2, incident_polarization=[0.0, 0.0, 1.0],
+        flow_projection_initial_m_s=0.8e5,
+        signal_uncertainty=np.full(wavelength.size, 0.5),
+        radial_order=12, angular_order=8, max_nfev=500,
+    )
+    assert result["population_count"] == 2
+    assert result["population_temperatures_eV"][0] < result["population_temperatures_eV"][1]
+    assert np.sum(result["population_number_density_fractions"]) == pytest.approx(1.0)
+    assert result["population_parameter_covariance"].shape == (5, 5)
+    assert result["public_physics_entrypoint"] == "thomson_multi_population_relativistic_fit"
