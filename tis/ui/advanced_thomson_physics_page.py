@@ -251,12 +251,16 @@ MODEL_PHYSICS_NOTES = {
         "followed by the measured response acting on bin-integrated spectral power. "
         "The result reports captured spectral probability without renormalizing truncated tails. "
         "A declared projected thermal-rms beta screen and a 0.1 bulk-flow beta screen guard the "
-        "non-relativistic approximation."
+        "non-relativistic approximation. The public workflow also closes fitted per-view flow projections "
+        "into a common 3-D vector when fit covariance and view geometry support it; optional geometry covariance "
+        "and cross-covariance are propagated, with condition-number and common-flow residual reporting gates."
     ),
     "gyrotropic_bi_kappa_spectral_fit": (
         "Physical forward model: the projected bi-Kappa marginal is integrated exactly using "
         "its Student-t CDF (nu = 2*kappa - 1) over each finite wavelength bin, before measured "
-        "response convolution. Wavelength-window tails are not renormalized."
+        "response convolution. Wavelength-window tails are not renormalized. The public workflow also closes "
+        "fitted per-view flow projections into a common 3-D vector when identifiable, with optional geometry "
+        "covariance, condition-number and common-flow residual gates."
     ),
     "thomson_normalized_poloidal_flux": (
         "Maps externally supplied channel poloidal flux to rho_pol = sqrt((psi_pol-psi_axis)/(psi_sep-psi_axis)). "
