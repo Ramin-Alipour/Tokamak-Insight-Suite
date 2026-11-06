@@ -552,6 +552,9 @@ def test_joint_compton_inverse_integrates_measured_laser_profile_in_physical_ker
     assert out["laser_spectral_profile"]["model"] == (
         "measured_incident_laser_profile_integrated_inside_Compton_forward_model"
     )
+    assert out["spectral_bin_integration"] == (
+        "8_point_Gauss_Legendre_finite_volume_bin_averages_of_relativistic_forward_kernel"
+    )
     for channel in out["laser_spectral_profile"]["channels"]:
         assert channel["incident_wavelength_quadrature_weights_sum"] == pytest.approx(1.0)
         assert "Klein_Nishina_kernel" in channel["convolution_approximation"]
@@ -575,6 +578,46 @@ def test_full_rank_but_ill_conditioned_data_inverse_is_not_reported_as_primary()
     assert out["electron_velocity_projection_profile_m_s"] is None
     assert out["parameter_covariance"] is None
     assert out["identifiability"]["data_condition_number_limit"] == 1.0
+
+
+def test_general_relativistic_bin_quadrature_integrates_smooth_spectrum_on_nonuniform_grid():
+    from tokamak_analysis.thomson_joint_spatial_spectral import (
+        _bin_averaged_callable_spectrum, _wavelength_edges,
+    )
+    from scipy.special import erf
+
+    x = np.array([529.0, 529.7, 531.1, 533.8, 537.0, 541.0])
+    centre, sigma, amplitude = 533.2, 1.35, 2.7
+    averaged = _bin_averaged_callable_spectrum(
+        x,
+        lambda wavelength: amplitude * np.exp(
+            -0.5 * ((wavelength - centre) / sigma) ** 2
+        ),
+        quadrature_order=24,
+    )
+    edges = _wavelength_edges(x)
+    root_two = np.sqrt(2.0)
+    exact_integrals = (
+        amplitude * sigma * np.sqrt(np.pi / 2.0)
+        * (erf((edges[1:] - centre) / (root_two * sigma))
+           - erf((edges[:-1] - centre) / (root_two * sigma)))
+    )
+    np.testing.assert_allclose(
+        averaged, exact_integrals / np.diff(edges), rtol=2e-11, atol=1e-13
+    )
+
+
+def test_general_relativistic_bin_quadrature_rejects_invalid_kernel_values():
+    from tokamak_analysis.thomson_joint_spatial_spectral import (
+        _bin_averaged_callable_spectrum,
+    )
+    x = np.linspace(530.0, 534.0, 9)
+    with pytest.raises(ValueError, match="one finite value per quadrature wavelength"):
+        _bin_averaged_callable_spectrum(x, lambda wavelength: np.full(3, 1.0))
+    with pytest.raises(ValueError, match="non-negative"):
+        _bin_averaged_callable_spectrum(
+            x, lambda wavelength: -np.ones_like(wavelength)
+        )
 
 
 def test_finite_bin_maxwellian_average_conserves_gaussian_area_on_nonuniform_grid():
