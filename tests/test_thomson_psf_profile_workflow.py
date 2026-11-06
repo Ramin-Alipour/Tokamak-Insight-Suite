@@ -134,3 +134,5 @@ def test_psf_uncertainty_draws_do_not_promote_nonidentifiable_profiles():
     assert result["spatial_mixing_uncertainty_successful_draws"] == 0
     assert result["coordinate_uncertainty_propagation_status"] == "insufficient_valid_draws"
     assert result["spatial_mixing_uncertainty_propagation_status"] == "insufficient_valid_draws"
+    assert "nominal measured spatial operator is not identifiable" in result["coordinate_uncertainty_warning"].lower()
+    assert "nominal measured spatial operator is not identifiable" in result["spatial_mixing_uncertainty_warning"].lower()
