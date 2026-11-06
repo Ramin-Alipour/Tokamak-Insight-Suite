@@ -108,7 +108,8 @@ MODEL_LABELS = {
 }
 
 # Full-EM response and field-fluctuation routes are explicit Dashboard choices.
-MODEL_LABELS["landau_fdt_full_em_spectrum"] = "Full-EM CTS — end-to-end Landau–FDT current noise → Maxwell field/Stokes spectrum"\nMODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
+MODEL_LABELS["landau_fdt_full_em_spectrum"] = "Full-EM CTS — end-to-end Landau–FDT current noise → Maxwell field/Stokes spectrum"
+MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
 MODEL_PHYSICS_NOTES = {
@@ -127,7 +128,10 @@ MODEL_PHYSICS_NOTES = {
         "renormalizing missing tails. Requires kappa>3/2. One view identifies T_q only, "
         "not T_parallel and T_perpendicular independently."
     ),
-    "landau_fdt_full_em_spectrum": (\n        "End-to-end local Full-EM fluctuation calculation: assemble the conserving multispecies Landau operator and its matched FDT current-noise covariance, derive the constitutive response, then propagate it through the Maxwell Green dyadic. The default dielectric is the constitutive dielectric from the same solver; an explicit relative_dielectric_tensor may be supplied for a separately validated passive background. Scope is unmagnetized, zero-flow, common-temperature Maxwellian plasma; this is not yet a magnetized CTS three-wave vertex or calibrated receiver spectrum."\n    ),\n    "landau_fdt_full_em_field_fluctuations": (
+    "landau_fdt_full_em_spectrum": (
+        "End-to-end local Full-EM fluctuation calculation: assemble the conserving multispecies Landau operator and its matched FDT current-noise covariance, derive the constitutive response, then propagate it through the Maxwell Green dyadic. The default dielectric is the constitutive dielectric from the same solver; an explicit relative_dielectric_tensor may be supplied for a separately validated passive background. Scope is unmagnetized, zero-flow, common-temperature Maxwellian plasma; this is not yet a magnetized CTS three-wave vertex or calibrated receiver spectrum."
+    ),
+    "landau_fdt_full_em_field_fluctuations": (
         "Input constitutive_response is the mapping returned by landau_fdt_full_em_constitutive. "
         "The solver computes S_E = mu0^2 omega^2 G S_J G^dagger, S_B = (k_cross/omega) "
         "S_E (k_cross/omega)^dagger, and the spectral Poynting flux. Undamped Maxwell "
@@ -942,8 +946,11 @@ def render_advanced_thomson_physics_page(st) -> None:
                 tail = result["relativistic_tail_diagnostic"]
                 st.subheader("Projected-distribution relativistic-tail validity")
                 st.latex(
-                    r"P(|v_q|\geq c)=F_{t_\nu}((-c-u_q)/s)"
-                    r"+1-F_{t_\nu}((c-u_q)/s),\quad \nu=2\kappa-1"
+                    r"P(|v_q|\geq c)=F_{t_
+u}((-c-u_q)/s)"
+                    r"+1-F_{t_
+u}((c-u_q)/s),\quad 
+u=2\kappa-1"
                 )
                 st.json(json_safe(tail))
                 if tail.get("requires_relativistic_forward_model", False):
