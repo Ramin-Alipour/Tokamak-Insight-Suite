@@ -52,6 +52,9 @@ def test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_tempe
     assert result["electron_velocity_projection_m_s"] == pytest.approx([1.0e4, -1.5e4, 2.0e4], abs=2.0e3)
     assert np.max(np.abs(result["residual_spectra"])) < 1e-5
     assert result["model_validity"]["relativistic_corrections"] is False
+    tail = result["relativistic_tail_diagnostic"]
+    assert tail["requires_relativistic_forward_model"] is False
+    assert tail["maximum_projected_superluminal_probability_lower_bound"] < 1.0e-8
 
 
 def test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures():
@@ -370,3 +373,16 @@ def test_bikappa_exact_projected_tail_exposes_superluminal_newtonian_probability
 
     shifted_tail = _kappa_projected_superluminal_tail_probability(0.2*c, 0.25*c, 4.0)
     assert 0.0 < shifted_tail <= 1.0
+
+def test_maxwellian_projected_superluminal_tail_uses_stable_gaussian_survival_probability():
+    from tokamak_analysis.thomson_anisotropic_inference import (
+        _maxwellian_projected_superluminal_tail_probability,
+    )
+
+    c = 299792458.0
+    cold = _maxwellian_projected_superluminal_tail_probability(0.0, 0.01*c)
+    hot = _maxwellian_projected_superluminal_tail_probability(0.0, 0.25*c)
+    shifted = _maxwellian_projected_superluminal_tail_probability(0.2*c, 0.25*c)
+    assert cold == 0.0
+    assert hot > cold
+    assert shifted > hot
