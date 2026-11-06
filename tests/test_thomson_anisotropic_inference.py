@@ -406,3 +406,50 @@ def test_bikappa_fit_withholds_physical_parameters_when_projected_tail_exceeds_t
     assert result["electron_temperature_perpendicular_eV"] is None
     assert result["kappa_index"] is None
     assert result["relativistic_tail_diagnostic"]["requires_relativistic_forward_model"] is True
+
+
+
+def test_gyrotropic_velocity_covariance_tensor_matches_second_moment_physics():
+    from tokamak_analysis.thomson_anisotropic_inference import (
+        _gyrotropic_velocity_covariance_tensors,
+    )
+
+    electron_charge = 1.602176634e-19
+    electron_mass = 9.1093837015e-31
+    t_parallel, t_perpendicular = 900.0, 250.0
+    field = np.array([
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0],
+    ])
+    tensors = _gyrotropic_velocity_covariance_tensors(
+        t_parallel, t_perpendicular, field
+    )
+    expected_eigenvalues = np.array([
+        electron_charge * t_perpendicular / electron_mass,
+        electron_charge * t_perpendicular / electron_mass,
+        electron_charge * t_parallel / electron_mass,
+    ])
+    assert tensors.shape == (2, 3, 3)
+    np.testing.assert_allclose(
+        np.linalg.eigvalsh(tensors[0]), expected_eigenvalues, rtol=1e-12
+    )
+    np.testing.assert_allclose(
+        np.linalg.eigvalsh(tensors[1]), expected_eigenvalues, rtol=1e-12
+    )
+    np.testing.assert_allclose(tensors[0][0, 0], tensors[1][2, 2], rtol=1e-12)
+    np.testing.assert_allclose(tensors[0][2, 2], tensors[1][0, 0], rtol=1e-12)
+
+
+def test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match():
+    from tokamak_analysis.thomson_anisotropic_inference import (
+        _gyrotropic_velocity_covariance_tensors,
+    )
+
+    temperature = 400.0
+    tensors = _gyrotropic_velocity_covariance_tensors(
+        temperature, temperature,
+        np.array([[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]),
+    )
+    expected = (1.602176634e-19 * temperature / 9.1093837015e-31) * np.eye(3)
+    np.testing.assert_allclose(tensors[0], expected, rtol=1e-12)
+    np.testing.assert_allclose(tensors[1], expected, rtol=1e-12)
