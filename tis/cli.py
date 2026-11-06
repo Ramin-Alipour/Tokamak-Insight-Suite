@@ -34,7 +34,7 @@ def main() -> int:
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
         if args.kind in ('diagnostics','both','status'):
-            diagnostics=[{**row,'maturity_level':maturity_label(row)} for row in DIAGNOSTICS]
+            diagnostics=DIAGNOSTICS
             if args.kind != 'status':
                 (out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(diagnostics,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
         if args.kind == 'status':
@@ -80,7 +80,7 @@ def main() -> int:
             (out/'DIAGNOSTIC_STATUS_REPORT.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
             print(f'Wrote reconciled diagnostic status report to {(out/"DIAGNOSTIC_STATUS_REPORT.json").resolve()}'); return 0
         if args.kind == 'analyses':
-            analyses=[{**row,'maturity_level':maturity_label(row)} for row in ANALYSES]
+            analyses=ANALYSES
             (out/'ANALYSIS_REGISTRY.json').write_text(json.dumps(analyses,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
         if args.kind in ('formulas','both'):(out/'FORMULA_REGISTRY.json').write_text(json.dumps(FORMULAS,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
         print(f'Wrote registry file(s) to {out.resolve()}'); return 0
