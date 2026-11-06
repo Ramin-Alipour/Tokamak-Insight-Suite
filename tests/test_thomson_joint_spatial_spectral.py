@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
 
-from tokamak_analysis.thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+from tokamak_analysis.thomson_joint_spatial_spectral import (
+    _huber_total_variation_residual,
+    reconstruct_joint_thomson_spatial_spectra,
+)
 
 
 def _synthetic_case():
@@ -793,3 +796,52 @@ def test_joint_spatial_spectral_inverse_validates_measured_psf_contract():
             spatial_psf_matrix=np.eye(radius.size),
             spatial_psf_sigma_m=0.05,
         )
+
+def test_huber_total_variation_penalty_is_quadratic_for_small_and_linear_for_large_gradients():
+    radius = np.linspace(0.0, 1.0, 5)
+    small_gradient = 1.0e-3 * radius
+    large_gradient = 10.0 * radius
+    small_residual = _huber_total_variation_residual(
+        small_gradient, radius, huber_scale=0.05
+    )
+    large_residual = _huber_total_variation_residual(
+        large_gradient, radius, huber_scale=0.05
+    )
+    # In the quadratic regime, sum(residual**2) approximates integral |u'|^2 dr.
+    assert np.sum(small_residual**2) == pytest.approx(1.0e-6, rel=2e-3)
+    # In the linear regime, doubling a large constant gradient doubles,
+    # rather than quadruples, the Huber-TV objective.
+    doubled = _huber_total_variation_residual(
+        20.0 * radius, radius, huber_scale=0.05
+    )
+    assert np.sum(doubled**2) / np.sum(large_residual**2) == pytest.approx(
+        2.0, rel=2e-3
+    )
+
+
+def test_joint_spatial_inverse_exposes_edge_preserving_regularization():
+    x, y, r, h, *_ = _synthetic_case()
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        regularization_strength=0.02,
+        regularization_kind="huber_total_variation",
+        tv_huber_scale=0.05,
+    )
+    assert out["regularization"]["edge_preserving"] is True
+    assert out["regularization"]["kind"] == (
+        "length_weighted_huber_total_variation_on_log_Te_flow_and_log_amplitude"
+    )
+    assert out["regularization"]["huber_scale"] == pytest.approx(0.05)
+
+
+def test_joint_spatial_inverse_rejects_unknown_regularization_kind():
+    x, y, r, h, *_ = _synthetic_case()
+    with pytest.raises(ValueError, match="regularization_kind"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+            regularization_kind="invented_smoother",
+        )
+
