@@ -999,7 +999,8 @@
       "relativistic_mj_effective_differential_cross_section",
       "cts_multi_population_kappa_electron_susceptibility",
       "thomson_gaussian_spatial_psf_matrix",
-      "optical_thomson_general_temperature_tensor"
+      "optical_thomson_general_temperature_tensor",
+      "thomson_spatial_mixing_operator_calibration_covariance"
     ],
     "test_links": [
       "tests/test_thomson_inference.py",
@@ -1111,7 +1112,11 @@
         ],
         "covariance_order": "channel_major",
         "uncertainty_semantics": "Local linearized covariance conditional on the selected physical model, measured response and regularization. Measurement, model-discrepancy and systematic covariance remain separate; full spatial mixing-operator calibration covariance is propagated through the data-only GLS sensitivity, with optional spectrum/operator cross-covariance validated as a joint positive-semidefinite block. Regularization does not contribute to data-only identifiability.",
-        "experimental_validation": "not_performed"
+        "experimental_validation": "not_performed",
+        "test_links": [
+          "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_full_spatial_mixing_operator_covariance",
+          "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validates_joint_block"
+        ]
       },
       {
         "name": "Joint Kappa/MJ structured-background inference",
