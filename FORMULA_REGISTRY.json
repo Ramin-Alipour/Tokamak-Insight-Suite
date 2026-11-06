@@ -9674,5 +9674,58 @@
       "analysis_family": "Analysis 1 — Thomson scattering / CTS",
       "subanalysis": "Collective Thomson — Full-EM wave propagation"
     }
+  },
+  {
+    "name": "Projected superluminal-tail probability for anisotropic Kappa Thomson inference",
+    "equation": "P(|v_q|≥c)=F_tν((-c-u_q)/s)+1−F_tν((c-u_q)/s), ν=2κ−1, s=θ_q√(κ/ν)",
+    "inputs": "u_q [m s^-1], θ_q [m s^-1], κ > 3/2",
+    "output": "dimensionless probability; lower bound on the 3-D superluminal probability",
+    "assumptions": "Exact one-dimensional marginal of the gyrotropic 3-D bi-Kappa closure; non-relativistic projected velocity coordinate; this diagnostic quantifies model-domain failure and is not a relativistic correction.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference._kappa_projected_superluminal_tail_probability",
+      "formula_key": "thomson_bikappa_projected_superluminal_tail_probability",
+      "input_specs": [
+        {
+          "name": "flow_m_s",
+          "unit": "m s^-1",
+          "description": "Fitted q-projected bulk flow u_q.",
+          "required": true
+        },
+        {
+          "name": "theta_m_s",
+          "unit": "m s^-1",
+          "description": "Projected Kappa scale parameter θ_q, not the second-moment thermal speed.",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "1",
+          "description": "Kappa index; finite projected variance requires κ > 3/2.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "projected_superluminal_probability_lower_bound",
+          "unit": "1",
+          "description": "Exact Student-t probability P(|v_q| ≥ c); because |v_q| ≤ |v|, this is a lower bound on the modeled 3-D superluminal probability."
+        }
+      ],
+      "prerequisites": [
+        "Gyrotropic bi-Kappa projected marginal",
+        "Subluminal fitted flow",
+        "Finite-variance Kappa index κ > 3/2"
+      ],
+      "uncertainty_model": "Deterministic diagnostic conditional on fitted flow, projected scale and Kappa index; parameter uncertainty is not folded into this probability.",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_bikappa_exact_projected_tail_exposes_superluminal_newtonian_probability",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa"
+      ],
+      "note": "Exposes a nonphysical tail hidden by RMS-beta screening. The projected probability is a rigorous lower bound on the corresponding 3-D superluminal probability; exceeding the configured tolerance requires a relativistic forward model."
+    }
   }
 ]
