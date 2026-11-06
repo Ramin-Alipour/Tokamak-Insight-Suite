@@ -116,13 +116,12 @@ def render_gyrotropic_thomson_page(st) -> None:
                 raise ValueError(f"Model-discrepancy covariance must have shape ({total_size}, {total_size}).")
             if covariance is not None and uncertainty is not None:
                 raise ValueError("Supply measurement covariance or pointwise uncertainty, not both.")
+            from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
             if model == "bi_maxwellian":
-                from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_maxwellian_thomson
-                solver = fit_gyrotropic_bi_maxwellian_thomson
+                api_model = "gyrotropic_bi_maxwellian_spectral_fit"
                 options = {}
             else:
-                from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
-                solver = fit_gyrotropic_bi_kappa_thomson
+                api_model = "gyrotropic_bi_kappa_spectral_fit"
                 options = {"initial_kappa": float(initial_kappa)}
             if uncertainty is not None:
                 options["signal_uncertainty"] = uncertainty
@@ -130,7 +129,7 @@ def render_gyrotropic_thomson_page(st) -> None:
                 options["measurement_covariance"] = covariance
             if discrepancy is not None:
                 options["model_discrepancy_covariance"] = discrepancy
-            result = solver(
+            result = run_advanced_thomson_physics(api_model,
                 wavelength, measured,
                 laser_wavelength_nm=float(laser_nm),
                 scattering_angle_rad=float(np.deg2rad(angle)),
