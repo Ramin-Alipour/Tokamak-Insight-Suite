@@ -648,6 +648,7 @@ def test_bikappa_response_conservation_reaches_public_api_and_dashboard_model():
     )
     assert result["systematic_covariance"].shape == (spectra.size, spectra.size)
     assert result["covariance_provenance"]["systematic_supplied"] is True
+    assert result["covariance_provenance"]["parameter_covariance_scale"] == "supplied_absolute_covariance"
     assert result["public_physics_entrypoint"] == model
     assert result["automatic_model_substitution"] is False
     assert result["reportable_as_inferred_parameter"] is True
