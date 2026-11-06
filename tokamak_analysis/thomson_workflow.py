@@ -448,6 +448,7 @@ def reconstruct_thomson_profile_from_spectra(
             "model_discrepancy_covariance": kwargs.get("model_discrepancy_covariance"),
             "regularization_sensitivity_strengths": kwargs.get("regularization_sensitivity_strengths"),
             "regularization_strength": spatial_regularization_strength,
+            "maximum_data_condition_number": kwargs.get("maximum_data_condition_number", 1.0e8),
             "background_model": spatial_background_model,
             "background_degree": spatial_background_degree,
             "background_interior_knots": spatial_background_interior_knots,

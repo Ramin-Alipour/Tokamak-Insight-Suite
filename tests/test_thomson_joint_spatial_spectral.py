@@ -555,3 +555,23 @@ def test_joint_compton_inverse_integrates_measured_laser_profile_in_physical_ker
     for channel in out["laser_spectral_profile"]["channels"]:
         assert channel["incident_wavelength_quadrature_weights_sum"] == pytest.approx(1.0)
         assert "Klein_Nishina_kernel" in channel["convolution_approximation"]
+
+
+def test_full_rank_but_ill_conditioned_data_inverse_is_not_reported_as_primary():
+    x, y, r, h, *_ = _synthetic_case()
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        maximum_data_condition_number=1.0,
+    )
+    assert out["optimizer"]["data_only_jacobian_rank"] == out["optimizer"]["parameter_count"]
+    assert out["optimizer"]["data_only_scaled_jacobian_condition_number"] > 1.0
+    assert out["optimizer"]["data_condition_number_acceptable"] is False
+    assert out["primary_result_status"] == "ill_conditioned_from_measured_data"
+    assert out["primary_outputs_reportable_as_identified"] is False
+    assert out["electron_temperature_profile_eV"] is None
+    assert out["electron_velocity_projection_profile_m_s"] is None
+    assert out["parameter_covariance"] is None
+    assert out["identifiability"]["data_condition_number_limit"] == 1.0

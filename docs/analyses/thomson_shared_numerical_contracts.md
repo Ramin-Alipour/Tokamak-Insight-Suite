@@ -30,3 +30,15 @@ Optical Thomson and CTS APIs. Existing APIs retain their own checks until each
 call site is migrated with regression tests. Therefore this module alone does
 not close TS-07, TS-11, TS-12, TS-14, TS-15, TS-17, or TS-18 at dashboard level,
 and does not close physical-model work TS-01 through TS-10.
+
+
+## Joint spatial-spectral conditioning gate
+
+The joint spatial-spectral optical inverse evaluates identifiability using the
+column-scaled Jacobian of measured data only. A numerically full-rank Jacobian
+is not sufficient when its condition number exceeds the explicit
+`maximum_data_condition_number` input (default `1e8`). In that case the fit
+is returned as `ill_conditioned_from_measured_data`; optimizer candidates may
+remain available for diagnosis, but primary physical profiles and data-only
+parameter covariance are withheld. The threshold is a configurable numerical
+stability criterion, not a universal plasma-physics validity boundary.

@@ -146,6 +146,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     signal_uncertainty=None, joint_spectral_covariance=None,
     model_discrepancy_covariance=None, regularization_sensitivity_strengths=None,
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
+    maximum_data_condition_number=1.0e8,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     physical_model="maxwellian", kappa_index=None, fit_kappa_index=False,
@@ -420,6 +421,11 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("signed plasma amplitudes are unsupported; use positive_amplitude=True")
     if isinstance(max_nfev, (bool, np.bool_)) or not isinstance(max_nfev, (int, np.integer)) or max_nfev < 1:
         raise ValueError("max_nfev must be a positive integer")
+    maximum_data_condition_number = _finite_real_scalar(
+        maximum_data_condition_number, "maximum_data_condition_number"
+    )
+    if maximum_data_condition_number < 1.0:
+        raise ValueError("maximum_data_condition_number must be >= 1")
 
     def predict(p):
         amp = np.exp(p[:r.size])
@@ -558,9 +564,18 @@ def reconstruct_joint_thomson_spatial_spectra(
         )
     else:
         model_domain_valid = bool(np.all(flow_beta < 1.0))
-    data_identifiable = bool(fit.success and data_rank == parameter_count and model_domain_valid)
+    condition_identifiable = bool(
+        np.isfinite(data_condition)
+        and data_condition <= maximum_data_condition_number
+    )
+    data_identifiable = bool(
+        fit.success and data_rank == parameter_count
+        and condition_identifiable and model_domain_valid
+    )
     if fit.success and not model_domain_valid:
         primary_status = "model_domain_rejected"
+    elif fit.success and data_rank == parameter_count and not condition_identifiable:
+        primary_status = "ill_conditioned_from_measured_data"
     elif data_identifiable:
         primary_status = "identified_from_measured_data"
     else:
@@ -584,7 +599,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     # result is required; otherwise no finite data-identified covariance is
     # published, even if regularization made the optimizer Hessian invertible.
     data_covariance_p = None
-    if data_rank == parameter_count:
+    if data_identifiable:
         data_information = data_jacobian.T @ data_jacobian
         data_covariance_p = np.linalg.pinv(data_information)
         if residual_scale is not None:
@@ -744,7 +759,7 @@ def reconstruct_joint_thomson_spatial_spectra(
                       "regularization_rows_excluded_from_identifiability": True,
                       "degrees_of_freedom": dof},
         "identifiability": {
-            "status": "identified_from_measured_data" if data_identifiable else "rank_deficient_or_optimizer_not_converged",
+            "status": primary_status,
             "data_only_jacobian_rank": data_rank,
             "parameter_count": parameter_count,
             "primary": [f"joint finite-dimensional Te(r), scattering-vector flow projection(r), and relative amplitude(r) under the supplied {physical_model} model and fixed operators"],
@@ -758,7 +773,9 @@ def reconstruct_joint_thomson_spatial_spectra(
             "primary": ["electron_temperature_profile_eV", "electron_velocity_projection_profile_m_s", "relative_spectral_amplitude_profile"] if data_identifiable else [],
             "conditional": ["absolute electron density requires a separate absolute-power and optical-collection inference with its complete auxiliary inputs"],
             "non_identifiable": ["perpendicular flow components", "spatial null-space and sub-resolution structures", "unrestricted anisotropic or non-Maxwellian electron distributions"],
-            "status": "identified_from_measured_data" if data_identifiable else "not_identifiable_from_measured_data",
+            "status": primary_status,
+            "data_condition_number_limit": maximum_data_condition_number,
+            "data_condition_number_acceptable": condition_identifiable,
         },
         "experimental_validation": "not_performed; numerical software inference only",
     }
