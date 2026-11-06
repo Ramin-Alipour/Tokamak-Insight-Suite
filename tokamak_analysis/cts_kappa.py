@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import gammaln, betainc, wofz
 from scipy.integrate import quad
+from .cts_kappa_dispersion import kappa_dispersion_function
 
 
 E = 1.602176634e-19
@@ -146,56 +147,51 @@ def kappa_electron_susceptibility(
             f"minimum_velocity_grid_probability_coverage={minimum_coverage:.8g}. "
             "Expand the velocity grid or explicitly lower the coverage threshold."
         )
-    # Evaluate the Landau integral over the complete analytic Kappa tail.
-    # A finite-grid derivative integral omits the non-zero derivative outside
-    # the tabulated interval; merely multiplying by the represented probability
-    # mass does not restore that missing susceptibility.  Integrate the exact
-    # marginal derivative on (-inf, inf), keeping the positive retarded pole.
-    thermal_speed = float(np.sqrt(scale_squared))
-    phase_velocity_scaled = phase_velocity/thermal_speed
-    log_dimensionless_normalization = gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi)
-
-    if pole_imaginary_part_m_s is None:
-        dimensionless_integral, dimensionless_derivative, real_error, derivative_real_error = _kappa_landau_real_axis_integrals(kap, phase_velocity_scaled)
-        integral = dimensionless_integral/thermal_speed**2
-        integral_phase_derivative = dimensionless_derivative/thermal_speed**3
-        imag_error = derivative_imag_error = 0.0
-        eta = 0.0
-        zeta = complex(phase_velocity, 0.0)
-        quadrature = "Sokhotski_Plemelj_exact_retarded_Landau_limit_with_subtracted_real_axis_PV_quadrature"
-        contour_method = "exact_eta_to_zero_plus"
-    else:
-        eta = _positive_real_scalar(pole_imaginary_part_m_s, "pole_imaginary_part_m_s")
-        zeta = complex(phase_velocity, eta)
-        eta_scaled = eta/thermal_speed
-        zeta_scaled = complex(phase_velocity_scaled, eta_scaled)
-        def dimensionless_pdf_derivative(x):
-            pdf_scaled=np.exp(log_dimensionless_normalization-kap*np.log1p(x*x))
-            return -2.0*kap*x/(1.0+x*x)*pdf_scaled
-        def outer_integrand(x):
-            return dimensionless_pdf_derivative(x)/(complex(x,0.0)-zeta_scaled)
-        def central_integrand(t):
-            x=phase_velocity_scaled+eta_scaled*t
-            return dimensionless_pdf_derivative(x)/complex(t,-1.0)
-        def outer_derivative_integrand(x):
-            denominator=complex(x,0.0)-zeta_scaled
-            return dimensionless_pdf_derivative(x)/(denominator**2)
-        def central_derivative_integrand(t):
-            x=phase_velocity_scaled+eta_scaled*t
-            return dimensionless_pdf_derivative(x)/(eta_scaled*complex(t,-1.0)**2)
-        def integrate_component(component,central,outer,power):
-            c,ce=quad(lambda t:float(component(central(t))),-50.0,50.0,epsabs=1e-12,epsrel=2e-8,limit=500)
-            l,le=quad(lambda x:float(component(outer(x))),-np.inf,phase_velocity_scaled-50.0*eta_scaled,epsabs=1e-12,epsrel=2e-8,limit=500)
-            r,re=quad(lambda x:float(component(outer(x))),phase_velocity_scaled+50.0*eta_scaled,np.inf,epsabs=1e-12,epsrel=2e-8,limit=500)
-            return (c+l+r)/thermal_speed**power,(ce+le+re)/thermal_speed**power
-        integral_real,real_error=integrate_component(np.real,central_integrand,outer_integrand,2)
-        integral_imag,imag_error=integrate_component(np.imag,central_integrand,outer_integrand,2)
-        integral=complex(integral_real,integral_imag)
-        derivative_real,derivative_real_error=integrate_component(np.real,central_derivative_integrand,outer_derivative_integrand,3)
-        derivative_imag,derivative_imag_error=integrate_component(np.imag,central_derivative_integrand,outer_derivative_integrand,3)
-        integral_phase_derivative=complex(derivative_real,derivative_imag)
-        quadrature="adaptive_complex_quadrature_of_exact_analytic_Kappa_derivative_over_minus_infinity_to_infinity"
-        contour_method="finite_positive_imaginary_pole_regularization"
+    # Use the shared generalized Kappa dispersion kernel as the canonical
+    # Landau integral.  Its dimensionless coordinate is
+    #   x = v / sqrt(((2*kappa-3)/kappa) * k_B*T/m),
+    # whereas the PDF above is written with scale sqrt((2*kappa-3)*k_B*T/m).
+    # The two coordinates differ by sqrt(kappa); the integral and its
+    # phase-velocity derivative therefore transform with powers 2 and 3.
+    # This explicit conversion prevents the optical/CTS Kappa kernels from
+    # drifting into inconsistent thermal-speed conventions.
+    dispersion_velocity_scale = float(np.sqrt(
+        ((2.0*kap-3.0)/kap) * E*te/mass
+    ))
+    eta = (
+        0.0 if pole_imaginary_part_m_s is None
+        else _positive_real_scalar(pole_imaginary_part_m_s, "pole_imaginary_part_m_s")
+    )
+    normalized_phase_velocity = phase_velocity/dispersion_velocity_scale
+    normalized_pole_imaginary = eta/dispersion_velocity_scale
+    dispersion = kappa_dispersion_function(
+        normalized_phase_velocity, normalized_pole_imaginary, kap
+    )
+    integral = complex(
+        dispersion["kappa_dispersion_integral"]/dispersion_velocity_scale**2
+    )
+    integral_phase_derivative = complex(
+        dispersion["kappa_dispersion_integral_derivative"]/dispersion_velocity_scale**3
+    )
+    integral_error = float(
+        dispersion["absolute_quadrature_error_estimate"]/dispersion_velocity_scale**2
+    )
+    derivative_error = float(
+        dispersion["derivative_absolute_quadrature_error_estimate"]/dispersion_velocity_scale**3
+    )
+    # The shared kernel reports a norm bound for complex quadrature.  It is a
+    # conservative component-wise bound for positive eta; on the exact
+    # Plemelj boundary the resonant imaginary part is analytic, not quadrature.
+    real_error = integral_error
+    imag_error = integral_error if eta > 0.0 else 0.0
+    derivative_real_error = derivative_error
+    derivative_imag_error = derivative_error if eta > 0.0 else 0.0
+    zeta = complex(phase_velocity, eta)
+    quadrature = dispersion["quadrature_method"]
+    contour_method = (
+        "exact_eta_to_zero_plus" if eta == 0.0
+        else "finite_positive_imaginary_pole_regularization"
+    )
 
     response = {
         "integral": complex(integral),
@@ -209,6 +205,9 @@ def kappa_electron_susceptibility(
         "grid_conditioning_applied_to_physical_response": False,
         "analytic_kappa_pdf_s_m": pdf.copy(),
         "pole": zeta,
+        "normalized_phase_velocity": complex(normalized_phase_velocity, normalized_pole_imaginary),
+        "dispersion_kernel": "shared_full_tail_generalized_kappa_landau_integral",
+        "dispersion_velocity_scale_m_s": dispersion_velocity_scale,
         "pole_imaginary_part_m_s": float(eta),
         "pole_order": 1,
         "quadrature": quadrature,
