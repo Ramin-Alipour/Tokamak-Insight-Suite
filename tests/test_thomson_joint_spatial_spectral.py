@@ -963,6 +963,7 @@ def test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validat
     mixing_covariance = np.eye(h.size) * 2.5e-7
     measurement_covariance = np.eye(y.size) * 1.0e-4
     cross = np.zeros((y.size, h.size))
+    cross[0, 0] = 1.0e-6
     out = reconstruct_joint_thomson_spatial_spectra(
         x, y, r, h, laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
@@ -973,7 +974,7 @@ def test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validat
     )
     assert out["spatial_mixing_covariance_contract"]["cross_covariance_with_measured_spectra_supplied"] is True
     assert out["spatial_mixing_cross_covariance_parameter_contribution"] is not None
-    assert np.allclose(out["spatial_mixing_cross_covariance_parameter_contribution"], 0.0)
+    assert np.any(np.abs(out["spatial_mixing_cross_covariance_parameter_contribution"]) > 0.0)
 
     with pytest.raises(ValueError, match="requires measured signal_uncertainty"):
         reconstruct_joint_thomson_spatial_spectra(
