@@ -631,6 +631,55 @@ def test_selected_maxwellian_can_dispatch_to_canonical_measured_spectrum_inferen
     assert captured["kwargs"]["background_model"] == "polynomial"
 
 
+def test_spectral_distribution_top_level_controls_reach_canonical_optical_fit(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(1059.8, 1060.2, 61)
+    signal = 1.0 + 0.2 * np.exp(-0.5 * ((wavelength - 1060.0) / 0.045) ** 2)
+    response = np.eye(wavelength.size)
+    discrepancy = np.eye(wavelength.size) * 1e-6
+    systematic = np.eye(wavelength.size) * 2e-6
+    polarization = np.array([0.0, 0.0, 1.0])
+    captured = {}
+
+    def fake_canonical(x, spectra, radius, **kwargs):
+        captured.update(kwargs)
+        return {
+            "channels": [{}],
+            "result_classification": {
+                "channels": [{
+                    "primary": [
+                        {"parameter": "electron_temperature_eV"},
+                        {"parameter": "electron_velocity_projection_m_s"},
+                    ]
+                }]
+            },
+        }
+
+    monkeypatch.setattr(inference, "analyze_thomson_spectra", fake_canonical)
+    analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=response,
+        background_signal=np.full_like(signal, 0.01),
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=1060.0,
+        scattering_angle_rad=np.pi / 2,
+        physical_background_model="polynomial",
+        incident_polarization=polarization,
+        include_compton_recoil=True,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        physical_fit_options={"radius_m": 0.42, "background_degree": 2},
+    )
+
+    assert captured["background_model"] == "polynomial"
+    assert captured["incident_polarization"] is polarization
+    assert captured["include_compton_recoil"] is True
+    assert captured["model_discrepancy_covariance"] is discrepancy
+    assert captured["systematic_covariance"] is systematic
+
+
 def test_maxwellian_canonical_inference_requires_radius_in_fit_options():
     import pytest
     from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
