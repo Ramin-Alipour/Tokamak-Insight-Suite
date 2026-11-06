@@ -263,6 +263,13 @@ MODEL_PHYSICS_NOTES = {
         "Propagates the full joint covariance of channel fluxes, magnetic-axis flux and separatrix flux by the delta method. "
         "This does not reconstruct equilibrium or infer flux from R,Z; do not confuse rho_pol with rho_tor."
     ),
+    "thomson_three_dimensional_flow": (
+        "Infers a common electron bulk-flow vector from v_q,i = q_hat_i dot v_e using covariance-weighted GLS. "
+        "The covariance-whitened design L^-1 Q must have rank three and condition number no greater than "
+        "maximum_geometry_condition_number (default 1e3); otherwise the 3-D vector and covariance are withheld. "
+        "Optional scattering-vector covariance and projection/geometry cross-covariance are propagated by "
+        "iterative tangent-plane errors-in-variables GLS. This is a shared-flow multi-view model, not a local flow map."
+    ),
 }
 
 MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
@@ -580,7 +587,8 @@ EXAMPLES = {
         "velocity_projection_m_s": [100000.0, 200000.0, 300000.0],
         "scattering_vector_unit": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         "projection_covariance_m2_s2": [[1000000.0, 0.0, 0.0], [0.0, 1000000.0, 0.0], [0.0, 0.0, 1000000.0]],
-        "scattering_vector_covariance": (1.0e-6*np.eye(9)).tolist()
+        "scattering_vector_covariance": (1.0e-6*np.eye(9)).tolist(),
+        "maximum_geometry_condition_number": 1000.0
     },
     "gyrotropic_bi_maxwellian_anisotropy": {
         "projected_temperature_eV": [180.0, 105.0, 80.0],
