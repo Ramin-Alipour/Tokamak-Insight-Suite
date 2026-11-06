@@ -113,7 +113,7 @@ MODEL_PHYSICS_NOTES = {
         "at derivative knots and does not expose the second-order pole derivative in this mode."
     ),
     "cts_tabulated_evdf_landau": (
-        "Electrostatic CTS spectrum from a supplied projected 1-D electron EVDF and Maxwellian ion species. "
+        "Electrostatic CTS spectrum from a supplied projected 1-D electron EVDF and either Maxwellian ions or independent tabulated 1-D ion marginals in each species rest frame. "
         "Set landau_limit=true to use the exact first-order Sokhotski-Plemelj response; otherwise "
         "pole_imaginary_part_m_s selects a finite retarded displacement. Exact-limit samples "
         "coincident with EVDF grid knots are rejected rather than regularized silently."

@@ -176,13 +176,16 @@ def collective_tabulated_electron_spectral_density(
     electron_probability_density_s_m, ion_species, ion_fractions,
     ion_temperature_eV, electron_velocity_m_s, ion_velocity_m_s,
     incident_direction, scattered_direction, pole_imaginary_part_m_s=None,
-    landau_limit=False,
+    landau_limit=False, ion_velocity_grids_m_s=None,
+    ion_probability_densities_s_m=None,
 ):
-    """Unmagnetized electrostatic CTS forward spectrum for a supplied projected EVDF.
+    """Unmagnetized electrostatic CTS spectrum with kinetic projected EVDFs.
 
-    The electron distribution is a researcher-supplied 1-D marginal along q.
-    Ions remain Maxwellian. This is a forward model, not a generic EVDF inverse;
-    no 3-D anisotropy or unconstrained VDF parameters are inferred.
+    Electrons use a supplied 1-D marginal along q. Ions may use the legacy
+    Maxwellian closure or independent supplied 1-D projected distributions in
+    each species rest frame. Tabulated ions use the same Landau/Plemelj
+    susceptibility integral and finite-support endpoint-jump convention as
+    electrons. This remains a 1-D electrostatic forward model.
     """
     x = np.asarray(wavelength_nm, dtype=float)
     ne = float(electron_density_m3)
@@ -251,15 +254,44 @@ def collective_tabulated_electron_spectral_density(
             pole_imaginary_part_m_s=pole_imaginary_part_m_s,
             landau_limit=landau_limit,
         )["electron_susceptibility"]
+    tabulated_ions = ion_velocity_grids_m_s is not None or ion_probability_densities_s_m is not None
+    if tabulated_ions and (ion_velocity_grids_m_s is None or ion_probability_densities_s_m is None):
+        raise ValueError("ion_velocity_grids_m_s and ion_probability_densities_s_m must be supplied together")
+    if tabulated_ions:
+        ion_grids = np.asarray(ion_velocity_grids_m_s, dtype=float)
+        ion_distributions = np.asarray(ion_probability_densities_s_m, dtype=float)
+        if (ion_grids.ndim != 2 or ion_distributions.shape != ion_grids.shape
+                or ion_grids.shape[0] != len(species) or ion_grids.shape[1] < 9
+                or np.any(~np.isfinite(ion_grids)) or np.any(~np.isfinite(ion_distributions))
+                or np.any(ion_distributions < 0) or np.any(np.diff(ion_grids, axis=1) <= 0)):
+            raise ValueError("tabulated ion grids and distributions must be matching finite arrays shaped (n_ion_species,n_velocity), with increasing grids and non-negative densities")
+        ion_areas = np.asarray([_trapezoid(row, grid) for row, grid in zip(ion_distributions, ion_grids)])
+        if np.any(~np.isfinite(ion_areas)) or np.any(ion_areas <= 0):
+            raise ValueError("each tabulated ion distribution must have positive finite integral")
+        ion_distributions = ion_distributions / ion_areas[:, None]
+    else:
+        ion_grids = ion_distributions = None
     for index, item in enumerate(species):
         density = fractions[index]*ne/item["charge_state"]
-        sigma_i = np.sqrt(temperatures[index]*E_CHARGE/item["mass_kg"])
         omega_pi2 = density*(item["charge_state"]*E_CHARGE)**2/(EPS0*item["mass_kg"])
-        pdf_i, _, _ = _maxwellian_pdf_and_derivatives(vphase-ui[index], sigma_i)
-        chi_i = np.asarray([
-            _landau_susceptibility(vphase[j]-ui[index], omega_pi2, k, sigma_i)
-            for j in range(x.size)
-        ], dtype=complex)
+        if tabulated_ions:
+            grid_i = ion_grids[index]
+            pdf_i = np.interp(vphase-ui[index], grid_i, ion_distributions[index], left=0.0, right=0.0)
+            chi_i = np.asarray([
+                -(omega_pi2/k**2)*generalized_landau_integral(
+                    grid_i, ion_distributions[index], vphase[j]-ui[index],
+                    pole_imaginary_part_m_s=pole_imaginary_part_m_s,
+                    landau_limit=landau_limit,
+                )["integral"]
+                for j in range(x.size)
+            ], dtype=complex)
+        else:
+            sigma_i = np.sqrt(temperatures[index]*E_CHARGE/item["mass_kg"])
+            pdf_i, _, _ = _maxwellian_pdf_and_derivatives(vphase-ui[index], sigma_i)
+            chi_i = np.asarray([
+                _landau_susceptibility(vphase[j]-ui[index], omega_pi2, k, sigma_i)
+                for j in range(x.size)
+            ], dtype=complex)
         ion_pdf.append(pdf_i)
         ion_chi.append(chi_i)
     ion_sum = np.sum(np.asarray(ion_chi), axis=0)
@@ -282,6 +314,14 @@ def collective_tabulated_electron_spectral_density(
         "electron_flow_projection_m_s": ue,
         "ion_flow_projections_m_s": ui,
         "electron_distribution_model": "researcher_supplied_tabulated_projected_1D_EVDF",
+        "ion_distribution_model": (
+            "researcher_supplied_tabulated_projected_1D_EVDF_per_species"
+            if tabulated_ions else "Maxwellian_per_species"
+        ),
+        "ion_distribution_normalization": (
+            "each species rest-frame projected EVDF normalized internally; ion density remains set by quasineutral composition"
+            if tabulated_ions else "Maxwellian normalized analytically"
+        ),
         "electron_distribution_normalization": "normalized internally for susceptibility and spectral shape; absolute density is supplied separately",
         "model": "unmagnetized electrostatic collective Thomson scattering with generalized tabulated electron VDF and Maxwellian ions",
         "pole_quadrature": "piecewise_linear_first_order_Landau_pole_with_distributional_finite_support_edges",
@@ -293,7 +333,7 @@ def collective_tabulated_electron_spectral_density(
             "non-relativistic unmagnetized electrostatic longitudinal response",
             "first-order Landau pole quadrature; no arbitrary-order pole closure",
             "finite velocity support is interpreted with an explicit zero extension; endpoint jumps are included; pole displacement is a numerical model input",
-            "ion populations are Maxwellian and supplied externally",
+            "tabulated ion populations, when supplied, are independent 1-D rest-frame marginals; no unrestricted 3-D ion EVDF is inferred",
         ],
         "experimental_validation": "not_performed",
     }
