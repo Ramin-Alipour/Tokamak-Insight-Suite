@@ -661,3 +661,78 @@ def test_joint_inverse_declares_exact_finite_bin_forward_physics_for_maxwellian_
         regularization_strength=0.0, physical_model="kappa", kappa_index=4.0,
     )
     assert kappa["spectral_bin_integration"] == "exact_Student_t_CDF_finite_volume_bin_averages_nu_2kappa_minus_1"
+
+
+def test_gaussian_spatial_psf_is_finite_volume_and_preserves_edge_loss():
+    from tokamak_analysis.thomson_joint_spatial_spectral import gaussian_spatial_psf_matrix
+
+    radius = np.linspace(0.0, 1.0, 5)
+    identity = gaussian_spatial_psf_matrix(radius, 0.0)
+    np.testing.assert_array_equal(identity, np.eye(radius.size))
+
+    psf = gaussian_spatial_psf_matrix(radius, 0.08)
+    assert psf.shape == (radius.size, radius.size)
+    assert np.all(np.isfinite(psf))
+    assert np.all(psf >= 0.0)
+    assert np.all(psf.sum(axis=0) <= 1.0 + 1e-12)
+    assert np.all(psf.sum(axis=0) > 0.0)
+    # The finite radial domain truncates the Gaussian tails at its edges.
+    assert psf.sum(axis=0)[0] < 1.0
+    assert psf.sum(axis=0)[-1] < 1.0
+    assert np.allclose(psf, psf[::-1, ::-1], rtol=1e-12, atol=1e-14)
+
+
+def test_joint_spatial_spectral_inverse_composes_measured_mixing_with_gaussian_psf():
+    from tokamak_analysis.thomson_joint_spatial_spectral import (
+        gaussian_spatial_psf_matrix,
+    )
+
+    wavelength, _, radius, mixing, te, flow = _synthetic_case()
+    psf = gaussian_spatial_psf_matrix(radius, 0.05)
+    sigma = 2.0 * 532.0 * np.sqrt(te / 510998.95069) * np.sin(np.pi / 4.0)
+    center = 532.0 * (
+        1.0 - 2.0 * np.sin(np.pi / 4.0) * flow / 299792458.0
+    )
+    intrinsic = np.exp(
+        -0.5 * ((wavelength[None, :] - center[:, None]) / sigma[:, None]) ** 2
+    )
+    measured = mixing @ psf @ intrinsic + 0.01
+
+    out = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(measured, 0.01),
+        regularization_strength=0.0,
+        spatial_psf_sigma_m=0.05,
+    )
+    assert out["primary_result_status"] == "identified_from_measured_data"
+    np.testing.assert_allclose(out["effective_spatial_mixing_matrix"], mixing @ psf)
+    np.testing.assert_allclose(out["spatial_psf_matrix"], psf)
+    assert out["spatial_psf_contract"]["source"] == "finite_volume_gaussian_psf_from_sigma"
+    assert out["spatial_psf_contract"]["renormalized"] is False
+    np.testing.assert_allclose(out["electron_temperature_profile_eV"], te, rtol=0.04)
+    np.testing.assert_allclose(
+        out["electron_velocity_projection_profile_m_s"], flow, atol=2.5e3
+    )
+
+
+def test_joint_spatial_spectral_inverse_validates_measured_psf_contract():
+    wavelength, spectra, radius, mixing, *_ = _synthetic_case()
+    invalid = np.eye(radius.size)
+    invalid[0, 0] = 1.2
+    with pytest.raises(ValueError, match="columns must have positive mass no greater than one"):
+        reconstruct_joint_thomson_spatial_spectra(
+            wavelength, spectra, radius, mixing,
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+            instrument_response=np.eye(wavelength.size),
+            spatial_psf_matrix=invalid,
+        )
+    with pytest.raises(ValueError, match="supply spatial_psf_matrix or spatial_psf_sigma_m"):
+        reconstruct_joint_thomson_spatial_spectra(
+            wavelength, spectra, radius, mixing,
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+            instrument_response=np.eye(wavelength.size),
+            spatial_psf_matrix=np.eye(radius.size),
+            spatial_psf_sigma_m=0.05,
+        )
