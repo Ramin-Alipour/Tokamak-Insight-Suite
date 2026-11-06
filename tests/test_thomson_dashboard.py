@@ -182,6 +182,10 @@ def test_spectral_distribution_subanalysis_executes_same_spectrum_projected_evdf
     assert "background_signal=fitted_background" in source
     assert "projected_evdf_options=evdf_options" in source
     assert "one-dimensional" in source or "one-dimensional q-parallel" in source
+    assert "'joint_spectral_covariance':None if joint_spectral_covariance is None" in source
+    assert "evdf_kwargs['signal_covariance']" in source
+    assert "model_discrepancy_covariance" in source
+    assert "systematic_covariance" in source
 
 
 def test_dashboard_exposes_conditional_path_integrated_density_inputs():
