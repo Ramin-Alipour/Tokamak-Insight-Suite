@@ -565,7 +565,7 @@ EXAMPLES = {
         "epsilon_r": {"real": [[[1,0,0],[0,1,0],[0,0,1]], [[1,0,0],[0,1,0],[0,0,1]]], "imag": [[[0,0,0],[0,0,0],[0,0,0]], [[0,0,0],[0,0,0],[0,0,0]]]},
         "kx_rad_m": 0.0,
         "ky_rad_m": 0.0
-    }
+    },
     "cts_conserving_bgk_fdt": {
         "angular_frequency_rad_s": [1.0e10, 2.0e10],
         "wave_number_m_inverse": 200000.0,
