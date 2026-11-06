@@ -158,7 +158,7 @@ MODEL_PHYSICS_NOTES = {
     ),
     "cts_multi_population_tabulated_evdf_landau": (
         "For electron populations j with density fractions alpha_j, the total longitudinal response is "
-        "chi_e=sum_j alpha_j chi_j, where chi_j=-(omega_pe^2/k^2)*alpha_j-free integral "
+        "chi_e=sum_j alpha_j chi_j, where chi_j=-(omega_pe^2/k^2) times the unit-density integral "
         "f'_j(v)/(v-v_phase-u_j-i0) dv. The electron fluctuation source is the separate weighted sum "
         "sum_j alpha_j f_j(v_phase-u_j), not a single averaged distribution. The shared dielectric is "
         "epsilon=1+sum_j chi_j+sum_i chi_i; the ion source is screened by |chi_e|^2/|epsilon|^2. "
