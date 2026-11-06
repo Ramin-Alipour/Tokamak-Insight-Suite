@@ -189,7 +189,7 @@ def landau_full_em_electric_field_fluctuation_spectrum(
         magnetic_noise[i] = magnetic_map @ electric_noise[i] @ magnetic_map.conj().T
         magnetic_noise[i] = 0.5*(magnetic_noise[i] + magnetic_noise[i].conj().T)
         electric_magnetic_cross[i] = electric_noise[i] @ magnetic_map.conj().T
-        poynting[i] = 0.5*np.real(
+        poynting[i] = 0.5/mu0*np.real(
             np.einsum("ijk,jk->i", levi_civita, electric_magnetic_cross[i])
         )
     for name, tensor in (("electric", electric_noise), ("magnetic", magnetic_noise)):

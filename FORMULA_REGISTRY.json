@@ -8927,7 +8927,7 @@
   },
   {
     "name": "Landau–FDT current-noise propagation to electromagnetic field fluctuations",
-    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E = μ₀²ω² G S_J G†; S_B = (k×/ω) S_E (k×/ω)†; Π = 0.5 Re⟨E×B*⟩",
+    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E = μ₀²ω² G S_J G†; S_B = (k×/ω) S_E (k×/ω)†; Π = (1/2μ₀) Re⟨E×B*⟩",
     "inputs": "ω [rad s⁻¹], k [m⁻¹], εᵣ [dimensionless], S_J [A² m⁻² per rad s⁻¹]",
     "output": "S_E [(V m⁻¹)² per rad s⁻¹], S_B [T² per rad s⁻¹], spectral Poynting flux [W m⁻² per rad s⁻¹]",
     "assumptions": "Local homogeneous linear dielectric; exp(−iωt); frequency-diagonal classical current-noise spectrum; invertible Maxwell operator.",

@@ -131,4 +131,11 @@ def test_landau_current_noise_propagates_to_electric_magnetic_fluctuations_and_p
             np.testing.assert_allclose(matrix, matrix.conj().T, rtol=1e-12, atol=1e-40)
             assert np.linalg.eigvalsh(matrix).min() >= -1e-10*np.linalg.norm(matrix, 2)
     assert result["electric_magnetic_cross_spectral_matrix"].shape == (2, 3, 3)
-    assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
+    poynting = result["spectral_poynting_flux_W_m2_per_rad_s"]
+    assert poynting.shape == (2, 3)
+    mu0 = 4.0e-7*np.pi
+    levi = np.zeros((3, 3, 3))
+    levi[0, 1, 2] = levi[1, 2, 0] = levi[2, 0, 1] = 1.0
+    levi[0, 2, 1] = levi[2, 1, 0] = levi[1, 0, 2] = -1.0
+    expected = 0.5/mu0*np.real(np.einsum("ijk,fjk->fi", levi, result["electric_magnetic_cross_spectral_matrix"]))
+    np.testing.assert_allclose(poynting, expected)

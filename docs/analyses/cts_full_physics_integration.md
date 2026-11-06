@@ -147,7 +147,7 @@ G = inverse(D)
 S_E = mu_0^2 omega^2 G S_J G^dagger
 S_B = (k_cross/omega) S_E (k_cross/omega)^dagger
 B = k x E / omega
-Pi = 0.5 Re <E x B*>_omega
+Pi = (1/(2 mu_0)) Re <E x B*>_omega
 ```
 
 The electric and magnetic spectral tensors retain Hermitian positive
