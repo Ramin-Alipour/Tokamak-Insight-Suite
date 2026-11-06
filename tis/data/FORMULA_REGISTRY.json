@@ -10282,61 +10282,96 @@
     "description": "Exact analytical projection of a non-gyrotropic three-dimensional Gaussian electron temperature tensor onto the CTS scattering vector, followed by the tabulated projected-EVDF Landau response."
   },
   {
-    "name": "Relativistic multi-population optical Thomson mixture",
-    "equation": "S_mix(λ) = [Σ_j η_j σ_j S_j(λ)] / [Σ_j η_j σ_j],  η_j = n_j / Σ_k n_k,  Σ_j η_j = 1",
-    "inputs": "Component electron temperatures T_j [eV], number-density fractions η_j, shared scattering-vector flow projection [m/s], laser wavelength, scattering angle, incident polarization and measured instrument response.",
-    "output": "Normalized mixed spectral density [nm^-1], component spectra and (for inference) fitted component temperatures, number-density fractions, shared flow and joint parameter covariance.",
-    "assumptions": "Finite mixture of 2–6 isotropic relativistic Maxwell-Jüttner populations sharing one q-parallel bulk-flow projection. Component labels are ordered by increasing temperature. Absolute density and unrestricted 3-D EVDF are not inferred.",
+    "name": "N-population relativistic optical Thomson mixture inference",
+    "equation": "S_mix(λ) = [Σ_j η_j σ_j S_j(λ; T_j, u_j)] / [Σ_j η_j σ_j],  η_j ≥ 0,  Σ_j η_j = 1",
+    "inputs": "Measured calibrated wavelength and intensity vectors, measured response matrix, population_count (2–8), ordered initial temperatures, initial number fractions, initial shared flow (or per-population flow initial values), incident polarization, and optional measurement/model-discrepancy covariance.",
+    "output": "N-component relativistic Maxwell-Jüttner mixture, fitted temperatures and number fractions, shared or population-specific scattering-vector flow projections, fitted signal/background, residuals and joint parameter covariance.",
+    "assumptions": "Finite mixture of 2–8 isotropic relativistic Maxwell-Jüttner populations. Temperatures are ordered to remove label switching; fractions lie on the unit simplex. A shared flow is default; independent population flow projections are optional. This is not an unrestricted EVDF inversion and does not infer absolute density.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_population_mixture.fit_multi_population_relativistic_thomson_spectrum",
+      "function_link": "tokamak_analysis.thomson_n_population.fit_n_population_relativistic_thomson_spectrum",
       "formula_key": "thomson_multi_population_relativistic_mixture",
       "input_specs": [
         {
           "name": "wavelength_nm",
           "unit": "nm",
-          "description": "Strictly increasing calibrated wavelength grid.",
+          "description": "Strictly increasing calibrated wavelength vector.",
           "required": true
         },
         {
           "name": "measured_spectrum",
           "unit": "calibrated intensity",
-          "description": "Non-negative calibrated measured spectrum.",
-          "required": true
-        },
-        {
-          "name": "population_count",
-          "unit": "dimensionless",
-          "description": "Number of isotropic Maxwell-Jüttner components, 2 through 6.",
+          "description": "Non-negative calibrated measured spectral intensity.",
           "required": true
         },
         {
           "name": "instrument_response",
           "unit": "dimensionless",
-          "description": "Measured non-negative column-normalized spectral response matrix.",
+          "description": "Measured non-negative column-normalized response matrix.",
           "required": true
         },
         {
+          "name": "population_count",
+          "unit": "dimensionless",
+          "description": "Number of components, integer 2 through 8.",
+          "required": true
+        },
+        {
+          "name": "initial_temperatures_eV",
+          "unit": "eV",
+          "description": "Positive strictly increasing initial component temperatures.",
+          "required": true
+        },
+        {
+          "name": "initial_fractions",
+          "unit": "dimensionless",
+          "description": "Strictly positive initial number fractions summing to one.",
+          "required": true
+        },
+        {
+          "name": "initial_flow_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Initial shared scattering-vector flow; used unless per-population initial flows are supplied.",
+          "required": true
+        },
+        {
+          "name": "initial_population_flow_projections_m_s",
+          "unit": "m s^-1",
+          "description": "Optional one initial subluminal q-projection per population.",
+          "required": false
+        },
+        {
           "name": "signal_uncertainty",
-          "unit": "intensity",
-          "description": "Optional pointwise 1-sigma uncertainty; mutually exclusive with full covariance.",
+          "unit": "calibrated intensity",
+          "description": "Optional pointwise 1-sigma uncertainty.",
           "required": false
         },
         {
           "name": "spectral_covariance",
           "unit": "intensity^2",
-          "description": "Optional full positive-definite spectral covariance; mutually exclusive with pointwise uncertainty.",
+          "description": "Optional full spectral covariance, mutually exclusive with pointwise uncertainty.",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "intensity^2",
+          "description": "Optional positive-semidefinite model-discrepancy covariance added to measurement covariance.",
           "required": false
         }
       ],
       "output_specs": [
         {
-          "name": "spectral_density_per_nm",
-          "unit": "nm^-1",
-          "description": "Cross-section-weighted normalized mixture spectral density."
+          "name": "model",
+          "unit": "text",
+          "description": "Physical N-population relativistic Maxwell-Jüttner Thomson model identifier."
+        },
+        {
+          "name": "population_count",
+          "unit": "dimensionless",
+          "description": "Number of mixture components."
         },
         {
           "name": "population_temperatures_eV",
@@ -10344,34 +10379,49 @@
           "description": "Ordered fitted component temperatures."
         },
         {
-          "name": "population_number_density_fractions",
+          "name": "population_number_fractions",
           "unit": "dimensionless",
-          "description": "Fitted non-negative component number-density fractions summing to one."
+          "description": "Fitted component electron number fractions."
         },
         {
-          "name": "shared_flow_projection_m_s",
+          "name": "electron_flow_projection_m_s",
           "unit": "m s^-1",
-          "description": "Fitted common scattering-vector flow projection."
+          "description": "Shared fitted scattering-vector flow, or null for independent component flows."
         },
         {
-          "name": "population_parameter_covariance",
-          "unit": "mixed",
-          "description": "Delta-method covariance for all component temperatures, fractions and shared flow."
+          "name": "population_flow_projections_m_s",
+          "unit": "m s^-1",
+          "description": "Fitted scattering-vector flow projection for each population."
         },
         {
-          "name": "population_temperature_uncertainties_eV",
-          "unit": "eV",
-          "description": "Marginal standard uncertainties of component temperatures."
+          "name": "spectral_amplitude",
+          "unit": "calibrated intensity scale",
+          "description": "Fitted non-negative spectral amplitude."
         },
         {
-          "name": "population_fraction_uncertainties",
-          "unit": "dimensionless",
-          "description": "Marginal standard uncertainties of component number-density fractions."
+          "name": "background_model",
+          "unit": "text",
+          "description": "Detector-space background basis selected by the user."
+        },
+        {
+          "name": "background_coefficients",
+          "unit": "calibrated intensity",
+          "description": "Fitted detector-background coefficients."
+        },
+        {
+          "name": "fitted_thomson_spectrum",
+          "unit": "calibrated intensity",
+          "description": "Response-convolved fitted plasma signal."
+        },
+        {
+          "name": "fitted_background",
+          "unit": "calibrated intensity",
+          "description": "Fitted detector-space background."
         },
         {
           "name": "fitted_spectrum",
           "unit": "calibrated intensity",
-          "description": "Response-convolved fitted spectrum including profiled background."
+          "description": "Total fitted spectrum."
         },
         {
           "name": "residual",
@@ -10379,19 +10429,39 @@
           "description": "Measured minus fitted spectrum."
         },
         {
-          "name": "fitted_signal_amplitude",
-          "unit": "calibrated intensity scale",
-          "description": "Profiled non-negative signal amplitude."
+          "name": "parameter_names",
+          "unit": "text[]",
+          "description": "Order of parameters in the joint covariance."
         },
         {
-          "name": "fitted_background_coefficients",
-          "unit": "calibrated intensity",
-          "description": "Profiled polynomial detector-background coefficients."
+          "name": "joint_parameter_covariance",
+          "unit": "mixed",
+          "description": "Joint covariance of temperatures, fractions, flows, amplitude and background coefficients."
         },
         {
-          "name": "population_count",
+          "name": "parameter_standard_uncertainties",
+          "unit": "mixed",
+          "description": "Marginal standard uncertainties in parameter_names order."
+        },
+        {
+          "name": "temperature_covariance_eV2",
+          "unit": "eV^2",
+          "description": "Temperature covariance block."
+        },
+        {
+          "name": "fraction_covariance",
           "unit": "dimensionless",
-          "description": "Number of fitted mixture components."
+          "description": "Number-fraction covariance block."
+        },
+        {
+          "name": "optimizer_success",
+          "unit": "boolean",
+          "description": "Nonlinear least-squares convergence flag."
+        },
+        {
+          "name": "optimizer_message",
+          "unit": "text",
+          "description": "Optimizer termination message."
         },
         {
           "name": "jacobian_rank",
@@ -10399,58 +10469,64 @@
           "description": "Scaled spectral-Jacobian rank."
         },
         {
+          "name": "jacobian_parameter_count",
+          "unit": "dimensionless",
+          "description": "Number of nonlinear fit parameters."
+        },
+        {
           "name": "jacobian_condition_number",
           "unit": "dimensionless",
-          "description": "Condition number of the scaled spectral Jacobian."
+          "description": "Condition number of the scaled Jacobian."
         },
         {
           "name": "degrees_of_freedom",
           "unit": "dimensionless",
-          "description": "Residual degrees of freedom after nonlinear and profiled linear parameters."
+          "description": "Residual degrees of freedom."
         },
         {
-          "name": "spectral_noise_model",
+          "name": "noise_model",
           "unit": "text",
-          "description": "Noise weighting used for inference and covariance."
+          "description": "Measurement and model-discrepancy weighting used for GLS."
         },
         {
-          "name": "optimizer_success",
+          "name": "model_discrepancy_covariance_included",
           "unit": "boolean",
-          "description": "Whether the bounded nonlinear least-squares solver converged."
+          "description": "Whether model-discrepancy covariance was included."
         },
         {
-          "name": "model",
+          "name": "covariance_status",
           "unit": "text",
-          "description": "Selected physical mixture model."
+          "description": "Scope of reported joint covariance."
         },
         {
-          "name": "population_fraction_definition",
-          "unit": "text",
-          "description": "Number-density fraction convention."
-        },
-        {
-          "name": "identifiability_status",
-          "unit": "text",
-          "description": "Data-only scaled-Jacobian identifiability status."
-        },
-        {
-          "name": "limitations",
+          "name": "population_assumptions",
           "unit": "text[]",
-          "description": "Scope and interpretation limitations."
+          "description": "Finite mixture model assumptions and limitations."
+        },
+        {
+          "name": "absolute_density_inferred",
+          "unit": "boolean",
+          "description": "False: absolute electron density is not inferred."
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text",
+          "description": "Experimental validation status."
         }
       ],
       "prerequisites": [
-        "Calibrated measured spectrum",
-        "Measured instrument response",
-        "Laser wavelength, scattering geometry and incident polarization"
+        "Calibrated measured optical Thomson spectrum",
+        "Measured wavelength-response matrix",
+        "Laser wavelength, scattering geometry and incident polarization",
+        "Explicit initial mixture temperatures and number fractions"
       ],
-      "uncertainty_model": "Whitened least-squares covariance from supplied pointwise uncertainty or full spectral covariance; residual-scaled covariance is explicitly marked uncalibrated when no measurement noise is supplied.",
+      "uncertainty_model": "Full GLS covariance from pointwise or full measurement covariance, optionally augmented by positive-semidefinite model-discrepancy covariance; joint physical/nuisance covariance is transformed by a numerical Jacobian. Without measurement covariance, covariance is residual-scaled and explicitly labeled uncalibrated.",
       "test_links": [
-        "tests/test_thomson_population_mixture.py::test_general_multi_population_forward_reduces_to_two_population_limit",
-        "tests/test_thomson_population_mixture.py::test_general_multi_population_forward_uses_number_density_simplex",
-        "tests/test_thomson_population_mixture.py::test_multi_population_fit_is_reachable_through_public_physics_dispatcher"
+        "tests/test_thomson_n_population.py::test_n_population_inverse_fits_ordered_temperatures_and_joint_background",
+        "tests/test_thomson_n_population.py::test_n_population_forward_model_supports_distinct_physical_flow_projections",
+        "tests/test_thomson_n_population.py::test_n_population_inverse_is_connected_to_public_physics_dispatcher"
       ],
-      "note": "The spectral mixture is cross-section weighted; arithmetic temperature averaging is not the forward model. Inference is rejected when the scaled spectral Jacobian is rank deficient or ill-conditioned."
+      "note": "The N-population solver already exists as an independent physical model; this registry entry maps its existing implementation into the shared Analysis-1 public physics API and advanced Dashboard. Data-only Jacobian rank and conditioning gate the fitted decomposition."
     },
     "references": [
       {
@@ -10460,24 +10536,25 @@
         "publisher": "Journal of Instrumentation",
         "type": "journal article",
         "doi": "10.1088/1748-0221/21/01/C01002",
-        "scope": "Context for relativistic multi-component Thomson modeling; the implemented finite Maxwell-Jüttner mixture is a parametric model, not the paper's Monte Carlo algorithm."
+        "scope": "Context for relativistic multi-component Thomson modeling; this implementation is a finite Maxwell-Jüttner parametric mixture, not the paper's Monte Carlo algorithm."
       }
     ],
     "implementation_trace": {
-      "function_link": "tokamak_analysis.thomson_population_mixture.fit_multi_population_relativistic_thomson_spectrum",
+      "function_link": "tokamak_analysis.thomson_n_population.fit_n_population_relativistic_thomson_spectrum",
       "function_links": [
-        "tokamak_analysis.thomson_population_mixture.multi_population_relativistic_thomson_spectrum",
+        "tokamak_analysis.thomson_n_population.n_population_relativistic_thomson_spectrum",
+        "tokamak_analysis.thomson_n_population.fit_n_population_relativistic_thomson_spectrum",
         "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
         "tis.ui.advanced_thomson_physics_page.render_advanced_thomson_physics_page"
       ],
       "formula_key": "thomson_multi_population_relativistic_mixture",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_thomson_population_mixture.py::test_general_multi_population_forward_reduces_to_two_population_limit",
-        "tests/test_thomson_population_mixture.py::test_general_multi_population_forward_uses_number_density_simplex",
-        "tests/test_thomson_population_mixture.py::test_multi_population_fit_is_reachable_through_public_physics_dispatcher"
+        "tests/test_thomson_n_population.py::test_n_population_inverse_fits_ordered_temperatures_and_joint_background",
+        "tests/test_thomson_n_population.py::test_n_population_forward_model_supports_distinct_physical_flow_projections",
+        "tests/test_thomson_n_population.py::test_n_population_inverse_is_connected_to_public_physics_dispatcher"
       ]
     },
-    "description": "Generalization of the two-component relativistic optical Thomson model to a finite 2–6 component isotropic Maxwell-Jüttner mixture with joint measured-spectrum inference and a data-only identifiability gate."
+    "description": "Connection of the existing N-population relativistic optical Thomson forward/inverse solver to the shared Analysis-1 public physics API and advanced Dashboard. Supports 2–8 isotropic Maxwell-Jüttner components, optional independent q-flow projections, structured backgrounds and joint covariance."
   }
 ]
