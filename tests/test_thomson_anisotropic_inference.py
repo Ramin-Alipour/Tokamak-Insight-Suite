@@ -346,3 +346,19 @@ def test_flow_projection_covariance_survives_unidentifiable_temperature_anisotro
     assert np.all(np.linalg.eigvalsh(result["flow_projection_covariance_m2_s2"]) > 0.0)
     np.testing.assert_allclose(result["electron_velocity_projection_m_s"], projections, atol=2.0e3)
 
+
+def test_bikappa_exact_projected_tail_exposes_superluminal_newtonian_probability():
+    from tokamak_analysis.thomson_anisotropic_inference import (
+        _kappa_projected_superluminal_tail_probability,
+    )
+
+    c = 299792458.0
+    cold_tail = _kappa_projected_superluminal_tail_probability(0.0, 0.01*c, 4.0)
+    assert 0.0 <= cold_tail < 1.0e-8
+
+    hot_tail = _kappa_projected_superluminal_tail_probability(0.0, 0.25*c, 4.0)
+    assert hot_tail > cold_tail
+    assert hot_tail > 1.0e-8
+
+    shifted_tail = _kappa_projected_superluminal_tail_probability(0.2*c, 0.25*c, 4.0)
+    assert 0.0 < shifted_tail <= 1.0
