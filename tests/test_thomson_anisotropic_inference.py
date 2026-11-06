@@ -514,3 +514,49 @@ def test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_clos
         rtol=2.0e-2,
         atol=2.0e3,
     )
+
+
+def test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options():
+    from tokamak_analysis.thomson_workflow import fit_gyrotropic_thomson_spectra
+
+    coordinate = np.linspace(-1.0, 1.0, 121)
+    wavelength = 1064.0 + 1.8 * (coordinate + 0.1*coordinate**3)
+    directions = np.eye(3)
+    magnetic_field = np.array([0.0, 0.0, 1.0])
+    common_flow = np.array([8.0e3, -6.0e3, 1.0e4])
+    temperatures = [300.0, 300.0, 850.0]
+    spectra = []
+    for q, temperature in zip(directions, temperatures):
+        flow = float(q @ common_flow)
+        sigma_v = np.sqrt(1.602176634e-19*temperature/9.1093837015e-31)
+        centre = 1064.0*(1.0-2.0*flow/299792458.0)
+        sigma_lambda = 1064.0*2.0*sigma_v/299792458.0
+        feature, _ = _gaussian_bin_average(wavelength, centre, sigma_lambda)
+        spectra.append(0.02+0.9*feature)
+
+    result = fit_gyrotropic_thomson_spectra(
+        wavelength,
+        np.asarray(spectra),
+        distribution_model="bi_maxwellian",
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi/2.0,
+        magnetic_field_unit=magnetic_field,
+        scattering_vector_unit=directions,
+        instrument_response_matrix=np.eye(wavelength.size),
+        initial_temperature_parallel_eV=700.0,
+        initial_temperature_perpendicular_eV=350.0,
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+        scattering_vector_covariance=np.eye(9)*1.0e-8,
+        maximum_geometry_condition_number=1.0e3,
+        minimum_projection_consistency_p_value=1.0e-3,
+    )
+    assert result["analysis_entry_point"] == "fit_gyrotropic_thomson_spectra"
+    assert result["three_dimensional_flow_inference"]["geometry_uncertainty_included"] is True
+    assert result["three_dimensional_flow_inference"]["reportable_as_inferred_parameter"] is True
+    np.testing.assert_allclose(
+        result["three_dimensional_flow_inference"]["electron_velocity_vector_m_s"],
+        common_flow,
+        rtol=3.0e-2,
+        atol=2.0e3,
+    )
