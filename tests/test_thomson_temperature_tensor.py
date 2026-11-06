@@ -123,3 +123,59 @@ def test_full_temperature_tensor_rejects_density_uncertainty_without_density():
         infer_full_temperature_tensor_from_thomson_projections(
             projected, q, electron_density_uncertainty_m3=1.0e17,
         )
+
+
+def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    wavelength = np.linspace(529.0, 535.0, 241)
+    laser, angle = 532.0, np.pi/2.0
+    q = np.array([[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,-1,1]],dtype=float)
+    q /= np.linalg.norm(q,axis=1)[:,None]
+    expected = np.array([[800.0,90.0,-35.0],[90.0,420.0,55.0],[-35.0,55.0,260.0]])
+    flows = np.array([1.0e4,-1.5e4,2.0e4,-0.5e4,0.7e4,-0.9e4,1.2e4])
+    qfactor=2*np.sin(angle/2)
+    edges=np.empty(wavelength.size+1)
+    edges[1:-1]=0.5*(wavelength[:-1]+wavelength[1:])
+    edges[0]=wavelength[0]-0.5*(wavelength[1]-wavelength[0])
+    edges[-1]=wavelength[-1]+0.5*(wavelength[-1]-wavelength[-2])
+    from scipy.special import ndtr
+    spectra=[]
+    for direction,flow in zip(q,flows):
+        tq=float(direction@expected@direction)
+        centre=laser*(1-qfactor*flow/c)
+        sigma=laser*qfactor*np.sqrt(e*tq/me)/c
+        z=(edges-centre)/sigma
+        probability=ndtr(z[1:])-ndtr(z[:-1])
+        positive=z[:-1]>0
+        probability[positive]=ndtr(-z[:-1][positive])-ndtr(-z[1:][positive])
+        spectra.append(2.0*probability/np.diff(edges)+0.02)
+    result=fit_general_temperature_tensor_thomson_spectra(
+        wavelength,np.asarray(spectra),laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full((len(q),len(wavelength)),2e-4),
+        initial_temperature_tensor_eV=np.eye(3)*500.0,
+        maximum_projected_rms_beta=0.1,
+    )
+    np.testing.assert_allclose(result["electron_temperature_tensor_eV"],expected,rtol=2e-3,atol=0.5)
+    np.testing.assert_allclose(result["electron_velocity_projection_m_s"],flows,rtol=1e-5,atol=2.0)
+    assert result["view_dyad_rank"]==6
+    assert result["jacobian_rank"]==result["jacobian_parameter_count"]
+    assert result["reportable_as_inferred_parameter"] is True
+    assert np.max(np.abs(result["residual_spectra"]))<1e-8
+    assert result["temperature_tensor_parameter_covariance_eV2"].shape==(6,6)
+
+
+def test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+    wavelength=np.linspace(529.0,535.0,41)
+    spectra=np.ones((6,wavelength.size))
+    q=np.tile([1.0,0.0,0.0],(6,1))
+    with pytest.raises(ValueError,match="not identifiable"):
+        fit_general_temperature_tensor_thomson_spectra(
+            wavelength,spectra,laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2,scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+        )

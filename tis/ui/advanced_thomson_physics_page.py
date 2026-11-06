@@ -79,6 +79,7 @@ MODEL_LABELS = {
     "thomson_joint_spatial_spectra": "Thomson profile — joint wavelength-resolved inversion of measured spatial spectra through a supplied mixing/PSF operator",
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "thomson_full_temperature_tensor": "Optical Thomson — unconstrained-gyrotropy 3-D electron temperature tensor from multi-view spectra",
+    "thomson_full_temperature_tensor_spectral_fit": "Optical Thomson — general 3-D non-gyrotropic temperature tensor fitted directly to measured multi-view spectra",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa inference with relativistic-tail validity diagnostic",
@@ -192,6 +193,13 @@ MODEL_PHYSICS_NOTES = {
     "maxwellian_electrostatic_susceptibility": (
         "Exact collisionless unmagnetized longitudinal Maxwellian response in the electron rest frame, " 
         "with v_th=sqrt(2 e T_e/m_e), zeta=(v_phase_lab-u_e dot q_hat)/v_th and Z=i sqrt(pi) wofz(zeta). The optional signed electron_flow_projection_m_s shifts the Landau resonance; zero is the default. This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."
+    ),
+    "thomson_full_temperature_tensor_spectral_fit": (
+        "Fits raw calibrated spectra jointly using a general symmetric positive-definite 3-D Gaussian velocity covariance. "
+        "For each measured scattering direction q, T_q=q^T T_eV q, sigma_lambda=lambda_L*2*sin(theta/2)*sqrt(e*T_q/m_e)/c, "
+        "and lambda_c=lambda_L*(1-2*sin(theta/2)*u_q/c). Gaussian probability is integrated exactly over finite wavelength bins; "
+        "the measured response acts on bin-integrated power. Six independent view dyads and a full-rank spectral Jacobian are mandatory. "
+        "This is a non-relativistic second-moment closure, not a general non-Gaussian 3-D EVDF."
     ),
     "thomson_full_temperature_tensor": (
         "Inverts T_q = q_hat.T @ T_eV @ q_hat for the six independent components of a general symmetric 3-D electron second-moment temperature tensor. " 
@@ -601,6 +609,25 @@ EXAMPLES = {
         "kappa": 4.0,
         "wavenumber_m_inverse": 120.0,
         "minimum_velocity_grid_probability_coverage": 0.999
+    },
+    "thomson_full_temperature_tensor_spectral_fit": {
+        "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
+        "measured_spectra": [
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,800.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,500.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,300.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,650.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,550.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,400.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,450.0)).tolist()
+        ],
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "scattering_vector_unit": [[1,0,0],[0,1,0],[0,0,1],[0.7071067812,0.7071067812,0],[0.7071067812,0,0.7071067812],[0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],
+        "instrument_response_matrix": np.eye(181).tolist(),
+        "initial_temperature_tensor_eV": [[600,0,0],[0,600,0],[0,0,600]],
+        "maximum_projected_rms_beta": 0.1,
+        "maximum_flow_beta": 0.1
     },
     "thomson_full_temperature_tensor": {
         "projected_temperature_eV": [800.0, 420.0, 260.0, 700.0, 495.0, 395.0, 373.3333333333],

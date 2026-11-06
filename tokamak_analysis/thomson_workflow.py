@@ -41,6 +41,12 @@ def fit_gyrotropic_thomson_spectra(wavelength_nm, measured_spectra, *, distribut
     return result
 
 
+def fit_general_temperature_tensor_thomson_spectra(*args, **kwargs):
+    """Fit the general non-gyrotropic 3-D temperature tensor directly to measured TS spectra."""
+    from .cts_full_physics import run_advanced_thomson_physics
+    return run_advanced_thomson_physics("thomson_full_temperature_tensor_spectral_fit", *args, **kwargs)
+
+
 def analyze_thomson_spectra(*args, **kwargs):
     """Infer physical plasma parameters directly from measured calibrated spectra.
 
