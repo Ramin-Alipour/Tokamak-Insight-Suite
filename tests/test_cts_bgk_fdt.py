@@ -73,6 +73,7 @@ def test_bgk_cts_reports_refinement_history_and_does_not_claim_unchecked_converg
     assert gate["final_order"] == 128
     assert gate["relative_response_change"] >= 0.0
     assert gate["converged"] is False
+    assert result["quantitative_release_gate"]["velocity_quadrature_release_allowed"] is False
     assert result["quantitative_release_gate"]["quantitative_spectrum_release_allowed"] is False
 
 
@@ -81,3 +82,16 @@ def test_bgk_cts_rejects_a_maximum_order_without_a_refinement():
         analyze_conserving_bgk_cts(
             **_inputs(), quadrature_order=64, quadrature_max_order=64
         )
+
+
+
+def test_bgk_quadrature_convergence_alone_does_not_release_quantitative_cts_spectrum():
+    result = analyze_conserving_bgk_cts(
+        **_inputs(), quadrature_order=64, quadrature_max_order=128,
+        quadrature_convergence_tolerance=1.0,
+    )
+    assert result["velocity_quadrature_convergence"]["converged"] is True
+    gate = result["quantitative_release_gate"]
+    assert gate["velocity_quadrature_release_allowed"] is True
+    assert gate["quantitative_spectrum_release_allowed"] is False
+    assert len(gate["quantitative_release_blockers"]) >= 2
