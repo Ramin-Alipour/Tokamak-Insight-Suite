@@ -6141,6 +6141,23 @@
           "name": "population_uncertainty_successful_refits",
           "unit": "integer",
           "available_when_model": "electrostatic_kappa"
+        },
+        {
+          "name": "population_relativistic_moments_candidate",
+          "unit": "relativistic gyrotropic moments of the regularized candidate VDF",
+          "available_when_model": "full_em_gyrotropic_vdf_shape",
+          "description": "Candidate-only moments remain conditional when the inverse shape is not identifiable."
+        },
+        {
+          "name": "population_relativistic_moments_identified",
+          "unit": "relativistic gyrotropic moments of the accepted fitted VDF",
+          "available_when_model": "full_em_gyrotropic_vdf_shape",
+          "description": "Mean parallel velocity, relativistic kinetic energy, parallel/perpendicular pressure temperatures and T_perp/T_parallel; emitted only for an identifiable fitted shape."
+        },
+        {
+          "name": "population_relativistic_moment_status",
+          "unit": "identifiability status",
+          "available_when_model": "full_em_gyrotropic_vdf_shape"
         }
       ],
       "assumptions": [
@@ -6583,7 +6600,8 @@
       "cts_path_integrated_gaussian_overlap",
       "magnetized_full_em_cts_spectral_transfer",
       "cts_spitzer_species_collision_frequencies",
-      "cts_multi_population_kappa_electron_susceptibility"
+      "cts_multi_population_kappa_electron_susceptibility",
+      "cts_relativistic_gyrotropic_vdf_pressure_moments"
     ],
     "test_links": [
       "tests/test_cts_analysis.py",
@@ -6594,7 +6612,8 @@
       "tests/test_cts_spatial_inference.py",
       "tests/test_cts_drifted_relativistic_evdf.py",
       "tests/test_cts_collisional_physics.py",
-      "tests/test_thomson_kinetic_models.py::test_collective_kappa_propagates_joint_mult_population_input_covariance"
+      "tests/test_thomson_kinetic_models.py::test_collective_kappa_propagates_joint_mult_population_input_covariance",
+      "tests/test_cts_full_em_gyrotropic_inverse.py::test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward"
     ],
     "limitations": [
       "Full-EM local external-input covariance supports local magnetic-field, direction and complex-polarization components only; frequency-resolved ray/equilibrium/beam covariance and cross-source covariance are not represented.",
