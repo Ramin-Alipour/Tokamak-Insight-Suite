@@ -488,9 +488,9 @@ def analyze_cts_microwave_background(
 
 
 
-// Canonical list shared with the advanced Dashboard selector. Keep this set in
-// lockstep with the explicit solver dispatch below; it also drives complete,
-// actionable errors for unsupported model names.
+# Canonical list shared with the advanced Dashboard selector. Keep this set in
+# lockstep with the explicit solver dispatch below; it also drives complete,
+# actionable errors for unsupported model names.
 ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_kinetic_background_fit",
     "thomson_multiview_3d_evdf",
