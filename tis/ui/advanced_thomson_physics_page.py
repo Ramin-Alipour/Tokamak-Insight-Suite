@@ -825,6 +825,28 @@ def render_advanced_thomson_physics_page(st) -> None:
             if isinstance(result, Mapping) and "validity_screening" in result:
                 st.subheader("Non-relativistic validity screen")
                 st.json(json_safe(result["validity_screening"]))
+            if isinstance(result, Mapping) and "fourth_moment_exists" in result:
+                st.subheader("Kappa physical moment hierarchy")
+                st.latex(r"\mathrm{Var}(v)=\frac{k_B T_e}{m_e}")
+                st.write({
+                    "second_moment_m2_s2": result.get("second_moment_m2_s2"),
+                    "velocity_grid_probability_coverage": result.get("velocity_grid_probability_coverage"),
+                    "fourth_moment_exists": result.get("fourth_moment_exists"),
+                    "kurtosis": result.get("kurtosis"),
+                    "excess_kurtosis": result.get("excess_kurtosis"),
+                    "fourth_central_moment_m4_s4": result.get("fourth_central_moment_m4_s4"),
+                })
+                if not result["fourth_moment_exists"]:
+                    st.warning(
+                        "For this Kappa index (kappa <= 5/2), the fourth velocity moment "
+                        "diverges. Kurtosis and fourth-moment-based diagnostics are therefore "
+                        "undefined, not zero."
+                    )
+                st.caption(
+                    "The analytic PDF remains normalized on the full velocity axis. "
+                    "The grid-conditioned PDF is a visualization-only conditional density; "
+                    "it is not substituted into the Landau susceptibility."
+                )
             st.json(safe)
             st.download_button(
                 "Export advanced physics result (JSON)",
