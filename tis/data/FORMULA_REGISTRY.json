@@ -9210,7 +9210,7 @@
   {
     "name": "Joint wavelength-resolved spatial Thomson physical-profile inversion",
     "equation": "μ_{cℓ}(θ)=Σ_j [M P]_{cj} A_j ∫_{Δλℓ} R_c(λ,λ′) S_phys(λ′;T_e,j,u_q,j,model) dλ′/Δλℓ + b_{cℓ}; θ̂=argmin_θ[(y−μ)^T C^{-1}(y−μ)+λ_reg||D²(log T_e,u_q/10^6,log A)||²]",
-    "inputs": "Calibrated measured spectra y[channel,wavelength], wavelength bin centres, radial nodes, measured spatial mixing matrix M, laser wavelength, scattering angle, optional measured instrument-response matrices R, finite-volume Gaussian or measured PSF operator P, channel-major measurement covariance, optional model-discrepancy covariance, selected Maxwellian/Kappa/relativistic Maxwell-Juttner forward model, optional incident polarization and measured laser spectrum.",
+    "inputs": "Calibrated measured spectra y[channel,wavelength], wavelength bin centres, radial nodes, measured spatial mixing matrix M, laser wavelength, scattering angle, optional measured instrument-response matrices R, finite-volume Gaussian or measured PSF operator P, channel-major measurement covariance, optional model-discrepancy and systematic covariance, selected Maxwellian/Kappa/relativistic Maxwell-Juttner forward model, optional incident polarization and measured laser spectrum.",
     "output": "Joint radial electron-temperature profile, scattering-vector flow projection profile and relative spectral-amplitude profile; fitted spectra and residuals; parameter covariance and covariance decomposition; data-only rank/conditioning and identifiability; PSF-calibration covariance; optional regularization-strength sensitivity.",
     "assumptions": "Prepared/calibrated channel-by-wavelength spectra; supplied fixed spatial mixing, PSF and instrument-response operators; one common scattering-vector projection across the fitted profile; detector-space backgrounds fitted jointly as nuisance basis coefficients; finite-volume wavelength-bin integration and non-negative plasma amplitude. Selected physical model is isotropic Maxwellian, isotropic finite-variance Kappa, or relativistic Maxwell-Juttner; Compton recoil is available only on the relativistic branch with incident polarization.",
     "status": "D",
@@ -9312,6 +9312,12 @@
           "unit": "dimensionless gradient scale with respect to normalized radius s=(r-r_min)/(r_max-r_min)",
           "required": false,
           "description": "Positive Huber transition scale for derivatives with respect to normalized radius; quadratic below the scale and approximately linear above it. Used only for huber_total_variation."
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "(channel x wavelength)^2; full channel-major covariance",
+          "required": false,
+          "description": "Independent calibration/systematic covariance; positive semidefinite and added to measurement and model-discrepancy covariance. Cross-covariance blocks must be included externally if these sources are correlated."
         }
       ],
       "output_specs": [
@@ -9363,14 +9369,20 @@
           "name": "regularization",
           "unit": "structured metadata",
           "description": "Selected penalty family, strength, Huber scale when applicable, and edge-preserving flag."
+        },
+        {
+          "name": "systematic_covariance_contribution",
+          "unit": "structured metadata",
+          "description": "Whether systematic covariance was supplied, its dimensions and trace, and its inclusion in the effective GLS weighting."
         }
       ],
       "prerequisites": [
         "Measured spectra, wavelength grid and radial nodes must be finite and dimensionally consistent.",
         "The spatial mixing operator composed with the PSF must have adequate data-only rank and conditioning.",
-        "A full channel-major spectral covariance or pointwise uncertainty may be supplied; measurement and model-discrepancy covariance are combined only under the declared independence assumption.",
         "The incident polarization is mandatory for relativistic Maxwell-Juttner inference; Compton recoil is restricted to that branch.",
-        "A single scattering direction identifies only the q-parallel flow projection, not the full three-dimensional flow vector."
+        "A single scattering direction identifies only the q-parallel flow projection, not the full three-dimensional flow vector.",
+        "Measurement, model-discrepancy and systematic covariance components are assumed mutually independent when summed; correlated sources require externally supplied cross-covariance blocks.",
+        "Systematic covariance is a full channel-major positive-semidefinite matrix and is propagated through the data-only GLS covariance, including regularization-strength refits."
       ],
       "uncertainty_model": "Joint GLS covariance from the whitened measured-spectrum Jacobian, retaining cross-covariance among radial temperature, projected flow, amplitude and detector-background nuisance parameters. Optional model-discrepancy covariance is added once to measurement covariance. Gaussian PSF-width calibration uncertainty is propagated by refit sensitivity. Regularization-choice spread is reported separately from measurement uncertainty. Identifiability is assessed from the data-only Jacobian, excluding regularization rows.",
       "limitations": [
@@ -9387,7 +9399,10 @@
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_adds_model_discrepancy_covariance_once_to_measurement_covariance",
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_reports_regularization_choice_sensitivity_separately",
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_composes_measured_mixing_with_gaussian_psf",
-        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_propagates_gaussian_psf_calibration_uncertainty"
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_propagates_gaussian_psf_calibration_uncertainty",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_systematic_covariance_into_profile_uncertainty",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_rejects_non_psd_systematic_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_carries_systematic_covariance_through_regularization_sensitivity"
       ],
       "note": "This is the public joint measured-spectrum spatial inverse, not independent channel fits followed by interpolation. It composes measured spatial mixing with the supplied PSF, fits physical spectra at every radial node, and jointly fits detector-space nuisance backgrounds. The public dispatcher and advanced Thomson Dashboard expose this solver. Software verification on synthetic cases is not experimental validation. Optional normalized-radius Huber total variation is available to reduce quadratic smoothing bias at steep radial gradients; it is a prior and does not add measurement information.",
       "raw_data_to_physics": false,
@@ -9399,6 +9414,8 @@
       "input_data_level": "calibrated_measured_spectra_and_fixed_response_operators",
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Spatial profile reconstruction"
-    }
+    },
+    "uncertainty_model": "Joint GLS covariance from the whitened measured-spectrum Jacobian, retaining cross-covariance among radial temperature, projected flow, amplitude and detector-background nuisance parameters. Optional model-discrepancy and systematic covariance components are each added exactly once to measurement covariance under an explicit mutual-independence assumption; correlated components require cross-covariance blocks. Gaussian PSF-width calibration uncertainty is propagated by refit sensitivity. Regularization-choice spread is reported separately from measurement uncertainty. Identifiability is assessed from the data-only Jacobian, excluding regularization rows.",
+    "note": "undefined Independent systematic covariance is accepted as a separate full channel-major component and is propagated through the same GLS weighting and regularization sensitivity refits; no silent cross-covariance assumption is made beyond the explicit independence declaration."
   }
 ]
