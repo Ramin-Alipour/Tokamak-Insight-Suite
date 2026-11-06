@@ -57,12 +57,22 @@ result = run_advanced_thomson_physics(
     ],
     common_temperature_J=T,
     collision_frequencies_s_inverse=[nu_e, nu_i],
+    quadrature_order=96,
+    quadrature_max_order=384,
+    quadrature_convergence_tolerance=1e-5,
 )
 ```
 
 The result includes the bare and screened response matrices, dielectric
 matrix and condition number, Coulomb interaction matrix, dynamic structure
-factor, collision regime, and explicit validity/convergence gates.
+factor, collision regime, and explicit validity/convergence gates. The BGK
+velocity integral is evaluated at the requested Hermite order and then
+re-evaluated at successively doubled orders (up to `quadrature_max_order`).
+The relative Frobenius-norm change of the complete multispecies response
+matrix is reported as `velocity_quadrature_convergence.relative_response_change`.
+A quantitative-release flag is true only when this change meets
+`quadrature_convergence_tolerance`; reaching the maximum order without meeting
+the tolerance leaves the result explicitly non-converged.
 
 ## Scope boundary
 
@@ -79,3 +89,13 @@ The model is available through the public Analysis-1 advanced physics
 dispatcher. It must not be labelled as a completed Full-EM CTS workflow or as
 absolute receiver power without the separate calibrated scattering and
 receiver transfer chain.
+
+
+## Numerical invariance checks
+
+The BGK kernel test suite also checks the Galilean frequency shift
+\(\omega' = \omega-kU\) for a common equilibrium drift and covariance of
+the response matrix under a simultaneous permutation of species densities,
+masses and collision frequencies. These are independent physical invariance
+checks; they complement the static Boltzmann limit and matrix-screening/FDT
+closure tests.
