@@ -1000,6 +1000,9 @@ elif page=='Spectral Analysis':
                     )
                 st.caption('The selected nuisance basis is fitted simultaneously with each measured Thomson spectrum. It is not interpreted as plasma emission.')
             spatial_mixing_upload=None
+            spatial_psf_mode='identity'
+            spatial_psf_sigma_text=None
+            spatial_psf_upload=None
             spatial_laser_profile_upload=None
             spatial_mixing_covariance_upload=None
             spatial_mixing_mc_samples=100
@@ -1013,6 +1016,27 @@ elif page=='Spectral Analysis':
             spatial_fit_kappa_index=False
             if joint_spatial_spectral:
                 spatial_mixing_upload=st.file_uploader('Nominal measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
+                spatial_psf_mode=st.selectbox(
+                    'Spatial PSF forward operator',
+                    ['identity','gaussian_sigma','measured_matrix'],
+                    format_func=lambda value: {
+                        'identity':'No additional PSF (mixing matrix is already the complete operator)',
+                        'gaussian_sigma':'Finite-volume Gaussian PSF with supplied sigma',
+                        'measured_matrix':'Researcher-supplied measured PSF matrix',
+                    }[value],
+                    key='ts_infer_spatial_psf_mode',
+                )
+                if spatial_psf_mode=='gaussian_sigma':
+                    spatial_psf_sigma_text=st.text_input(
+                        'Gaussian spatial PSF sigma (m; calibrated input)',
+                        value='',key='ts_infer_spatial_psf_sigma',
+                        help='The finite-volume Gaussian maps true radial nodes into observed radial bins. Probability outside the finite radial domain is retained as edge loss, not renormalized.',
+                    )
+                elif spatial_psf_mode=='measured_matrix':
+                    spatial_psf_upload=st.file_uploader(
+                        'Measured spatial PSF matrix CSV (observed radial bins × true radial nodes)',
+                        type=['csv','txt'],key='ts_infer_spatial_psf_matrix',
+                    )
                 spatial_laser_profile_upload=st.file_uploader(
                     'Optional measured incident laser spectrum CSV (incident_wavelength_nm, spectral_density_per_nm)',
                     type=['csv','txt'],key='ts_infer_spatial_laser_profile',
@@ -1308,6 +1332,18 @@ elif page=='Spectral Analysis':
                         if spatial_mixing_upload is None:
                             raise ValueError('Upload the fixed spatial mixing matrix to run joint spatial-spectral inversion.')
                         spatial_mixing_matrix=pd.read_csv(spatial_mixing_upload,header=None).to_numpy(dtype=float)
+                        if spatial_psf_mode=='gaussian_sigma':
+                            if spatial_psf_sigma_text is None or not spatial_psf_sigma_text.strip():
+                                raise ValueError('Supply the calibrated Gaussian spatial PSF sigma in metres.')
+                            kwargs['spatial_psf_sigma_m']=_parse_ts_scalar(
+                                spatial_psf_sigma_text,'Gaussian spatial PSF sigma',minimum=0.0
+                            )
+                        elif spatial_psf_mode=='measured_matrix':
+                            if spatial_psf_upload is None:
+                                raise ValueError('Upload the measured spatial PSF matrix when measured_matrix mode is selected.')
+                            kwargs['spatial_psf_matrix']=pd.read_csv(
+                                spatial_psf_upload,header=None
+                            ).to_numpy(dtype=float)
                         if spatial_laser_profile_upload is not None:
                             laser_profile_table=pd.read_csv(
                                 spatial_laser_profile_upload,header=None
