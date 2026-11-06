@@ -747,6 +747,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
                         directions,
                         projection_covariance_m2_s2=projection_covariance,
                         scattering_vector_covariance=kwargs.get("scattering_vector_covariance"),
+                        projection_geometry_cross_covariance=kwargs.get(
+                            "projection_geometry_cross_covariance"
+                        ),
                     )
                 except (ValueError, np.linalg.LinAlgError) as exc:
                     result["three_dimensional_flow_inference"] = {
