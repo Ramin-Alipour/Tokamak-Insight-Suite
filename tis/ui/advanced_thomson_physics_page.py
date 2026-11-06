@@ -122,7 +122,7 @@ MODEL_PHYSICS_NOTES = {
     "kappa_electrostatic_susceptibility": (
         "Collisionless, unmagnetized, non-relativistic longitudinal electron response for the exact "
         "1-D marginal of an isotropic 3-D finite-variance Kappa distribution (kappa > 3/2). "
-        "The solver integrates the analytic Kappa derivative over the complete velocity axis and "
+        "The solver integrates the analytic Kappa derivative over the complete velocity axis in the electron rest frame, "
         "returns chi_e = -(omega_pe^2/k^2) integral f'_kappa(v)/(v-v_phase-i*eta) dv. "
         "It also returns d chi_e/d v_phase = -(omega_pe^2/k^2) integral "
         "f'_kappa(v)/(v-v_phase-i*eta)^2 dv at fixed positive eta, with separate real/imaginary "
