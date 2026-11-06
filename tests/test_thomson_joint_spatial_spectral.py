@@ -891,6 +891,17 @@ def test_joint_inverse_propagates_systematic_covariance_into_profile_uncertainty
         4.0 * base["parameter_covariance"],
         rtol=3.0e-3, atol=1.0e-12,
     )
+    components = combined["spectral_covariance_parameter_components"]
+    np.testing.assert_allclose(
+        components["measurement"] + components["systematic"],
+        combined["measurement_data_parameter_covariance"],
+        rtol=2.0e-8, atol=1.0e-12,
+    )
+    np.testing.assert_allclose(
+        components["systematic"],
+        0.75 * combined["measurement_data_parameter_covariance"],
+        rtol=3.0e-3, atol=1.0e-12,
+    )
 
 
 def test_joint_inverse_rejects_non_psd_systematic_covariance():
