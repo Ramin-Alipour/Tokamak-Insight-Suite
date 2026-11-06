@@ -1651,29 +1651,64 @@ def collective_kappa_spectral_density(
             distribution = str(population.get("distribution", "maxwellian")).lower()
             kappa_i = population.get("kappa")
             flow_i = float(population.get("flow_projection_m_s", ui[index]))
-            if distribution not in ("maxwellian", "kappa"):
-                raise ValueError(f"ion_populations[{index}].distribution must be 'maxwellian' or 'kappa'")
-            if distribution == "kappa":
+            if distribution not in ("maxwellian", "kappa", "bi_kappa"):
+                raise ValueError(
+                    f"ion_populations[{index}].distribution must be 'maxwellian', 'kappa' or 'bi_kappa'"
+                )
+            if distribution in ("kappa", "bi_kappa"):
+                if isinstance(kappa_i, (bool, np.bool_)) or not isinstance(
+                    kappa_i, (int, float, np.integer, np.floating)
+                ):
+                    raise ValueError(f"ion_populations[{index}].kappa must be finite and > 1.5")
                 kappa_i = float(kappa_i)
                 if not np.isfinite(kappa_i) or kappa_i <= 1.5:
                     raise ValueError(f"ion_populations[{index}].kappa must be finite and > 1.5")
             elif kappa_i is not None:
                 raise ValueError(f"ion_populations[{index}].kappa is only valid for a Kappa ion distribution")
+            projected_ion_temperature = float(temperatures[index])
+            ion_pitch_cosine = None
+            if distribution == "bi_kappa":
+                t_parallel_i = _positive(
+                    population.get("temperature_parallel_eV"),
+                    f"ion_populations[{index}].temperature_parallel_eV",
+                )
+                t_perpendicular_i = _positive(
+                    population.get("temperature_perpendicular_eV"),
+                    f"ion_populations[{index}].temperature_perpendicular_eV",
+                )
+                magnetic_field_i = np.asarray(population.get("magnetic_field_unit"))
+                if (magnetic_field_i.dtype.kind not in "iuf" or magnetic_field_i.shape != (3,)
+                        or np.any(~np.isfinite(magnetic_field_i))
+                        or not np.isclose(np.linalg.norm(magnetic_field_i), 1.0, rtol=1e-8, atol=1e-10)):
+                    raise ValueError(
+                        f"ion_populations[{index}].magnetic_field_unit must be a finite unit 3-vector"
+                    )
+                ion_pitch_cosine = float(np.clip(np.dot(magnetic_field_i, qhat), -1.0, 1.0))
+                projected_ion_temperature = (
+                    t_perpendicular_i * (1.0 - ion_pitch_cosine**2)
+                    + t_parallel_i * ion_pitch_cosine**2
+                )
             if not np.isfinite(flow_i) or abs(flow_i) >= C:
                 raise ValueError(f"ion_populations[{index}].flow_projection_m_s must be finite and subluminal")
             resolved_ion_populations.append({
                 "distribution": distribution, "kappa": kappa_i,
                 "flow_projection_m_s": flow_i,
+                "projected_temperature_eV": projected_ion_temperature,
+                "temperature_parallel_eV": t_parallel_i if distribution == "bi_kappa" else None,
+                "temperature_perpendicular_eV": t_perpendicular_i if distribution == "bi_kappa" else None,
+                "magnetic_pitch_cosine": ion_pitch_cosine,
             })
     ion_chi = []
     ion_pdf = []
     for index, item in enumerate(species):
         density = fractions[index]*ne/item["charge_state"]
-        sigma_i = np.sqrt(temperatures[index]*E_CHARGE/item["mass_kg"])
-        omega_pi2 = density*(item["charge_state"]*E_CHARGE)**2/(EPS0*item["mass_kg"])
         ion_model = resolved_ion_populations[index]
+        sigma_i = np.sqrt(
+            ion_model["projected_temperature_eV"]*E_CHARGE/item["mass_kg"]
+        )
+        omega_pi2 = density*(item["charge_state"]*E_CHARGE)**2/(EPS0*item["mass_kg"])
         ion_phase = vphase-ion_model["flow_projection_m_s"]
-        if ion_model["distribution"] == "kappa":
+        if ion_model["distribution"] in ("kappa", "bi_kappa"):
             ion_pdf_i, _, _ = _kappa_pdf_and_derivatives(
                 ion_phase, sigma_i, ion_model["kappa"])
         else:
@@ -1683,7 +1718,7 @@ def collective_kappa_spectral_density(
         for j in range(x.size):
             chi_i[j] = _landau_susceptibility(
                 ion_phase[j], omega_pi2, k, sigma_i,
-                distribution=ion_model["distribution"],
+                distribution=("kappa" if ion_model["distribution"] == "bi_kappa" else ion_model["distribution"]),
                 kappa=ion_model["kappa"])
         ion_chi.append(chi_i)
     ion_sum = np.sum(np.asarray(ion_chi), axis=0)

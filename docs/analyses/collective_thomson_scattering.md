@@ -599,3 +599,11 @@ before dielectric screening. This is an unmagnetized electrostatic response
 for an anisotropic equilibrium; it does not include cyclotron harmonics,
 magnetized dielectric tensor elements, or a Full-EM CTS scattering vertex.
 A single scattering direction constrains T_q, not both T_parallel and T_perp.
+
+Ion species may also use the same gyrotropic bi-Kappa projected marginal by
+supplying distribution="bi_kappa", kappa, temperature_parallel_eV,
+temperature_perpendicular_eV, and magnetic_field_unit in the corresponding
+ion_populations entry. The ion susceptibility and ion fluctuation source use
+the same q-projected second-moment temperature, with the ion mass and
+charge-state plasma-frequency weighting retained. This remains a longitudinal
+unmagnetized projection, not a magnetized ion-harmonic response.

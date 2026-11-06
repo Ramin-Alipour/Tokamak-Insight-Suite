@@ -229,7 +229,7 @@ MODEL_PHYSICS_NOTES = {
         "Electrons use exact projected 1-D marginals of isotropic Kappa, gyrotropic bi-Kappa, or Maxwellian populations with full Landau-contour susceptibility. "
         "A bi-Kappa population requires parallel/perpendicular second-moment temperatures and a unit magnetic-field direction; its directional temperature is T_q=T_perp+(T_parallel-T_perp)(b_hat dot q_hat)^2. "
         "Each population's density fraction, projected temperature and q-parallel flow are explicit; one scattering direction does not identify both anisotropy temperatures. "
-        "Each ion species may independently use a Maxwellian or finite-variance Kappa distribution with its own projected flow; species charge neutrality and ion plasma-frequency weighting are retained. "
+        "Each ion species may independently use a Maxwellian, finite-variance Kappa or gyrotropic bi-Kappa projected marginal with its own projected flow; species charge neutrality and ion plasma-frequency weighting are retained. "
         "The longitudinal Landau-contour susceptibilities are summed before dielectric screening, and electron/ion fluctuation terms form S(k,omega). "
         "This remains collisionless, unmagnetized and electrostatic; it is not a collisional, relativistic or Full-EM closure."
     ),
@@ -588,7 +588,7 @@ EXAMPLES = {
             {"density_fraction": 0.25, "temperature_ratio": 2.5, "kappa": 3.0, "distribution": "kappa", "flow_projection_m_s": 150000.0},
             {"density_fraction": 0.10, "temperature_ratio": 5.0, "distribution": "maxwellian", "flow_projection_m_s": 800000.0}
         ],
-        "ion_populations": [{"distribution": "kappa", "kappa": 3.0, "flow_projection_m_s": 0.0}],
+        "ion_populations": [{"distribution": "bi_kappa", "kappa": 3.0, "temperature_parallel_eV": 260.0, "temperature_perpendicular_eV": 120.0, "magnetic_field_unit": [1.0, 0.0, 0.0], "flow_projection_m_s": 0.0}],
         "incident_direction": [1.0, 0.0, 0.0],
         "scattered_direction": [0.0, 1.0, 0.0]
     },

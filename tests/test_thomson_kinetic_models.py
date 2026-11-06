@@ -1325,3 +1325,70 @@ def test_collective_cts_bikappa_population_is_reachable_through_public_analysis1
     assert result["automatic_model_substitution"] is False
     assert result["electron_populations"][0]["distribution"] == "bi_kappa"
     assert result["electron_mixture_moments"]["population_count"] == 1
+
+def test_collective_cts_ion_bikappa_population_reduces_to_isotropic_kappa_limit():
+    wavelength = np.linspace(1050.0, 1078.0, 41)
+    angle = np.pi / 2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    common = dict(
+        laser_wavelength_nm=1064.0, scattering_angle_rad=angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=120.0,
+        kappa=4.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+    )
+    isotropic = collective_kappa_spectral_density(wavelength, **common)
+    gyrotropic = collective_kappa_spectral_density(
+        wavelength,
+        ion_populations=[{
+            "distribution": "bi_kappa", "kappa": 3.2,
+            "temperature_parallel_eV": 80.0,
+            "temperature_perpendicular_eV": 80.0,
+            "magnetic_field_unit": [0.0, 0.0, 1.0],
+            "flow_projection_m_s": 0.0,
+        }],
+        **common,
+    )
+    np.testing.assert_allclose(
+        gyrotropic["ion_susceptibility"], isotropic["ion_susceptibility"],
+        rtol=2e-10, atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        gyrotropic["spectral_density_per_nm"], isotropic["spectral_density_per_nm"],
+        rtol=2e-10, atol=1e-12,
+    )
+
+
+def test_collective_cts_ion_bikappa_uses_directional_temperature():
+    wavelength = np.linspace(1050.0, 1078.0, 31)
+    angle = np.pi / 2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    magnetic = np.array([1.0, 0.0, 0.0])
+    qhat = np.array(scattered) - np.array(incident)
+    qhat /= np.linalg.norm(qhat)
+    mu = float(np.dot(magnetic, qhat))
+    expected_tq = 70.0*(1.0-mu**2)+180.0*mu**2
+    result = collective_kappa_spectral_density(
+        wavelength, 1064.0, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=120.0, kappa=3.8,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        ion_populations=[{
+            "distribution": "bi_kappa", "kappa": 3.8,
+            "temperature_parallel_eV": 180.0,
+            "temperature_perpendicular_eV": 70.0,
+            "magnetic_field_unit": magnetic,
+            "flow_projection_m_s": 0.0,
+        }],
+    )
+    ion = result["ion_populations"][0]
+    assert ion["projected_temperature_eV"] == pytest.approx(expected_tq)
+    assert ion["magnetic_pitch_cosine"] == pytest.approx(mu)

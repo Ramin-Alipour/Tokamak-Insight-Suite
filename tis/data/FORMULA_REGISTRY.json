@@ -7742,10 +7742,10 @@
   },
   {
     "name": "Multi-population Kappa electron susceptibility for collective Thomson scattering",
-    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; χ_a=−(ω_pa²/k²)∫_L[(∂f_a/∂v)/(v−ω/k)]dv; ω_pe,j²=n_eη_je²/(ε₀m_e); ω_pi,s²=n_sZ_s²e²/(ε₀m_s); Σ_jη_j=1; n_s=α_sn_e/Z_s; T_q,j=T_perp,j+(T_parallel,j−T_perp,j)(b_hat·q_hat)²",
-    "inputs": "n_e [m^-3], T_e [eV], electron population fractions η_j, temperature ratios τ_j, distribution selector Maxwellian or Kappa, Kappa indices κ_j > 3/2 when selected, projected electron flows u_j [m/s], per-ion-species distribution selector Maxwellian or Kappa, ion Kappa indices κ_s > 3/2 when selected, ion charge-density fractions α_s, ion temperatures and projected flows, k [m^-1], ω [rad/s]",
+    "equation": "χ_e=Σ_jχ_e,j; χ_i=Σ_sχ_i,s; χ_a=−(ω_pa²/k²)∫_L[(∂f_a/∂v)/(v−ω/k)]dv; ω_pe,j²=n_eη_je²/(ε₀m_e); ω_pi,s²=n_sZ_s²e²/(ε₀m_s); Σ_jη_j=1; n_s=α_sn_e/Z_s; T_q,j=T_perp,j+(T_parallel,j−T_perp,j)(b_hat·q_hat)²; T_q,s=T_perp,s+(T_parallel,s−T_perp,s)(b_hat·q_hat)^2",
+    "inputs": "n_e [m^-3], T_e [eV], electron population fractions η_j, temperature ratios τ_j, distribution selector Maxwellian or Kappa, Kappa indices κ_j > 3/2 when selected, projected electron flows u_j [m/s], per-ion-species distribution selector Maxwellian, Kappa or bi-Kappa; bi-Kappa ions require T_parallel,s, T_perp,s and magnetic-field direction when selected, ion charge-density fractions α_s, ion temperatures and projected flows, k [m^-1], ω [rad/s]",
     "output": "Complex total longitudinal electron susceptibility χ_e and density-weighted projected electron source distribution",
-    "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; quasi-neutrality; each species is represented by its exact 1-D projected marginal for the selected Maxwellian, isotropic finite-variance Kappa, or gyrotropic finite-variance bi-Kappa family. For bi-Kappa electrons the directional second-moment temperature is T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)^2; a single scattering direction does not identify both anisotropy temperatures. Population fractions, anisotropy axis and species composition are fixed explicit inputs; susceptibility contributions are summed before common dielectric screening.",
+    "assumptions": "Unmagnetized collisionless electrostatic longitudinal response; quasi-neutrality; each species is represented by its exact 1-D projected marginal for the selected Maxwellian, isotropic finite-variance Kappa, or gyrotropic finite-variance bi-Kappa family for both electrons and ions. For bi-Kappa electrons the directional second-moment temperature is T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)^2; a single scattering direction does not identify both anisotropy temperatures. Population fractions, anisotropy axis and species composition are fixed explicit inputs; susceptibility contributions are summed before common dielectric screening.",
     "status": "D",
     "category": "Thomson scattering / collective kinetic response",
     "execution_contract": {
@@ -7787,9 +7787,9 @@
         },
         {
           "name": "ion_populations",
-          "unit": "optional one-per-ion-species list of distribution (maxwellian or kappa), kappa when selected, and flow_projection_m_s mappings",
+          "unit": "optional one-per-ion-species list of distribution (maxwellian, kappa or bi_kappa), kappa when selected, flow_projection_m_s; bi_kappa also requires temperature_parallel_eV, temperature_perpendicular_eV and magnetic_field_unit",
           "required": false,
-          "description": "Ion populations default to Maxwellian with the supplied species flow. Kappa ions require kappa > 3/2; one mapping is required per ion species when supplied."
+          "description": "Ion populations default to Maxwellian with supplied species flow. Kappa and bi-Kappa ions require kappa > 3/2; bi-Kappa additionally requires two positive second-moment temperatures and a unit magnetic-field vector. One mapping is required per ion species."
         }
       ],
       "output_specs": [
@@ -7810,16 +7810,22 @@
         "Each supplied electron population density_fraction is positive and fractions sum to one; isotropic temperature_ratio is positive and projected flow is subluminal. A bi_kappa population instead supplies positive temperature_parallel_eV and temperature_perpendicular_eV, kappa > 3/2, and a finite unit magnetic_field_unit; its exact q-projected temperature is used in the Landau response.",
         "Electron and ion Kappa indices must exceed 3/2 to ensure finite variance.",
         "When ion_populations is supplied, it must contain exactly one mapping per ion species; each flow is finite and subluminal.",
-        "Quasi-neutral ion density is n_i = alpha_i n_e / Z_i; each ion susceptibility uses omega_pi^2 = n_i Z_i^2 e^2/(epsilon_0 m_i)."
+        "Quasi-neutral ion density is n_i = alpha_i n_e / Z_i; each ion susceptibility uses omega_pi^2 = n_i Z_i^2 e^2/(epsilon_0 m_i).",
+        "A bi_kappa ion population requires positive temperature_parallel_eV and temperature_perpendicular_eV, kappa > 3/2, and a finite unit magnetic_field_unit; its exact q-projected temperature enters the ion Landau susceptibility."
       ],
       "uncertainty_model": "Population parameters are fixed external inputs in the current CTS fit. Their uncertainties are not inferred or propagated by this extension; the fitted base electron density, reference temperature and global Kappa parameter retain the existing local-fit covariance.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_electron_dielectric_uses_weighted_landau_responses",
-        "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_rejects_non_normalized_density_fractions", "tests/test_thomson_kinetic_models.py::test_collective_cts_bikappa_population_reduces_to_isotropic_kappa_limit", "tests/test_thomson_kinetic_models.py::test_collective_cts_bikappa_population_uses_directional_temperature_projection", "tests/test_thomson_kinetic_models.py::test_collective_cts_bikappa_population_is_reachable_through_public_analysis1_api"
+        "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_rejects_non_normalized_density_fractions",
+        "tests/test_thomson_kinetic_models.py::test_collective_cts_bikappa_population_reduces_to_isotropic_kappa_limit",
+        "tests/test_thomson_kinetic_models.py::test_collective_cts_bikappa_population_uses_directional_temperature_projection",
+        "tests/test_thomson_kinetic_models.py::test_collective_cts_bikappa_population_is_reachable_through_public_analysis1_api",
+        "tests/test_thomson_kinetic_models.py::test_collective_cts_ion_bikappa_population_reduces_to_isotropic_kappa_limit",
+        "tests/test_thomson_kinetic_models.py::test_collective_cts_ion_bikappa_uses_directional_temperature"
       ],
       "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian, isotropic Kappa and gyrotropic bi-Kappa distributions may be selected independently for each supplied electron population. For a bi-Kappa electron population the exact projected marginal uses T_q=T_perp+(T_parallel−T_perp)(b_hat·q_hat)^2; one view identifies only T_q. The spectrum is constructed from the common dielectric screening and corresponding electron/ion source terms. This remains an unmagnetized collisionless electrostatic forward/inference branch, not a magnetized Full-EM or collisional closure. Population, anisotropy and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse."
     },
-    "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian and finite-variance Kappa distributions may be selected independently for each supplied population. The spectrum is then constructed from the common dielectric screening and the corresponding electron/ion source terms. This is still an unmagnetized collisionless electrostatic forward/inference branch; it is not a magnetized Full-EM or collisional closure. Population and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse."
+    "note": "The collective dielectric function is formed from the density-weighted electron and species-resolved ion Landau susceptibilities. Maxwellian and finite-variance Kappa distributions may be selected independently for each supplied population. The spectrum is then constructed from the common dielectric screening and the corresponding electron/ion source terms. This is still an unmagnetized collisionless electrostatic forward/inference branch; it is not a magnetized Full-EM or collisional closure. Population and ion-state parameters remain fixed inputs unless separately estimated by a dedicated identifiable inverse. Ion species may also use exact gyrotropic bi-Kappa projected marginals; their q-directional temperatures are used in the ion Landau response and source term."
   },
   {
     "name": "Measured-laser-profile relativistic Compton Thomson spectral-power convolution",
