@@ -247,10 +247,10 @@ def _curvature(axis):
 
 
 def _huber_total_variation_residual(profile, axis, huber_scale):
-    """Length-weighted Huber-TV residual for an edge-preserving radial prior.
+    """Normalized-radius Huber-TV residual for an edge-preserving radial prior.
 
-    Squared residuals approximate integral rho_delta(d profile / dr) dr,
-    where rho_delta(g)=2*delta^2*(sqrt(1+(g/delta)^2)-1).
+    Squared residuals approximate integral rho_delta(d profile / ds) ds, where
+    rho_delta(g)=2*delta^2*(sqrt(1+(g/delta)^2)-1) and s is normalized radius.
     The penalty is quadratic for small gradients and linear for large ones,
     avoiding the strong edge suppression of quadratic curvature smoothing.
     """
@@ -689,10 +689,11 @@ def reconstruct_joint_thomson_spatial_spectra(
                                   np.sqrt(lam_reg) * (d2 @ flow / 1e6),
                                   np.sqrt(lam_reg) * (d2 @ np.log(amp))]
             else:
+                normalized_radius = (r - r[0]) / (r[-1] - r[0])
                 penalties = np.sqrt(lam_reg) * np.r_[
-                    _huber_total_variation_residual(np.log(te), r, huber_scale),
-                    _huber_total_variation_residual(flow / 1e6, r, huber_scale),
-                    _huber_total_variation_residual(np.log(amp), r, huber_scale),
+                    _huber_total_variation_residual(np.log(te), normalized_radius, huber_scale),
+                    _huber_total_variation_residual(flow / 1e6, normalized_radius, huber_scale),
+                    _huber_total_variation_residual(np.log(amp), normalized_radius, huber_scale),
                 ]
             return np.r_[data, penalties]
         return data
