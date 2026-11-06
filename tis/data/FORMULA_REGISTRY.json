@@ -6314,6 +6314,28 @@
           "unit": "dimensionless; conservative non-relativistic projected thermal-speed validity threshold",
           "required": false,
           "default": 0.1
+        },
+        {
+          "name": "scattering_vector_covariance",
+          "unit": "dimensionless²; optional full (3*n_views) Cartesian covariance for q directions, routed to the derived 3-D flow GLS closure",
+          "required": false
+        },
+        {
+          "name": "projection_geometry_cross_covariance",
+          "unit": "m s^-1; dimensionless; optional Cov(v_q,q_xyz), shape (n_views,3*n_views), routed to derived 3-D flow GLS closure",
+          "required": false
+        },
+        {
+          "name": "maximum_geometry_condition_number",
+          "unit": "dimensionless; whitened-design condition ceiling for derived 3-D flow; default 1e3",
+          "required": false,
+          "default": 1000
+        },
+        {
+          "name": "minimum_projection_consistency_p_value",
+          "unit": "dimensionless; common-flow chi-square survival probability threshold for overdetermined views; default 1e-3",
+          "required": false,
+          "default": 0.001
         }
       ],
       "output_specs": [
@@ -6356,6 +6378,10 @@
         {
           "name": "spectral_bin_integration",
           "unit": "exact Gaussian CDF integration over finite wavelength bins"
+        },
+        {
+          "name": "three_dimensional_flow_inference",
+          "unit": "nested GLS result; vector/covariance withheld for rank deficiency, ill-conditioned geometry, rejected common-flow residual, or superluminal speed"
         }
       ],
       "prerequisites": [
@@ -6372,7 +6398,10 @@
         "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen",
         "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ],
-      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen."
+      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen. The public advanced-physics dispatcher additionally routes optional scattering-vector covariance, projection/geometry cross-covariance, a whitened-geometry condition ceiling (default 1e3), and a common-flow chi-square p-value threshold (default 1e-3) to the derived 3-D flow closure; these options are not passed into the per-view spectral fitter.",
+      "function_links": [
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ]
     },
     "references": [
       {
@@ -6395,7 +6424,8 @@
     "implementation_trace": {
       "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
       "function_links": [
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson"
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
       ],
       "formula_key": "gyrotropic_bi_maxwellian_optical_thomson_joint_fit",
       "implementation_link_status": "mapped",
@@ -7709,6 +7739,28 @@
             1.5001,
             200
           ]
+        },
+        {
+          "name": "scattering_vector_covariance",
+          "unit": "dimensionless²; optional full (3*n_views) Cartesian covariance for q directions, routed to the derived 3-D flow GLS closure",
+          "required": false
+        },
+        {
+          "name": "projection_geometry_cross_covariance",
+          "unit": "m s^-1; dimensionless; optional Cov(v_q,q_xyz), shape (n_views,3*n_views), routed to derived 3-D flow GLS closure",
+          "required": false
+        },
+        {
+          "name": "maximum_geometry_condition_number",
+          "unit": "dimensionless; whitened-design condition ceiling for derived 3-D flow; default 1e3",
+          "required": false,
+          "default": 1000
+        },
+        {
+          "name": "minimum_projection_consistency_p_value",
+          "unit": "dimensionless; common-flow chi-square survival probability threshold for overdetermined views; default 1e-3",
+          "required": false,
+          "default": 0.001
         }
       ],
       "output_specs": [
@@ -7755,6 +7807,10 @@
         {
           "name": "kappa_index",
           "unit": "dimensionless; only when the full data Jacobian identifies the Kappa index"
+        },
+        {
+          "name": "three_dimensional_flow_inference",
+          "unit": "nested GLS result; vector/covariance withheld for rank deficiency, ill-conditioned geometry, rejected common-flow residual, or superluminal speed"
         }
       ],
       "prerequisites": [
@@ -7770,7 +7826,10 @@
         "tests/test_thomson_workflow.py::test_registered_gyrotropic_workflow_dispatches_bimaxwellian_and_bikappa_without_fallback",
         "tests/test_thomson_workflow.py::test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback"
       ],
-      "note": "The distribution family and finite-variance domain follow the published additive bi-Kappa formulation. The registered optical Thomson implementation fits its exact projected 1-D marginal and is not a magnetized kinetic dispersion solver."
+      "note": "The distribution family and finite-variance domain follow the published additive bi-Kappa formulation. The registered optical Thomson implementation fits its exact projected 1-D marginal and is not a magnetized kinetic dispersion solver. The public advanced-physics dispatcher additionally routes optional scattering-vector covariance, projection/geometry cross-covariance, a whitened-geometry condition ceiling (default 1e3), and a common-flow chi-square p-value threshold (default 1e-3) to the derived 3-D flow closure; these options are not passed into the per-view spectral fitter.",
+      "function_links": [
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ]
     },
     "references": [
       {
@@ -7789,7 +7848,8 @@
       "function_link": "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
       "function_links": [
         "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
       ],
       "formula_key": "gyrotropic_anisotropic_kappa_optical_thomson_joint_fit",
       "implementation_link_status": "mapped",
