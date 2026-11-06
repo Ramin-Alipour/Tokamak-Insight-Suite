@@ -945,12 +945,18 @@ def render_advanced_thomson_physics_page(st) -> None:
                         result.get("temperature_anisotropy_ratio_parallel_over_perpendicular"),
                     "covariance_tensor_per_view_m2_s2":
                         result.get("thermal_velocity_covariance_tensor_per_view_m2_s2"),
+                    "projected_variance_from_tensor_m2_s2":
+                        result.get("projected_velocity_variance_from_tensor_m2_s2"),
+                    "projected_variance_expected_from_fit_m2_s2":
+                        result.get("projected_velocity_variance_expected_m2_s2"),
+                    "projected_variance_relative_residual":
+                        result.get("projected_velocity_variance_relative_residual"),
                     "definition": result.get("thermal_velocity_covariance_definition"),
                 })
                 if result.get("thermal_velocity_covariance_tensor_per_view_m2_s2") is None:
                     st.warning(
                         "The 3-D thermal covariance tensor is withheld because both "
-                        "temperature components are not identifiable and within model validity."
+                        "temperature components are not both identifiable within the declared model-validity domain."
                     )
             st.json(safe)
             st.download_button(
