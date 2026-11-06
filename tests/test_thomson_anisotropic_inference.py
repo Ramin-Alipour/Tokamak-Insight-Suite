@@ -465,3 +465,52 @@ def test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match():
     expected = (1.602176634e-19 * temperature / 9.1093837015e-31) * np.eye(3)
     np.testing.assert_allclose(tensors[0], expected, rtol=1e-12)
     np.testing.assert_allclose(tensors[1], expected, rtol=1e-12)
+
+
+def test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_closure():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    coordinate = np.linspace(-1.0, 1.0, 161)
+    wavelength = 1064.0 + 2.0 * (coordinate + 0.12 * coordinate**3)
+    laser, angle = 1064.0, np.pi / 2.0
+    magnetic_field = np.array([0.0, 0.0, 1.0])
+    directions = np.eye(3)
+    common_flow = np.array([1.2e4, -0.8e4, 0.5e4])
+    flows = directions @ common_flow
+    temperatures = np.array([250.0, 250.0, 900.0])
+    spectra = []
+    for temperature, flow in zip(temperatures, flows):
+        sigma_v = np.sqrt(1.602176634e-19 * temperature / 9.1093837015e-31)
+        centre = laser * (1.0 - 2.0*np.sin(angle/2.0)*flow/299792458.0)
+        sigma_lambda = laser * 2.0*np.sin(angle/2.0)*sigma_v/299792458.0
+        feature, _ = _gaussian_bin_average(wavelength, centre, sigma_lambda)
+        spectra.append(0.03 + 0.8*feature + 1.0e-4*(wavelength-laser))
+
+    result = run_advanced_thomson_physics(
+        "gyrotropic_bi_maxwellian_spectral_fit",
+        wavelength,
+        np.asarray(spectra),
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        magnetic_field_unit=magnetic_field,
+        scattering_vector_unit=directions,
+        instrument_response_matrix=np.eye(wavelength.size),
+        initial_temperature_parallel_eV=800.0,
+        initial_temperature_perpendicular_eV=300.0,
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+        scattering_vector_covariance=np.eye(9)*1.0e-8,
+        maximum_geometry_condition_number=1.0e3,
+        minimum_projection_consistency_p_value=1.0e-3,
+    )
+    flow_result = result["three_dimensional_flow_inference"]
+    assert flow_result["geometry_uncertainty_included"] is True
+    assert flow_result["geometry_condition_status"] == "well_conditioned"
+    assert flow_result["cross_view_consistency_status"] == "not_testable_exactly_three_views"
+    assert flow_result["reportable_as_inferred_parameter"] is True
+    np.testing.assert_allclose(
+        flow_result["electron_velocity_vector_m_s"],
+        common_flow,
+        rtol=2.0e-2,
+        atol=2.0e3,
+    )
