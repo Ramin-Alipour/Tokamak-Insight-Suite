@@ -206,14 +206,19 @@ def test_exact_sokhotski_plemelj_landau_limit_matches_principal_value_and_resona
     assert "sokhotski_plemelj" in result["quadrature"]
 
 
-def test_exact_landau_limit_rejects_derivative_knots_and_higher_order_poles():
+def test_exact_landau_limit_rejects_derivative_knots_and_unsupported_pole_orders():
     import pytest
     velocity = np.linspace(-5.0, 5.0, 101)
     distribution = np.exp(-0.5*velocity**2)
     with pytest.raises(ValueError, match="derivative knot"):
         generalized_landau_integral(velocity, distribution, 0.0, landau_limit=True)
-    with pytest.raises(ValueError, match="first-order"):
-        generalized_landau_integral(velocity, distribution, 0.37, landau_limit=True, pole_order=2)
+    with pytest.raises(ValueError, match="supports first-order"):
+        generalized_landau_integral(velocity, distribution, 0.37, landau_limit=True, pole_order=3)
+    derivative = generalized_landau_integral(
+        velocity, distribution, 0.37, landau_limit=True, pole_order=2,
+    )
+    assert derivative["pole_order"] == 2
+    assert "hadamard_finite_part" in derivative["quadrature"]
 
 
 def test_exact_landau_limit_is_connected_to_electron_susceptibility():
@@ -604,3 +609,32 @@ def test_exact_landau_derivative_rejects_resonance_at_vdf_grid_knot():
             include_phase_velocity_derivative=True,
             landau_limit=True,
         )
+
+
+
+def test_tabulated_cts_forward_api_exposes_exact_electron_susceptibility_derivative():
+    from tokamak_analysis.thomson_generalized_dispersion import (
+        collective_tabulated_electron_spectral_density,
+    )
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    velocity = np.linspace(-8.0e6, 8.0e6, 1601)
+    distribution = np.exp(-0.5*(velocity/1.0e6)**2)
+    result = collective_tabulated_electron_spectral_density(
+        wavelength, 1064.0, np.pi/2.0,
+        electron_density_m3=1.0e18,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=distribution,
+        ion_species=[{"name":"H+","charge_state":1.0,"mass_amu":1.00784}],
+        ion_fractions=[1.0], ion_temperature_eV=[10.0],
+        electron_velocity_m_s=[0.0,0.0,0.0],
+        ion_velocity_m_s=[[0.0,0.0,0.0]],
+        incident_direction=[1.0,0.0,0.0],
+        scattered_direction=[0.0,1.0,0.0],
+        pole_imaginary_part_m_s=100.0,
+        include_electron_phase_velocity_derivative=True,
+    )
+    derivative = result["electron_susceptibility_phase_velocity_derivative_s_m"]
+    assert derivative.shape == wavelength.shape
+    assert np.all(np.isfinite(derivative.real))
+    assert np.all(np.isfinite(derivative.imag))
+    assert "fixed k and fixed projected EVDF" in result["electron_susceptibility_derivative_definition"]
