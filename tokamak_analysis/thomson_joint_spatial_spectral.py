@@ -276,7 +276,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     spatial_psf_sigma_uncertainty_m=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
-    model_discrepancy_covariance=None, regularization_sensitivity_strengths=None,
+    model_discrepancy_covariance=None, systematic_covariance=None,
+    regularization_sensitivity_strengths=None,
     regularization_strength=0.0, regularization_kind="curvature",
     tv_huber_scale=0.05, positive_amplitude=True, max_nfev=3000,
     maximum_data_condition_number=1.0e8,
@@ -456,17 +457,40 @@ def reconstruct_joint_thomson_spatial_spectra(
                 "model_discrepancy_covariance must be positive semidefinite"
             )
 
+    systematic = None
+    if systematic_covariance is not None:
+        systematic = _real_array(systematic_covariance, "systematic_covariance")
+        if (systematic.shape != (m*nlam, m*nlam)
+                or not np.all(np.isfinite(systematic))
+                or not np.allclose(systematic, systematic.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "systematic_covariance must be finite, symmetric, and channel-major"
+            )
+        systematic = 0.5 * (systematic + systematic.T)
+        systematic_eigenvalues = np.linalg.eigvalsh(systematic)
+        systematic_scale = max(
+            float(np.max(np.abs(systematic_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if systematic_eigenvalues[0] < -1e-10 * systematic_scale:
+            raise ValueError("systematic_covariance must be positive semidefinite")
+
+    covariance_components = [
+        component for component in (measurement_covariance, discrepancy, systematic)
+        if component is not None
+    ]
     total_spectral_covariance = None
-    if measurement_covariance is not None or discrepancy is not None:
-        if measurement_covariance is None:
-            total_spectral_covariance = discrepancy.copy()
-            noise_model = "model_discrepancy_only_channel_major_covariance"
-        elif discrepancy is None:
-            total_spectral_covariance = measurement_covariance.copy()
-            noise_model = measurement_covariance_source
-        else:
-            total_spectral_covariance = measurement_covariance + discrepancy
-            noise_model = "measurement_plus_model_discrepancy_channel_major_covariance"
+    if covariance_components:
+        total_spectral_covariance = np.sum(covariance_components, axis=0)
+        supplied_labels = [
+            label for label, component in (
+                ("measurement", measurement_covariance),
+                ("model_discrepancy", discrepancy),
+                ("systematic", systematic),
+            ) if component is not None
+        ]
+        noise_model = "_plus_".join(supplied_labels) + "_channel_major_covariance"
         try:
             chol = np.linalg.cholesky(total_spectral_covariance)
         except np.linalg.LinAlgError as exc:
@@ -1007,17 +1031,37 @@ def reconstruct_joint_thomson_spatial_spectra(
             "model_discrepancy_covariance_trace": (
                 float(np.trace(discrepancy)) if discrepancy is not None else None
             ),
+            "systematic_covariance_supplied": systematic is not None,
+            "systematic_covariance_shape": (
+                list(systematic.shape) if systematic is not None else None
+            ),
+            "systematic_covariance_trace": (
+                float(np.trace(systematic)) if systematic is not None else None
+            ),
             "combined_covariance": (
-                "measurement_covariance_plus_independent_model_discrepancy_covariance"
-                if measurement_covariance is not None and discrepancy is not None
+                "independent_measurement_model_discrepancy_and_systematic_covariances"
+                if measurement_covariance is not None and discrepancy is not None and systematic is not None
+                else "independent_measurement_and_systematic_covariances"
+                if measurement_covariance is not None and systematic is not None and discrepancy is None
+                else "independent_measurement_and_model_discrepancy_covariances"
+                if measurement_covariance is not None and discrepancy is not None and systematic is None
+                else "model_discrepancy_and_systematic_covariances"
+                if measurement_covariance is None and discrepancy is not None and systematic is not None
+                else "systematic_covariance_only"
+                if measurement_covariance is None and discrepancy is None and systematic is not None
                 else "model_discrepancy_covariance_only"
                 if measurement_covariance is None and discrepancy is not None
                 else "measurement_covariance_only"
                 if measurement_covariance is not None
                 else "unweighted_residual_scaled"
             ),
+            "independence_assumption": (
+                "all supplied covariance components are mutually independent; "
+                "supply their cross-covariance blocks externally if correlated"
+            ),
             "cross_covariance_assumed_zero": bool(
-                measurement_covariance is not None and discrepancy is not None
+                sum(component is not None for component in
+                    (measurement_covariance, discrepancy, systematic)) > 1
             ),
             "silent_jitter_or_eigenvalue_clipping": False,
         },
@@ -1077,6 +1121,7 @@ def reconstruct_joint_thomson_spatial_spectra(
                 signal_uncertainty=signal_uncertainty,
                 joint_spectral_covariance=joint_spectral_covariance,
                 model_discrepancy_covariance=model_discrepancy_covariance,
+                systematic_covariance=systematic_covariance,
                 regularization_sensitivity_strengths=None,
                 regularization_strength=float(strength),
                 regularization_kind=regularization_kind,
