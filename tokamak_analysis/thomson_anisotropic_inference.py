@@ -268,6 +268,18 @@ def _gyrotropic_velocity_covariance_tensors(temperature_parallel_eV, temperature
     ])
 
 
+def _projected_velocity_variance_from_tensor(covariance_tensors, scattering_vector_unit):
+    """Project each 3-D thermal covariance onto its measured scattering direction."""
+    tensors = _real_array(covariance_tensors, "covariance_tensors", 3)
+    directions = _real_array(scattering_vector_unit, "scattering_vector_unit", 2)
+    if tensors.shape != (directions.shape[0], 3, 3) or directions.shape[1] != 3:
+        raise ValueError("covariance tensors and scattering directions must have matching view counts")
+    norms = np.linalg.norm(directions, axis=1)
+    if not np.allclose(norms, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("scattering_vector_unit rows must be unit vectors")
+    return np.einsum("vi,vij,vj->v", directions, tensors, directions)
+
+
 def fit_gyrotropic_bi_maxwellian_thomson(
     wavelength_nm, measured_spectra, *, laser_wavelength_nm,
     scattering_angle_rad, magnetic_field_unit, scattering_vector_unit,
@@ -507,6 +519,12 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     )
     tpar = float(np.exp(fit.x[0])) if reportable_anisotropy else None
     tperp = float(np.exp(fit.x[1])) if reportable_anisotropy else None
+    thermal_covariance = _gyrotropic_velocity_covariance_tensors(tpar, tperp, b)
+    projected_variance_from_tensor = (
+        None if thermal_covariance is None
+        else _projected_velocity_variance_from_tensor(thermal_covariance, q)
+    )
+    projected_variance_expected = _E * directional / _ME
     return {
         "model": "gyrotropic_bi_maxwellian_nonrelativistic_optical_thomson",
         "model_validity": {
@@ -518,7 +536,14 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         },
         "electron_temperature_parallel_eV": tpar,
         "electron_temperature_perpendicular_eV": tperp,
-        "thermal_velocity_covariance_tensor_per_view_m2_s2": _gyrotropic_velocity_covariance_tensors(tpar, tperp, b),
+        "thermal_velocity_covariance_tensor_per_view_m2_s2": thermal_covariance,
+        "projected_velocity_variance_from_tensor_m2_s2": projected_variance_from_tensor,
+        "projected_velocity_variance_expected_m2_s2": projected_variance_expected,
+        "projected_velocity_variance_relative_residual": (
+            None if projected_variance_from_tensor is None
+            else (projected_variance_from_tensor - projected_variance_expected)
+                 / projected_variance_expected
+        ),
         "thermal_velocity_covariance_definition": "(e/m_e) * [T_perp I + (T_parallel-T_perp) b b^T]; temperatures are in eV",
         "temperature_anisotropy_ratio_parallel_over_perpendicular": (
             float(tpar / tperp) if tpar is not None and tperp is not None else None
@@ -840,6 +865,15 @@ def fit_gyrotropic_bi_kappa_thomson(
         parameter_covariance = transform @ parameter_covariance @ transform.T
     spectrally_identifiable = geometry_rank == 2 and full_rank
     reportable = spectrally_identifiable and not projected_tail_exceeds_tolerance
+    thermal_covariance = _gyrotropic_velocity_covariance_tensors(
+        float(np.exp(fit.x[0])) if reportable else None,
+        float(np.exp(fit.x[1])) if reportable else None, b
+    )
+    projected_variance_from_tensor = (
+        None if thermal_covariance is None
+        else _projected_velocity_variance_from_tensor(thermal_covariance, q)
+    )
+    projected_variance_expected = _E * directional / _ME
     return {
         "model": "gyrotropic_bi_kappa_nonrelativistic_optical_thomson",
         "distribution_definition": "f3(v) proportional to [1 + v_parallel^2/(kappa*theta_parallel^2) + v_perp^2/(kappa*theta_perp^2)]^(-(kappa+1))",
@@ -847,9 +881,13 @@ def fit_gyrotropic_bi_kappa_thomson(
         "temperature_definition": "T_q[eV]=m_e*Var(v_q)/e; theta_q^2=((2*kappa-3)/kappa)*(e*T_q/m_e)",
         "electron_temperature_parallel_eV": float(np.exp(fit.x[0])) if reportable else None,
         "electron_temperature_perpendicular_eV": float(np.exp(fit.x[1])) if reportable else None,
-        "thermal_velocity_covariance_tensor_per_view_m2_s2": _gyrotropic_velocity_covariance_tensors(
-            float(np.exp(fit.x[0])) if reportable else None,
-            float(np.exp(fit.x[1])) if reportable else None, b
+        "thermal_velocity_covariance_tensor_per_view_m2_s2": thermal_covariance,
+        "projected_velocity_variance_from_tensor_m2_s2": projected_variance_from_tensor,
+        "projected_velocity_variance_expected_m2_s2": projected_variance_expected,
+        "projected_velocity_variance_relative_residual": (
+            None if projected_variance_from_tensor is None
+            else (projected_variance_from_tensor - projected_variance_expected)
+                 / projected_variance_expected
         ),
         "thermal_velocity_covariance_definition": (
             "(e/m_e) * [T_perp I + (T_parallel-T_perp) b b^T]; "
