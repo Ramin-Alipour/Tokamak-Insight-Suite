@@ -708,8 +708,50 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     result = solver(*args, **kwargs)
     if not isinstance(result, Mapping):
         raise TypeError("advanced physics solver must return a mapping")
+    result = dict(result)
+
+    # A gyrotropic multi-view fit already estimates one q-parallel flow
+    # projection per view. Close the physical path by solving v_q = q_hat.v
+    # jointly in 3-D, using the *fit-derived cross-view projection covariance*.
+    # Never replace a missing/singular covariance with an invented identity.
+    if model in {"gyrotropic_bi_maxwellian_spectral_fit", "gyrotropic_bi_kappa_spectral_fit"}:
+        directions = kwargs.get("scattering_vector_unit")
+        if directions is not None:
+            projections = np.asarray(result.get("electron_velocity_projection_m_s"), dtype=float)
+            order = list(result.get("parameter_order") or [])
+            parameter_covariance = result.get("parameter_covariance")
+            flow_names = [f"flow_projection_view_{i}_m_s" for i in range(projections.size)]
+            if parameter_covariance is None or any(name not in order for name in flow_names):
+                result["three_dimensional_flow_inference"] = {
+                    "identifiability": "not_reported",
+                    "reportable_as_inferred_parameter": False,
+                    "electron_velocity_vector_m_s": None,
+                    "electron_velocity_covariance_m2_s2": None,
+                    "reason": "A finite full-rank joint spectral-fit covariance is required to propagate correlated view-projection uncertainty.",
+                }
+            else:
+                covariance = np.asarray(parameter_covariance, dtype=float)
+                indices = [order.index(name) for name in flow_names]
+                if covariance.shape != (len(order), len(order)):
+                    raise ValueError("gyrotropic fit parameter covariance does not match parameter_order")
+                projection_covariance = covariance[np.ix_(indices, indices)]
+                try:
+                    result["three_dimensional_flow_inference"] = infer_three_dimensional_flow_from_thomson_projections(
+                        projections,
+                        directions,
+                        projection_covariance_m2_s2=projection_covariance,
+                        scattering_vector_covariance=kwargs.get("scattering_vector_covariance"),
+                    )
+                except (ValueError, np.linalg.LinAlgError) as exc:
+                    result["three_dimensional_flow_inference"] = {
+                        "identifiability": "not_reported",
+                        "reportable_as_inferred_parameter": False,
+                        "electron_velocity_vector_m_s": None,
+                        "electron_velocity_covariance_m2_s2": None,
+                        "reason": f"3-D flow covariance/geometry solve was not reportable: {exc}",
+                    }
     return {
-        **dict(result),
+        **result,
         "public_physics_entrypoint": model,
         "automatic_model_substitution": False,
     }

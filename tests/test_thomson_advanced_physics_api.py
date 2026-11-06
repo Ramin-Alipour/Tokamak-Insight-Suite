@@ -155,3 +155,71 @@ def test_collective_kappa_dispatch_forwards_mixed_kinetic_populations():
     assert result["ion_populations"][0]["distribution"] == "kappa"
     assert result["spectral_density_per_nm"].shape == wavelength.shape
     assert np.all(np.isfinite(result["dielectric_function"]))
+
+def test_gyrotropic_public_api_closes_multi_view_projections_to_3d_flow():
+    from tokamak_analysis.thomson_anisotropic_inference import _gaussian_bin_average
+
+    wavelength = np.linspace(1062.0, 1066.0, 161)
+    laser = 1064.0
+    angle = np.pi / 2.0
+    magnetic = np.array([0.0, 0.0, 1.0])
+    directions = np.array([
+        [0.0, 0.0, 1.0],
+        [np.sqrt(3.0) / 2.0, 0.0, 0.5],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+    ])
+    true_flow = np.array([1.2e4, -8.0e3, 1.5e4])
+    projections = directions @ true_flow
+    pitch2 = (directions @ magnetic) ** 2
+    directional_temperature = 350.0 + (900.0 - 350.0) * pitch2
+    spectra = []
+    for temperature, flow in zip(directional_temperature, projections):
+        sigma_v = np.sqrt(1.602176634e-19 * temperature / 9.1093837015e-31)
+        center = laser * (1.0 - 2.0*np.sin(angle/2.0)*flow/299792458.0)
+        sigma_lambda = laser * 2.0*np.sin(angle/2.0)*sigma_v/299792458.0
+        shape, _ = _gaussian_bin_average(wavelength, center, sigma_lambda)
+        spectra.append(0.03 + 0.8*shape + 1.0e-4*(wavelength-laser))
+
+    result = physics.run_advanced_thomson_physics(
+        "gyrotropic_bi_maxwellian_spectral_fit",
+        wavelength, np.asarray(spectra),
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        magnetic_field_unit=magnetic,
+        scattering_vector_unit=directions,
+        instrument_response_matrix=np.eye(wavelength.size),
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+    )
+    flow = result["three_dimensional_flow_inference"]
+    assert flow["identifiability"] == "identifiable_from_three_dimensional_view_geometry"
+    assert flow["reportable_as_inferred_parameter"] is True
+    np.testing.assert_allclose(flow["electron_velocity_vector_m_s"], true_flow, atol=2.0e3)
+    assert flow["electron_velocity_covariance_m2_s2"].shape == (3, 3)
+    assert result["public_physics_entrypoint"] == "gyrotropic_bi_maxwellian_spectral_fit"
+
+
+def test_gyrotropic_public_api_does_not_invent_3d_flow_when_covariance_is_missing(monkeypatch):
+    sentinel = {
+        "electron_velocity_projection_m_s": np.array([1.0, 2.0, 3.0]),
+        "parameter_order": [
+            "T_parallel_eV", "T_perpendicular_eV",
+            "flow_projection_view_0_m_s", "log_amplitude_view_0",
+            "background_offset_view_0", "background_slope_view_0_per_nm",
+            "flow_projection_view_1_m_s", "log_amplitude_view_1",
+            "background_offset_view_1", "background_slope_view_1_per_nm",
+            "flow_projection_view_2_m_s", "log_amplitude_view_2",
+            "background_offset_view_2", "background_slope_view_2_per_nm",
+        ],
+        "parameter_covariance": None,
+    }
+    monkeypatch.setattr(physics, "fit_gyrotropic_bi_maxwellian_thomson", lambda *a, **k: sentinel)
+    result = physics.run_advanced_thomson_physics(
+        "gyrotropic_bi_maxwellian_spectral_fit",
+        scattering_vector_unit=np.eye(3),
+    )
+    flow = result["three_dimensional_flow_inference"]
+    assert flow["reportable_as_inferred_parameter"] is False
+    assert flow["electron_velocity_vector_m_s"] is None
+    assert "covariance is required" in flow["reason"]

@@ -34,7 +34,10 @@ def render_gyrotropic_thomson_page(st) -> None:
     st.caption(
         "Required: one common calibrated wavelength grid, one measured response matrix, "
         "and independently measured view geometry. A single view identifies only a "
-        "directional temperature, not T_parallel and T_perpendicular separately."
+        "directional temperature, not T_parallel and T_perpendicular separately. "
+        "With three linearly independent scattering directions, the API also reconstructs "
+        "the 3-D flow vector from the jointly fitted projections and their full covariance. "
+        "Optional scattering_vector_covariance in the geometry JSON propagates direction uncertainty."
     )
     spectrum_file = st.file_uploader(
         "Measured multi-view spectra CSV: wavelength_nm followed by one intensity column per view",
@@ -51,6 +54,8 @@ def render_gyrotropic_thomson_page(st) -> None:
             [0.8660254037844386, 0.0, 0.5],
             [1.0, 0.0, 0.0],
         ],
+        # Optional 3*n_view square Cartesian covariance can be supplied here
+        # in view-major [qx,qy,qz] ordering for tangent-plane EIV propagation.
     }, indent=2)
     geometry_text = st.text_area(
         "Measured geometry (JSON)", value=geometry_default,
@@ -102,6 +107,15 @@ def render_gyrotropic_thomson_page(st) -> None:
                 raise ValueError("Geometry JSON must contain magnetic_field_unit and scattering_vector_unit.")
             magnetic = np.asarray(geometry["magnetic_field_unit"], dtype=float)
             q_vectors = np.asarray(geometry["scattering_vector_unit"], dtype=float)
+            q_covariance = geometry.get("scattering_vector_covariance")
+            if q_covariance is not None:
+                q_covariance = np.asarray(q_covariance, dtype=float)
+                expected_geometry_covariance_shape = (3 * n_view, 3 * n_view)
+                if q_covariance.shape != expected_geometry_covariance_shape or not np.all(np.isfinite(q_covariance)):
+                    raise ValueError(
+                        "scattering_vector_covariance in geometry JSON must be a finite "
+                        f"{expected_geometry_covariance_shape} Cartesian covariance matrix in view-major order."
+                    )
             if magnetic.shape not in {(3,), (n_view, 3)} or q_vectors.shape != (n_view, 3):
                 raise ValueError(f"Geometry must provide one or {n_view} magnetic-field unit vector(s) and exactly {n_view} scattering-vector unit vectors.")
             uncertainty = _read_numeric_csv(uncertainty_file, "Pointwise uncertainty")
@@ -135,12 +149,33 @@ def render_gyrotropic_thomson_page(st) -> None:
                 scattering_angle_rad=float(np.deg2rad(angle)),
                 magnetic_field_unit=magnetic,
                 scattering_vector_unit=q_vectors,
+                scattering_vector_covariance=q_covariance,
                 instrument_response_matrix=response,
                 initial_temperature_parallel_eV=float(initial_parallel),
                 initial_temperature_perpendicular_eV=float(initial_perpendicular),
                 **options,
             )
             st.subheader("Gyrotropic inference result")
+            flow_result = result.get("three_dimensional_flow_inference") or {}
+            if flow_result.get("reportable_as_inferred_parameter") is True:
+                st.success(
+                    "The fitted view projections identify a subluminal 3-D electron-flow vector. "
+                    "Its covariance includes the full cross-view spectral-fit covariance."
+                )
+                st.markdown("**Three-dimensional electron-flow inference**")
+                st.json({
+                    "electron_velocity_vector_m_s": flow_result.get("electron_velocity_vector_m_s"),
+                    "electron_speed_m_s": flow_result.get("electron_speed_m_s"),
+                    "electron_velocity_covariance_m2_s2": flow_result.get("electron_velocity_covariance_m2_s2"),
+                    "fit_residual_projection_m_s": flow_result.get("fit_residual_projection_m_s"),
+                    "reduced_chi_square": flow_result.get("reduced_chi_square"),
+                    "geometry_covariance_method": flow_result.get("geometry_covariance_method"),
+                })
+            elif flow_result:
+                st.warning(
+                    "A 3-D flow vector was withheld: "
+                    + str(flow_result.get("reason", "the supplied view geometry or fit covariance is insufficient."))
+                )
             if result.get("reportable_as_inferred_parameter") is True:
                 st.success("The multi-view data identify the reported anisotropic temperature parameters within the solver's declared model scope.")
             else:
