@@ -933,6 +933,25 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "The 3-D flow vector is withheld unless the view directions and "
                         "fit-derived cross-view flow covariance identify all three components."
                     )
+            if isinstance(result, Mapping) and "thermal_velocity_covariance_tensor_per_view_m2_s2" in result:
+                st.subheader("Gyrotropic 3-D thermal velocity covariance")
+                st.latex(
+                    r"\langle\delta\mathbf v\,\delta\mathbf v^T\rangle"
+                    r"=\frac{e}{m_e}\left[T_\perp I+(T_\parallel-T_\perp)"
+                    r"\hat{\mathbf b}\hat{\mathbf b}^T\right]"
+                )
+                st.write({
+                    "temperature_anisotropy_ratio_parallel_over_perpendicular":
+                        result.get("temperature_anisotropy_ratio_parallel_over_perpendicular"),
+                    "covariance_tensor_per_view_m2_s2":
+                        result.get("thermal_velocity_covariance_tensor_per_view_m2_s2"),
+                    "definition": result.get("thermal_velocity_covariance_definition"),
+                })
+                if result.get("thermal_velocity_covariance_tensor_per_view_m2_s2") is None:
+                    st.warning(
+                        "The 3-D thermal covariance tensor is withheld because both "
+                        "temperature components are not identifiable and within model validity."
+                    )
             st.json(safe)
             st.download_button(
                 "Export advanced physics result (JSON)",
