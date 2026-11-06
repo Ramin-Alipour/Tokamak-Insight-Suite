@@ -36,6 +36,7 @@ from .cts_kappa import maxwellian_electron_susceptibility
 from .cts_kappa_dispersion import kappa_dispersion_function
 from .thomson_generalized_dispersion import (
     collective_tabulated_electron_spectral_density,
+    collective_multi_population_tabulated_electron_spectral_density,
     generalized_electron_susceptibility,
 )
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
@@ -730,9 +731,10 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - cts_tabulated_evdf_landau: electrostatic CTS dynamic structure spectrum using
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
-        either Maxwellian or species-resolved tabulated ion EVDFs. The output also
-        reports directional second-moment temperatures and standardized shape
-        moments. This is a forward model, not a 3-D EVDF inverse.
+        either Maxwellian or species-resolved tabulated ion EVDFs.
+      - cts_multi_population_tabulated_evdf_landau: density-weighted sum of independent
+        electron-population Landau susceptibilities and Klimontovich fluctuation sources,
+        coupled through one multispecies dielectric; population fractions are explicit inputs.
       - maxwellian_electrostatic_susceptibility: exact Fried-Conte Maxwellian electron susceptibility using the Faddeeva function.
       - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
@@ -831,6 +833,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = generalized_electron_susceptibility
     elif model == "cts_tabulated_evdf_landau":
         solver = collective_tabulated_electron_spectral_density
+    elif model == "cts_multi_population_tabulated_evdf_landau":
+        solver = collective_multi_population_tabulated_electron_spectral_density
     elif model == "cts_non_gyrotropic_gaussian_tensor_spectrum":
         solver = collective_non_gyrotropic_gaussian_electron_spectrum
     elif model == "cts_electrostatic_measured_spectrum_inference":
