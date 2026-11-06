@@ -5938,7 +5938,12 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_gls_recovers_vector_from_independent_views",
-        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views"
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_for_rank_deficient_views",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_ill_conditioned_full_rank_geometry",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_geometry_condition_limit",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_withholds_vector_when_views_reject_common_flow",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_marks_exactly_three_views_as_not_testable",
+        "tests/test_thomson_kinetic_models.py::test_thomson_three_dimensional_flow_rejects_invalid_consistency_threshold"
       ]
     },
     "uncertainty_model": "GLS with supplied full projection covariance; optional full scattering-vector covariance and projection/geometry cross-covariance are propagated by first-order iterative errors-in-variables GLS. SVD is used for the whitened design solve and covariance. The condition number gates vector reporting; for overdetermined views, the chi-square survival probability tests the shared-flow model and gates reporting when inconsistent.",
