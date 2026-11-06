@@ -226,9 +226,9 @@ MODEL_PHYSICS_NOTES = {
     ),
     "cts_collective_kappa_spectrum": (
         "Collisionless, unmagnetized, longitudinal electrostatic CTS forward model. "
-        "Electrons use the exact 1-D marginal of an isotropic 3-D Kappa distribution "
-        "with finite-variance convention kappa > 3/2 and full Landau-contour susceptibility. "
-        "Each electron population may independently use a finite-variance Kappa or Maxwellian 1-D marginal; density fractions, temperature ratios and projected flows are explicit. "
+        "Electrons use exact projected 1-D marginals of isotropic Kappa, gyrotropic bi-Kappa, or Maxwellian populations with full Landau-contour susceptibility. "
+        "A bi-Kappa population requires parallel/perpendicular second-moment temperatures and a unit magnetic-field direction; its directional temperature is T_q=T_perp+(T_parallel-T_perp)(b_hat dot q_hat)^2. "
+        "Each population's density fraction, projected temperature and q-parallel flow are explicit; one scattering direction does not identify both anisotropy temperatures. "
         "Each ion species may independently use a Maxwellian or finite-variance Kappa distribution with its own projected flow; species charge neutrality and ion plasma-frequency weighting are retained. "
         "The longitudinal Landau-contour susceptibilities are summed before dielectric screening, and electron/ion fluctuation terms form S(k,omega). "
         "This remains collisionless, unmagnetized and electrostatic; it is not a collisional, relativistic or Full-EM closure."
@@ -584,7 +584,7 @@ EXAMPLES = {
         "electron_velocity_m_s": [0.0, 0.0, 0.0],
         "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
         "electron_populations": [
-            {"density_fraction": 0.65, "temperature_ratio": 0.7, "kappa": 5.0, "distribution": "kappa", "flow_projection_m_s": -100000.0},
+            {"density_fraction": 0.65, "temperature_parallel_eV": 420.0, "temperature_perpendicular_eV": 120.0, "magnetic_field_unit": [1.0, 0.0, 0.0], "kappa": 5.0, "distribution": "bi_kappa", "flow_projection_m_s": -100000.0},
             {"density_fraction": 0.25, "temperature_ratio": 2.5, "kappa": 3.0, "distribution": "kappa", "flow_projection_m_s": 150000.0},
             {"density_fraction": 0.10, "temperature_ratio": 5.0, "distribution": "maxwellian", "flow_projection_m_s": 800000.0}
         ],

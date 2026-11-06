@@ -581,3 +581,21 @@ resonant damping sign, and an independent finite-difference check of the
 analytic phase derivative. The model remains collisionless, isotropic,
 non-relativistic, unmagnetized and electrostatic; this change does not claim
 collisional, magnetized or Full-EM Kappa CTS.
+
+### Gyrotropic bi-Kappa electron populations in electrostatic CTS
+
+The collective electrostatic Kappa forward model accepts an electron population
+with distribution="bi_kappa", temperature_parallel_eV,
+temperature_perpendicular_eV, kappa, and magnetic_field_unit. For
+scattering direction q_hat and gyrotropy axis b_hat, the exact one-dimensional
+marginal has second-moment temperature
+
+T_q = T_perp + (T_parallel - T_perp) (b_hat dot q_hat)^2,
+
+and uses the finite-variance Kappa marginal with kappa > 3/2. The
+corresponding longitudinal susceptibility is evaluated from that projected
+marginal and summed with other electron and ion population susceptibilities
+before dielectric screening. This is an unmagnetized electrostatic response
+for an anisotropic equilibrium; it does not include cyclotron harmonics,
+magnetized dielectric tensor elements, or a Full-EM CTS scattering vertex.
+A single scattering direction constrains T_q, not both T_parallel and T_perp.

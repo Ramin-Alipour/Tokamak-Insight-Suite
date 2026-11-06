@@ -1290,3 +1290,38 @@ def test_collective_cts_bikappa_population_rejects_missing_magnetic_geometry():
                 "kappa": 3.8,
             }],
         )
+
+def test_collective_cts_bikappa_population_is_reachable_through_public_analysis1_api():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    wavelength = np.linspace(1050.0, 1078.0, 31)
+    angle = np.pi / 2.0
+    incident = [-np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    scattered = [np.sin(angle/2.0), np.cos(angle/2.0), 0.0]
+    result = run_advanced_thomson_physics(
+        "cts_collective_kappa_spectrum",
+        wavelength_nm=wavelength,
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=angle,
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=120.0,
+        kappa=3.8,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[80.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident,
+        scattered_direction=scattered,
+        electron_populations=[{
+            "density_fraction": 1.0, "distribution": "bi_kappa",
+            "temperature_parallel_eV": 240.0,
+            "temperature_perpendicular_eV": 90.0,
+            "magnetic_field_unit": [1.0, 0.0, 0.0],
+            "kappa": 3.8, "flow_projection_m_s": 0.0,
+        }],
+    )
+    assert result["public_physics_entrypoint"] == "cts_collective_kappa_spectrum"
+    assert result["automatic_model_substitution"] is False
+    assert result["electron_populations"][0]["distribution"] == "bi_kappa"
+    assert result["electron_mixture_moments"]["population_count"] == 1
