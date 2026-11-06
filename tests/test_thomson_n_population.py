@@ -60,3 +60,46 @@ def test_n_population_inverse_fits_ordered_temperatures_and_joint_background():
     assert result["joint_parameter_covariance"].shape[0] == len(result["parameter_names"])
     assert result["jacobian_rank"] == result["jacobian_parameter_count"]
     assert result["absolute_density_inferred"] is False
+
+
+
+def test_n_population_forward_model_supports_distinct_physical_flow_projections():
+    x = np.linspace(450.0, 614.0, 161)
+    distinct = n_population_relativistic_thomson_spectrum(
+        x, 532.0, np.pi / 2.0, [150.0, 1800.0], [0.7, 0.3],
+        population_flow_projections_m_s=[-2.0e4, 5.0e4],
+        incident_polarization=[1.0, 0.0, 0.0],
+        radial_order=16, angular_order=8,
+    )
+    shared = n_population_relativistic_thomson_spectrum(
+        x, 532.0, np.pi / 2.0, [150.0, 1800.0], [0.7, 0.3],
+        flow_projection_m_s=1.5e4,
+        incident_polarization=[1.0, 0.0, 0.0],
+        radial_order=16, angular_order=8,
+    )
+    assert distinct["population_flow_projections_m_s"] == pytest.approx([-2.0e4, 5.0e4])
+    assert distinct["population_components"][0]["flow_projection_m_s"] == pytest.approx(-2.0e4)
+    assert distinct["population_components"][1]["flow_projection_m_s"] == pytest.approx(5.0e4)
+    assert distinct["flow_projection_m_s"] is None
+    assert not np.allclose(
+        distinct["spectral_density_per_nm"], shared["spectral_density_per_nm"],
+        rtol=1e-5, atol=1e-12,
+    )
+
+
+def test_n_population_forward_model_rejects_ambiguous_flow_contract():
+    with pytest.raises(ValueError, match="supply exactly one"):
+        n_population_relativistic_thomson_spectrum(
+            np.linspace(520.0, 544.0, 81), 532.0, np.pi / 2.0,
+            [500.0, 2000.0], [0.7, 0.3],
+            incident_polarization=[1.0, 0.0, 0.0],
+            radial_order=16, angular_order=8,
+        )
+    with pytest.raises(ValueError, match="match the population count"):
+        n_population_relativistic_thomson_spectrum(
+            np.linspace(520.0, 544.0, 81), 532.0, np.pi / 2.0,
+            [500.0, 2000.0], [0.7, 0.3],
+            population_flow_projections_m_s=[1.0e4],
+            incident_polarization=[1.0, 0.0, 0.0],
+            radial_order=16, angular_order=8,
+        )
