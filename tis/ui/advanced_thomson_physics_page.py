@@ -576,7 +576,9 @@ EXAMPLES = {
         "common_temperature_J": 1.602176634e-17,
         "collision_frequencies_s_inverse": [2.0e7, 1.0e5],
         "bulk_flow_m_s": 0.0,
-        "quadrature_order": 64
+        "quadrature_order": 64,
+        "quadrature_max_order": 384,
+        "quadrature_convergence_tolerance": 1.0e-5
     },
 }
  
