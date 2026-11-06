@@ -9925,5 +9925,99 @@
         "scope": "Thomson-scattering velocity projections and thermal second moments; the symmetric tensor inversion follows from the second-moment projection identity."
       }
     ]
+  },
+  {
+    "name": "Thomson spatial-mixing operator calibration covariance",
+    "equation": "r=W[y−F(p,H)], J_p=∂r/∂p, J_H=∂r/∂vec(H); S_H=−(J_pᵀJ_p)^−1J_pᵀJ_H; C_p=C_{p|y}+S_H C_H S_Hᵀ+S_y C_{yH} S_Hᵀ+S_H C_{yH}ᵀ S_yᵀ",
+    "inputs": "Channel-major calibrated spectra, measured spectral covariance, calibrated spatial mixing operator H, full row-major covariance C_H of vec(H), and optional spectrum/operator cross-covariance C_yH",
+    "output": "Physical profile-parameter covariance including first-order spatial mixing calibration and spectrum/operator cross-covariance contributions",
+    "assumptions": "The physical spectral forward model, measured instrument response and PSF shape are fixed during the local linearization. The mixing operator covariance is an externally calibrated covariance; the derivative is evaluated at the data-identifiable GLS solution. Cross-covariance is included only when the joint measured-spectrum/operator covariance block is positive semidefinite.",
+    "status": "D",
+    "category": "Thomson spatial profile inference",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "formula_key": "thomson_spatial_mixing_operator_calibration_covariance",
+      "input_specs": [
+        {
+          "name": "spatial_mixing_matrix",
+          "unit": "n_channels x n_nodes calibrated spatial mixing operator",
+          "required": true
+        },
+        {
+          "name": "spatial_mixing_matrix_covariance",
+          "unit": "(n_channels*n_nodes)^2 covariance, row-major channel/node order",
+          "required": true
+        },
+        {
+          "name": "joint_spectral_covariance or signal_uncertainty",
+          "unit": "channel-major measured spectral covariance or pointwise standard uncertainty",
+          "required": false
+        },
+        {
+          "name": "spectral_mixing_cross_covariance",
+          "unit": "(n_channels*n_wavelengths) x (n_channels*n_nodes) covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spatial_mixing_calibration_parameter_covariance",
+          "unit": "physical profile-parameter covariance contribution"
+        },
+        {
+          "name": "spatial_mixing_cross_covariance_parameter_contribution",
+          "unit": "physical profile-parameter covariance cross contribution"
+        },
+        {
+          "name": "spatial_mixing_parameter_sensitivity",
+          "unit": "derivative of fit parameters with respect to row-major mixing-operator elements"
+        }
+      ],
+      "prerequisites": [
+        "Data-only Jacobian must identify all fitted parameters; regularization rows are excluded from this gate.",
+        "Mixing-operator covariance must be finite, symmetric and positive semidefinite.",
+        "A spectrum/operator cross-covariance requires measured spectral covariance and a positive-semidefinite joint block."
+      ],
+      "uncertainty_model": "First-order implicit GLS sensitivity propagates the full covariance of the supplied spatial mixing operator. Optional measured-spectrum/operator cross-covariance contributes both symmetric cross terms; model-discrepancy and systematic covariance remain separately represented in the spectral weighting.",
+      "limitations": [
+        "Local linearized uncertainty only; large operator perturbations and positivity-boundary effects require full operator-realization refits.",
+        "The covariance is conditional on the selected physical model, instrument response, PSF, spatial discretization and regularization.",
+        "This numerical software verification is not experimental validation."
+      ],
+      "function_links": [
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "note": "The operator is differentiated analytically element-by-element after PSF composition; covariance is not approximated by independent per-channel scalar errors.",
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_full_spatial_mixing_operator_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validates_joint_block"
+      ],
+      "execution_scope": "measured_calibrated_spectra_to_spatial_physical_profile_inference",
+      "input_data_level": "measured_calibrated_spectra_and_calibrated_spatial_operator",
+      "raw_data_to_physics_semantics": "Raw detector calibration and PSF/mixing calibration are external inputs; this function begins with calibrated spectra and a supplied spatial operator.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Spatial profile reconstruction"
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectra_and_calibrated_spatial_operator",
+    "execution_scope": "measured_calibrated_spectra_to_spatial_physical_profile_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "function_links": [
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
+      ],
+      "formula_key": "thomson_spatial_mixing_operator_calibration_covariance",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_full_spatial_mixing_operator_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validates_joint_block"
+      ]
+    }
   }
 ]
