@@ -481,6 +481,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         if component is not None
     ]
     total_spectral_covariance = None
+    spectral_covariance_cholesky = None
     if covariance_components:
         total_spectral_covariance = np.sum(covariance_components, axis=0)
         supplied_labels = [
@@ -500,6 +501,7 @@ def reconstruct_joint_thomson_spatial_spectra(
             noise_model = "_plus_".join(supplied_labels) + "_channel_major_covariance"
         try:
             chol = np.linalg.cholesky(total_spectral_covariance)
+            spectral_covariance_cholesky = chol
         except np.linalg.LinAlgError as exc:
             raise ValueError(
                 "combined spectral covariance must be positive definite; no silent jitter is applied"
@@ -815,6 +817,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     # published, even if regularization made the optimizer Hessian invertible.
     data_covariance_p = None
     measurement_data_covariance_p = None
+    spectral_covariance_parameter_components_p = {}
     psf_calibration_covariance_p = None
     psf_sigma_parameter_sensitivity = None
     if data_identifiable:
@@ -823,6 +826,31 @@ def reconstruct_joint_thomson_spatial_spectra(
         if residual_scale is not None:
             data_covariance_p *= residual_scale
         measurement_data_covariance_p = data_covariance_p.copy()
+        if spectral_covariance_cholesky is not None:
+            # Decompose the data-only GLS covariance by source.  In whitened
+            # coordinates Cw=L^-1 C_source L^-T and the parameter contribution
+            # is H^-1 J^T Cw J H^-1.  These components sum to H^-1 when the
+            # supplied covariance components sum to the effective covariance.
+            whitening_matrix = np.linalg.solve(
+                spectral_covariance_cholesky, np.eye(m*nlam)
+            )
+            for label, component in (
+                ("measurement", measurement_covariance),
+                ("model_discrepancy", discrepancy),
+                ("systematic", systematic),
+            ):
+                if component is None:
+                    continue
+                whitened_component = (
+                    whitening_matrix @ component @ whitening_matrix.T
+                )
+                contribution = (
+                    data_covariance_p @ data_jacobian.T
+                    @ whitened_component @ data_jacobian @ data_covariance_p
+                )
+                spectral_covariance_parameter_components_p[label] = (
+                    0.5 * (contribution + contribution.T)
+                )
         if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0:
             # Differentiate the complete measured-spectrum residual with respect
             # to the calibrated PSF width, then use implicit GLS sensitivity
@@ -939,6 +967,10 @@ def reconstruct_joint_thomson_spatial_spectra(
             transform @ measurement_data_covariance_p @ transform.T
             if measurement_data_covariance_p is not None else None
         ),
+        "spectral_covariance_parameter_components": {
+            label: transform @ contribution @ transform.T
+            for label, contribution in spectral_covariance_parameter_components_p.items()
+        },
         "psf_calibration_parameter_covariance": (
             transform @ psf_calibration_covariance_p @ transform.T
             if psf_calibration_covariance_p is not None else None
