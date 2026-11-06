@@ -780,6 +780,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
       - thomson_multiview_3d_evdf: non-negative 3-D velocity-space inversion from multiple measured scattering views; the data-only stacked kernel rank gates whether a 3-D EVDF is reportable.
       - thomson_relativistic_exact_flow_projection: exact relativistic Doppler inversion for one fitted q-parallel bulk-flow projection (not a distribution mean or 3-D flow).
+      - thomson_n_population_relativistic_fit: measured-spectrum inversion of a finite 2–8 component relativistic Maxwell-Juttner mixture, with ordered temperatures, simplex number fractions, optional component-specific q-flow, measured response, structured background, joint measurement/model-discrepancy covariance and a scaled-Jacobian identifiability gate.
       - thomson_kinetic_background_fit: finite-bin Kappa or bin-averaged relativistic
         Maxwell-Juttner physical fit with detector background, instrument response,
         measurement/model-discrepancy/systematic covariance and joint nuisance covariance.
