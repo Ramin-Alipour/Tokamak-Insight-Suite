@@ -386,3 +386,23 @@ def test_maxwellian_projected_superluminal_tail_uses_stable_gaussian_survival_pr
     assert cold == 0.0
     assert hot > cold
     assert shifted > hot
+
+def test_bikappa_fit_withholds_physical_parameters_when_projected_tail_exceeds_tolerance():
+    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+
+    wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
+    result = fit_gyrotropic_bi_kappa_thomson(
+        wavelength, spectra, laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
+        initial_temperature_parallel_eV=750.0,
+        initial_temperature_perpendicular_eV=400.0,
+        initial_kappa=5.0,
+        maximum_projected_superluminal_tail_probability=1.0e-14,
+    )
+    assert result["parameter_reporting_status"] == "model_outside_nonrelativistic_validity_domain"
+    assert result["reportable_as_inferred_parameter"] is False
+    assert result["electron_temperature_parallel_eV"] is None
+    assert result["electron_temperature_perpendicular_eV"] is None
+    assert result["kappa_index"] is None
+    assert result["relativistic_tail_diagnostic"]["requires_relativistic_forward_model"] is True
