@@ -9041,5 +9041,120 @@
       ],
       "note": "Local Maxwell field-fluctuation propagation with transverse Stokes observables; not a magnetized CTS three-wave vertex, ray solution or calibrated receiver spectrum."
     }
+  },
+  {
+    "name": "Full-tail generalized Kappa plasma dispersion integral",
+    "equation": "fκ(x)=Γ(κ)/[√(πκ)Γ(κ−1/2)](1+x²/κ)^−κ; Iκ(ζ)=∫_{−∞}^{∞} f′κ(x)/(x−ζ) dx, Im(ζ)>0; Iκ(x+i0)=PV∫f′κ(u)/(u−x)du+iπf′κ(x); I′κ(ζ)=∫f′κ(x)/(x−ζ)²dx",
+    "inputs": "Dimensionless phase velocity ζ_real, ζ_imag ≥ 0; finite-variance Kappa index κ>3/2; optional positive absolute and relative quadrature tolerances.",
+    "output": "Complex full-tail Kappa dispersion integral and analytic derivative, normalization, Landau-contour method and adaptive quadrature error estimates.",
+    "assumptions": "Exact one-dimensional marginal of an isotropic non-relativistic 3-D Kappa EVDF; collisionless, unmagnetized longitudinal response; retarded Landau branch only. Real-axis values use Cauchy principal value plus exact Sokhotski–Plemelj residues. This dimensionless kernel is not itself a dielectric tensor or a fluctuation-dissipation closure.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa_dispersion.kappa_dispersion_function",
+      "formula_key": "cts_generalized_kappa_dispersion_function",
+      "input_specs": [
+        {
+          "name": "zeta_real",
+          "unit": "dimensionless real phase velocity",
+          "required": true,
+          "description": "Finite real part of the normalized Landau phase velocity."
+        },
+        {
+          "name": "zeta_imag",
+          "unit": "dimensionless; >= 0",
+          "required": true,
+          "description": "Non-negative imaginary part selecting the retarded upper-half-plane branch; zero requests the exact Landau boundary value."
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; strictly > 3/2",
+          "required": true,
+          "description": "Finite-variance Kappa index."
+        },
+        {
+          "name": "quadrature_epsabs",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Positive absolute quadrature tolerance."
+        },
+        {
+          "name": "quadrature_epsrel",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Positive relative quadrature tolerance."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "kappa_dispersion_integral",
+          "unit": "dimensionless complex",
+          "description": "Full-real-axis integral of the analytic Kappa marginal derivative over the retarded Landau denominator."
+        },
+        {
+          "name": "kappa_dispersion_integral_derivative",
+          "unit": "dimensionless complex",
+          "description": "Analytic derivative with respect to normalized phase velocity, including the exact real-axis boundary derivative."
+        },
+        {
+          "name": "normalization",
+          "unit": "dimensionless",
+          "description": "Analytic normalization constant of the projected Kappa marginal."
+        },
+        {
+          "name": "quadrature_method",
+          "unit": "text",
+          "description": "Full-tail complex quadrature or transformed finite-interval Cauchy principal-value method."
+        },
+        {
+          "name": "absolute_quadrature_error_estimate",
+          "unit": "dimensionless",
+          "description": "Adaptive quadrature error estimate for the dispersion integral."
+        },
+        {
+          "name": "derivative_absolute_quadrature_error_estimate",
+          "unit": "dimensionless",
+          "description": "Adaptive quadrature error estimate for the analytic phase-velocity derivative."
+        },
+        {
+          "name": "landau_branch",
+          "unit": "text",
+          "description": "Retarded upper-half-plane branch and exact Sokhotski–Plemelj boundary."
+        },
+        {
+          "name": "validity_domain",
+          "unit": "text",
+          "description": "Isotropic, non-relativistic, unmagnetized, collisionless longitudinal response."
+        }
+      ],
+      "prerequisites": [
+        "Finite real zeta components and positive quadrature tolerances.",
+        "Kappa index strictly greater than 3/2 for finite second-moment temperature.",
+        "zeta_imag must be non-negative; the advanced lower-half-plane branch is rejected."
+      ],
+      "uncertainty_model": "Returns adaptive quadrature error estimates for the complex integral and its analytic derivative. Does not infer uncertainty in supplied physical parameters or model discrepancy.",
+      "limitations": [
+        "Dimensionless longitudinal response kernel only; physical susceptibility requires dimensional plasma prefactors and velocity normalization.",
+        "No magnetized cyclotron harmonics, transverse dielectric response, collisional operator, FDT noise closure or relativistic Kappa distribution."
+      ],
+      "test_links": [
+        "tests/test_kappa_dispersion_function.py::test_kappa_dispersion_has_correct_maxwellian_limit",
+        "tests/test_kappa_dispersion_function.py::test_kappa_dispersion_derivative_matches_complex_step_difference",
+        "tests/test_kappa_dispersion_function.py::test_real_axis_uses_exact_plemelj_resonance_and_rejects_advanced_branch",
+        "tests/test_kappa_dispersion_function.py::test_real_axis_kappa_dispersion_derivative_matches_boundary_finite_difference"
+      ],
+      "note": "Publicly dispatched through run_advanced_thomson_physics('kappa_dispersion_function') and the advanced Thomson Dashboard. The Maxwellian limit, retarded Landau residue and real-axis analytic derivative are tested independently. Numerical verification is not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "function_links": [
+        "tokamak_analysis.cts_kappa_dispersion.kappa_dispersion_function"
+      ],
+      "execution_scope": "physical_response_kernel",
+      "input_data_level": "dimensionless_physical_parameters",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson / Collective Thomson — generalized Kappa kinetic kernel"
+    }
   }
 ]
