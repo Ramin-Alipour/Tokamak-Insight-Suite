@@ -39,6 +39,7 @@ from .thomson_generalized_dispersion import (
 )
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
 from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
+from .cts_bgk_fdt import analyze_conserving_bgk_cts
 from .cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
