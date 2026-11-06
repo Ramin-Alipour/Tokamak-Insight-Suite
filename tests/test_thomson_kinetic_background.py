@@ -35,6 +35,9 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
         max_nfev=5000,
     )
     assert result["optimizer_success"]
+    assert result["status"] == "identified_from_measurement"
+    assert result["primary_result_status"] == "identified_from_measurement"
+    assert result["reportable_as_primary_inference"] is True
     assert result["joint_parameter_covariance"].shape == (6, 6)
     assert result["physical_background_cross_covariance"].shape == (3, 2)
     assert result["jacobian_rank"] == result["jacobian_parameter_count"]

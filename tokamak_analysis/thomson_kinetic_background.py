@@ -437,6 +437,14 @@ def fit_noncollective_kinetic_thomson_with_background(
         :n_physical, n_physical + 1:
     ]
     return {
+        # This solver raises before returning if optimization, physical
+        # identifiability, or joint physical/background identifiability fails.
+        # Publish that enforced gate in the public result contract so callers
+        # (notably Spectral Distribution) can distinguish a reportable fit
+        # from a descriptive Gaussian-width diagnostic.
+        "status": "identified_from_measurement",
+        "primary_result_status": "identified_from_measurement",
+        "reportable_as_primary_inference": True,
         "model": f"non_collective_{physical_model}_with_structured_detector_background",
         "physical_model": physical_model,
         "physical_parameter_names": ["electron_temperature_eV", "electron_velocity_projection_m_s"] + (["kappa_index"] if physical_model == "kappa" else []),
