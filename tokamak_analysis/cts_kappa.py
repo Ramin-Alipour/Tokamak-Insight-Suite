@@ -73,7 +73,9 @@ def kappa_electron_susceptibility(
     """Return chi_e for a drifting normalized 1-D marginal of an isotropic 3-D Kappa.
 
     The temperature parameter is the usual second-moment temperature, so the
-    marginal variance is k_B T / m. The analytic Kappa CDF quantifies the mass
+    marginal variance is k_B T / m. A signed projected electron bulk drift
+    shifts the resonant phase velocity to v_phase,rest=v_phase,lab-u_e. The
+    analytic Kappa CDF quantifies the mass
     represented by the finite grid. Grids truncating too much of the heavy tail
     are rejected rather than silently renormalized into an artificially narrow
     distribution. The default retarded Landau contour is the exact eta-to-zero Sokhotski-Plemelj limit; a finite positive pole displacement is optional and explicit.
@@ -271,7 +273,9 @@ def maxwellian_electron_susceptibility(
     zeta = v_phase/sqrt(2*k_B*T/m), and
     chi_e = (2*omega_pe**2/(k**2*v_th**2)) * (1 + zeta*Z(zeta)).
     The retarded Landau contour is selected by the Faddeeva function for
-    real phase velocity. This is an analytic Maxwellian reference kernel,
+    real phase velocity. A signed projected electron drift u_e is included
+    through zeta=(v_phase_lab-u_e)/v_th, so the resonance is evaluated in the
+    electron bulk rest frame. This is an analytic Maxwellian reference kernel,
     not a collisional, magnetized, or electromagnetic CTS model.
     """
     raw_phase = np.asarray(phase_velocity_m_s)
