@@ -258,3 +258,17 @@ def test_full_em_landau_fdt_response_alias_is_selectable_in_dashboard():
     assert alias in MODEL_LABELS
     assert alias in EXAMPLES
     assert EXAMPLES[alias] == EXAMPLES[canonical]
+
+
+def test_dashboard_routes_landau_fdt_maxwell_electric_magnetic_fluctuations():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "landau_fdt_full_em_field_fluctuations"
+    assert model in MODEL_LABELS and model in EXAMPLES
+    result = run_advanced_thomson_physics(model, **EXAMPLES[model])
+    assert result["public_physics_entrypoint"] == model
+    assert result["electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s"].shape == (2, 3, 3)
+    assert result["magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s"].shape == (2, 3, 3)
+    assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
+    assert result["cts_three_wave_vertex_connected"] is False

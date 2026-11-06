@@ -265,6 +265,21 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "landau_fdt_full_em_field_fluctuations": {
+        "constitutive_response": {
+            "angular_frequency_rad_s": [100000.0, 200000.0],
+            "relative_dielectric_tensor": [
+                [[2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 2.0]],
+                [[2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 2.0]]
+            ],
+            "current_fluctuation_spectral_matrix": [
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+            ]
+        },
+        "wave_number_m_inverse": 0.001,
+        "propagation_direction": [1.0, 2.0, 0.5]
+    },
     "cts_tabulated_evdf_susceptibility": {
         "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
         "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/1.0e6)**2).tolist(),

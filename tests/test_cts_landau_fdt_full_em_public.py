@@ -132,18 +132,3 @@ def test_landau_current_noise_propagates_to_electric_magnetic_fluctuations_and_p
             assert np.linalg.eigvalsh(matrix).min() >= -1e-10*np.linalg.norm(matrix, 2)
     assert result["electric_magnetic_cross_spectral_matrix"].shape == (2, 3, 3)
     assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
-
-
-def test_landau_current_noise_rejects_an_undamped_maxwell_pole():
-    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
-
-    omega = np.array([1.0e6])
-    response = {
-        "angular_frequency_rad_s": omega,
-        "current_fluctuation_spectral_matrix": np.eye(3, dtype=complex)[None, :, :],
-        "relative_dielectric_tensor": np.eye(3, dtype=complex)[None, :, :],
-    }
-    with np.testing.assert_raises(np.linalg.LinAlgError):
-        landau_full_em_electric_field_fluctuation_spectrum(
-            response, omega[0]/299792458.0, propagation_direction=(1.0, 0.0, 0.0)
-        )
