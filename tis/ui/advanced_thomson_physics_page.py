@@ -70,6 +70,7 @@ MODEL_LABELS = {
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
     "cts_tabulated_evdf_susceptibility": "CTS — tabulated projected-EVDF susceptibility and analytic Landau phase derivative",
     "cts_tabulated_evdf_landau": "CTS — tabulated projected-EVDF Landau response and multispecies electrostatic spectrum (finite-eta or exact Plemelj limit)",
+    "cts_multi_population_tabulated_evdf_landau": "CTS — density-weighted multi-electron-population EVDF Landau response and fluctuation spectrum",
     "cts_non_gyrotropic_gaussian_tensor_spectrum": "CTS — non-gyrotropic 3-D Gaussian temperature tensor projected exactly onto q and evaluated with the tabulated Landau response",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
@@ -154,6 +155,15 @@ MODEL_PHYSICS_NOTES = {
         "the exact first-order retarded boundary value using PV integral + i*pi*f'(v_phase), "
         "rather than an artificial finite pole displacement. It rejects phase velocities "
         "at derivative knots and does not expose the second-order pole derivative in this mode."
+    ),
+    "cts_multi_population_tabulated_evdf_landau": (
+        "For electron populations j with density fractions alpha_j, the total longitudinal response is "
+        "chi_e=sum_j alpha_j chi_j, where chi_j=-(omega_pe^2/k^2)*alpha_j-free integral "
+        "f'_j(v)/(v-v_phase-u_j-i0) dv. The electron fluctuation source is the separate weighted sum "
+        "sum_j alpha_j f_j(v_phase-u_j), not a single averaged distribution. The shared dielectric is "
+        "epsilon=1+sum_j chi_j+sum_i chi_i; the ion source is screened by |chi_e|^2/|epsilon|^2. "
+        "Fractions and rest-frame projected 1-D EVDFs are supplied explicitly; this is a non-relativistic, "
+        "unmagnetized electrostatic forward model, not an inversion of component fractions or 3-D EVDFs."
     ),
     "cts_tabulated_evdf_landau": (
         "Electrostatic CTS spectrum from a supplied projected 1-D electron EVDF and either Maxwellian ions or independent tabulated 1-D ion marginals in each species rest frame. "
@@ -401,6 +411,28 @@ EXAMPLES = {
         "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/1.0e6)**2).tolist(),
         "phase_velocity_m_s": 0.735e6, "electron_density_m3": 1.0e18,
         "wavenumber_m_inverse": 120.0, "landau_limit": True
+    },
+    "cts_multi_population_tabulated_evdf_landau": {
+        "wavelength_nm": np.linspace(1060.0, 1068.0, 41).tolist(),
+        "laser_wavelength_nm": 1064.0, "scattering_angle_rad": 1.5707963267948966,
+        "electron_density_m3": 1.0e18,
+        "electron_populations": [
+            {
+                "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
+                "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/8.0e5)**2).tolist(),
+                "density_fraction": 0.85, "bulk_velocity_m_s": [0.0, 0.0, 0.0]
+            },
+            {
+                "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
+                "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/2.0e6)**2).tolist(),
+                "density_fraction": 0.15, "bulk_velocity_m_s": [0.0, 0.0, 0.0]
+            }
+        ],
+        "ion_species": [{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        "ion_fractions": [1.0], "ion_temperature_eV": [10.0],
+        "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
+        "incident_direction": [1.0, 0.0, 0.0], "scattered_direction": [0.0, 1.0, 0.0],
+        "landau_limit": False, "pole_imaginary_part_m_s": 100.0
     },
     "cts_tabulated_evdf_landau": {
         "wavelength_nm": np.linspace(1060.0, 1068.0, 41).tolist(),
