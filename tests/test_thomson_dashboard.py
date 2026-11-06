@@ -188,6 +188,10 @@ def test_dashboard_exposes_conditional_path_integrated_density_inputs():
         for item in app.file_uploader
     )
     assert any(
+        item.label.startswith("Optional full optical-profile covariance CSV")
+        for item in app.file_uploader
+    )
+    assert any(
         item.label == "Absolutely calibrated integrated scattered power (W)"
         for item in app.text_input
     )
