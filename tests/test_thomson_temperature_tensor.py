@@ -37,6 +37,19 @@ def test_full_temperature_tensor_recovers_non_gyrotropic_tensor_with_gls_covaria
     assert result["reportable_as_inferred_parameter"]
 
 
+
+def test_exactly_six_unweighted_views_do_not_claim_parameter_uncertainty():
+    q, _, projected = _views()
+    result = infer_full_temperature_tensor_from_thomson_projections(
+        projected[:6], q[:6],
+    )
+    assert result["degrees_of_freedom"] == 0
+    assert result["parameter_covariance_eV2"] is None
+    assert result["parameter_covariance_status"] == (
+        "not_reported_without_absolute_covariance_or_redundant_views"
+    )
+    assert result["reportable_as_inferred_parameter"] is True
+
 def test_full_temperature_tensor_rejects_rank_deficient_view_geometry():
     q = np.tile([1.0, 0.0, 0.0], (6, 1))
     with pytest.raises(ValueError, match="not identifiable"):
