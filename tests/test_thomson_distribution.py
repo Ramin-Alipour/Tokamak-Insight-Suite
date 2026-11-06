@@ -885,3 +885,51 @@ def test_spectral_distribution_accepts_canonical_analysis1_kinetic_model_ids(
     assert result["physical_inference"]["solver_model"] == solver_model
     assert result["physical_inference"]["gaussian_width_used_as_temperature"] is False
     assert result["physical_inference"]["reportable_as_primary_inference"] is True
+
+
+def test_spectral_distribution_kappa_inference_is_reportable_from_real_joint_fit():
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    wavelength = np.linspace(529.0, 535.0, 181)
+    laser = 532.0
+    angle = np.pi / 2.0
+    temperature, flow, kappa = 300.0, 8.0e4, 3.5
+    q = 2.0 * np.sin(angle / 2.0)
+    centre = laser * (1.0 - q * flow / 299792458.0)
+    sigma = laser * q * np.sqrt(temperature / 510998.95069)
+    degrees = 2.0 * kappa - 1.0
+    scale = sigma * np.sqrt((degrees - 2.0) / degrees)
+    shape = (1.0 + ((wavelength - centre) / scale) ** 2 / degrees) ** (-kappa)
+    z = 2.0 * (wavelength - wavelength.min()) / np.ptp(wavelength) - 1.0
+    background = 0.04 + 0.006 * z
+    measured = 2.3 * shape + background
+
+    result = analyze_thomson_spectral_distribution(
+        wavelength,
+        measured,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full(wavelength.size, 0.003),
+        background_signal=background,
+        moment_mc_samples=20,
+        physical_model="kappa",
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        physical_fit_options={
+            "physical_initial": [280.0, 0.0, 4.0],
+            "background_model": "linear",
+            "max_nfev": 5000,
+        },
+    )
+
+    inference = result["physical_inference"]
+    assert inference["status"] == "identified_from_measurement"
+    assert inference["reportable_as_primary_inference"] is True
+    assert inference["gaussian_width_used_as_temperature"] is False
+    assert inference["fit"]["primary_result_status"] == "identified_from_measurement"
+    assert inference["fit"]["parameter_identifiability"]["joint_jacobian_rank"] == (
+        inference["fit"]["parameter_identifiability"]["joint_parameter_count"]
+    )
+    assert inference["fit"]["electron_temperature_eV"] == pytest.approx(
+        temperature, rel=0.05
+    )
+    assert inference["fit"]["kappa_index"] == pytest.approx(kappa, rel=0.08)
