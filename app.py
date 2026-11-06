@@ -1120,6 +1120,7 @@ elif page=='Spectral Analysis':
             with st.expander('Optional path-integrated absolute-density inference (conditional)'):
                 st.caption('Upload a path-profile CSV with columns: path_coordinate_m, incident_power_profile_W, differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr, optical_efficiency_profile. These are fixed, already-characterized inputs. One integrated power measurement returns only a weighted path-average density, not a pointwise density profile.')
                 path_profile_upload=st.file_uploader('Path-dependent optical/geometry profiles CSV',type=['csv'],key='ts_path_density_profile')
+                path_profile_covariance_upload=st.file_uploader('Optional full optical-profile covariance CSV (4N × 4N; block order: incident power, cross-section, solid angle, efficiency)',type=['csv'],key='ts_path_density_covariance')
                 path_scattered_power_text=st.text_input('Absolutely calibrated integrated scattered power (W)',value='',key='ts_path_density_power')
                 path_scattered_power_unc_text=st.text_input('Integrated scattered-power 1σ uncertainty (W; optional)',value='',key='ts_path_density_power_unc')
             analysis_signature_payload = {
@@ -1176,6 +1177,7 @@ elif page=='Spectral Analysis':
                 'density_covariance_upload': _ts_upload_digest(density_covariance_upload),
                 'joint_density_covariance_upload': _ts_upload_digest(joint_density_covariance_upload),
                 'path_density_profile_upload': _ts_upload_digest(path_profile_upload),
+                'path_density_profile_covariance_upload': _ts_upload_digest(path_profile_covariance_upload),
                 'path_density_scattered_power': path_scattered_power_text,
                 'path_density_scattered_power_uncertainty': path_scattered_power_unc_text,
             }
@@ -1424,6 +1426,10 @@ elif page=='Spectral Analysis':
                             path_profile['optical_efficiency_profile'].to_numpy(dtype=float),
                             scattered_power_uncertainty_W=_parse_ts_optional_scalar(
                                 path_scattered_power_unc_text,'Integrated scattered-power uncertainty'),
+                            optical_profile_covariance=(
+                                pd.read_csv(path_profile_covariance_upload,header=None).to_numpy(dtype=float)
+                                if path_profile_covariance_upload is not None else None
+                            ),
                         )
                         result['path_integrated_density']=path_density_result
                     st.session_state['tis_thomson_spectral_inference']={
