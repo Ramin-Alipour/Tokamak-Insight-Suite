@@ -29,12 +29,20 @@ def _strict_real_scalar(value, name, *, positive=False, nonnegative=False):
 
 
 def _strict_real_vector(value, name):
-    """Return a finite real vector without accepting strings or booleans."""
-    raw = np.asarray(value)
-    if raw.dtype.kind not in "iuf":
+    """Return a finite real vector without accepting coerced bool/string/complex input.
+
+    Inspect Python sequences as objects before NumPy promotion: a mixed sequence
+    such as [True, 0.0, 0.0] otherwise becomes float64 and loses its bool type.
+    """
+    raw = np.asarray(value, dtype=object)
+    if raw.ndim != 1 or any(
+        isinstance(item, (bool, np.bool_))
+        or not isinstance(item, (int, float, np.integer, np.floating))
+        for item in raw
+    ):
         raise ValueError(f"{name} must contain finite real numeric values")
-    result = raw.astype(float, copy=False)
-    if result.ndim != 1 or np.any(~np.isfinite(result)):
+    result = np.asarray(value, dtype=float)
+    if np.any(~np.isfinite(result)):
         raise ValueError(f"{name} must be a finite real vector")
     return result
 
@@ -289,7 +297,7 @@ def integrate_kinetic_ece_radiative_transfer(
         raise ValueError("electron_temperature_eV must be positive with one value per segment")
     if alpha.ndim == 1:
         if alpha.shape != lengths.shape:
-            raise ValueError("1-D absorption coefficient must match segment_length_m")
+            raise ValueError("1-D absorption coefficient shape must match segment_length_m")
         alpha = np.broadcast_to(alpha[None, :], (f.size, lengths.size)).copy()
     elif alpha.shape != (f.size, lengths.size):
         raise ValueError("2-D absorption coefficient must have shape (n_frequency, n_segment)")
@@ -310,9 +318,14 @@ def integrate_kinetic_ece_radiative_transfer(
         "brightness_temperature_out_K": brightness,
         "segment_optical_depth": tau,
         "total_optical_depth": total_tau,
-        "transmission": np.exp(-total_tau),
+        "transmission": np.where(
+            np.exp(-total_tau) <= np.finfo(float).eps,
+            0.0,
+            np.exp(-total_tau),
+        ),
         "source_function": "Rayleigh_Jeans_local_thermodynamic_equilibrium",
         "transfer_solver": "ordered_piecewise_constant_exact_formal_solution",
+        "transmission_numerical_zero_threshold": "values <= machine epsilon are reported as zero; brightness remains evaluated with expm1",
         "limitations": [
             "Uses supplied local kinetic absorption coefficients and segment temperatures.",
             "Assumes LTE and Rayleigh-Jeans source function.",
