@@ -10083,7 +10083,7 @@
         "All views must sample a common plasma volume/time interval or be mapped to one common equilibrium coordinate.",
         "At least six independent scattering-view dyads are required for six tensor components."
       ],
-      "uncertainty_model": "Full supplied positive-definite covariance of directional temperatures is propagated through GLS. If no covariance is supplied, an identity metric is used and the local covariance is residual-scaled. At an active PSD boundary, symmetric local covariance is withheld.",
+      "uncertainty_model": "Full supplied positive-definite covariance of directional temperatures is propagated through GLS. If no covariance is supplied, an identity metric is used and the local covariance is residual-scaled. At an active PSD boundary, symmetric local covariance is withheld. Chi-square consistency probability is withheld unless an absolute measurement covariance is supplied and there are redundant views (n_view > 6).",
       "limitations": [
         "Does not infer density, bulk flow, heat flux or higher EVDF moments.",
         "Does not replace the gyrotropic Maxwellian/Kappa raw-spectrum forward fits; it inverts their independently inferred directional second moments.",
@@ -10094,7 +10094,8 @@
         "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_recovers_non_gyrotropic_tensor_with_gls_covariance",
         "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_rank_deficient_view_geometry",
         "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_non_positive_definite_measurement_covariance",
-        "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher"
+        "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher",
+        "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_enforces_positive_semidefinite_boundary"
       ]
     },
     "raw_data_to_physics": false,
@@ -10113,7 +10114,8 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_recovers_non_gyrotropic_tensor_with_gls_covariance",
-        "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher"
+        "tests/test_thomson_temperature_tensor_api.py::test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatcher",
+        "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_enforces_positive_semidefinite_boundary"
       ]
     },
     "references": [
