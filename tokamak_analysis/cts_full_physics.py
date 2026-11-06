@@ -71,7 +71,8 @@ from .thomson_kinetic_models import (
     collective_kappa_spectral_density,
     fit_collective_kappa,
 )
-from .thomson_temperature_tensor import infer_full_temperature_tensor_from_thomson_projections\nfrom .cts_magnetoionic import (
+from .thomson_temperature_tensor import infer_full_temperature_tensor_from_thomson_projections
+from .cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
     cold_plasma_absorbed_power_density,
@@ -846,6 +847,7 @@ __all__ = [
     "infer_gyrotropic_bi_maxwellian_temperatures",
     "fit_gyrotropic_bi_maxwellian_thomson",
     "fit_gyrotropic_bi_kappa_thomson",
-    "infer_three_dimensional_flow_from_thomson_projections",\n    "infer_full_temperature_tensor_from_thomson_projections",
+    "infer_three_dimensional_flow_from_thomson_projections",
+    "infer_full_temperature_tensor_from_thomson_projections",
     "run_advanced_thomson_physics",
 ]
