@@ -724,6 +724,8 @@ EXAMPLES["thomson_joint_spatial_spectra"] = {
     "instrument_response": np.eye(_joint_ts_wavelength.size).tolist(),
     "signal_uncertainty": np.full_like(_joint_ts_spectra, 0.01).tolist(),
     "regularization_strength": 0.0,
+    "regularization_kind": "curvature",
+    "tv_huber_scale": 0.05,
     "physical_model": "maxwellian",
 }
 
@@ -779,6 +781,11 @@ def render_advanced_thomson_physics_page(st) -> None:
     )
     if model in MODEL_PHYSICS_NOTES:
         st.info(MODEL_PHYSICS_NOTES[model])
+    st.caption(
+        "For joint spatial Thomson inversion, regularization_kind accepts curvature or huber_total_variation. "
+        "The latter is an edge-preserving Huber-TV prior; tv_huber_scale controls its quadratic-to-linear transition. "
+        "It does not add measurement information or resolve data-unidentifiable modes."
+    )
     st.caption(
         "Enter one JSON object containing the keyword arguments for the selected solver. "
         "For complex-valued arrays use {\"real\": [...], \"imag\": [...]}; both arrays must have identical shapes. "
