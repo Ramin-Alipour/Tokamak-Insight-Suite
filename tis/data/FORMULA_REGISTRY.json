@@ -9773,5 +9773,94 @@
       ],
       "note": "Quantifies the superluminal tail that an RMS-beta threshold alone does not describe. A projected superluminal particle necessarily has superluminal 3-D speed."
     }
+  },
+  {
+    "name": "Gyrotropic 3-D thermal velocity covariance tensor from optical Thomson anisotropy fit",
+    "equation": "Σ_v,j = (e/m_e)[T_perp I + (T_parallel−T_perp) b_hat_j b_hat_j^T]; A_T=T_parallel/T_perp; eigenvalues={eT_parallel/m_e,eT_perp/m_e,eT_perp/m_e}",
+    "inputs": "Identifiable T_parallel and T_perpendicular [eV]; unit magnetic-field direction b_hat per spectral view",
+    "output": "Per-view 3×3 thermal velocity covariance tensor [m² s⁻²] and dimensionless temperature anisotropy ratio",
+    "assumptions": "Gyrotropic distribution with zero heat flux and finite second moments; temperatures are second-moment temperatures; each view retains its own magnetic-field direction; no single global tensor is formed by averaging distinct field directions.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+      "function_links": [
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ],
+      "formula_key": "optical_thomson_gyrotropic_velocity_covariance_tensor",
+      "input_specs": [
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "eV; positive and identifiable",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "eV; positive and identifiable",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_unit",
+          "unit": "unit 3-vector or n_view×3 unit vectors",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "thermal_velocity_covariance_tensor_per_view_m2_s2",
+          "unit": "m² s⁻²; n_view×3×3 symmetric positive-definite tensor"
+        },
+        {
+          "name": "temperature_anisotropy_ratio_parallel_over_perpendicular",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "Both gyrotropic temperatures must pass the spectral identifiability gate.",
+        "The selected non-relativistic model must pass its declared validity screen.",
+        "Each magnetic-field direction must be supplied as a normalized 3-vector."
+      ],
+      "uncertainty_model": "The tensor is a deterministic transformation of fitted temperatures and supplied magnetic-field directions. Its covariance is not claimed by this output; use the fitted parameter covariance and geometry covariance for uncertainty propagation.",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_tensor_matches_second_moment_physics",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match"
+      ],
+      "note": "The relation is valid for both Maxwellian and finite-variance bi-Kappa closures because T_parallel and T_perpendicular are defined by the second moments. A separate tensor is returned per view to avoid averaging spatially varying magnetic-field axes."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook",
+        "scope": "Thomson-scattering velocity projections and thermal moments; the tensor relation follows from the gyrotropic second-moment definition."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectrum_plus_magnetic_geometry",
+    "execution_scope": "derived_physical_moment_tensor_from_joint_gyrotropic_spectral_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson — gyrotropic anisotropic inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+      "function_links": [
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
+      ],
+      "formula_key": "optical_thomson_gyrotropic_velocity_covariance_tensor",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_tensor_matches_second_moment_physics",
+        "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_velocity_covariance_is_isotropic_when_temperatures_match"
+      ]
+    }
   }
 ]
