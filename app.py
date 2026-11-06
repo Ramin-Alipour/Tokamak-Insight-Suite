@@ -1444,6 +1444,9 @@ elif page=='Spectral Analysis':
                             'wavelength_nm':wavelengths.copy(),
                             'spectra':spectra.copy(),
                             'signal_uncertainty':None if signal_uncertainty is None else signal_uncertainty.copy(),
+                            'joint_spectral_covariance':None if joint_spectral_covariance is None else np.asarray(joint_spectral_covariance,dtype=float).copy(),
+                            'model_discrepancy_covariance':None if model_discrepancy_covariance is None else np.asarray(model_discrepancy_covariance,dtype=float).copy(),
+                            'systematic_covariance':None if systematic_covariance is None else np.asarray(systematic_covariance,dtype=float).copy(),
                             'instrument_response':np.asarray(instrument_response,dtype=float).copy(),
                             'laser_wavelength_nm':float(laser_nm),
                             'scattering_angle_rad':float(angle_rad),
@@ -3895,9 +3898,38 @@ elif page=='Advanced Analysis':
                                 else:
                                     evdf_options['regularization_strength']=None
                                 evdf_kwargs={}
+                                n_channels,n_wavelengths=saved_spectra.shape
+                                block_start=int(channel_index)*n_wavelengths
+                                block_stop=block_start+n_wavelengths
                                 saved_uncertainty=analysis_inputs.get('signal_uncertainty')
+                                saved_joint_covariance=analysis_inputs.get('joint_spectral_covariance')
                                 if saved_uncertainty is not None:
                                     evdf_kwargs['signal_uncertainty']=np.asarray(saved_uncertainty,dtype=float)[channel_index]
+                                elif saved_joint_covariance is not None:
+                                    covariance_array=np.asarray(saved_joint_covariance,dtype=float)
+                                    if covariance_array.shape==(n_channels*n_wavelengths,n_channels*n_wavelengths):
+                                        evdf_kwargs['signal_covariance']=covariance_array[
+                                            block_start:block_stop,block_start:block_stop
+                                        ].copy()
+                                    elif covariance_array.shape==(n_wavelengths,n_wavelengths):
+                                        evdf_kwargs['signal_covariance']=covariance_array.copy()
+                                    else:
+                                        raise ValueError('Saved joint spectral covariance has no valid full channel-major or single-channel shape.')
+                                for covariance_name in ('model_discrepancy_covariance','systematic_covariance'):
+                                    saved_component=analysis_inputs.get(covariance_name)
+                                    if saved_component is None:
+                                        continue
+                                    component=np.asarray(saved_component,dtype=float)
+                                    if component.shape==(n_channels*n_wavelengths,n_channels*n_wavelengths):
+                                        evdf_options[covariance_name]=component[
+                                            block_start:block_stop,block_start:block_stop
+                                        ].copy()
+                                    elif component.shape==(n_wavelengths,n_wavelengths):
+                                        evdf_options[covariance_name]=component.copy()
+                                    else:
+                                        raise ValueError(
+                                            f'Saved {covariance_name} has no valid full channel-major or single-channel shape.'
+                                        )
                                 laser_source_x=analysis_inputs.get('laser_spectrum_wavelength_nm')
                                 laser_source_y=analysis_inputs.get('laser_spectrum_density_per_nm')
                                 if laser_source_x is not None and laser_source_y is not None:
