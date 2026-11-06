@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import least_squares, lsq_linear
 from scipy.integrate import trapezoid
-from scipy.special import gammaln, ndtr, stdtr, kve, roots_genlaguerre
+from scipy.special import gammaincc, gammaln, ndtr, stdtr, kve, roots_genlaguerre
 from numpy.polynomial.legendre import leggauss
 
 E_CHARGE = 1.602176634e-19
@@ -371,6 +371,7 @@ def infer_three_dimensional_flow_from_thomson_projections(
     scattering_vector_covariance=None,
     projection_geometry_cross_covariance=None,
     maximum_geometry_condition_number=1.0e3,
+    minimum_projection_consistency_p_value=1.0e-3,
 ):
     """Infer a 3-D bulk-flow vector from independent measured TS projections.
 
@@ -393,6 +394,9 @@ def infer_three_dimensional_flow_from_thomson_projections(
     maximum_condition = float(maximum_geometry_condition_number)
     if not np.isfinite(maximum_condition) or maximum_condition <= 1.0:
         raise ValueError("maximum_geometry_condition_number must be finite and greater than one")
+    minimum_consistency_p = float(minimum_projection_consistency_p_value)
+    if not np.isfinite(minimum_consistency_p) or not 0.0 < minimum_consistency_p < 1.0:
+        raise ValueError("minimum_projection_consistency_p_value must lie strictly between zero and one")
     projections = np.asarray(velocity_projection_m_s)
     directions = np.asarray(scattering_vector_unit)
     covariance = np.asarray(projection_covariance_m2_s2)
@@ -491,6 +495,7 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "design_rank": rank,
         "geometry_condition_number": None,
         "maximum_geometry_condition_number": maximum_condition,
+        "minimum_projection_consistency_p_value": minimum_consistency_p,
         "geometry_condition_status": "rank_deficient" if rank < 3 else "not_evaluated",
         "input_velocity_projection_m_s": projections.copy(),
         "input_projection_covariance_m2_s2": covariance.copy(),
@@ -582,13 +587,21 @@ def infer_three_dimensional_flow_from_thomson_projections(
             raise ValueError("3-D flow geometry-covariance GLS did not converge in 50 iterations")
     residual = projections-directions@velocity
     chi2 = float(residual @ np.linalg.solve(effective_covariance, residual))
+    degrees_of_freedom = int(projections.size - 3)
+    consistency_p_value = (
+        float(gammaincc(0.5 * degrees_of_freedom, 0.5 * chi2))
+        if degrees_of_freedom > 0 else None
+    )
+    consistency_accepted = (
+        consistency_p_value is None or consistency_p_value >= minimum_consistency_p
+    )
     speed = float(np.linalg.norm(velocity))
     geometry_well_conditioned = bool(
         np.isfinite(geometry_condition_number)
         and geometry_condition_number <= maximum_condition
     )
     physical = bool(np.all(np.isfinite(velocity)) and speed < C)
-    reportable = physical and geometry_well_conditioned
+    reportable = physical and geometry_well_conditioned and consistency_accepted
     return {
         **result,
         "identifiability": (
@@ -599,6 +612,12 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "geometry_condition_status": (
             "well_conditioned" if geometry_well_conditioned else "ill_conditioned_vector_withheld"
         ),
+        "cross_view_consistency_p_value": consistency_p_value,
+        "cross_view_consistency_status": (
+            "not_testable_exactly_three_views" if consistency_p_value is None
+            else "consistent_with_common_flow" if consistency_accepted
+            else "common_flow_model_rejected"
+        ),
         "reportable_as_inferred_parameter": reportable,
         "electron_velocity_vector_m_s": velocity if reportable else None,
         "electron_velocity_covariance_m2_s2": parameter_covariance if reportable else None,
@@ -607,12 +626,16 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "electron_speed_m_s": speed if reportable else None,
         "fit_residual_projection_m_s": residual,
         "chi_square": chi2,
-        "degrees_of_freedom": int(projections.size-3),
-        "reduced_chi_square": chi2/(projections.size-3) if projections.size > 3 else None,
+        "degrees_of_freedom": degrees_of_freedom,
+        "reduced_chi_square": chi2/degrees_of_freedom if degrees_of_freedom > 0 else None,
         "physicality_status": "subluminal" if physical else "non_finite_or_superluminal_solution; vector withheld",
         "geometry_reporting_reason": (
             None if geometry_well_conditioned else
             "Covariance-whitened scattering geometry exceeds maximum_geometry_condition_number; 3-D vector and covariance are withheld."
+        ),
+        "model_adequacy_reason": (
+            None if consistency_accepted else
+            "The measured view projections are inconsistent with one shared 3-D flow vector at the configured chi-square p-value threshold."
         ),
     }
 
