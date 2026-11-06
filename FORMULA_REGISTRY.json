@@ -8365,6 +8365,46 @@
       ],
       "output_specs": [
         {
+          "name": "wave_number_m_inverse",
+          "unit": "m^-1"
+        },
+        {
+          "name": "angular_frequency_rad_s",
+          "unit": "rad s^-1"
+        },
+        {
+          "name": "collision_frequencies_s_inverse",
+          "unit": "s^-1"
+        },
+        {
+          "name": "collisionless_species_indices",
+          "unit": "integer indices"
+        },
+        {
+          "name": "collision_regime",
+          "unit": "text"
+        },
+        {
+          "name": "collision_operator",
+          "unit": "text"
+        },
+        {
+          "name": "conservation",
+          "unit": "conservation contract"
+        },
+        {
+          "name": "equilibrium_assumptions",
+          "unit": "equilibrium contract"
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer"
+        },
+        {
+          "name": "cts_integration_status",
+          "unit": "text"
+        },
+        {
           "name": "bare_density_response_m3_per_J",
           "unit": "m^-3 J^-1"
         },
@@ -8377,16 +8417,48 @@
           "unit": "dimensionless complex matrix"
         },
         {
-          "name": "dynamic_structure_factor_m3_s",
-          "unit": "m^-3 s"
+          "name": "dielectric_condition_number",
+          "unit": "dimensionless"
         },
         {
           "name": "velocity_quadrature_convergence",
           "unit": "relative response-change diagnostics"
         },
         {
+          "name": "coulomb_interaction_matrix_J_m3",
+          "unit": "J m^3"
+        },
+        {
+          "name": "dynamic_structure_factor_m3_s",
+          "unit": "m^-3 s"
+        },
+        {
+          "name": "fdt_closure",
+          "unit": "text"
+        },
+        {
+          "name": "fdt_positive_semidefinite",
+          "unit": "boolean"
+        },
+        {
+          "name": "screening_model",
+          "unit": "text"
+        },
+        {
+          "name": "cts_model",
+          "unit": "text"
+        },
+        {
+          "name": "integration_status",
+          "unit": "text"
+        },
+        {
           "name": "quantitative_release_gate",
           "unit": "validation status"
+        },
+        {
+          "name": "limitations",
+          "unit": "text list"
         }
       ],
       "prerequisites": [
