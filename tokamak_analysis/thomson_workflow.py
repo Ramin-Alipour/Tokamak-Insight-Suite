@@ -427,6 +427,7 @@ def reconstruct_thomson_profile_from_spectra(
             raise ValueError("joint spatial-spectral reconstruction requires wavelength_nm, measured spectra and radius_m")
         allowed_joint = {"model", "laser_wavelength_nm", "scattering_angle_rad",
                          "instrument_response", "spatial_psf_matrix", "spatial_psf_sigma_m",
+                         "spatial_psf_sigma_uncertainty_m",
                          "laser_spectrum_wavelength_nm", "laser_spectrum_density_per_nm",
                          "signal_uncertainty", "joint_spectral_covariance",
                          "model_discrepancy_covariance",
@@ -444,6 +445,7 @@ def reconstruct_thomson_profile_from_spectra(
             "instrument_response": kwargs.get("instrument_response"),
             "spatial_psf_matrix": kwargs.get("spatial_psf_matrix"),
             "spatial_psf_sigma_m": kwargs.get("spatial_psf_sigma_m"),
+            "spatial_psf_sigma_uncertainty_m": kwargs.get("spatial_psf_sigma_uncertainty_m"),
             "laser_spectrum_wavelength_nm": kwargs.get("laser_spectrum_wavelength_nm"),
             "laser_spectrum_density_per_nm": kwargs.get("laser_spectrum_density_per_nm"),
             "signal_uncertainty": kwargs.get("signal_uncertainty"),
