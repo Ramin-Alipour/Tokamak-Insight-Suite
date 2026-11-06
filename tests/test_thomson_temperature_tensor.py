@@ -53,3 +53,10 @@ def test_full_temperature_tensor_rejects_non_positive_definite_measurement_covar
         infer_full_temperature_tensor_from_thomson_projections(
             projected, q, projected_temperature_covariance_eV2=covariance,
         )
+
+
+def test_unweighted_tensor_fit_does_not_claim_a_chi_square_probability():
+    q, _, projected = _views()
+    result = infer_full_temperature_tensor_from_thomson_projections(projected, q)
+    assert result["consistency_p_value"] is None
+    assert result["consistency_status"] == "not_testable_without_absolute_covariance_or_redundant_views"
