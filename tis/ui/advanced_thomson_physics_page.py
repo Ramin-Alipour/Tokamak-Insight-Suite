@@ -80,7 +80,7 @@ MODEL_LABELS = {
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
-    "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa spectral inference",
+    "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa inference with relativistic-tail validity diagnostic",
     "cts_conserving_bgk_fdt": "CTS — conserving multispecies BGK response + Poisson screening + classical matrix FDT",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
