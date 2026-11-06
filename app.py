@@ -3882,12 +3882,119 @@ elif page=='Advanced Analysis':
     elif workflow=='Analysis 1 / Microwave CTS subanalysis':
         st.markdown('Analysis 1 subanalysis — microwave CTS: infer plasma and ion parameters from a measured, calibrated frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
-            'electrostatic','electrostatic_kappa','full_electromagnetic','full_em_spatial_profiles'
-        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons' if v=='electrostatic_kappa' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else 'Magnetized full-electromagnetic CTS')),key='cts_physical_model')
+            'electrostatic','electrostatic_kappa','full_electromagnetic','full_em_spatial_profiles','full_em_gyrotropic_vdf_shape'
+        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons' if v=='electrostatic_kappa' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else ('Relativistic gyrotropic Full-EM CTS VDF-shape inverse' if v=='full_em_gyrotropic_vdf_shape' else 'Magnetized full-electromagnetic CTS'))),key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
         elif cts_model is None:
             st.info('Select the CTS physical model explicitly. No model is selected automatically.')
+        elif cts_model=='full_em_gyrotropic_vdf_shape':
+            st.caption('Fixed-bulk magnetized Full-EM CTS inverse for a relativistic gyrotropic momentum-space VDF. Every optimizer evaluation calls the relativistic Full-EM kinetic forward solver. Bulk plasma, geometry, population density and receiver response remain supplied inputs; only the non-negative VDF shape is reconstructed.')
+            left,right=st.columns(2)
+            with left:
+                vf_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_vdf_frequency')
+                vf_spectrum_col=col_select('Calibrated CTS spectral power',[x for x in numeric if x!=vf_frequency_col] or numeric,'cts_vdf_spectrum')
+                vf_uncertainty_col=st.selectbox('Spectral 1σ uncertainty column (or supply covariance)',['<none>']+[x for x in numeric if x not in {vf_frequency_col,vf_spectrum_col}],key='cts_vdf_uncertainty')
+                vf_probe=st.text_input('Probe frequency (Hz)',key='cts_vdf_probe')
+                vf_ne=st.text_input('Fixed bulk electron density (m⁻³)',key='cts_vdf_ne')
+                vf_te=st.text_input('Fixed bulk electron temperature (eV)',key='cts_vdf_te')
+                vf_ti=st.text_input('Fixed ion temperatures (eV; one per ion species)',key='cts_vdf_ti')
+                vf_population_kind=st.selectbox('Reconstructed population',['electron','fast_ion'],key='cts_vdf_population_kind')
+                vf_electron_flow=st.text_input('Fixed bulk electron-flow projection (m/s; electron VDF mode requires 0)',value='0',key='cts_vdf_electron_flow')
+                vf_population_name=st.text_input('Population name',value='nonthermal_population',key='cts_vdf_population_name')
+                vf_population_density=st.text_input('Fast-ion population density (m⁻³; fast_ion only)',key='cts_vdf_population_density')
+                vf_population_mass=st.text_input('Fast-ion mass (amu; fast_ion only)',key='cts_vdf_population_mass')
+                vf_population_charge=st.text_input('Fast-ion charge state (fast_ion only)',key='cts_vdf_population_charge')
+            with right:
+                vf_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_vdf_response')
+                vf_covariance_upload=st.file_uploader('Optional measured frequency covariance CSV',type=['csv','txt'],key='cts_vdf_covariance')
+                vf_geometry_json=st.text_area('Scattering geometry JSON',placeholder='{"incident_direction":[1,0,0],"scattered_direction":[0,1,0]}',key='cts_vdf_geometry')
+                vf_pperp_json=st.text_area('p_perpendicular grid JSON (kg m/s)',placeholder='[1e-22,2e-22,3e-22,4e-22]',key='cts_vdf_pperp')
+                vf_ppar_json=st.text_area('p_parallel grid JSON (kg m/s)',placeholder='[-3e-22,-1e-22,1e-22,3e-22]',key='cts_vdf_ppar')
+                vf_initial_json=st.text_area('Initial non-negative gyrotropic VDF matrix JSON',placeholder='[[1,1,1,1],[1,1,1,1],[1,1,1,1],[1,1,1,1]]',key='cts_vdf_initial')
+                vf_regularization_upload=st.file_uploader('Momentum-space regularization matrix CSV',type=['csv','txt'],key='cts_vdf_regularization')
+                vf_regularization_strength=st.text_input('Regularization strength',key='cts_vdf_regularization_strength')
+                vf_harmonic=int(st.number_input('Gyro-harmonic truncation',min_value=2,max_value=64,value=8,key='cts_vdf_harmonic'))
+                vf_quadrature=int(st.number_input('Relativistic quadrature order',min_value=4,max_value=64,value=12,key='cts_vdf_quadrature'))
+            st.markdown('**Fixed ion composition and wave polarization**')
+            vf_names=st.text_input('Ion species names (comma-separated)',key='cts_vdf_species')
+            vf_charges=st.text_input('Ion charge states (comma-separated)',key='cts_vdf_charges')
+            vf_masses=st.text_input('Ion masses (amu; comma-separated)',key='cts_vdf_masses')
+            vf_fractions=st.text_input('Ion charge-density fractions (comma-separated; sum to 1)',key='cts_vdf_fractions')
+            p1,p2=st.columns(2)
+            with p1:
+                vf_bfield=st.text_input('Magnetic field (T; x,y,z)',key='cts_vdf_bfield')
+                vf_incident_pol=st.text_input('Incident polarization (real/complex 3-vector)',key='cts_vdf_incident_pol')
+            with p2:
+                vf_scattered_pol=st.text_input('Scattered polarization (real/complex 3-vector)',key='cts_vdf_scattered_pol')
+                vf_ion_flow=st.text_input('Fixed ion-flow projections (m/s; comma-separated; optional)',key='cts_vdf_ion_flow')
+            if st.button('Run relativistic gyrotropic Full-EM CTS VDF inversion',type='primary',key='run_cts_vdf_inverse'):
+                try:
+                    frequency=pd.to_numeric(df[vf_frequency_col],errors='coerce').to_numpy(dtype=float)
+                    spectrum=pd.to_numeric(df[vf_spectrum_col],errors='coerce').to_numpy(dtype=float)
+                    if not np.all(np.isfinite(frequency)) or not np.all(np.isfinite(spectrum)) or np.any(np.diff(frequency)<=0):
+                        raise ValueError('Frequency and spectrum must be finite and strictly increasing.')
+                    if vf_response_upload is None or vf_regularization_upload is None:
+                        raise ValueError('Upload both the measured frequency-response matrix and the momentum-space regularization matrix.')
+                    response_vf=pd.read_csv(vf_response_upload,header=None).to_numpy(dtype=float)
+                    regularization_vf=pd.read_csv(vf_regularization_upload,header=None).to_numpy(dtype=float)
+                    covariance_vf=None if vf_covariance_upload is None else pd.read_csv(vf_covariance_upload,header=None).to_numpy(dtype=float)
+                    uncertainty_vf=None
+                    if vf_uncertainty_col!='<none>':
+                        uncertainty_vf=pd.to_numeric(df[vf_uncertainty_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(uncertainty_vf)) or np.any(uncertainty_vf<=0):
+                            raise ValueError('Spectral 1σ uncertainty must be finite and positive.')
+                    if (uncertainty_vf is None)==(covariance_vf is None):
+                        raise ValueError('Supply exactly one spectral uncertainty column or full covariance matrix.')
+                    names=[v.strip() for v in vf_names.split(',') if v.strip()]
+                    charges=[float(v.strip()) for v in vf_charges.split(',') if v.strip()]
+                    masses=[float(v.strip()) for v in vf_masses.split(',') if v.strip()]
+                    fractions=[float(v.strip()) for v in vf_fractions.split(',') if v.strip()]
+                    if not names or not (len(names)==len(charges)==len(masses)==len(fractions)):
+                        raise ValueError('Ion names, charges, masses and fractions must have matching lengths.')
+                    ion_species=[{'name':n,'charge_state':z,'mass_amu':m} for n,z,m in zip(names,charges,masses)]
+                    ion_temperatures=_parse_ts_float_list(vf_ti,'Fixed ion temperatures')
+                    if ion_temperatures.size!=len(names):
+                        raise ValueError('Supply one fixed ion temperature per ion species.')
+                    geometry=json.loads(vf_geometry_json)
+                    pperp=np.asarray(json.loads(vf_pperp_json),dtype=float)
+                    pparallel=np.asarray(json.loads(vf_ppar_json),dtype=float)
+                    initial_distribution=np.asarray(json.loads(vf_initial_json),dtype=float)
+                    flow=float(vf_electron_flow)
+                    if vf_population_kind=='electron' and flow!=0.0:
+                        raise ValueError('Electron gyrotropic VDF inversion requires the separately supplied bulk electron-flow projection to be exactly zero; represent drift by VDF asymmetry.')
+                    kwargs_vdf={
+                        'frequency_shift_Hz':frequency,'measured_spectrum':spectrum,
+                        'probe_frequency_Hz':float(vf_probe),'scattering_geometry':geometry,
+                        'population_kind':vf_population_kind,
+                        'p_perpendicular_kg_m_s':pperp,'p_parallel_kg_m_s':pparallel,
+                        'initial_distribution_kg_m_s_inverse3':initial_distribution,
+                        'electron_density_m3':float(vf_ne),'electron_temperature_eV':float(vf_te),
+                        'ion_temperature_eV':ion_temperatures,'ion_species':ion_species,
+                        'ion_fractions':fractions,'magnetic_field_T':_parse_ts_vector(vf_bfield,'Magnetic field'),
+                        'incident_polarization':_parse_ts_complex_vector(vf_incident_pol,'Incident polarization'),
+                        'scattered_polarization':_parse_ts_complex_vector(vf_scattered_pol,'Scattered polarization'),
+                        'instrument_response':response_vf,'regularization_matrix':regularization_vf,
+                        'regularization_strength':float(vf_regularization_strength),
+                        'electron_flow_projection_m_s':flow,'ion_flow_projection_m_s':None if not vf_ion_flow.strip() else _parse_ts_float_list(vf_ion_flow,'Ion flow projections'),
+                        'population_name':vf_population_name,'harmonic_order':vf_harmonic,
+                        'quadrature_order':vf_quadrature,
+                        'measurement_uncertainty':uncertainty_vf,'measurement_covariance':covariance_vf,
+                    }
+                    if vf_population_kind=='fast_ion':
+                        kwargs_vdf.update({
+                            'population_density_m3':float(vf_population_density),
+                            'population_mass_amu':float(vf_population_mass),
+                            'population_charge_state':float(vf_population_charge),
+                        })
+                    result_cts=analyze_cts_spectrum_model(model='full_em_gyrotropic_vdf_shape',**kwargs_vdf)
+                    st.success('Relativistic gyrotropic VDF inversion completed within its fixed-bulk Full-EM model scope.')
+                    st.json(result_cts)
+                    json_download('Export relativistic gyrotropic CTS VDF and moments',result_cts,'tis_cts_gyrotropic_vdf_inverse.json')
+                    add_report_section('Relativistic gyrotropic CTS VDF inverse',result_cts)
+                except Exception as e:
+                    st.error(f'Relativistic gyrotropic CTS VDF inversion failed: {e}')
+
         elif cts_model=='electrostatic_kappa':
             st.caption('Collisionless unmagnetized longitudinal CTS with an isotropic 3-D Kappa electron population and Maxwellian ions. The inverse fits n_e, T_e and kappa jointly; ion temperatures, species, composition, geometry and 3-D flows are externally supplied.')
             c1,c2=st.columns(2)
