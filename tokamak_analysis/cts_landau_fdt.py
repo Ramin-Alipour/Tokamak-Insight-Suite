@@ -171,7 +171,7 @@ def build_linearized_landau_fdt(
         moments[sl, s] = 1.0
         moments[sl, ns:ns+3] = mass*velocity_grids[s]
         moments[sl, ns+3] = 0.5*mass*np.sum(velocity_grids[s]**2, axis=1)
-    inv_resid = float(sparse_norm(K@moments) /
+    inv_resid = float(np.linalg.norm(K@moments) /
         max(sparse_norm(K)*np.linalg.norm(moments), np.finfo(float).tiny))
     # K is a Gram sum, hence PSD; verify the FDT covariance numerically.
     # The metadata below advertises exact discrete conservation.  A loose
