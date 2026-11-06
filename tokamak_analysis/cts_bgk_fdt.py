@@ -77,8 +77,8 @@ def analyze_conserving_bgk_cts(
 
     if isinstance(quadrature_order, (bool, np.bool_)) or int(quadrature_order) != quadrature_order or quadrature_order < 24:
         raise ValueError("quadrature_order must be an integer >= 24")
-    if isinstance(quadrature_max_order, (bool, np.bool_)) or int(quadrature_max_order) != quadrature_max_order or quadrature_max_order < quadrature_order:
-        raise ValueError("quadrature_max_order must be an integer >= quadrature_order")
+    if isinstance(quadrature_max_order, (bool, np.bool_)) or int(quadrature_max_order) != quadrature_max_order or quadrature_max_order <= quadrature_order:
+        raise ValueError("quadrature_max_order must be an integer > quadrature_order")
     tolerance = float(quadrature_convergence_tolerance)
     if not np.isfinite(tolerance) or tolerance <= 0.0:
         raise ValueError("quadrature_convergence_tolerance must be positive and finite")
@@ -120,9 +120,6 @@ def analyze_conserving_bgk_cts(
         if quadrature_error <= tolerance:
             quadrature_converged = True
             break
-    if not np.isfinite(quadrature_error):
-        quadrature_error = 0.0
-        quadrature_converged = True
     interaction = np.outer(charge, charge) / (epsilon_0 * k**2)
     identity = np.eye(len(species), dtype=complex)
     screened = np.empty_like(response0)
