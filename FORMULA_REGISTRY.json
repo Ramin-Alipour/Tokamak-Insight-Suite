@@ -5843,10 +5843,10 @@
   },
   {
     "name": "Collisionless isotropic-Kappa CTS Landau susceptibility",
-    "equation": "f'_κ(v) = -2κv f_κ(v)/(a_κ+v²), a_κ=(2κ-3)k_B T_e/m_e; χ_e=-(ω_pe²/k²)∫_{-∞}^{∞} f'_κ(v)/(v-ζ) dv, Im(ζ)>0",
+    "equation": "f'_κ(v) = -2κv f_κ(v)/(a_κ+v²), a_κ=(2κ-3)k_B T_e/m_e; χ_e=-(ω_pe²/k²)∫_{-∞}^{∞} f'_κ(v)/(v-ζ) dv, Im(ζ)>0; v_phi,rest = v_phi,lab − u_e·q_hat",
     "inputs": "v [m/s] coverage grid; phase_velocity [m/s]; n_e [m^-3]; T_e [eV]; κ>3/2; k [m^-1]; optional positive Landau-pole displacement [m/s]",
     "output": "Complex longitudinal electron susceptibility; full-tail Landau integral; adaptive quadrature errors; finite-grid CDF coverage",
-    "assumptions": "Isotropic non-relativistic 3-D Kappa distribution; exact 1-D marginal; collisionless, unmagnetized, longitudinal response; positive retarded-pole displacement.",
+    "assumptions": "Isotropic non-relativistic 3-D Kappa distribution; exact 1-D marginal; collisionless, unmagnetized, longitudinal response; positive retarded-pole displacement. Optional projected electron bulk drift is treated by a Galilean shift to the electron rest frame; the model remains non-relativistic.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -5908,6 +5908,13 @@
           "unit": "dimensionless",
           "description": "Explicit minimum analytic Kappa CDF mass represented by the supplied diagnostic grid; default 0.999.",
           "required": false
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; signed projected electron bulk velocity along the wave/scattering vector; strictly subluminal",
+          "required": false,
+          "default": 0,
+          "description": "Landau resonance is evaluated at v_phi,rest=v_phi,lab-u_e dot q_hat."
         }
       ],
       "output_specs": [
@@ -5940,6 +5947,14 @@
           "name": "landau_integral_tail_complete",
           "unit": "boolean",
           "description": "True when the physical susceptibility integral includes the analytic distribution over the full real velocity axis."
+        },
+        {
+          "name": "phase_velocity_in_electron_rest_frame_m_s",
+          "unit": "m s^-1; v_phi,lab-u_e dot q_hat"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; supplied signed projected electron bulk velocity"
         }
       ],
       "prerequisites": [
@@ -7789,10 +7804,10 @@
   },
   {
     "name": "Analytic Maxwellian longitudinal susceptibility (Fried–Conte)",
-    "equation": "χ_e(ζ) = (1/(k² λ_De²))[1 + ζ Z(ζ)],  Z(ζ)=i√π w(ζ),  ζ=v_phase/(√2 σ_e),  σ_e²=e T_e/m_e,  λ_De²=ε₀ e T_e/(n_e e²),  dχ_e/dv_phase = [1/(√2 σ_e k² λ_De²)] [Z(ζ) − 2ζ(1+ζZ(ζ))]",
+    "equation": "χ_e(ζ) = (1/(k² λ_De²))[1 + ζ Z(ζ)],  Z(ζ)=i√π w(ζ),  ζ=v_phase/(√2 σ_e),  σ_e²=e T_e/m_e,  λ_De²=ε₀ e T_e/(n_e e²),  dχ_e/dv_phase = [1/(√2 σ_e k² λ_De²)] [Z(ζ) − 2ζ(1+ζZ(ζ))]; v_phi,rest = v_phi,lab − u_e·q_hat",
     "inputs": "Real phase velocity [m/s], electron density [m^-3], electron temperature [eV], wavenumber [m^-1]",
     "output": "Dimensionless complex longitudinal electron susceptibility",
-    "assumptions": "Collisionless, unmagnetized, non-relativistic isotropic Maxwellian electrons; retarded Landau contour; SI units; electron-only susceptibility (no ion term or FDT fluctuation spectrum).",
+    "assumptions": "Collisionless, unmagnetized, non-relativistic isotropic Maxwellian electrons; retarded Landau contour; SI units; electron-only susceptibility (no ion term or FDT fluctuation spectrum). Optional projected electron bulk drift is treated by a Galilean shift to the electron rest frame; the model remains non-relativistic.",
     "status": "D",
     "category": "Collective Thomson scattering",
     "execution_contract": {
@@ -7825,6 +7840,13 @@
           "name": "mass_kg",
           "unit": "kg; defaults to electron mass",
           "required": false
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; signed projected electron bulk velocity along the wave/scattering vector; strictly subluminal",
+          "required": false,
+          "default": 0,
+          "description": "Landau resonance is evaluated at v_phi,rest=v_phi,lab-u_e dot q_hat."
         }
       ],
       "output_specs": [
@@ -7855,6 +7877,14 @@
         {
           "name": "plasma_dispersion_function_derivative",
           "unit": "dimensionless complex"
+        },
+        {
+          "name": "phase_velocity_in_electron_rest_frame_m_s",
+          "unit": "m s^-1; v_phi,lab-u_e dot q_hat"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; supplied signed projected electron bulk velocity"
         }
       ],
       "prerequisites": [
@@ -7909,10 +7939,10 @@
   },
   {
     "name": "Full-tail isotropic-Kappa Landau susceptibility phase-velocity derivative",
-    "equation": "Iκ(vφ)=PV∫_{−∞}^{∞} f′κ(v)/(v−vφ) dv + iπ f′κ(vφ); χe=−(ωpe²/k²)Iκ; ∂χe/∂vφ=−(ωpe²/k²)[FP∫ f′κ(v)/(v−vφ)² dv + iπ f″κ(vφ)]; ∂χe/∂ω=(1/k)∂χe/∂vφ. Default: exact retarded η→0+ Landau limit.",
+    "equation": "Iκ(vφ)=PV∫_{−∞}^{∞} f′κ(v)/(v−vφ) dv + iπ f′κ(vφ); χe=−(ωpe²/k²)Iκ; ∂χe/∂vφ=−(ωpe²/k²)[FP∫ f′κ(v)/(v−vφ)² dv + iπ f″κ(vφ)]; ∂χe/∂ω=(1/k)∂χe/∂vφ. Default: exact retarded η→0+ Landau limit.; v_phi,rest = v_phi,lab − u_e·q_hat",
     "inputs": "Electron density [m^-3], second-moment electron temperature [eV], Kappa index κ>3/2, real phase velocity [m/s], wavenumber [m^-1], optional explicit finite-pole regularization η [m/s], velocity grid for probability-coverage gate.",
     "output": "Complex longitudinal electron susceptibility, analytic phase-velocity derivative and angular-frequency derivative, with separate real-axis quadrature error estimates and explicit Landau-contour mode.",
-    "assumptions": "Exact 1-D marginal of isotropic 3-D finite-variance Kappa; collisionless, unmagnetized, non-relativistic longitudinal response; default exact retarded Landau contour evaluated by Sokhotski-Plemelj real-axis quadrature and analytic resonant residues; optional finite positive η only when explicitly supplied; analytic Kappa tail integrated over the full velocity axis.",
+    "assumptions": "Exact 1-D marginal of isotropic 3-D finite-variance Kappa; collisionless, unmagnetized, non-relativistic longitudinal response; default exact retarded Landau contour evaluated by Sokhotski-Plemelj real-axis quadrature and analytic resonant residues; optional finite positive η only when explicitly supplied; analytic Kappa tail integrated over the full velocity axis. Optional projected electron bulk drift is treated by a Galilean shift to the electron rest frame; the model remains non-relativistic.",
     "status": "D",
     "category": "Collective Thomson scattering",
     "execution_contract": {
@@ -7956,6 +7986,13 @@
           "name": "v",
           "unit": "m/s; increasing grid used for analytic probability-coverage gate",
           "required": true
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; signed projected electron bulk velocity along the wave/scattering vector; strictly subluminal",
+          "required": false,
+          "default": 0,
+          "description": "Landau resonance is evaluated at v_phi,rest=v_phi,lab-u_e dot q_hat."
         }
       ],
       "output_specs": [
@@ -7990,6 +8027,14 @@
         {
           "name": "finite_pole_regularization_used",
           "unit": "boolean"
+        },
+        {
+          "name": "phase_velocity_in_electron_rest_frame_m_s",
+          "unit": "m s^-1; v_phi,lab-u_e dot q_hat"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; supplied signed projected electron bulk velocity"
         }
       ],
       "prerequisites": [
