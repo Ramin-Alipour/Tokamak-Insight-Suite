@@ -931,3 +931,63 @@ def test_joint_inverse_carries_systematic_covariance_through_regularization_sens
     assert out["spectral_covariance_provenance"]["systematic_covariance_supplied"] is True
     assert len(out["regularization_sensitivity"]["candidate_diagnostics"]) == 2
 
+
+
+def test_joint_inverse_propagates_full_spatial_mixing_operator_covariance():
+    x, y, r, h, *_ = _synthetic_case()
+    mixing_covariance = np.eye(h.size) * 2.5e-7
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(y, 0.01),
+        spatial_mixing_matrix_covariance=mixing_covariance,
+        regularization_strength=0.0,
+    )
+    calibration = out["spatial_mixing_calibration_parameter_covariance"]
+    assert calibration is not None
+    assert calibration.shape == out["parameter_covariance"].shape
+    assert np.all(np.isfinite(calibration))
+    assert np.linalg.eigvalsh(0.5*(calibration+calibration.T))[0] >= -1e-10
+    assert out["spatial_mixing_covariance_contract"]["supplied"] is True
+    assert out["spatial_mixing_covariance_contract"]["parameter_order"] == (
+        "row_major_channel_then_true_spatial_node"
+    )
+    assert out["covariance_decomposition"]["spatial_mixing_calibration_covariance_available"] is True
+    assert np.trace(out["parameter_covariance"]) > np.trace(
+        out["measurement_data_parameter_covariance"]
+    )
+
+
+def test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validates_joint_block():
+    x, y, r, h, *_ = _synthetic_case()
+    mixing_covariance = np.eye(h.size) * 2.5e-7
+    measurement_covariance = np.eye(y.size) * 1.0e-4
+    cross = np.zeros((y.size, h.size))
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=measurement_covariance,
+        spatial_mixing_matrix_covariance=mixing_covariance,
+        spectral_mixing_cross_covariance=cross,
+        regularization_strength=0.0,
+    )
+    assert out["spatial_mixing_covariance_contract"]["cross_covariance_with_measured_spectra_supplied"] is True
+    assert out["spatial_mixing_cross_covariance_parameter_contribution"] is not None
+    assert np.allclose(out["spatial_mixing_cross_covariance_parameter_contribution"], 0.0)
+
+    with pytest.raises(ValueError, match="requires measured signal_uncertainty"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+            spatial_mixing_matrix_covariance=mixing_covariance,
+            spectral_mixing_cross_covariance=cross,
+        )
+    invalid_cross = np.ones((y.size, h.size)) * 1e-2
+    with pytest.raises(ValueError, match="joint measured-spectrum/spatial-mixing covariance"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+            joint_spectral_covariance=measurement_covariance,
+            spatial_mixing_matrix_covariance=mixing_covariance,
+            spectral_mixing_cross_covariance=invalid_cross,
+        )
