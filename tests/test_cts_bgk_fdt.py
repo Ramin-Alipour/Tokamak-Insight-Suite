@@ -60,3 +60,24 @@ def test_bgk_cts_is_reachable_through_public_analysis_one_physics_api():
     assert result["public_physics_entrypoint"] == "cts_conserving_bgk_fdt"
     assert result["automatic_model_substitution"] is False
     assert result["cts_model"].startswith("isothermal_momentum_conserving_multispecies_BGK")
+
+
+
+def test_bgk_cts_reports_refinement_history_and_does_not_claim_unchecked_convergence():
+    result = analyze_conserving_bgk_cts(
+        **_inputs(), quadrature_order=64, quadrature_max_order=128,
+        quadrature_convergence_tolerance=1e-30,
+    )
+    gate = result["velocity_quadrature_convergence"]
+    assert gate["orders_evaluated"] == [64, 128]
+    assert gate["final_order"] == 128
+    assert gate["relative_response_change"] >= 0.0
+    assert gate["converged"] is False
+    assert result["quantitative_release_gate"]["quantitative_spectrum_release_allowed"] is False
+
+
+def test_bgk_cts_rejects_a_maximum_order_without_a_refinement():
+    with pytest.raises(ValueError, match="quadrature_max_order must be an integer > quadrature_order"):
+        analyze_conserving_bgk_cts(
+            **_inputs(), quadrature_order=64, quadrature_max_order=64
+        )
