@@ -110,6 +110,16 @@ def _kappa_bin_average(wavelength_nm, laser_wavelength_nm, scattering_q_factor,
     return probability / widths, probability
 
 
+def _maxwellian_projected_superluminal_tail_probability(flow_m_s, sigma_m_s):
+    """Exact Gaussian probability P(|v_q| >= c) for a fitted projected flow."""
+    flow, sigma = map(float, (flow_m_s, sigma_m_s))
+    if not np.all(np.isfinite([flow, sigma])) or abs(flow) >= _C or sigma <= 0.0:
+        raise ValueError("projected Maxwellian tail requires subluminal flow and positive sigma")
+    lower = (-_C - flow) / sigma
+    upper = (_C - flow) / sigma
+    return float(np.clip(ndtr(lower) + ndtr(-upper), 0.0, 1.0))
+
+
 def _kappa_projected_superluminal_tail_probability(flow_m_s, theta_m_s, kappa):
     r"""Exact projected Kappa probability outside the speed-of-light boundary.
 
@@ -234,6 +244,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     temperature_bounds_eV=(1.0e-3, 1.0e7),
     flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
     maximum_projected_rms_beta=0.1,
+    maximum_projected_superluminal_tail_probability=1.0e-8,
     max_nfev=4000,
 ):
     """Jointly infer T_parallel, T_perpendicular and per-view q-flow projections.
@@ -373,6 +384,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     beta_limit = float(maximum_projected_rms_beta)
     if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
         raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
+    projected_tail_tolerance = float(maximum_projected_superluminal_tail_probability)
+    if not np.isfinite(projected_tail_tolerance) or not 0.0 < projected_tail_tolerance < 1.0:
+        raise ValueError("maximum_projected_superluminal_tail_probability must lie strictly between zero and one")
     if isinstance(max_nfev, (bool, np.bool_)) or int(max_nfev) < 1:
         raise ValueError("max_nfev must be a positive integer")
     qmag_factor = 2.0 * np.sin(angle / 2.0)
@@ -423,7 +437,16 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         raise RuntimeError(f"gyrotropic bi-Maxwellian Thomson fit failed: {fit.message}")
     fitted, directional, captured_probability = predict(fit.x)
     projected_rms_beta = np.sqrt(_E * directional / _ME) / _C
-    fitted_flow_beta = np.abs(fit.x[2::4]) / _C
+    fitted_flows = fit.x[2::4].copy()
+    fitted_flow_beta = np.abs(fitted_flows) / _C
+    projected_sigma_v = np.sqrt(_E * directional / _ME)
+    projected_superluminal_tail_lower_bound = np.asarray([
+        _maxwellian_projected_superluminal_tail_probability(flow, sigma)
+        for flow, sigma in zip(fitted_flows, projected_sigma_v)
+    ])
+    projected_tail_exceeds_tolerance = bool(
+        np.max(projected_superluminal_tail_lower_bound) > projected_tail_tolerance
+    )
     if np.max(projected_rms_beta) >= beta_limit or np.max(fitted_flow_beta) >= 0.1:
         raise ValueError(
             "Fitted thermal or bulk-flow speed exceeds the declared non-relativistic "
@@ -794,6 +817,18 @@ def fit_gyrotropic_bi_kappa_thomson(
             "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
             "status": "within_declared_nonrelativistic_screen",
             "interpretation": "Conservative software screening threshold, not a universal physical boundary."
+        },
+        "relativistic_tail_diagnostic": {
+            "definition": "P(|v_q| >= c) from the exact Gaussian projected marginal; a lower bound on the 3-D superluminal probability",
+            "projected_superluminal_probability_lower_bound": projected_superluminal_tail_lower_bound,
+            "maximum_projected_superluminal_probability_lower_bound": float(np.max(projected_superluminal_tail_lower_bound)),
+            "tolerance": projected_tail_tolerance,
+            "status": "exceeds_tolerance_use_relativistic_model" if projected_tail_exceeds_tolerance else "below_projected_tail_tolerance",
+            "requires_relativistic_forward_model": projected_tail_exceeds_tolerance,
+            "warning": (
+                "The non-relativistic Maxwellian closure assigns more than the projected-tail tolerance to superluminal projected velocities."
+                if projected_tail_exceeds_tolerance else None
+            ),
         },
         "magnetic_pitch_cosine": mu,
         "magnetic_pitch_cosine_squared": mu2,
