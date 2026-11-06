@@ -181,3 +181,46 @@ def test_full_em_field_fluctuations_reject_nonphysical_current_covariance(bad_ma
     }
     with pytest.raises(ValueError, match=message):
         landau_full_em_electric_field_fluctuation_spectrum(response, 1.0e-3)
+
+
+def test_end_to_end_landau_fdt_full_em_spectrum_chains_operator_noise_and_maxwell_green():
+    inputs = _inputs()
+    result = run_advanced_thomson_physics(
+        "landau_fdt_full_em_spectrum", **inputs,
+        propagation_direction=(1.0, 2.0, 0.5),
+    )
+    assert result["public_physics_entrypoint"] == "landau_fdt_full_em_spectrum"
+    assert result["automatic_model_substitution"] is False
+    assert result["integration_status"] == (
+        "conserving_Landau_operator_and_matching_FDT_noise_connected_"
+        "through_frequency_resolved_Maxwell_Green_dyadic"
+    )
+    assert result["cts_three_wave_vertex_connected"] is False
+    assert result["constitutive_response"]["conductivity_tensor_S_m"].shape == (2, 3, 3)
+    for key in (
+        "electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s",
+        "magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s",
+        "electric_magnetic_cross_spectral_matrix",
+    ):
+        tensor = np.asarray(result[key])
+        assert tensor.shape == (2, 3, 3)
+        assert np.all(np.isfinite(tensor))
+        for matrix in tensor:
+            np.testing.assert_allclose(matrix, matrix.conj().T, rtol=1e-10, atol=1e-35)
+            assert np.linalg.eigvalsh(matrix).min() >= -1e-9 * max(
+                np.linalg.norm(matrix, ord=2), np.finfo(float).tiny
+            )
+    assert result["transverse_stokes_spectral_density_IQUV"].shape == (2, 4)
+    assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
+    assert result["quantitative_release_gate"]["magnetized_response_required_for_magnetized_plasma"] is True
+
+
+def test_end_to_end_landau_fdt_full_em_spectrum_rejects_undamped_green_pole():
+    inputs = _inputs()
+    inputs["angular_frequency_rad_s"] = np.array([1.0e6])
+    inputs["wave_number_m_inverse"] = 1.0e6 / 299792458.0
+    with pytest.raises(np.linalg.LinAlgError, match="ill-conditioned"):
+        run_advanced_thomson_physics(
+            "landau_fdt_full_em_spectrum", **inputs,
+            propagation_direction=(1.0, 0.0, 0.0),
+        )
