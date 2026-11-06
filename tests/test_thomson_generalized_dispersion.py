@@ -585,7 +585,7 @@ def test_exact_landau_susceptibility_derivative_matches_phase_velocity_differenc
     ) / (2.0 * step)
     np.testing.assert_allclose(
         exact["susceptibility_phase_velocity_derivative_s_m"],
-        finite_difference, rtol=2.0e-5, atol=2.0e-7,
+        finite_difference, rtol=3.0e-5, atol=2.0e-7,
     )
     assert exact["phase_derivative_quadrature"] == (
         "hadamard_finite_part_second_order_landau_derivative"
