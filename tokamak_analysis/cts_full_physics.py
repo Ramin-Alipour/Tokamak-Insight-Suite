@@ -669,6 +669,7 @@ def collective_non_gyrotropic_gaussian_electron_spectrum(
 # actionable errors for unsupported model names.
 ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_kinetic_background_fit",
+    "thomson_multi_population_relativistic_fit",
     "thomson_multiview_3d_evdf",
     "kappa_electrostatic_susceptibility",
     "kappa_dispersion_function",
@@ -811,6 +812,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     elif model == "thomson_kinetic_background_fit":
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         solver = fit_noncollective_kinetic_thomson_with_background
+    elif model == "thomson_multi_population_relativistic_fit":
+        from .thomson_population_mixture import fit_multi_population_relativistic_thomson_spectrum
+        solver = fit_multi_population_relativistic_thomson_spectrum
     elif model == "relativistic_kinetic_ece_profile":
         solver = solve_relativistic_kinetic_ece_profile
     elif model == "relativistic_kinetic_ece":
