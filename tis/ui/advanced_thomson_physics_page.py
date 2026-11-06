@@ -116,7 +116,10 @@ MODEL_PHYSICS_NOTES = {
         "Electrostatic CTS spectrum from a supplied projected 1-D electron EVDF and either Maxwellian ions or independent tabulated 1-D ion marginals in each species rest frame. "
         "Set landau_limit=true to use the exact first-order Sokhotski-Plemelj response; otherwise "
         "pole_imaginary_part_m_s selects a finite retarded displacement. Exact-limit samples "
-        "coincident with EVDF grid knots are rejected rather than regularized silently."
+        "coincident with EVDF grid knots are rejected rather than regularized silently. "
+        "For non-Maxwellian ions, supply ion_velocity_grids_m_s and ion_probability_densities_s_m "
+        "as matching (n_ion_species, n_velocity) arrays in each species rest frame; "
+        "ion_temperature_eV is optional for that branch."
     ),
     "thomson_temperature_from_spectral_width": (
         "Conditional Te estimator: Te = (sigma_lambda/lambda_0)^2 m_e c^2 / "

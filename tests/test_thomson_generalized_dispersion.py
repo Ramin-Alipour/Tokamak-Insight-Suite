@@ -206,12 +206,15 @@ def test_collective_tabulated_evdf_accepts_non_maxwellian_tabulated_ion_populati
         np.exp(-0.5*((ion_velocity-2.5e4)/2.0e4)**2)
         + 0.6*np.exp(-0.5*((ion_velocity+3.0e4)/1.5e4)**2)
     )
-    result = collective_tabulated_electron_spectral_density(
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+    result = run_advanced_thomson_physics(
+        "cts_tabulated_evdf_landau",
         wavelength, 1064.0, np.pi/2,
         electron_density_m3=1.0e18,
         electron_velocity_grid_m_s=velocity,
         electron_probability_density_s_m=electron_pdf,
-        ion_species=["D+"], ion_fractions=[1.0], ion_temperature_eV=[20.0],
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
         electron_velocity_m_s=[0.0, 0.0, 0.0],
         ion_velocity_m_s=[[0.0, 0.0, 0.0]],
         incident_direction=[1.0, 0.0, 0.0],
@@ -238,7 +241,7 @@ def test_collective_tabulated_evdf_requires_ion_grid_and_density_together():
             electron_density_m3=1.0e18,
             electron_velocity_grid_m_s=velocity,
             electron_probability_density_s_m=np.exp(-0.5*(velocity/1e6)**2),
-            ion_species=["D+"], ion_fractions=[1.0], ion_temperature_eV=[20.0],
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}], ion_fractions=[1.0],
             electron_velocity_m_s=[0.0, 0.0, 0.0],
             ion_velocity_m_s=[[0.0, 0.0, 0.0]],
             incident_direction=[1.0, 0.0, 0.0],
