@@ -246,6 +246,29 @@ def _curvature(axis):
     return matrix
 
 
+def _huber_total_variation_residual(profile, axis, huber_scale):
+    """Length-weighted Huber-TV residual for an edge-preserving radial prior.
+
+    Squared residuals approximate integral rho_delta(d profile / dr) dr,
+    where rho_delta(g)=2*delta^2*(sqrt(1+(g/delta)^2)-1).
+    The penalty is quadratic for small gradients and linear for large ones,
+    avoiding the strong edge suppression of quadratic curvature smoothing.
+    """
+    values = _real_array(profile, "profile")
+    radial = _real_array(axis, "axis")
+    delta = _finite_real_scalar(huber_scale, "huber_scale")
+    if values.ndim != 1 or radial.ndim != 1 or values.shape != radial.shape:
+        raise ValueError("profile and axis must be matching one-dimensional arrays")
+    spacing = np.diff(radial)
+    if np.any(spacing <= 0.0):
+        raise ValueError("axis must be strictly increasing")
+    if delta <= 0.0:
+        raise ValueError("huber_scale must be strictly positive")
+    gradient = np.diff(values) / spacing
+    rho = 2.0 * delta**2 * (np.sqrt(1.0 + (gradient / delta)**2) - 1.0)
+    return np.sqrt(np.maximum(rho * spacing, 0.0))
+
+
 def reconstruct_joint_thomson_spatial_spectra(
     wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix, *,
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
@@ -254,7 +277,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
     model_discrepancy_covariance=None, regularization_sensitivity_strengths=None,
-    regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
+    regularization_strength=0.0, regularization_kind="curvature",
+    tv_huber_scale=0.05, positive_amplitude=True, max_nfev=3000,
     maximum_data_condition_number=1.0e8,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
@@ -360,6 +384,11 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie strictly between 0 and pi")
     if not np.isfinite(lam_reg) or lam_reg < 0:
         raise ValueError("regularization_strength must be finite and non-negative")
+    if regularization_kind not in {"curvature", "huber_total_variation"}:
+        raise ValueError("regularization_kind must be curvature or huber_total_variation")
+    huber_scale = _finite_real_scalar(tv_huber_scale, "tv_huber_scale")
+    if huber_scale <= 0.0:
+        raise ValueError("tv_huber_scale must be strictly positive")
     sensitivity_strengths = None
     if regularization_sensitivity_strengths is not None:
         sensitivity_strengths = _real_array(
@@ -655,9 +684,16 @@ def reconstruct_joint_thomson_spatial_spectra(
         predicted, te, flow, amp, _ = predict(p)
         data = whiten(y - predicted)
         if lam_reg > 0:
-            penalties = np.r_[np.sqrt(lam_reg) * (d2 @ np.log(te)),
-                              np.sqrt(lam_reg) * (d2 @ flow / 1e6),
-                              np.sqrt(lam_reg) * (d2 @ np.log(amp))]
+            if regularization_kind == "curvature":
+                penalties = np.r_[np.sqrt(lam_reg) * (d2 @ np.log(te)),
+                                  np.sqrt(lam_reg) * (d2 @ flow / 1e6),
+                                  np.sqrt(lam_reg) * (d2 @ np.log(amp))]
+            else:
+                penalties = np.sqrt(lam_reg) * np.r_[
+                    _huber_total_variation_residual(np.log(te), r, huber_scale),
+                    _huber_total_variation_residual(flow / 1e6, r, huber_scale),
+                    _huber_total_variation_residual(np.log(amp), r, huber_scale),
+                ]
             return np.r_[data, penalties]
         return data
 
@@ -948,8 +984,17 @@ def reconstruct_joint_thomson_spatial_spectra(
             if physical_model == "kappa" else
             "8_point_Gauss_Legendre_finite_volume_bin_averages_of_relativistic_forward_kernel"
         ),
-        "regularization": {"kind": "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude",
-                           "strength": lam_reg, "user_selected": True},
+        "regularization": {
+            "kind": (
+                "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude"
+                if regularization_kind == "curvature"
+                else "length_weighted_huber_total_variation_on_log_Te_flow_and_log_amplitude"
+            ),
+            "strength": lam_reg,
+            "huber_scale": huber_scale if regularization_kind == "huber_total_variation" else None,
+            "user_selected": True,
+            "edge_preserving": regularization_kind == "huber_total_variation",
+        },
         "noise_model": noise_model,
         "spectral_covariance_provenance": {
             "measurement_covariance_source": measurement_covariance_source,
@@ -1033,6 +1078,8 @@ def reconstruct_joint_thomson_spatial_spectra(
                 model_discrepancy_covariance=model_discrepancy_covariance,
                 regularization_sensitivity_strengths=None,
                 regularization_strength=float(strength),
+                regularization_kind=regularization_kind,
+                tv_huber_scale=huber_scale,
                 positive_amplitude=positive_amplitude,
                 max_nfev=max_nfev,
                 background_model=background_model,
