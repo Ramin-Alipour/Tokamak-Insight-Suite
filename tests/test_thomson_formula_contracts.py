@@ -128,3 +128,21 @@ def test_thomson_temperature_formula_contract_preserves_measured_response_forwar
     assert "instrument-corrected width" not in " ".join(contract["prerequisites"]).lower()
     assert "measured-response-convolved physical forward fit" in contract["note"]
     assert "does not correct or deconvolve measured spectra" in contract["note"]
+
+
+def test_nonrelativistic_thomson_flow_propagates_joint_wavelength_geometry_covariance():
+    from tokamak_analysis.formula_library import thomson_velocity_projection
+
+    covariance = [
+        [4.0e-10, 1.0e-10, 2.0e-12],
+        [1.0e-10, 9.0e-10, -1.0e-12],
+        [2.0e-12, -1.0e-12, 4.0e-8],
+    ]
+    result = thomson_velocity_projection(
+        531.999, 532.0, 1.1, input_covariance_nm2_rad2=covariance
+    )
+    j = result["velocity_jacobian_m_s_per_input_unit"]
+    expected = math.sqrt(sum(j[i] * covariance[i][k] * j[k]
+                              for i in range(3) for k in range(3)))
+    assert result["uncertainty_electron_velocity_projection_m_s"] == pytest.approx(expected)
+    assert "full_joint_covariance" in result["uncertainty_model"]

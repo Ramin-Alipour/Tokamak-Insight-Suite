@@ -887,18 +887,64 @@ def thomson_electron_temperature_from_spectral_width(intrinsic_sigma_nm, laser_w
     return out
 
 
-def thomson_velocity_projection(fitted_center_nm, laser_wavelength_nm, scattering_angle_rad, *, sigma_fitted_center_nm=None, sigma_laser_wavelength_nm=None, sigma_scattering_angle_rad=None):
-    """Non-relativistic Doppler projection from the fitted Thomson centroid."""
-    center=_positive("fitted_center_nm",fitted_center_nm); laser=_positive("laser_wavelength_nm",laser_wavelength_nm); angle=_finite("scattering_angle_rad",scattering_angle_rad)
-    if not 0 < angle <= math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi].")
-    supplied=(sigma_fitted_center_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
-    if any(v is not None for v in supplied) and not all(v is not None for v in supplied): raise ValueError("Provide all three independent uncertainties, or none.")
-    sine=math.sin(angle/2); velocity=-C_LIGHT*(center-laser)/(2*laser*sine)
-    if abs(velocity)>=C_LIGHT: raise ValueError("Fitted centroid implies a superluminal non-relativistic flow projection.")
-    out={"electron_velocity_projection_m_s":velocity}
-    if all(v is not None for v in supplied):
-        sc,sl,sa=[_nonnegative(n,v) for n,v in zip(("sigma_fitted_center_nm","sigma_laser_wavelength_nm","sigma_scattering_angle_rad"),supplied)]
-        out["uncertainty_electron_velocity_projection_m_s"]=math.sqrt((C_LIGHT*sc/(2*laser*sine))**2+(C_LIGHT*center*sl/(2*laser**2*sine))**2+(0.5*velocity*math.cos(angle/2)/sine*sa)**2)
+def thomson_velocity_projection(
+    fitted_center_nm, laser_wavelength_nm, scattering_angle_rad, *,
+    sigma_fitted_center_nm=None, sigma_laser_wavelength_nm=None,
+    sigma_scattering_angle_rad=None, input_covariance_nm2_rad2=None,
+):
+    """First-order non-relativistic Doppler projection with joint geometry covariance.
+
+    The covariance is ordered [fitted centre nm, laser wavelength nm, angle rad].
+    The linearized Doppler relation is v_q = -c (lambda_s-lambda_0) /
+    [2 lambda_0 sin(theta/2)]. Cross-covariances are retained through J C J.T.
+    """
+    center = _positive("fitted_center_nm", fitted_center_nm)
+    laser = _positive("laser_wavelength_nm", laser_wavelength_nm)
+    angle = _finite("scattering_angle_rad", scattering_angle_rad)
+    if not 0 < angle <= math.pi:
+        raise ValueError("scattering_angle_rad must lie in (0, pi].")
+    supplied = (sigma_fitted_center_nm, sigma_laser_wavelength_nm, sigma_scattering_angle_rad)
+    if input_covariance_nm2_rad2 is not None and any(v is not None for v in supplied):
+        raise ValueError("Provide either input_covariance_nm2_rad2 or all three independent uncertainties, not both.")
+    if input_covariance_nm2_rad2 is None and any(v is not None for v in supplied) and not all(v is not None for v in supplied):
+        raise ValueError("Provide all three independent uncertainties, or none.")
+    sine = math.sin(angle / 2.0)
+    velocity = -C_LIGHT * (center - laser) / (2.0 * laser * sine)
+    if abs(velocity) >= C_LIGHT:
+        raise ValueError("Fitted centroid implies a superluminal non-relativistic flow projection.")
+    jacobian = np.asarray([
+        -C_LIGHT / (2.0 * laser * sine),
+        C_LIGHT * center / (2.0 * laser**2 * sine),
+        -0.5 * velocity / math.tan(angle / 2.0),
+    ], dtype=float)
+    out = {
+        "electron_velocity_projection_m_s": velocity,
+        "kinematics": "first_order_nonrelativistic_doppler",
+        "velocity_jacobian_m_s_per_input_unit": jacobian,
+        "input_covariance_order": ["fitted_center_nm", "laser_wavelength_nm", "scattering_angle_rad"],
+    }
+    if input_covariance_nm2_rad2 is not None:
+        covariance = np.asarray(input_covariance_nm2_rad2, dtype=float)
+        if covariance.shape != (3, 3) or not np.all(np.isfinite(covariance)):
+            raise ValueError("input_covariance_nm2_rad2 must be a finite 3x3 matrix.")
+        scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12 * scale):
+            raise ValueError("input_covariance_nm2_rad2 must be symmetric.")
+        covariance = 0.5 * (covariance + covariance.T)
+        if np.linalg.eigvalsh(covariance)[0] < -1e-10 * scale:
+            raise ValueError("input_covariance_nm2_rad2 must be positive semidefinite.")
+        variance = float(jacobian @ covariance @ jacobian.T)
+        out["uncertainty_electron_velocity_projection_m_s"] = math.sqrt(max(variance, 0.0))
+        out["variance_electron_velocity_projection_m2_s2"] = max(variance, 0.0)
+        out["uncertainty_model"] = "first_order_full_joint_covariance_including_wavelength_geometry_cross_terms"
+    elif all(v is not None for v in supplied):
+        sc, sl, sa = [_nonnegative(n, v) for n, v in zip(
+            ("sigma_fitted_center_nm", "sigma_laser_wavelength_nm", "sigma_scattering_angle_rad"), supplied
+        )]
+        variance = float(jacobian @ np.diag([sc**2, sl**2, sa**2]) @ jacobian.T)
+        out["uncertainty_electron_velocity_projection_m_s"] = math.sqrt(variance)
+        out["variance_electron_velocity_projection_m2_s2"] = variance
+        out["uncertainty_model"] = "first_order_independent_input_uncertainties"
     return out
 
 
