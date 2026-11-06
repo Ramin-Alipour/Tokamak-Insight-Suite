@@ -1,10 +1,11 @@
-"""Joint wavelength-resolved spatial Thomson inverse with a fixed mixing operator.
+"""Joint wavelength-resolved spatial Thomson inverse with fixed operators.
 
-This module fits calibrated measured channel-by-wavelength spectra directly.
-The spatial mixing operator and spectral response are supplied fixed forward
-operators: this code does not calibrate instruments or estimate a PSF.
-The selected physical model is the isotropic, non-relativistic Maxwellian
-single-particle Thomson line shape with a scalar scattering-vector flow.
+This module fits calibrated channel-by-wavelength spectra directly. The
+researcher-supplied spatial mixing operator, optional PSF, and spectral response
+are fixed forward operators; this code does not calibrate instruments or infer
+an arbitrary PSF. Select an isotropic Maxwellian, finite-variance isotropic
+Kappa, or relativistic Maxwell-Juttner single-particle Thomson model. The
+inferred flow is the component projected along the supplied scattering vector.
 """
 from __future__ import annotations
 
@@ -262,13 +263,15 @@ def reconstruct_joint_thomson_spatial_spectra(
     maximum_recoil_correction_fraction=0.01,
     include_compton_recoil=False,
 ):
-    """Jointly infer Te(r), projected flow(r), and spectral amplitude(r).
+    """Jointly infer Te(r), projected flow(r), and relative amplitude(r).
 
     Data layout is channel x wavelength; covariance is flattened in
-    channel-major order. The supplied mixing matrix maps spatial nodes to
-    detector-space backgrounds are fitted jointly as nuisance basis
-    coefficients and are not mixed as plasma emission. Select constant,
-    linear, polynomial, cubic-spline, or researcher-supplied template bases.
+    channel-major order. The supplied mixing matrix maps radial nodes to
+    detector channels and is composed with the optional PSF. Detector-space
+    backgrounds are fitted jointly as nuisance basis coefficients; they are
+    not mixed as plasma emission. Select constant, linear, polynomial,
+    cubic-spline, or researcher-supplied background-template bases. The
+    physical forward model is selected explicitly by physical_model.
     """
     if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
