@@ -616,10 +616,12 @@ def fit_multi_population_relativistic_thomson_spectrum(
     temperatures, fractions, flow = decode(fit.x)
     standard_p = np.sqrt(np.maximum(np.diag(covariance_p), 0.0))
     # Delta-method Jacobian for ordered temperatures, softmax fractions and flow.
-    transform = np.zeros((2*count, fit.x.size))
-    for j in range(count):
-        transform[j, :j+1] = temperatures[j]
-        transform[j, j+1:j+1] = 0.0
+    transform = np.zeros((2*count + 1, fit.x.size))
+    transform[0, 0] = temperatures[0]
+    for j in range(1, count):
+        transform[j, 0] = temperatures[0]
+        for k in range(1, j + 1):
+            transform[j, k] = np.exp(fit.x[k])
     for j in range(count):
         for k in range(count-1):
             transform[count+j, count+k] = fractions[j] * ((1.0 if j == k else 0.0) - fractions[k])
