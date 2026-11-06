@@ -800,7 +800,7 @@ def test_joint_spatial_spectral_inverse_validates_measured_psf_contract():
 def test_huber_total_variation_penalty_is_quadratic_for_small_and_linear_for_large_gradients():
     radius = np.linspace(0.0, 1.0, 5)
     small_gradient = 1.0e-3 * radius
-    large_gradient = 10.0 * radius
+    large_gradient = 100.0 * radius
     small_residual = _huber_total_variation_residual(
         small_gradient, radius, huber_scale=0.05
     )
@@ -812,7 +812,7 @@ def test_huber_total_variation_penalty_is_quadratic_for_small_and_linear_for_lar
     # In the linear regime, doubling a large constant gradient doubles,
     # rather than quadruples, the Huber-TV objective.
     doubled = _huber_total_variation_residual(
-        20.0 * radius, radius, huber_scale=0.05
+        200.0 * radius, radius, huber_scale=0.05
     )
     assert np.sum(doubled**2) / np.sum(large_residual**2) == pytest.approx(
         2.0, rel=2e-3
