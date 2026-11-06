@@ -77,7 +77,7 @@ MODEL_LABELS = {
     "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
     "thomson_psf_profile_inverse": "Thomson profile — PSF/mixing-aware inversion with optional GCV regularization",
     "thomson_joint_spatial_spectra": "Thomson profile — joint wavelength-resolved inversion of measured spatial spectra through a supplied mixing/PSF operator",
-    "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
+    "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",\n    "thomson_full_temperature_tensor": "Optical Thomson — unconstrained-gyrotropy 3-D electron temperature tensor from multi-view spectra",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa inference with relativistic-tail validity diagnostic",
@@ -185,7 +185,7 @@ MODEL_PHYSICS_NOTES = {
         "Exact collisionless unmagnetized longitudinal Maxwellian response in the electron rest frame, " 
         "with v_th=sqrt(2 e T_e/m_e), zeta=(v_phase_lab-u_e dot q_hat)/v_th and Z=i sqrt(pi) wofz(zeta). The optional signed electron_flow_projection_m_s shifts the Landau resonance; zero is the default. This is an electron susceptibility kernel only; it does not add ion response, FDT fluctuations, collisions, or Full-EM physics."
     ),
-    "gyrotropic_bi_maxwellian_anisotropy": (
+    "thomson_full_temperature_tensor": (\n        "Inverts T_q = q_hat.T @ T_eV @ q_hat for the six independent components of a general symmetric 3-D electron second-moment temperature tensor. " \n        "At least six independent scattering-view dyads are required; full covariance-weighted GLS and a positive-semidefinite tensor constraint are applied. " \n        "This removes the imposed gyrotropic-axis assumption but does not reconstruct higher EVDF moments. A PSD-boundary solution does not report symmetric local covariance."\n    ),\n    "gyrotropic_bi_maxwellian_anisotropy": (
         "Uses T_q = T_perp*(1-mu^2) + T_parallel*mu^2 with iterative "
         "errors-in-variables GLS. Optional magnetic_pitch_cosine_covariance "
         "and projected_temperature_pitch_cross_covariance are propagated "
@@ -589,7 +589,7 @@ EXAMPLES = {
         "wavenumber_m_inverse": 120.0,
         "minimum_velocity_grid_probability_coverage": 0.999
     },
-    "thomson_three_dimensional_flow": {
+    "thomson_full_temperature_tensor": {\n        "projected_temperature_eV": [800.0, 420.0, 260.0, 655.0, 512.5, 340.0, 467.5],\n        "scattering_vector_unit": [[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0],[0.7071067812,0.7071067812,0.0],[0.7071067812,0.0,0.7071067812],[0.0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],\n        "projected_temperature_covariance_eV2": (0.04*np.eye(7)).tolist(),\n        "maximum_geometry_condition_number": 1000.0,\n        "minimum_consistency_p_value": 0.001\n    },\n    "thomson_three_dimensional_flow": {
         "velocity_projection_m_s": [100000.0, 200000.0, 300000.0],
         "scattering_vector_unit": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         "projection_covariance_m2_s2": [[1000000.0, 0.0, 0.0], [0.0, 1000000.0, 0.0], [0.0, 0.0, 1000000.0]],
