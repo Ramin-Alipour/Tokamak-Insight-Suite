@@ -606,3 +606,74 @@ def test_cts_kappa_susceptibility_uses_shared_generalized_dispersion_kernel(eta_
         expected_susceptibility_derivative, rel=2e-11, abs=1e-18
     )
 
+def test_cts_kappa_susceptibility_uses_shared_generalized_dispersion_kernel():
+    from tokamak_analysis.cts_kappa_dispersion import kappa_dispersion_function
+
+    kappa = 4.3
+    ne, te, mass = 2.0e18, 250.0, 9.1093837015e-31
+    charge, eps0, wave_number = 1.602176634e-19, 8.8541878128e-12, 120.0
+    velocity_scale = np.sqrt(
+        ((2.0*kappa-3.0)/kappa) * charge*te/mass
+    )
+    relative_phase = 0.63*velocity_scale
+    flow = -0.21*velocity_scale
+    eta = 0.17*velocity_scale
+    parameters = dict(
+        v=np.linspace(-18.0*velocity_scale, 18.0*velocity_scale, 2401),
+        phase_velocity_m_s=relative_phase+flow,
+        electron_density_m3=ne,
+        electron_temperature_eV=te,
+        kappa=kappa,
+        wavenumber_m_inverse=wave_number,
+        electron_flow_projection_m_s=flow,
+        pole_imaginary_part_m_s=eta,
+        minimum_velocity_grid_probability_coverage=0.99,
+    )
+    result = kappa_electron_susceptibility(**parameters)
+    kernel = kappa_dispersion_function(
+        relative_phase/velocity_scale, eta/velocity_scale, kappa
+    )
+    expected_integral = kernel["kappa_dispersion_integral"]/velocity_scale**2
+    expected_derivative = kernel["kappa_dispersion_integral_derivative"]/velocity_scale**3
+    omega_pe_squared = ne*charge**2/(eps0*mass)
+    assert result["dispersion_kernel"] == "shared_full_tail_generalized_kappa_landau_integral"
+    assert result["normalized_phase_velocity"] == pytest.approx(
+        complex(relative_phase/velocity_scale, eta/velocity_scale)
+    )
+    assert result["integral"] == pytest.approx(expected_integral, rel=2e-11, abs=1e-18)
+    assert result["integral_phase_velocity_derivative_s3_m3"] == pytest.approx(
+        expected_derivative, rel=2e-11, abs=1e-24
+    )
+    assert result["electron_susceptibility"] == pytest.approx(
+        -omega_pe_squared/wave_number**2*expected_integral,
+        rel=2e-11, abs=1e-14,
+    )
+    assert result["susceptibility_phase_velocity_derivative_s_m"] == pytest.approx(
+        -omega_pe_squared/wave_number**2*expected_derivative,
+        rel=2e-11, abs=1e-18,
+    )
+
+
+def test_cts_kappa_susceptibility_and_shared_kernel_agree_on_exact_landau_boundary():
+    from tokamak_analysis.cts_kappa_dispersion import kappa_dispersion_function
+
+    parameters = args(k=4.3)
+    parameters.pop("pole_imaginary_part_m_s")
+    scale = np.sqrt(
+        ((2.0*parameters["kappa"]-3.0)/parameters["kappa"])
+        * 1.602176634e-19*parameters["electron_temperature_eV"]
+        / 9.1093837015e-31
+    )
+    relative_phase = 0.42*scale
+    parameters["phase_velocity_m_s"] = relative_phase
+    result = kappa_electron_susceptibility(**parameters)
+    kernel = kappa_dispersion_function(relative_phase/scale, 0.0, parameters["kappa"])
+    assert result["integral"] == pytest.approx(
+        kernel["kappa_dispersion_integral"]/scale**2, rel=2e-10, abs=1e-18
+    )
+    assert result["integral_phase_velocity_derivative_s3_m3"] == pytest.approx(
+        kernel["kappa_dispersion_integral_derivative"]/scale**3,
+        rel=2e-10, abs=1e-24,
+    )
+    assert result["landau_contour_method"] == "exact_eta_to_zero_plus"
+
