@@ -22,3 +22,29 @@ def test_full_temperature_tensor_is_reachable_through_public_analysis1_dispatche
     np.testing.assert_allclose(result["electron_temperature_tensor_eV"], expected, rtol=1e-10, atol=1e-10)
     assert result["public_physics_entrypoint"] == "thomson_full_temperature_tensor"
     assert result["reportable_as_inferred_parameter"] is True
+
+
+def test_pressure_tensor_closure_is_exposed_through_public_analysis1_dispatcher():
+    q = np.array([
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0],
+    ])
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    expected = np.array([[800.0, 90.0, -35.0],
+                         [90.0, 420.0, 55.0],
+                         [-35.0, 55.0, 260.0]])
+    projected = np.einsum("vi,ij,vj->v", q, expected, q)
+    result = run_advanced_thomson_physics(
+        "thomson_full_temperature_tensor",
+        projected, q,
+        projected_temperature_covariance_eV2=0.04*np.eye(q.shape[0]),
+        electron_density_m3=2.0e19,
+        electron_density_uncertainty_m3=1.0e18,
+    )
+    np.testing.assert_allclose(
+        result["electron_pressure_tensor_Pa"],
+        2.0e19 * 1.602176634e-19 * expected,
+        rtol=1e-10, atol=1e-10,
+    )
+    assert result["public_physics_entrypoint"] == "thomson_full_temperature_tensor"

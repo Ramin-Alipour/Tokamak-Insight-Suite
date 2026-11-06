@@ -75,3 +75,38 @@ def test_full_temperature_tensor_enforces_positive_semidefinite_boundary():
     assert result["positive_semidefinite_constraint_active"] is True
     assert result["parameter_covariance_eV2"] is None
     assert result["parameter_covariance_status"] == "not_reported_psd_boundary"
+
+
+def test_full_temperature_tensor_derives_pressure_tensor_from_independent_density():
+    q, expected, projected = _views()
+    density = 2.0e19
+    result = infer_full_temperature_tensor_from_thomson_projections(
+        projected, q,
+        projected_temperature_covariance_eV2=0.04 * np.eye(q.shape[0]),
+        electron_density_m3=density,
+        electron_density_uncertainty_m3=0.1e19,
+    )
+    np.testing.assert_allclose(
+        result["electron_pressure_tensor_Pa"],
+        density * 1.602176634e-19 * expected,
+        rtol=1e-10, atol=1e-10,
+    )
+    assert result["electron_pressure_parameter_covariance_Pa2"].shape == (6, 6)
+    assert result["electron_pressure_covariance_status"] == (
+        "independent_temperature_gls_and_density_uncertainty_delta_method"
+    )
+
+
+def test_full_temperature_tensor_does_not_infer_pressure_without_density():
+    q, _, projected = _views()
+    result = infer_full_temperature_tensor_from_thomson_projections(projected, q)
+    assert result["electron_pressure_tensor_Pa"] is None
+    assert result["electron_pressure_parameter_covariance_Pa2"] is None
+
+
+def test_full_temperature_tensor_rejects_density_uncertainty_without_density():
+    q, _, projected = _views()
+    with pytest.raises(ValueError, match="requires electron_density_m3"):
+        infer_full_temperature_tensor_from_thomson_projections(
+            projected, q, electron_density_uncertainty_m3=1.0e17,
+        )

@@ -956,6 +956,18 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "The 3-D flow vector is withheld unless the view directions and "
                         "fit-derived cross-view flow covariance identify all three components."
                     )
+            if isinstance(result, Mapping) and result.get("electron_pressure_tensor_Pa") is not None:
+                st.subheader("Electron pressure tensor — density-conditioned closure")
+                st.latex(r"\mathbf P_e = n_e e\,\mathbf T_{e,\mathrm{eV}}")
+                st.write({
+                    "electron_density_m3": result.get("electron_density_m3"),
+                    "electron_density_uncertainty_m3": result.get("electron_density_uncertainty_m3"),
+                    "electron_pressure_tensor_Pa": result.get("electron_pressure_tensor_Pa"),
+                    "pressure_parameter_covariance_Pa2": result.get("electron_pressure_parameter_covariance_Pa2"),
+                    "covariance_provenance": result.get("electron_pressure_covariance_status"),
+                })
+                if result.get("electron_pressure_parameter_covariance_Pa2") is None:
+                    st.warning("Pressure is derived, but its covariance is withheld because the temperature-tensor covariance is unavailable at the active PSD boundary or was not estimable.")
             if isinstance(result, Mapping) and "thermal_velocity_covariance_tensor_per_view_m2_s2" in result:
                 st.subheader("Gyrotropic 3-D thermal velocity covariance")
                 st.latex(

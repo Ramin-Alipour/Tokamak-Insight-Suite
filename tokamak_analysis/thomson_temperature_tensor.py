@@ -36,6 +36,8 @@ def infer_full_temperature_tensor_from_thomson_projections(
     projected_temperature_covariance_eV2=None,
     maximum_geometry_condition_number=1.0e6,
     minimum_consistency_p_value=1.0e-3,
+    electron_density_m3=None,
+    electron_density_uncertainty_m3=None,
 ):
     """Infer a general symmetric PSD 3-D temperature tensor from q-projections.
 
@@ -172,9 +174,49 @@ def infer_full_temperature_tensor_from_thomson_projections(
         covariance_status = "local_gls_covariance_interior_psd_cone"
 
     eigenvalues, eigenvectors = np.linalg.eigh(tensor)
+
+    # Optional thermodynamic closure: P_e = n_e e T_eV. Density is an
+    # independently supplied measurement, never inferred from spectral width.
+    pressure_tensor = None
+    pressure_covariance = None
+    pressure_covariance_status = "not_available_without_temperature_covariance"
+    density_uncertainty = None
+    if electron_density_m3 is not None:
+        density = float(electron_density_m3)
+        if not np.isfinite(density) or density <= 0.0:
+            raise ValueError("electron_density_m3 must be finite and strictly positive")
+        if electron_density_uncertainty_m3 is not None:
+            density_uncertainty = float(electron_density_uncertainty_m3)
+            if not np.isfinite(density_uncertainty) or density_uncertainty < 0.0:
+                raise ValueError("electron_density_uncertainty_m3 must be finite and non-negative")
+        tensor_components = np.array([
+            tensor[0, 0], tensor[1, 1], tensor[2, 2],
+            tensor[0, 1], tensor[0, 2], tensor[1, 2],
+        ])
+        pressure_tensor = density * _E * tensor
+        if parameter_covariance is not None:
+            pressure_covariance = (density * _E) ** 2 * parameter_covariance
+            if density_uncertainty is not None:
+                pressure_covariance += (_E * density_uncertainty) ** 2 * np.outer(
+                    tensor_components, tensor_components
+                )
+                pressure_covariance_status = (
+                    "independent_temperature_gls_and_density_uncertainty_delta_method"
+                )
+            else:
+                pressure_covariance_status = "temperature_gls_only_density_treated_as_exact"
+    elif electron_density_uncertainty_m3 is not None:
+        raise ValueError("electron_density_uncertainty_m3 requires electron_density_m3")
+
     return {
         "electron_temperature_tensor_eV": tensor,
         "thermal_velocity_covariance_tensor_m2_s2": (_E / _M_E) * tensor,
+        "electron_density_m3": None if electron_density_m3 is None else float(electron_density_m3),
+        "electron_density_uncertainty_m3": density_uncertainty,
+        "electron_pressure_tensor_Pa": pressure_tensor,
+        "electron_pressure_parameter_covariance_Pa2": pressure_covariance,
+        "electron_pressure_covariance_status": pressure_covariance_status,
+        "electron_pressure_equation": "P_e_Pa = n_e_m-3 * elementary_charge_C * T_e_eV",
         "principal_temperature_eigenvalues_eV": eigenvalues,
         "principal_axes_cartesian_columns": eigenvectors,
         "predicted_projected_temperature_eV": predicted,
