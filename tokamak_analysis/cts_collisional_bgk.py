@@ -60,8 +60,17 @@ def conserving_bgk_longitudinal_susceptibility(
     if n.ndim != 1 or n.size == 0 or m.shape != n.shape or nu.shape != n.shape:
         raise ValueError("species density, mass and collision-frequency arrays must match")
     if (np.any(~np.isfinite(n)) or np.any(n <= 0) or np.any(~np.isfinite(m)) or np.any(m <= 0)
-            or np.any(~np.isfinite(nu)) or np.any(nu <= 0)):
-        raise ValueError("species densities, masses and collision frequencies must be positive and finite")
+            or np.any(~np.isfinite(nu)) or np.any(nu < 0)):
+        raise ValueError("species densities and masses must be positive and finite; collision frequencies must be finite and non-negative")
+    if not np.any(nu > 0):
+        # With every species collisionless, the conserving BGK correction is
+        # identically absent. The same routine still evaluates the Vlasov
+        # streaming response, but it must not divide by a zero total relaxation
+        # weight when constructing the common momentum-restoring velocity.
+        momentum_weights = np.zeros_like(nu)
+    else:
+        momentum_weights = nu * m * n
+        momentum_weights = momentum_weights / np.sum(momentum_weights)
     if isinstance(quadrature_order, (bool, np.bool_)) or int(quadrature_order) != quadrature_order or quadrature_order < 24:
         raise ValueError("quadrature_order must be an integer >= 24")
     flow = float(bulk_flow_m_s)
@@ -71,9 +80,6 @@ def conserving_bgk_longitudinal_susceptibility(
     nodes, weights = roots_hermite(int(quadrature_order))
     ns = n.size
     response = np.empty((omega.size, ns, ns), dtype=complex)
-    momentum_weights = nu * m * n
-    momentum_weights = momentum_weights / np.sum(momentum_weights)
-
     for iw, w in enumerate(omega):
         velocities = []
         denominators = []
@@ -129,6 +135,8 @@ def conserving_bgk_longitudinal_susceptibility(
         "wave_number_m_inverse": k,
         "angular_frequency_rad_s": omega.copy(),
         "collision_frequencies_s_inverse": nu.copy(),
+        "collisionless_species_indices": np.flatnonzero(nu == 0.0),
+        "collision_regime": "collisionless_vlasov_limit" if np.all(nu == 0.0) else ("mixed_collisionless_collisional_bgk" if np.any(nu == 0.0) else "collisional_bgk"),
         "collision_operator": "isothermal_multispecies_momentum_conserving_BGK",
         "conservation": {
             "species_particle_number": True,
