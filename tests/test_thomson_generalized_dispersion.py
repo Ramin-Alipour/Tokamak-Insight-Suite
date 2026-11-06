@@ -422,3 +422,22 @@ def test_non_gyrotropic_gaussian_tensor_rejects_non_positive_tensor_and_inadequa
         collective_non_gyrotropic_gaussian_electron_spectrum(
             **common, electron_temperature_tensor_eV=np.diag([100.0, 100.0, 100.0])
         )
+
+
+def test_non_gyrotropic_tensor_formula_registry_is_synchronized_and_executable():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    assert formulas == packaged
+    entries = [
+        item for item in formulas
+        if item.get("execution_contract", {}).get("formula_key") == "cts_non_gyrotropic_gaussian_tensor_projection"
+    ]
+    assert len(entries) == 1
+    contract = entries[0]["execution_contract"]
+    assert contract["implementation_link_status"] == "mapped"
+    assert contract["function_link"] == "tokamak_analysis.cts_full_physics.collective_non_gyrotropic_gaussian_electron_spectrum"
+    assert "tests/test_thomson_generalized_dispersion.py::test_non_gyrotropic_gaussian_tensor_cts_uses_exact_q_projection_and_public_api" in contract["test_links"]

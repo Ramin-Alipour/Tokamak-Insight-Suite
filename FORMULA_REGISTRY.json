@@ -10174,5 +10174,111 @@
       ],
       "note": "Raw-spectrum physical forward fit, distinct from the algebraic projection-only tensor inversion."
     }
+  },
+{
+    "name": "Non-gyrotropic Gaussian tensor projection for collective Thomson scattering",
+    "equation": "T_q = q_hat^T T_e q_hat; sigma_q^2 = e*T_q/m_e; f_q(v) = exp(-v^2/(2*sigma_q^2))/sqrt(2*pi*sigma_q^2); chi_e = -(omega_pe^2/k^2) integral[f_q'(v)/(v-v_phi-i0^+) dv",
+    "inputs": "Symmetric positive-definite 3x3 electron temperature tensor in eV, electron bulk-flow vector, scattering directions, finite projected-velocity grid, electron density and explicit ion species/composition/temperature/flow",
+    "output": "Multispecies electrostatic CTS spectral density, exact q-projected Gaussian temperature, projected flow and finite-grid probability coverage",
+    "assumptions": "Non-relativistic unmagnetized electrostatic response. The 3-D Gaussian is marginalized analytically along the scattering vector. Bulk flow is applied once as the resonant Doppler shift; the thermal marginal is zero-centred.",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_full_physics.collective_non_gyrotropic_gaussian_electron_spectrum",
+      "formula_key": "cts_non_gyrotropic_gaussian_tensor_projection",
+      "input_specs": [
+        {
+          "name": "electron_temperature_tensor_eV",
+          "unit": "eV; symmetric positive-definite 3x3 tensor",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s^-1; subluminal 3-vector",
+          "required": true
+        },
+        {
+          "name": "incident_direction/scattered_direction",
+          "unit": "unit propagation vectors",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_grid_m_s",
+          "unit": "m s^-1; increasing finite projected-velocity grid",
+          "required": true
+        },
+        {
+          "name": "ion_species/ion_fractions/ion_temperature_eV/ion_velocity_m_s",
+          "unit": "explicit multispecies ion closure",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "projected_directional_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "projected_flow_velocity_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "CTS spectral density per nm"
+        },
+        {
+          "name": "projected_velocity_grid_probability",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "The temperature tensor must be symmetric positive definite.",
+        "The scattering directions and scattering angle must be mutually consistent.",
+        "The supplied projected velocity grid must capture at least the configured probability mass.",
+        "The full six-component tensor is not identifiable from one scattering vector."
+      ],
+      "uncertainty_model": "No tensor or measurement covariance is inferred by this forward model; uncertainties must be propagated by a multi-view inference with the joint spectral covariance.",
+      "limitations": [
+        "Gaussian EVDF family only; this is not a general arbitrary non-Maxwellian 3-D reconstruction.",
+        "Non-relativistic, unmagnetized electrostatic Landau response only.",
+        "One view identifies T_q=q_hat^T T_e q_hat, not all independent tensor components.",
+        "Finite velocity support is gated by explicit captured-probability threshold."
+      ],
+      "test_links": [
+        "tests/test_thomson_generalized_dispersion.py::test_non_gyrotropic_gaussian_tensor_cts_uses_exact_q_projection_and_public_api",
+        "tests/test_thomson_generalized_dispersion.py::test_non_gyrotropic_gaussian_tensor_rejects_non_positive_tensor_and_inadequate_tails"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "physical_forward_model_from_tensor_and_geometry",
+      "input_data_level": "model_parameters_and_calibrated_geometry",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Collective Thomson scattering — non-gyrotropic Gaussian tensor projection"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_full_physics.collective_non_gyrotropic_gaussian_electron_spectrum",
+      "function_links": [
+        "tokamak_analysis.cts_full_physics.collective_non_gyrotropic_gaussian_electron_spectrum",
+        "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
+      ],
+      "formula_key": "cts_non_gyrotropic_gaussian_tensor_projection",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_generalized_dispersion.py::test_non_gyrotropic_gaussian_tensor_cts_uses_exact_q_projection_and_public_api",
+        "tests/test_thomson_generalized_dispersion.py::test_non_gyrotropic_gaussian_tensor_rejects_non_positive_tensor_and_inadequate_tails"
+      ]
+    },
+    "description": "Exact analytical projection of a non-gyrotropic three-dimensional Gaussian electron temperature tensor onto the CTS scattering vector, followed by the tabulated projected-EVDF Landau response."
   }
 ]
