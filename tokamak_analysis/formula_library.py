@@ -856,35 +856,76 @@ def langmuir_ion_density_from_saturation_current(
 
 
 
-def thomson_electron_temperature_from_spectral_width(intrinsic_sigma_nm, laser_wavelength_nm, scattering_angle_rad, *, sigma_intrinsic_sigma_nm=None, sigma_laser_wavelength_nm=None, sigma_scattering_angle_rad=None):
-    """Infer Maxwellian Te from an intrinsic width parameter of the physical forward fit.
+def thomson_electron_temperature_from_spectral_width(
+    intrinsic_sigma_nm, laser_wavelength_nm, scattering_angle_rad, *,
+    sigma_intrinsic_sigma_nm=None, sigma_laser_wavelength_nm=None,
+    sigma_scattering_angle_rad=None, input_covariance_nm2_rad2=None,
+):
+    """Conditional Maxwellian Te estimator with full width/calibration covariance.
 
-    The canonical analysis estimates this intrinsic width while convolving the
-    physical spectrum with the supplied measured instrument response. This
-    helper does not deconvolve or instrument-correct the measured spectrum.
+    Te = (sigma_lambda/lambda_0)^2 m_e c^2 /
+         [4 sin^2(theta/2)]. sigma_lambda must be the intrinsic thermal
+    Gaussian width from a physical forward fit with the measured instrument
+    response applied. The result is not a general temperature for non-Maxwellian,
+    anisotropic, multi-population, flowing or unresolved spectra. Joint covariance
+    order is [intrinsic_sigma_nm, laser_wavelength_nm, scattering_angle_rad].
     """
-    sigma=_positive("intrinsic_sigma_nm",intrinsic_sigma_nm); laser=_positive("laser_wavelength_nm",laser_wavelength_nm); angle=_finite("scattering_angle_rad",scattering_angle_rad)
-    if not 0 < angle < math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi).")
-    supplied=(sigma_intrinsic_sigma_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
-    if any(v is not None for v in supplied) and not all(v is not None for v in supplied): raise ValueError("Provide all three independent uncertainties, or none.")
-    sine=math.sin(angle/2); te=(sigma/laser)**2*510998.95069/(4*sine**2)
+    sigma = _positive("intrinsic_sigma_nm", intrinsic_sigma_nm)
+    laser = _positive("laser_wavelength_nm", laser_wavelength_nm)
+    angle = _finite("scattering_angle_rad", scattering_angle_rad)
+    if not 0 < angle < math.pi:
+        raise ValueError("scattering_angle_rad must lie in (0, pi).")
+    supplied = (sigma_intrinsic_sigma_nm, sigma_laser_wavelength_nm, sigma_scattering_angle_rad)
+    if input_covariance_nm2_rad2 is not None and any(v is not None for v in supplied):
+        raise ValueError("Provide either input_covariance_nm2_rad2 or all three independent uncertainties, not both.")
+    if input_covariance_nm2_rad2 is None and any(v is not None for v in supplied) and not all(v is not None for v in supplied):
+        raise ValueError("Provide all three independent uncertainties, or none.")
+    sine = math.sin(angle / 2.0)
+    te = (sigma / laser)**2 * 510998.95069 / (4.0 * sine**2)
     theta_e = te / 510998.95069
-    out={
-        "electron_temperature_eV":te,
-        "temperature_identifiability":"conditional_on_non_collective_isotropic_nonrelativistic_maxwellian_model",
-        "model_assumption":"intrinsic Gaussian spectral width is the thermal Doppler width of an isotropic non-relativistic Maxwellian; flow broadening, non-Maxwellian tails, unresolved populations and residual instrumental broadening must be handled by the selected spectral forward model",
-        "relativistic_temperature_parameter_theta_e":theta_e,
-        "nonrelativistic_screen_status":(
-            "within_conservative_theta_e_screen"
-            if theta_e <= 0.01 else
-            "outside_conservative_theta_e_screen_use_relativistic_model"
+    jacobian = np.asarray([2.0 * te / sigma, -2.0 * te / laser, -te / math.tan(angle / 2.0)], dtype=float)
+    out = {
+        "electron_temperature_eV": te,
+        "temperature_identifiability": "conditional_on_non_collective_isotropic_nonrelativistic_maxwellian_model",
+        "model_assumption": (
+            "intrinsic Gaussian spectral width is the thermal Doppler width of an isotropic "
+            "non-relativistic Maxwellian; flow broadening, non-Maxwellian tails, unresolved "
+            "populations and residual instrumental broadening must be handled by the selected "
+            "spectral forward model"
         ),
-        "screen_threshold_theta_e":0.01,
+        "relativistic_temperature_parameter_theta_e": theta_e,
+        "nonrelativistic_screen_status": (
+            "within_conservative_theta_e_screen" if theta_e <= 0.01
+            else "outside_conservative_theta_e_screen_use_relativistic_model"
+        ),
+        "screen_threshold_theta_e": 0.01,
+        "temperature_jacobian_eV_per_input_unit": jacobian,
+        "input_covariance_order": ["intrinsic_sigma_nm", "laser_wavelength_nm", "scattering_angle_rad"],
     }
-    if all(v is not None for v in supplied):
-        ss,sl,sa=[_nonnegative(n,v) for n,v in zip(("sigma_intrinsic_sigma_nm","sigma_laser_wavelength_nm","sigma_scattering_angle_rad"),supplied)]
-        out["uncertainty_electron_temperature_eV"]=te*math.sqrt((2*ss/sigma)**2+(2*sl/laser)**2+(math.cos(angle/2)/sine*sa)**2)
+    if input_covariance_nm2_rad2 is not None:
+        covariance = np.asarray(input_covariance_nm2_rad2, dtype=float)
+        if covariance.shape != (3, 3) or not np.all(np.isfinite(covariance)):
+            raise ValueError("input_covariance_nm2_rad2 must be a finite 3x3 matrix.")
+        scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12 * scale):
+            raise ValueError("input_covariance_nm2_rad2 must be symmetric.")
+        covariance = 0.5 * (covariance + covariance.T)
+        if np.linalg.eigvalsh(covariance)[0] < -1e-10 * scale:
+            raise ValueError("input_covariance_nm2_rad2 must be positive semidefinite.")
+        variance = float(jacobian @ covariance @ jacobian.T)
+        out["uncertainty_electron_temperature_eV"] = math.sqrt(max(variance, 0.0))
+        out["variance_electron_temperature_eV2"] = max(variance, 0.0)
+        out["uncertainty_model"] = "first_order_full_joint_covariance_including_width_calibration_geometry_cross_terms"
+    elif all(v is not None for v in supplied):
+        ss, sl, sa = [_nonnegative(n, v) for n, v in zip(
+            ("sigma_intrinsic_sigma_nm", "sigma_laser_wavelength_nm", "sigma_scattering_angle_rad"), supplied
+        )]
+        variance = float(jacobian @ np.diag([ss**2, sl**2, sa**2]) @ jacobian.T)
+        out["uncertainty_electron_temperature_eV"] = math.sqrt(variance)
+        out["variance_electron_temperature_eV2"] = variance
+        out["uncertainty_model"] = "first_order_independent_input_uncertainties"
     return out
+
 
 
 def thomson_velocity_projection(

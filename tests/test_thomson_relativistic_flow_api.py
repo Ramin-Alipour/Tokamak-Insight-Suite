@@ -82,3 +82,18 @@ def test_exact_relativistic_thomson_flow_rejects_mixed_covariance_and_sigmas():
             sigma_scattering_angle_rad=1e-4,
             input_covariance_nm2_rad2=[[1e-8, 0.0, 0.0], [0.0, 1e-8, 0.0], [0.0, 0.0, 1e-8]],
         )
+
+
+def test_temperature_width_solver_is_exposed_through_advanced_physics_api():
+    result = run_advanced_thomson_physics(
+        "thomson_temperature_from_spectral_width",
+        intrinsic_sigma_nm=0.02, laser_wavelength_nm=532.0,
+        scattering_angle_rad=math.pi / 2.0,
+        input_covariance_nm2_rad2=[
+            [1.0e-8, 0.0, 0.0], [0.0, 4.0e-12, 0.0], [0.0, 0.0, 1.0e-8]
+        ],
+    )
+    assert result["electron_temperature_eV"] > 0.0
+    assert result["uncertainty_electron_temperature_eV"] > 0.0
+    assert result["temperature_identifiability"].startswith("conditional_on_")
+    assert result["public_physics_entrypoint"] == "thomson_temperature_from_spectral_width"

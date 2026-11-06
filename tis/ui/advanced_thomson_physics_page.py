@@ -58,6 +58,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 
 MODEL_LABELS = {
+    "thomson_temperature_from_spectral_width": "Optical Thomson — conditional Maxwellian temperature from intrinsic thermal width with joint covariance",
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from multiple independent measured scattering views",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility and analytic phase-velocity derivative",
@@ -105,6 +106,13 @@ MODEL_LABELS = {
 MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_temperature_from_spectral_width": (
+        "Conditional Te estimator: Te = (sigma_lambda/lambda_0)^2 m_e c^2 / "
+        "[4 sin^2(theta/2)]. Valid only for an intrinsic instrument-response-fitted "
+        "isotropic non-relativistic Maxwellian thermal width; not a general temperature "
+        "for Kappa, anisotropic, multi-population or flow-broadened spectra. Joint "
+        "covariance order: [intrinsic width nm, laser wavelength nm, scattering angle rad]."
+    ),
     "thomson_relativistic_exact_flow_projection": (
         "Exact mono-velocity q-parallel relativistic Doppler inversion. The optional "
         "input_covariance_nm2_rad2 is the full joint covariance of [fitted centre nm, "
@@ -235,6 +243,19 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "thomson_temperature_from_spectral_width": {
+        "intrinsic_sigma_nm": 0.02,
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "sigma_intrinsic_sigma_nm": null,
+        "sigma_laser_wavelength_nm": null,
+        "sigma_scattering_angle_rad": null,
+        "input_covariance_nm2_rad2": [
+            [1.0e-8, 0.0, 0.0],
+            [0.0, 4.0e-12, 0.0],
+            [0.0, 0.0, 1.0e-8]
+        ]
+    },
     "bi_kappa_electrostatic_susceptibility": {
         "v": np.linspace(-2.0e8, 2.0e8, 1601).tolist(),
         "phase_velocity_m_s": 1.0e6,

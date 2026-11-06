@@ -47,7 +47,10 @@ from .cts_stokes_transfer import (
 from .thomson_evdf import reconstruct_thomson_evdf
 from .thomson_scattering import infer_thomson_path_averaged_density
 from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
-from .formula_library import thomson_velocity_projection_relativistic_exact
+from .formula_library import (
+    thomson_electron_temperature_from_spectral_width,
+    thomson_velocity_projection_relativistic_exact,
+)
 
 from .advanced_inference import reconstruct_multiview_3d_evdf
 from .thomson_anisotropic_inference import (
@@ -677,6 +680,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = cold_plasma_mode_radiative_coefficients
     elif model == "cold_plasma_mode_group_velocity":
         solver = cold_plasma_mode_group_velocity
+    elif model == "thomson_temperature_from_spectral_width":
+        solver = thomson_electron_temperature_from_spectral_width
     elif model == "thomson_relativistic_exact_flow_projection":
         solver = thomson_velocity_projection_relativistic_exact
     elif model == "thomson_projected_evdf":

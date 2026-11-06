@@ -146,3 +146,20 @@ def test_nonrelativistic_thomson_flow_propagates_joint_wavelength_geometry_covar
                               for i in range(3) for k in range(3)))
     assert result["uncertainty_electron_velocity_projection_m_s"] == pytest.approx(expected)
     assert "full_joint_covariance" in result["uncertainty_model"]
+
+
+def test_temperature_from_thomson_width_propagates_joint_covariance():
+    from tokamak_analysis.formula_library import thomson_electron_temperature_from_spectral_width
+    covariance = [
+        [1.0e-8, 1.0e-11, 2.0e-12],
+        [1.0e-11, 4.0e-12, -1.0e-12],
+        [2.0e-12, -1.0e-12, 1.0e-8],
+    ]
+    result = thomson_electron_temperature_from_spectral_width(
+        0.02, 532.0, math.pi / 2.0, input_covariance_nm2_rad2=covariance
+    )
+    j = result["temperature_jacobian_eV_per_input_unit"]
+    expected = math.sqrt(sum(j[i] * covariance[i][k] * j[k]
+                              for i in range(3) for k in range(3)))
+    assert result["uncertainty_electron_temperature_eV"] == pytest.approx(expected)
+    assert result["temperature_identifiability"].startswith("conditional_on_")
