@@ -62,3 +62,17 @@ def test_3d_periodic_maxwell_is_executable_through_public_analysis_dispatcher():
     assert result["public_physics_entrypoint"] == "periodic_3d_full_wave"
     assert result["magnetic_flux_density_T"].shape == (z.size, y.size, x.size, 3)
     assert "global_energy_balance_relative_residual" in result
+
+def test_3d_periodic_maxwell_rejects_weakly_active_dielectric():
+    omega, x, y, z, epsilon, current = _uniform_lossy_case()
+    active_epsilon = np.eye(3, dtype=complex) * (1.0 - 1.0e-12j)
+    try:
+        solve_3d_periodic_full_wave(
+            omega, x, y, z, active_epsilon,
+            impressed_current_density_A_m2=current,
+        )
+    except ValueError as exc:
+        assert "must be passive" in str(exc)
+    else:
+        raise AssertionError("a negative dissipative dielectric eigenvalue must be rejected")
+
