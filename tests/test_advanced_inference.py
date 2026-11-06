@@ -74,6 +74,17 @@ def test_multiview_3d_evdf_requires_data_supported_rank():
     )
     assert result["status"] == "identified_from_multi_view_measurements"
     assert result["evdf_m3_s3"] is not None
+    expected_probability = true * volume / np.sum(true * volume)
+    expected_mean = expected_probability @ np.arange(18).reshape(6, 3)
+    centered = np.arange(18).reshape(6, 3) - expected_mean
+    expected_covariance = np.einsum(
+        "i,ij,ik->jk", expected_probability, centered, centered
+    )
+    np.testing.assert_allclose(result["mean_velocity_vector_m_s"], expected_mean, rtol=1e-6, atol=1e-6)
+    np.testing.assert_allclose(result["velocity_covariance_tensor_m2_s2"], expected_covariance, rtol=1e-6, atol=1e-6)
+    assert result["mean_velocity_covariance_m2_s2"].shape == (3, 3)
+    assert result["velocity_covariance_tensor_covariance_m4_s4"].shape == (9, 9)
+    assert result["velocity_moment_status"] == "identified_from_multi_view_measurements"
     one_view = reconstruct_multiview_3d_evdf(
         kernels[:1], data[:1], np.arange(18).reshape(6, 3),
         voxel_volume_m3_s3=volume, regularization_matrix=penalty,
@@ -81,6 +92,9 @@ def test_multiview_3d_evdf_requires_data_supported_rank():
     )
     assert one_view["status"] == "conditional_regularized_3d_candidate"
     assert one_view["evdf_m3_s3"] is None
+    assert one_view["mean_velocity_vector_m_s"] is None
+    assert one_view["candidate_mean_velocity_vector_m_s"].shape == (3,)
+    assert one_view["velocity_moment_status"] == "conditional_candidate_only_velocity_moments_not_identified"
 
 
 
