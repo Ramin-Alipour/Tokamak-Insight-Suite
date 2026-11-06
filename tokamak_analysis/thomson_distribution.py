@@ -788,14 +788,19 @@ def analyze_thomson_spectral_distribution(
     # forward fitter when the caller supplies the spatial coordinate and fit
     # controls. The Gaussian-width conversion above remains a clearly labelled
     # diagnostic candidate; it is never promoted to the primary measurement.
-    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"} and physical_fit_options is not None:
+    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"} and (
+        physical_fit_options is not None or any(value is not None for value in (
+            incident_polarization, include_compton_recoil, physical_background_model,
+            model_discrepancy_covariance, systematic_covariance, physical_initial,
+        ))
+    ):
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError(
                 "laser_wavelength_nm and scattering_angle_rad are required for canonical Thomson physical inference"
             )
-        if not isinstance(physical_fit_options, dict):
+        if physical_fit_options is not None and not isinstance(physical_fit_options, dict):
             raise ValueError("physical_fit_options must be a mapping for canonical Maxwellian inference")
-        options = dict(physical_fit_options)
+        options = dict(physical_fit_options or {})
         direct_options = {
             "incident_polarization": incident_polarization,
             "include_compton_recoil": include_compton_recoil,
@@ -813,15 +818,10 @@ def analyze_thomson_spectral_distribution(
                 )
             options[option_name] = option_value
         if physical_initial is not None:
-            if physical_model == "collective_kappa":
-                if "collective_kappa_initial" in options:
-                    raise ValueError("physical_initial conflicts with physical_fit_options.collective_kappa_initial")
-                options["collective_kappa_initial"] = physical_initial
-            else:
-                raise ValueError(
-                    "physical_initial is supported for Kappa/MJ kinetic fits and collective_kappa; "
-                    "the selected canonical model uses its own initialization contract"
-                )
+            raise ValueError(
+                "physical_initial is a Kappa/MJ kinetic-fit seed; the selected canonical model "
+                "uses its model-specific initialization inputs in physical_fit_options"
+            )
         if "radius_m" not in options:
             raise ValueError(
                 "physical_fit_options must include radius_m for the canonical measured-spectrum Maxwellian fit"
