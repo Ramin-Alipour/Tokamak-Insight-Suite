@@ -743,6 +743,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     # result is required; otherwise no finite data-identified covariance is
     # published, even if regularization made the optimizer Hessian invertible.
     data_covariance_p = None
+    measurement_data_covariance_p = None
     psf_calibration_covariance_p = None
     psf_sigma_parameter_sensitivity = None
     if data_identifiable:
@@ -750,6 +751,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         data_covariance_p = np.linalg.pinv(data_information)
         if residual_scale is not None:
             data_covariance_p *= residual_scale
+        measurement_data_covariance_p = data_covariance_p.copy()
         if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0:
             # Differentiate the complete measured-spectrum residual with respect
             # to the calibrated PSF width, then use implicit GLS sensitivity
@@ -862,6 +864,10 @@ def reconstruct_joint_thomson_spatial_spectra(
         "parameter_covariance": physical_covariance,
         "profile_parameter_covariance": profile_parameter_covariance,
         "regularized_parameter_covariance": regularized_parameter_covariance,
+        "measurement_data_parameter_covariance": (
+            transform @ measurement_data_covariance_p @ transform.T
+            if measurement_data_covariance_p is not None else None
+        ),
         "psf_calibration_parameter_covariance": (
             transform @ psf_calibration_covariance_p @ transform.T
             if psf_calibration_covariance_p is not None else None
@@ -871,14 +877,19 @@ def reconstruct_joint_thomson_spatial_spectra(
             if psf_sigma_parameter_sensitivity is not None else None
         ),
         "covariance_decomposition": {
-            "reported_parameter_covariance": "data_only_GLS_plus_linearized_external_PSF_calibration_covariance_excluding_regularization_penalty",
+            "reported_parameter_covariance": (
+                "data_only_GLS_plus_linearized_external_PSF_calibration_covariance_excluding_regularization_penalty"
+                if psf_calibration_covariance_p is not None else
+                "data_only_GLS_covariance_excluding_regularization_penalty"
+            ),
+            "measurement_data_covariance_available": measurement_data_covariance_p is not None and data_identifiable,
             "psf_calibration_covariance": "implicit_GLS_parameter_sensitivity_to_scalar_Gaussian_PSF_sigma_uncertainty; conditional on fixed PSF shape and mixing operator",
             "regularized_parameter_covariance": "optimizer_local_covariance_including_selected_regularization_penalty",
             "profile_parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                                        [f"Te_{i}_eV" for i in range(n)] +
                                        [f"flow_projection_{i}_m_s" for i in range(n)]),
             "cross_covariance_retained_between_amplitude_temperature_flow_and_spatial_nodes": physical_covariance is not None,
-            "data_only_covariance_available": data_covariance_p is not None and data_identifiable,
+            "data_and_external_operator_covariance_available": data_covariance_p is not None and data_identifiable,
             "unweighted_residual_scale": residual_scale,
         },
         "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
