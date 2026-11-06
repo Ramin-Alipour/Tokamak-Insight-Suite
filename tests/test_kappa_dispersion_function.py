@@ -40,3 +40,22 @@ def test_real_axis_uses_exact_plemelj_resonance_and_rejects_advanced_branch():
         kappa_dispersion_function(0.0, -0.1, 3.5)
     with pytest.raises(ValueError, match="3/2"):
         kappa_dispersion_function(0.0, 0.1, 1.5)
+
+def test_real_axis_kappa_dispersion_derivative_matches_boundary_finite_difference():
+    zeta_real = 0.8
+    result = kappa_dispersion_function(zeta_real, 0.0, 3.5)
+    assert result["kappa_dispersion_integral_derivative"] is not None
+    h = 2.0e-5
+    plus = kappa_dispersion_function(zeta_real + h, 0.0, 3.5)
+    minus = kappa_dispersion_function(zeta_real - h, 0.0, 3.5)
+    finite_difference = (
+        plus["kappa_dispersion_integral"] - minus["kappa_dispersion_integral"]
+    ) / (2.0*h)
+    np.testing.assert_allclose(
+        result["kappa_dispersion_integral_derivative"],
+        finite_difference,
+        rtol=2.0e-5,
+        atol=2.0e-7,
+    )
+    assert result["derivative_absolute_quadrature_error_estimate"] >= 0.0
+
