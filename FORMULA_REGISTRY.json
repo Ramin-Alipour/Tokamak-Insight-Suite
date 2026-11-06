@@ -8597,5 +8597,67 @@
       ],
       "note": "Numerical implementation of the finite-volume Gaussian CDF operator; analytic/software verification only, not empirical PSF calibration."
     }
+  },
+  {
+    "name": "Linearized propagation of Gaussian spatial PSF calibration uncertainty in Thomson profile inversion",
+    "equation": "S_σ = −(J_dᵀJ_d)^+ J_dᵀ (∂r/∂σ_PSF); C_{p,PSF}=S_σ σ²_{σ_PSF} S_σᵀ; C_p,total=C_p,data+C_{p,PSF}",
+    "inputs": "Measured channel-by-wavelength spectra, fixed spatial mixing matrix H, Gaussian PSF width σ_PSF [m], external 1-sigma calibration uncertainty σ_{σ_PSF} [m], measured spectral covariance and selected Thomson forward model",
+    "output": "Parameter-space covariance contribution from Gaussian PSF-width calibration uncertainty, propagated to amplitude, Te, projected flow, optional fitted Kappa index and detector-background nuisance coefficients",
+    "assumptions": "First-order local GLS sensitivity around the fitted solution; Gaussian PSF shape and nominal spatial mixing matrix are fixed; uncertainty is supplied externally and is not inferred from plasma spectra. The derivative is evaluated by a one-sided or central finite difference that respects σ_PSF >= 0. Regularization rows are excluded from the data-only sensitivity and identifiability Jacobian.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "formula_key": "thomson_gaussian_psf_sigma_uncertainty",
+      "input_specs": [
+        {
+          "name": "spatial_psf_sigma_m",
+          "unit": "m",
+          "required": true
+        },
+        {
+          "name": "spatial_psf_sigma_uncertainty_m",
+          "unit": "m; 1-sigma",
+          "required": true
+        },
+        {
+          "name": "joint_spectral_covariance or signal_uncertainty",
+          "unit": "channel-major covariance or pointwise 1-sigma",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "psf_calibration_parameter_covariance",
+          "unit": "parameter covariance"
+        },
+        {
+          "name": "psf_sigma_parameter_sensitivity",
+          "unit": "parameter per metre"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "total local parameter covariance including supplied PSF calibration contribution"
+        }
+      ],
+      "prerequisites": [
+        "A calibrated Gaussian PSF width and its external 1-sigma uncertainty.",
+        "A fixed supplied spatial mixing matrix and measured calibrated Thomson spectra.",
+        "A data-identifiable joint spatial-spectral solution."
+      ],
+      "uncertainty_model": "C_p,PSF = (dp/dsigma_PSF) Var(sigma_PSF) (dp/dsigma_PSF)^T, where dp/dsigma_PSF is obtained from the data-only GLS normal equations and finite-difference derivative of the complete whitened spectral residual. This is first-order local propagation, not nonlinear Monte Carlo or PSF-shape uncertainty.",
+      "limitations": [
+        "Only scalar Gaussian PSF-width uncertainty is represented; a full measured PSF-matrix element covariance is not yet propagated.",
+        "The result is conditional on the fixed spatial mixing matrix, Gaussian PSF family and supplied spectral covariance.",
+        "No experimental PSF calibration or independent validation is claimed."
+      ],
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_propagates_gaussian_psf_calibration_uncertainty",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_spatial_spectral_inverse_rejects_unattached_psf_width_uncertainty"
+      ],
+      "note": "Physical forward-operator calibration uncertainty is propagated to fitted plasma/background parameters through local GLS sensitivity; software verification only, not empirical calibration."
+    }
   }
 ]
