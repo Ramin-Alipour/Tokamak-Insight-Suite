@@ -166,7 +166,8 @@ def _apply_response_in_bin_integrated_space(response_matrix, spectral_density, w
 
 def _fit_covariance_blocks(jacobian, cost, n_observations, flow_indices,
                            measurement_covariance_supplied,
-                           discrepancy_supplied):
+                           discrepancy_supplied,
+                           systematic_covariance_supplied=False):
     """Return full and profiled-flow covariance from the whitened fit Jacobian.
 
     The flow covariance is computed by eliminating all nuisance directions
@@ -218,11 +219,13 @@ def _fit_covariance_blocks(jacobian, cost, n_observations, flow_indices,
         flow_information = profiled_flow_jacobian.T @ profiled_flow_jacobian
         flow_covariance = np.linalg.inv(flow_information)
 
-    if measurement_covariance_supplied or discrepancy_supplied:
+    if (measurement_covariance_supplied or discrepancy_supplied
+            or systematic_covariance_supplied):
         scale = 1.0
         scale_method = (
             "absolute_model_discrepancy_covariance"
-            if discrepancy_supplied and not measurement_covariance_supplied
+            if (discrepancy_supplied and not measurement_covariance_supplied
+                and not systematic_covariance_supplied)
             else "supplied_absolute_covariance"
         )
     else:
@@ -531,7 +534,8 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         _fit_covariance_blocks(
             fit.jac, fit.cost, size, flow_indices,
             measurement_covariance_supplied,
-            discrepancy is not None or systematic is not None,
+            discrepancy is not None,
+            systematic is not None,
         )
     )
     parameter_covariance = (
@@ -924,7 +928,8 @@ def fit_gyrotropic_bi_kappa_thomson(
         _fit_covariance_blocks(
             fit.jac, fit.cost, size, flow_indices,
             measurement_covariance_supplied,
-            discrepancy is not None or systematic is not None,
+            discrepancy is not None,
+            systematic is not None,
         )
     )
     parameter_covariance = (
