@@ -60,6 +60,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 MODEL_LABELS = {
     "thomson_temperature_from_spectral_width": "Optical Thomson — conditional Maxwellian temperature from intrinsic thermal width with joint covariance",
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
+    "thomson_multi_population_relativistic_fit": "Optical Thomson — joint inference of 2–6 relativistic Maxwell-Juttner populations, simplex fractions and shared flow",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion with vector flow, velocity-covariance tensor and propagated moment uncertainty from independent measured views",
     "kappa_electrostatic_susceptibility": "CTS — dimensional isotropic-Kappa susceptibility from the shared full-tail Landau kernel, with exact thermal scaling and analytic phase derivative",
     "kappa_dispersion_function": "Optical/CTS kinetic kernel — full-tail generalized Kappa plasma dispersion integral with exact Landau boundary value",
@@ -336,6 +337,20 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "thomson_multi_population_relativistic_fit": {
+        "wavelength_nm": np.linspace(350.0, 750.0, 81).tolist(),
+        "measured_spectrum": (np.exp(-0.5*((np.linspace(350.0, 750.0, 81)-532.0)/35.0)**2)).tolist(),
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response": np.eye(81).tolist(),
+        "population_count": 2,
+        "incident_polarization": [0.0, 0.0, 1.0],
+        "flow_projection_initial_m_s": 0.0,
+        "signal_uncertainty": np.full(81, 0.02).tolist(),
+        "radial_order": 12,
+        "angular_order": 8,
+        "background_degree": 0
+    },
     "cts_non_gyrotropic_gaussian_tensor_spectrum": {
         "wavelength_nm": np.linspace(1060.0, 1068.0, 41).tolist(),
         "laser_wavelength_nm": 1064.0,
