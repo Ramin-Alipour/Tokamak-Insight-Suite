@@ -925,7 +925,16 @@ def reconstruct_joint_thomson_spatial_spectra(
             "uncertainty": (
                 "linearized_GLS_parameter_covariance_propagated_from_external_sigma_calibration_uncertainty"
                 if psf_calibration_covariance_p is not None else
+                "not_propagated_data_solution_not_identifiable"
+                if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0 else
                 "fixed_operator_no_PSF_calibration_covariance_supplied"
+            ),
+            "uncertainty_status": (
+                "propagated"
+                if psf_calibration_covariance_p is not None else
+                "not_propagated_data_solution_not_identifiable"
+                if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0 else
+                "not_supplied"
             ),
         },
         "instrument_response": "researcher_supplied_fixed_forward_operator",
