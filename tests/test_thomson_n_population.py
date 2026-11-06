@@ -103,3 +103,34 @@ def test_n_population_forward_model_rejects_ambiguous_flow_contract():
             incident_polarization=[1.0, 0.0, 0.0],
             radial_order=16, angular_order=8,
         )
+
+
+def test_n_population_inverse_is_connected_to_public_physics_dispatcher():
+    from tokamak_analysis.cts_full_physics import (
+        ADVANCED_THOMSON_PHYSICS_MODELS, run_advanced_thomson_physics,
+    )
+    x = np.linspace(450.0, 614.0, 121)
+    response = np.eye(x.size)
+    physical = n_population_relativistic_thomson_spectrum(
+        x, 532.0, np.pi/2.0, [120.0, 1200.0], [0.72, 0.28],
+        flow_projection_m_s=1.0e4,
+        incident_polarization=[1.0, 0.0, 0.0],
+        radial_order=12, angular_order=8,
+    )
+    measured = 8.0e3*physical["spectral_density_per_nm"] + 1.0
+    model = "thomson_n_population_relativistic_fit"
+    assert model in ADVANCED_THOMSON_PHYSICS_MODELS
+    result = run_advanced_thomson_physics(
+        model, x, measured, 532.0, np.pi/2.0, response,
+        population_count=2,
+        initial_temperatures_eV=[100.0, 1500.0],
+        initial_fractions=[0.7, 0.3],
+        initial_flow_projection_m_s=8.0e3,
+        incident_polarization=[1.0, 0.0, 0.0],
+        signal_uncertainty=np.full(x.size, 0.2),
+        background_model="constant",
+        radial_order=12, angular_order=8, max_nfev=1000,
+    )
+    assert result["public_physics_entrypoint"] == model
+    assert result["population_count"] == 2
+    assert result["joint_parameter_covariance"].shape[0] == len(result["parameter_names"])
