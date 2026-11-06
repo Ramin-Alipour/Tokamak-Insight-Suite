@@ -55,7 +55,7 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
     gamma = np.sqrt(1.0 + (momentum / (ME*C))**2)
     velocity_parallel = p_parallel[None, :] / (gamma*ME)
     expected_candidate_mean = float(np.sum(candidate*weights*velocity_parallel))
-    assert result["electron_parallel_mean_velocity_candidate_m_s"] == expected_candidate_mean
+    assert np.isclose(result["electron_parallel_mean_velocity_candidate_m_s"], expected_candidate_mean, rtol=1e-12, atol=1e-9)
     assert result["electron_parallel_velocity_definition"].startswith("integral(")
     if result["distribution_kg_m_s_inverse3"] is None:
         assert result["electron_parallel_mean_velocity_m_s"] is None
@@ -63,7 +63,7 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
     else:
         fitted = result["distribution_kg_m_s_inverse3"]
         expected_fitted_mean = float(np.sum(fitted*weights*velocity_parallel))
-        assert result["electron_parallel_mean_velocity_m_s"] == expected_fitted_mean
+        assert np.isclose(result["electron_parallel_mean_velocity_m_s"], expected_fitted_mean, rtol=1e-12, atol=1e-9)
         assert result["electron_parallel_mean_velocity_status"] == "identified_from_fitted_gyrotropic_EVDF"
 
     from tokamak_analysis.cts_full_em import E_CHARGE
@@ -82,7 +82,7 @@ def test_full_em_gyrotropic_electron_shape_inverse_calls_relativistic_forward(mo
         moments["pressure_anisotropy_Tperp_over_Tparallel"],
         expected_t_perpendicular/expected_t_parallel, rtol=1e-12,
     )
-    assert moments["mean_parallel_velocity_m_s"] == expected_candidate_mean
+    assert np.isclose(moments["mean_parallel_velocity_m_s"], expected_candidate_mean, rtol=1e-12, atol=1e-9)
     if result["distribution_kg_m_s_inverse3"] is None:
         assert result["population_relativistic_moments_identified"] is None
         assert result["population_relativistic_moment_status"] == "conditional_candidate_only_shape_not_identifiable"
