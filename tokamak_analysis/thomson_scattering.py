@@ -407,11 +407,43 @@ def infer_thomson_path_averaged_density(
         sigma_ps = _positive_finite_scalar(
             scattered_power_uncertainty_W, "scattered_power_uncertainty_W", allow_zero=True
         )
+    profile_sigma = None
+    if optical_profile_covariance is not None:
+        n = s.size
+        cov = np.asarray(optical_profile_covariance, dtype=float)
+        if cov.shape != (4*n, 4*n) or not np.all(np.isfinite(cov)):
+            raise ValueError("optical_profile_covariance must be finite and 4N x 4N")
+        scale = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+        if not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-12*scale):
+            raise ValueError("optical_profile_covariance must be symmetric")
+        cov = 0.5*(cov+cov.T)
+        sd = np.sqrt(np.maximum(np.diag(cov), 0.0))
+        if np.any(np.abs(cov[sd == 0.0, :]) > 1e-12*scale):
+            raise ValueError("zero-variance profile entries cannot have covariance")
+        corr = np.zeros_like(cov)
+        ix = np.flatnonzero(sd > 0.0)
+        if ix.size:
+            corr[np.ix_(ix, ix)] = cov[np.ix_(ix, ix)] / np.outer(sd[ix], sd[ix])
+        if np.linalg.eigvalsh(corr)[0] < -1e-10:
+            raise ValueError("optical_profile_covariance must be positive semidefinite")
+        dx = np.diff(s)
+        w = np.r_[0.5*dx[0], 0.5*(dx[:-1]+dx[1:]), 0.5*dx[-1]]
+        dden = np.concatenate([w*kernel/x for x in (pi, dsigma, omega, eta)])
+        grad = -(density/denominator)*dden
+        variance = float(grad @ cov @ grad)
+        if variance < -1e-10*density**2:
+            raise ValueError("optical_profile_covariance gives negative variance")
+        profile_sigma = float(np.sqrt(max(variance, 0.0)))
+    variance = 0.0 if profile_sigma is None else profile_sigma**2
+    if sigma_ps is not None:
+        variance += (sigma_ps/denominator)**2
+    uncertainty = np.sqrt(variance) if (sigma_ps is not None or profile_sigma is not None) else None
     return {
         "electron_density_path_averaged_m3": float(density),
         "electron_density_path_averaged_uncertainty_m3": (
-            None if sigma_ps is None else float(sigma_ps / denominator)
+            None if uncertainty is None else float(uncertainty)
         ),
+        "electron_density_optical_profile_uncertainty_m3": profile_sigma,
         "path_integrated_sensitivity_W_m3": denominator,
         "path_coordinate_m": s.copy(),
         "normalized_path_weight": kernel / denominator,
@@ -431,5 +463,15 @@ def infer_thomson_path_averaged_density(
             "Optically thin single scattering; no multiple-scattering contribution.",
             "The supplied path-dependent factors are fixed and are not calibrated or corrected by this function.",
         ],
-        "uncertainty_model": "First-order propagation of supplied scattered-power uncertainty only; uncertainty/covariance of path-dependent factors is not included unless separately propagated by the caller.",
+        "optical_profile_covariance_order": (
+            ["incident_power_profile_W", "differential_cross_section_profile_m2_sr",
+             "collection_solid_angle_profile_sr", "optical_efficiency_profile"]
+            if profile_sigma is not None else None
+        ),
+        "uncertainty_model": (
+            "First-order Jacobian propagation of full 4N x 4N optical-profile covariance, including cross-position and cross-factor correlations; scattered power is independent."
+            if profile_sigma is not None else
+            "First-order propagation of scattered-power uncertainty only; optical-profile covariance is not included."
+            if sigma_ps is not None else "No uncertainty supplied."
+        ),
     }
