@@ -297,6 +297,11 @@ def reconstruct_joint_thomson_spatial_spectra(
     not mixed as plasma emission. Select constant, linear, polynomial,
     cubic-spline, or researcher-supplied background-template bases. The
     physical forward model is selected explicitly by physical_model.
+    Measurement, model-discrepancy and systematic covariance matrices are
+    accepted as separate channel-major components and summed only under an
+    explicit mutual-independence assumption. The source-resolved parameter
+    covariance contributions are returned separately; correlated error sources
+    require their cross-covariance blocks to be included by the caller.
     """
     if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
