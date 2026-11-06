@@ -9211,7 +9211,7 @@
     "name": "Joint wavelength-resolved spatial Thomson physical-profile inversion",
     "equation": "μ_{cℓ}(θ)=Σ_j [M P]_{cj} A_j ∫_{Δλℓ} R_c(λ,λ′) S_phys(λ′;T_e,j,u_q,j,model) dλ′/Δλℓ + b_{cℓ}; θ̂=argmin_θ[(y−μ)^T C^{-1}(y−μ)+λ_reg||D²(log T_e,u_q/10^6,log A)||²]",
     "inputs": "Calibrated measured spectra y[channel,wavelength], wavelength bin centres, radial nodes, measured spatial mixing matrix M, laser wavelength, scattering angle, optional measured instrument-response matrices R, finite-volume Gaussian or measured PSF operator P, channel-major measurement covariance, optional model-discrepancy and systematic covariance, selected Maxwellian/Kappa/relativistic Maxwell-Juttner forward model, optional incident polarization and measured laser spectrum.",
-    "output": "Joint radial electron-temperature profile, scattering-vector flow projection profile and relative spectral-amplitude profile; fitted spectra and residuals; parameter covariance and covariance decomposition; data-only rank/conditioning and identifiability; PSF-calibration covariance; optional regularization-strength sensitivity.",
+    "output": "Joint radial electron-temperature profile, scattering-vector flow projection profile and relative spectral-amplitude profile; fitted spectra and residuals; parameter covariance and covariance decomposition; data-only rank/conditioning and identifiability; PSF-calibration covariance; optional regularization-strength sensitivity.; source-resolved parameter-covariance contributions for measurement, model discrepancy and systematic errors",
     "assumptions": "Prepared/calibrated channel-by-wavelength spectra; supplied fixed spatial mixing, PSF and instrument-response operators; one common scattering-vector projection across the fitted profile; detector-space backgrounds fitted jointly as nuisance basis coefficients; finite-volume wavelength-bin integration and non-negative plasma amplitude. Selected physical model is isotropic Maxwellian, isotropic finite-variance Kappa, or relativistic Maxwell-Juttner; Compton recoil is available only on the relativistic branch with incident polarization.",
     "status": "D",
     "category": "Thomson scattering",
@@ -9379,6 +9379,11 @@
           "name": "systematic_covariance_provenance",
           "unit": "structured metadata",
           "description": "Supply flag, dimensions, trace, independence assumption and inclusion in the effective GLS metric."
+        },
+        {
+          "name": "spectral_covariance_parameter_components",
+          "unit": "joint fitted-parameter covariance contribution by independent source",
+          "description": "Measurement, model-discrepancy and systematic covariance contributions computed in whitened GLS coordinates; components sum to the data-only GLS covariance before external PSF calibration covariance."
         }
       ],
       "prerequisites": [
