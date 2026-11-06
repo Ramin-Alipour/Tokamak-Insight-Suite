@@ -6396,11 +6396,14 @@
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
         "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen",
-        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen",
+        "tests/test_thomson_anisotropic_inference.py::test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_closure",
+        "tests/test_thomson_anisotropic_inference.py::test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options"
       ],
       "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen. The public advanced-physics dispatcher additionally routes optional scattering-vector covariance, projection/geometry cross-covariance, a whitened-geometry condition ceiling (default 1e3), and a common-flow chi-square p-value threshold (default 1e-3) to the derived 3-D flow closure; these options are not passed into the per-view spectral fitter.",
       "function_links": [
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
+        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
       ]
     },
     "references": [
@@ -6425,7 +6428,8 @@
       "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
       "function_links": [
         "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson",
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
+        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
       ],
       "formula_key": "gyrotropic_bi_maxwellian_optical_thomson_joint_fit",
       "implementation_link_status": "mapped",
@@ -6433,7 +6437,9 @@
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_gaussian_thomson_forward_model_integrates_exact_finite_wavelength_bins",
-        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
+        "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen",
+        "tests/test_thomson_anisotropic_inference.py::test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_closure",
+        "tests/test_thomson_anisotropic_inference.py::test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options"
       ]
     }
   },
@@ -7828,7 +7834,8 @@
       ],
       "note": "The distribution family and finite-variance domain follow the published additive bi-Kappa formulation. The registered optical Thomson implementation fits its exact projected 1-D marginal and is not a magnetized kinetic dispersion solver. The public advanced-physics dispatcher additionally routes optional scattering-vector covariance, projection/geometry cross-covariance, a whitened-geometry condition ceiling (default 1e3), and a common-flow chi-square p-value threshold (default 1e-3) to the derived 3-D flow closure; these options are not passed into the per-view spectral fitter.",
       "function_links": [
-        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
+        "tokamak_analysis.thomson_workflow.fit_gyrotropic_thomson_spectra"
       ]
     },
     "references": [
