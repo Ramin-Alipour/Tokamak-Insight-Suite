@@ -598,6 +598,7 @@ def test_bikappa_accepts_distinct_probability_conserving_response_per_view():
     # A non-symmetric, finite-volume column-stochastic redistribution kernel.
     blurred = 0.90 * identity
     blurred[1:, :-1] += 0.10 * np.eye(n - 1)
+    blurred[-1, -1] = 1.0  # retain all probability in the final input bin
     response = np.stack((identity, blurred, identity))
     measured = intrinsic_spectra.copy()
     measured[1] = _apply_response_in_bin_integrated_space(
