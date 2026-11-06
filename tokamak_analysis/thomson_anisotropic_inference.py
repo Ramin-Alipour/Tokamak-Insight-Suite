@@ -498,14 +498,14 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "interpretation": "RMS speed screening alone does not quantify the Gaussian probability beyond the speed-of-light boundary; inspect the exact projected-tail lower bound."
         },
         "relativistic_tail_diagnostic": {
-            "definition": "P(|v_q| >= c) from the exact Student-t projected marginal; a lower bound on the 3-D superluminal probability",
+            "definition": "P(|v_q| >= c) from the exact Gaussian projected marginal; a lower bound on the 3-D superluminal probability",
             "projected_superluminal_probability_lower_bound": projected_superluminal_tail_lower_bound,
             "maximum_projected_superluminal_probability_lower_bound": float(np.max(projected_superluminal_tail_lower_bound)),
             "tolerance": projected_tail_tolerance,
             "status": "exceeds_tolerance_use_relativistic_model" if projected_tail_exceeds_tolerance else "below_projected_tail_tolerance",
             "requires_relativistic_forward_model": projected_tail_exceeds_tolerance,
             "warning": (
-                "The non-relativistic Kappa closure assigns more than the projected-tail tolerance to superluminal projected velocities; do not interpret this fit as a relativistic EVDF."
+                "The non-relativistic Maxwellian closure assigns more than the projected-tail tolerance to superluminal projected velocities."
                 if projected_tail_exceeds_tolerance else None
             ),
         },
@@ -823,18 +823,18 @@ def fit_gyrotropic_bi_kappa_thomson(
             "maximum_projected_rms_beta": beta_limit,
             "maximum_fitted_projected_rms_beta": float(np.max(projected_rms_beta)),
             "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
-            "status": "within_declared_nonrelativistic_screen",
+            "status": "projected_tail_exceeds_tolerance" if projected_tail_exceeds_tolerance else "within_declared_nonrelativistic_screen",
             "interpretation": "RMS speed screening is necessary but not sufficient; the exact Student-t projected-tail diagnostic is evaluated separately."
         },
         "relativistic_tail_diagnostic": {
-            "definition": "P(|v_q| >= c) from the exact Gaussian projected marginal; a lower bound on the 3-D superluminal probability",
+            "definition": "P(|v_q| >= c) from the exact Student-t projected marginal; a lower bound on the 3-D superluminal probability",
             "projected_superluminal_probability_lower_bound": projected_superluminal_tail_lower_bound,
             "maximum_projected_superluminal_probability_lower_bound": float(np.max(projected_superluminal_tail_lower_bound)),
             "tolerance": projected_tail_tolerance,
             "status": "exceeds_tolerance_use_relativistic_model" if projected_tail_exceeds_tolerance else "below_projected_tail_tolerance",
             "requires_relativistic_forward_model": projected_tail_exceeds_tolerance,
             "warning": (
-                "The non-relativistic Maxwellian closure assigns more than the projected-tail tolerance to superluminal projected velocities."
+                "The non-relativistic Kappa closure assigns more than the projected-tail tolerance to superluminal projected velocities; do not interpret this fit as a relativistic EVDF."
                 if projected_tail_exceeds_tolerance else None
             ),
         },
