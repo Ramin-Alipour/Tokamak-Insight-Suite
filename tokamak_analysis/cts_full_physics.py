@@ -45,6 +45,7 @@ from .cts_stokes_transfer import (
     propagate_stratified_polarized_lte_stokes,
 )
 from .thomson_evdf import reconstruct_thomson_evdf
+from .thomson_scattering import infer_thomson_path_averaged_density
 from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
 from .formula_library import thomson_velocity_projection_relativistic_exact
 
