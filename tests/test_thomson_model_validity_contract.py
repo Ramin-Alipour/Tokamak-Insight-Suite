@@ -55,7 +55,7 @@ def test_missing_fit_parameter_is_not_misreported_as_valid_domain():
     )
     assert result["status"] == "incomplete_domain_diagnostics"
     assert result["domain_assessment_complete"] is False
-    assert result["quantitative_reporting_allowed"] is True
+    assert result["quantitative_reporting_allowed"] is False
 
 
 def test_relativistic_model_does_not_receive_nonrelativistic_temperature_warning():
