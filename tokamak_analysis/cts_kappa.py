@@ -315,8 +315,9 @@ def bi_kappa_electron_susceptibility(
     wavenumber_m_inverse, mass_kg=ME,
     pole_imaginary_part_m_s=None,
     minimum_velocity_grid_probability_coverage=0.999,
+    electron_flow_projection_m_s=0.0,
 ):
-    r"""Collisionless longitudinal susceptibility of a gyrotropic bi-Kappa EVDF.
+    r"""Collisionless longitudinal susceptibility of a drifting gyrotropic bi-Kappa EVDF.
 
     The 3-D distribution is proportional to
       [1 + v_perp^2/(kappa theta_perp^2)
@@ -328,7 +329,9 @@ def bi_kappa_electron_susceptibility(
     The Landau integral is then evaluated by the existing full-tail analytic
     Kappa solver. This is a gyrotropic, non-relativistic, unmagnetized
     longitudinal projection; it is not a magnetized harmonic or Full-EM
-    susceptibility. One view measures T_q, not both temperatures separately.
+    susceptibility. A field-aligned or oblique bulk drift enters through the
+    Galilean-shifted resonant phase velocity v_phi - u_e dot q_hat. One view
+    measures T_q, not both temperatures separately.
     """
     b = np.asarray(magnetic_field_unit)
     q = np.asarray(scattering_vector_unit)
@@ -343,10 +346,20 @@ def bi_kappa_electron_susceptibility(
         raise ValueError("magnetic_field_unit and scattering_vector_unit must be finite unit vectors")
     t_parallel = _positive_real_scalar(electron_temperature_parallel_eV, "electron_temperature_parallel_eV")
     t_perpendicular = _positive_real_scalar(electron_temperature_perpendicular_eV, "electron_temperature_perpendicular_eV")
+    if (isinstance(electron_flow_projection_m_s, (bool, np.bool_))
+            or not np.isscalar(electron_flow_projection_m_s)):
+        raise ValueError("electron_flow_projection_m_s must be a finite subluminal scalar")
+    electron_flow = float(electron_flow_projection_m_s)
+    if not np.isfinite(electron_flow) or abs(electron_flow) >= C:
+        raise ValueError("electron_flow_projection_m_s must be finite and strictly subluminal")
+    phase_velocity = float(phase_velocity_m_s)
+    if not np.isfinite(phase_velocity):
+        raise ValueError("phase_velocity_m_s must be finite")
+    relative_phase_velocity = phase_velocity - electron_flow
     mu = float(np.clip(np.dot(b, q), -1.0, 1.0))
     t_projected = t_perpendicular + (t_parallel - t_perpendicular) * mu**2
     result = kappa_electron_susceptibility(
-        v, phase_velocity_m_s,
+        v, relative_phase_velocity,
         electron_density_m3=electron_density_m3,
         electron_temperature_eV=t_projected,
         kappa=kappa, wavenumber_m_inverse=wavenumber_m_inverse,
@@ -359,10 +372,14 @@ def bi_kappa_electron_susceptibility(
         "electron_temperature_parallel_eV": t_parallel,
         "electron_temperature_perpendicular_eV": t_perpendicular,
         "projected_temperature_eV": float(t_projected),
+        "electron_flow_projection_m_s": electron_flow,
+        "phase_velocity_lab_m_s": phase_velocity,
+        "phase_velocity_in_electron_rest_frame_m_s": float(relative_phase_velocity),
+        "resonance_frame": "electron_bulk_rest_frame_using_v_phase_minus_u_e_dot_q_hat",
         "magnetic_pitch_cosine": mu,
         "directional_temperature_relation": "T_q = T_perp + (T_parallel - T_perp)*(b_hat dot q_hat)^2",
         "separate_parallel_perpendicular_temperatures_identifiable_from_one_view": False,
-        "anisotropy_model": "gyrotropic_bi_Kappa_with_common_kappa_and_zero_drift",
+        "anisotropy_model": "gyrotropic_bi_Kappa_with_common_kappa_and_projected_bulk_drift",
         "limitations": [
             "Collisionless unmagnetized longitudinal response only; no cyclotron harmonics or magnetic-field-dependent dielectric tensor.",
             "Non-relativistic distribution; no relativistic bi-Kappa response.",
