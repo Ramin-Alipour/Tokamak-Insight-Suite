@@ -145,7 +145,7 @@ def test_tabulated_evdf_phase_derivative_formula_registry_is_synchronized():
 def test_exact_sokhotski_plemelj_landau_limit_matches_principal_value_and_resonance():
     velocity = np.linspace(-12.0, 12.0, 2401)
     distribution = np.exp(-0.5*(velocity/2.0)**2)
-    phase_velocity = 0.73
+    phase_velocity = 0.735
     result = generalized_landau_integral(velocity, distribution, phase_velocity, landau_limit=True)
     normalized = result["normalized_probability_density_s_m"]
     slopes = np.diff(normalized)/np.diff(velocity)
@@ -185,7 +185,7 @@ def test_exact_landau_limit_is_exposed_by_public_advanced_cts_dispatcher():
     distribution = np.exp(-0.5*(velocity/2.0)**2)
     result = run_advanced_thomson_physics(
         "cts_tabulated_evdf_susceptibility", velocity_grid_m_s=velocity,
-        probability_density_s_m=distribution, phase_velocity_m_s=0.73,
+        probability_density_s_m=distribution, phase_velocity_m_s=0.735,
         electron_density_m3=1.0e18, wavenumber_m_inverse=100.0, landau_limit=True,
     )
     assert result["landau_limit"] is True

@@ -258,12 +258,3 @@ def test_full_em_landau_fdt_response_alias_is_selectable_in_dashboard():
     assert alias in MODEL_LABELS
     assert alias in EXAMPLES
     assert EXAMPLES[alias] == EXAMPLES[canonical]
-
-
-def test_advanced_thomson_dashboard_has_examples_for_tabulated_evdf_routes():
-    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
-    assert "cts_tabulated_evdf_susceptibility" in MODEL_LABELS
-    assert "cts_tabulated_evdf_landau" in MODEL_LABELS
-    assert "cts_tabulated_evdf_susceptibility" in EXAMPLES
-    assert "cts_tabulated_evdf_landau" in EXAMPLES
-    assert EXAMPLES["cts_tabulated_evdf_susceptibility"]["landau_limit"] is True

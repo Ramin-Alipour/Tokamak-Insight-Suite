@@ -258,7 +258,7 @@ EXAMPLES = {
     "cts_tabulated_evdf_susceptibility": {
         "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
         "probability_density_s_m": np.exp(-0.5*(np.linspace(-8.0e6, 8.0e6, 1601)/1.0e6)**2).tolist(),
-        "phase_velocity_m_s": 0.73e6, "electron_density_m3": 1.0e18,
+        "phase_velocity_m_s": 0.735e6, "electron_density_m3": 1.0e18,
         "wavenumber_m_inverse": 120.0, "landau_limit": True
     },
     "cts_tabulated_evdf_landau": {

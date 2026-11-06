@@ -26,7 +26,7 @@ from .thomson_kinetic_models import (
 
 def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
                                 phase_velocity_m_s, *, pole_imaginary_part_m_s=None,
-                                pole_order=1, include_finite_support_boundary_terms=True, landau_limit=False):
+                                pole_order=1, include_finite_support_boundary_terms=True):
     """Evaluate integral f'(v)/(v-zeta) dv for a tabulated projected VDF.
 
     f is linearly interpolated on the supplied velocity grid, so f' is
@@ -52,40 +52,23 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
     pole_order = int(pole_order)
     if not isinstance(include_finite_support_boundary_terms, (bool, np.bool_)):
         raise ValueError("include_finite_support_boundary_terms must be boolean")
-    if not isinstance(landau_limit, (bool, np.bool_)):
-        raise ValueError("landau_limit must be boolean")
+    eta = (1e-6 * float(np.median(np.diff(v))) if pole_imaginary_part_m_s is None
+           else float(pole_imaginary_part_m_s))
+    if not np.isfinite(eta) or eta <= 0:
+        raise ValueError("pole_imaginary_part_m_s must be positive and finite")
+    zeta = complex(vp, eta)
     slopes = np.diff(f) / np.diff(v)
-    if landau_limit:
-        if pole_order != 1:
-            raise ValueError("exact Landau limit is implemented only for the first-order pole")
-        if pole_imaginary_part_m_s not in (None, 0, 0.0):
-            raise ValueError("pole_imaginary_part_m_s must be omitted or zero with landau_limit=True")
-        scale_v = max(float(np.max(np.abs(v))), abs(vp), 1.0)
-        if np.any(np.abs(v - vp) <= 32.0*np.finfo(float).eps*scale_v):
-            raise ValueError("exact Landau limit is undefined at a tabulated derivative knot or support endpoint")
-        real_part = 0.0
-        for left, right, slope in zip(v[:-1], v[1:], slopes):
-            real_part += float(slope)*(np.log(abs(float(right)-vp))-np.log(abs(float(left)-vp)))
-        inside = bool(v[0] < vp < v[-1])
-        interval = int(np.searchsorted(v, vp)-1) if inside else None
-        integral = complex(real_part, np.pi*float(slopes[interval]) if inside else 0.0)
-        zeta, eta = complex(vp, 0.0), 0.0
-        quadrature = "analytic_principal_value_plus_sokhotski_plemelj_resonance"
-    else:
-        eta = (1e-6*float(np.median(np.diff(v))) if pole_imaginary_part_m_s is None
-               else float(pole_imaginary_part_m_s))
-        if not np.isfinite(eta) or eta <= 0:
-            raise ValueError("pole_imaginary_part_m_s must be positive and finite")
-        zeta = complex(vp, eta)
-        integral = 0.0j
-        quadrature = "analytic_piecewise_linear_derivative_integral"
-        for left, right, slope in zip(v[:-1], v[1:], slopes):
-            left_delta, right_delta = complex(left, 0.0)-zeta, complex(right, 0.0)-zeta
-            if pole_order == 1:
-                interval_integral = np.log(right_delta)-np.log(left_delta)
-            else:
-                interval_integral = (right_delta**(1-pole_order)-left_delta**(1-pole_order))/(1-pole_order)
-            integral += float(slope)*interval_integral
+    integral = 0.0j
+    for left, right, slope in zip(v[:-1], v[1:], slopes):
+        left_delta = complex(left, 0.0) - zeta
+        right_delta = complex(right, 0.0) - zeta
+        if pole_order == 1:
+            interval_integral = np.log(right_delta) - np.log(left_delta)
+        else:
+            interval_integral = (
+                right_delta ** (1 - pole_order) - left_delta ** (1 - pole_order)
+            ) / (1 - pole_order)
+        integral += float(slope) * interval_integral
 
     # The tabulated VDF is interpreted as zero outside its finite support.
     # Its distributional derivative therefore contains endpoint jumps:
@@ -107,7 +90,7 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
         "normalized_probability_density_s_m": f,
         "pole": zeta,
         "pole_imaginary_part_m_s": eta,
-        "quadrature": quadrature + "_plus_distributional_finite_support_endpoint_jumps",
+        "quadrature": "analytic_piecewise_linear_derivative_integral_plus_distributional_finite_support_endpoint_jumps",
         "pole_order": pole_order,
         "finite_support_extension": (
             "zero_outside_tabulated_velocity_interval_with_distributional_endpoint_jumps"
@@ -115,15 +98,14 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
             "finite_interval_truncation_of_an_analytic_nonzero_tail; endpoint_jumps_omitted"
         ),
         "finite_support_boundary_terms_included": bool(include_finite_support_boundary_terms),
-        "landau_limit": bool(landau_limit),
-        "limitation": "exact first-order Landau boundary value; derivative knots rejected" if landau_limit else "one complex pole per call; finite velocity support and positive pole displacement are explicit numerical inputs",
+        "limitation": "one complex pole per call; finite velocity support and positive pole displacement are explicit numerical inputs",
     }
 
 
 def generalized_electron_susceptibility(
     velocity_grid_m_s, probability_density_s_m, phase_velocity_m_s, *,
     electron_density_m3, wavenumber_m_inverse, pole_imaginary_part_m_s=None,
-    include_phase_velocity_derivative=False, landau_limit=False,
+    include_phase_velocity_derivative=False,
 ):
     """Return longitudinal susceptibility and optionally its analytic pole derivative.
 
@@ -137,13 +119,9 @@ def generalized_electron_susceptibility(
         raise ValueError("electron density and wavenumber must be positive and finite")
     if not isinstance(include_phase_velocity_derivative, (bool, np.bool_)):
         raise ValueError("include_phase_velocity_derivative must be boolean")
-    if not isinstance(landau_limit, (bool, np.bool_)):
-        raise ValueError("landau_limit must be boolean")
-    if landau_limit and include_phase_velocity_derivative:
-        raise ValueError("exact first-order Landau limit does not expose the second-order pole derivative")
     response = generalized_landau_integral(
         velocity_grid_m_s, probability_density_s_m, phase_velocity_m_s,
-        pole_imaginary_part_m_s=pole_imaginary_part_m_s, landau_limit=landau_limit,
+        pole_imaginary_part_m_s=pole_imaginary_part_m_s,
     )
     omega_pe2 = ne * E_CHARGE**2 / (EPS0 * ME)
     chi = -(omega_pe2 / k**2) * response["integral"]
@@ -176,7 +154,6 @@ def collective_tabulated_electron_spectral_density(
     electron_probability_density_s_m, ion_species, ion_fractions,
     ion_temperature_eV, electron_velocity_m_s, ion_velocity_m_s,
     incident_direction, scattered_direction, pole_imaginary_part_m_s=None,
-    landau_limit=False,
 ):
     """Unmagnetized electrostatic CTS forward spectrum for a supplied projected EVDF.
 
@@ -249,7 +226,6 @@ def collective_tabulated_electron_spectral_density(
             vgrid, fgrid, vp-ue, electron_density_m3=ne,
             wavenumber_m_inverse=k,
             pole_imaginary_part_m_s=pole_imaginary_part_m_s,
-            landau_limit=landau_limit,
         )["electron_susceptibility"]
     for index, item in enumerate(species):
         density = fractions[index]*ne/item["charge_state"]
@@ -286,8 +262,7 @@ def collective_tabulated_electron_spectral_density(
         "model": "unmagnetized electrostatic collective Thomson scattering with generalized tabulated electron VDF and Maxwellian ions",
         "pole_quadrature": "piecewise_linear_first_order_Landau_pole_with_distributional_finite_support_edges",
         "velocity_support_extension": "zero_outside_supplied_interval; endpoint jumps included in susceptibility",
-        "pole_imaginary_part_m_s": 0.0 if landau_limit else pole_imaginary_part_m_s,
-        "landau_limit": bool(landau_limit),
+        "pole_imaginary_part_m_s": pole_imaginary_part_m_s,
         "limitations": [
             "projected 1-D electron VDF only; no unrestricted 3-D or anisotropic EVDF inversion",
             "non-relativistic unmagnetized electrostatic longitudinal response",
