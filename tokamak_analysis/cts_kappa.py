@@ -68,8 +68,9 @@ def kappa_electron_susceptibility(
     mass_kg=ME,
     pole_imaginary_part_m_s=None,
     minimum_velocity_grid_probability_coverage=0.999,
+    electron_flow_projection_m_s=0.0,
 ):
-    """Return chi_e for the normalized 1-D marginal of an isotropic 3-D Kappa.
+    """Return chi_e for a drifting normalized 1-D marginal of an isotropic 3-D Kappa.
 
     The temperature parameter is the usual second-moment temperature, so the
     marginal variance is k_B T / m. The analytic Kappa CDF quantifies the mass
@@ -98,6 +99,14 @@ def kappa_electron_susceptibility(
     phase_velocity = float(phase_velocity_m_s)
     if not np.isfinite(phase_velocity):
         raise ValueError("phase_velocity_m_s must be a finite real scalar")
+    if (isinstance(electron_flow_projection_m_s, (bool, np.bool_))
+            or not np.isscalar(electron_flow_projection_m_s)):
+        raise ValueError("electron_flow_projection_m_s must be a finite subluminal scalar")
+    electron_flow = float(electron_flow_projection_m_s)
+    if not np.isfinite(electron_flow) or abs(electron_flow) >= C:
+        raise ValueError("electron_flow_projection_m_s must be finite and strictly subluminal")
+    phase_velocity_lab = phase_velocity
+    phase_velocity -= electron_flow
     if pole_imaginary_part_m_s is not None:
         _positive_real_scalar(pole_imaginary_part_m_s, "pole_imaginary_part_m_s")
     if (isinstance(minimum_velocity_grid_probability_coverage, (bool, np.bool_))
@@ -221,6 +230,9 @@ def kappa_electron_susceptibility(
         ),
         "plasma_frequency_squared_s_minus2": float(plasma_frequency_squared),
         "wavenumber_m_inverse": wave_number,
+        "phase_velocity_lab_m_s": phase_velocity_lab,
+        "phase_velocity_in_electron_rest_frame_m_s": phase_velocity,
+        "electron_flow_projection_m_s": electron_flow,
         "distribution_model": "exact_1D_marginal_of_isotropic_3D_Kappa",
         "kappa": kap,
         "theta_m_s": float(np.sqrt(theta_squared)),
@@ -250,6 +262,7 @@ def kappa_electron_susceptibility(
 def maxwellian_electron_susceptibility(
     phase_velocity_m_s, *, electron_density_m3, electron_temperature_eV,
     wavenumber_m_inverse, mass_kg=ME,
+    electron_flow_projection_m_s=0.0,
 ):
     r"""Exact collisionless Maxwellian longitudinal susceptibility.
 
@@ -267,6 +280,13 @@ def maxwellian_electron_susceptibility(
     phase = raw_phase.astype(float, copy=False)
     if np.any(~np.isfinite(phase)):
         raise ValueError("phase_velocity_m_s must be finite")
+    if (isinstance(electron_flow_projection_m_s, (bool, np.bool_))
+            or not np.isscalar(electron_flow_projection_m_s)):
+        raise ValueError("electron_flow_projection_m_s must be a finite subluminal scalar")
+    electron_flow = float(electron_flow_projection_m_s)
+    if not np.isfinite(electron_flow) or abs(electron_flow) >= C:
+        raise ValueError("electron_flow_projection_m_s must be finite and strictly subluminal")
+    relative_phase = phase - electron_flow
     ne = _positive_real_scalar(electron_density_m3, "electron_density_m3")
     te = _positive_real_scalar(electron_temperature_eV, "electron_temperature_eV")
     wave_number = _positive_real_scalar(wavenumber_m_inverse, "wavenumber_m_inverse")
@@ -274,7 +294,7 @@ def maxwellian_electron_susceptibility(
     sigma2 = E * te / mass
     thermal_speed = float(np.sqrt(2.0 * sigma2))
     omega_pe2 = ne * E**2 / (EPS0 * mass)
-    zeta = phase / thermal_speed
+    zeta = relative_phase / thermal_speed
     plasma_dispersion = 1j * np.sqrt(np.pi) * wofz(zeta)
     susceptibility_scale = omega_pe2 / (wave_number**2 * sigma2)
     susceptibility = susceptibility_scale * (1.0 + zeta * plasma_dispersion)
@@ -294,6 +314,9 @@ def maxwellian_electron_susceptibility(
         "plasma_dispersion_function_derivative": complex(plasma_dispersion_derivative) if scalar_input else plasma_dispersion_derivative,
         "susceptibility_phase_velocity_derivative_s_m": complex(susceptibility_phase_derivative) if scalar_input else susceptibility_phase_derivative,
         "normalized_phase_velocity": float(zeta) if scalar_input else zeta,
+        "phase_velocity_lab_m_s": float(phase) if scalar_input else phase,
+        "phase_velocity_in_electron_rest_frame_m_s": float(relative_phase) if scalar_input else relative_phase,
+        "electron_flow_projection_m_s": electron_flow,
         "thermal_speed_m_s": thermal_speed,
         "one_dimensional_velocity_variance_m2_s2": float(sigma2),
         "plasma_frequency_squared_s_minus2": float(omega_pe2),
