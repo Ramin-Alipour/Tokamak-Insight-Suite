@@ -84,6 +84,11 @@ def render_gyrotropic_thomson_page(st) -> None:
         "Optional full model-discrepancy covariance CSV (view-major ordering)",
         type=["csv", "txt"], key="ts_gyro_discrepancy",
     )
+    projection_geometry_cross_file = st.file_uploader(
+        "Optional projection–scattering-geometry cross-covariance CSV "
+        "(n_view × 3*n_view; view-major Cartesian ordering)",
+        type=["csv", "txt"], key="ts_gyro_projection_geometry_cross_covariance",
+    )
     initial_parallel = st.number_input("Initial T_parallel (eV)", min_value=1e-6, value=800.0, key="ts_gyro_tpar")
     initial_perpendicular = st.number_input("Initial T_perpendicular (eV)", min_value=1e-6, value=400.0, key="ts_gyro_tperp")
     initial_kappa = st.number_input("Initial kappa (bi-Kappa only)", min_value=1.5001, value=4.0, key="ts_gyro_kappa")
@@ -121,6 +126,17 @@ def render_gyrotropic_thomson_page(st) -> None:
             uncertainty = _read_numeric_csv(uncertainty_file, "Pointwise uncertainty")
             covariance = _read_numeric_csv(covariance_file, "Measurement covariance")
             discrepancy = _read_numeric_csv(discrepancy_file, "Model-discrepancy covariance")
+            projection_geometry_cross = _read_numeric_csv(
+                projection_geometry_cross_file, "Projection-geometry cross-covariance"
+            )
+            if projection_geometry_cross is not None and projection_geometry_cross.shape != (n_view, 3*n_view):
+                raise ValueError(
+                    f"Projection-geometry cross-covariance must have shape ({n_view}, {3*n_view})."
+                )
+            if projection_geometry_cross is not None and q_covariance is None:
+                raise ValueError(
+                    "Projection-geometry cross-covariance requires scattering_vector_covariance in geometry JSON."
+                )
             if uncertainty is not None and uncertainty.shape != measured.shape:
                 raise ValueError(f"Pointwise uncertainty must have shape {measured.shape}.")
             total_size = n_view * n_bin
@@ -143,6 +159,8 @@ def render_gyrotropic_thomson_page(st) -> None:
                 options["measurement_covariance"] = covariance
             if discrepancy is not None:
                 options["model_discrepancy_covariance"] = discrepancy
+            if projection_geometry_cross is not None:
+                options["projection_geometry_cross_covariance"] = projection_geometry_cross
             result = run_advanced_thomson_physics(api_model,
                 wavelength, measured,
                 laser_wavelength_nm=float(laser_nm),
