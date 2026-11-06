@@ -415,3 +415,241 @@ def fit_two_population_relativistic_thomson_spectrum(
             "No experimental validation is performed or claimed.",
         ],
     }
+
+
+
+def multi_population_relativistic_thomson_spectrum(
+    wavelength_nm, laser_wavelength_nm, scattering_angle_rad,
+    population_temperatures_eV, population_fractions, *,
+    flow_projection_m_s, incident_polarization, radial_order=36,
+    angular_order=18, maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
+):
+    """Forward spectrum for an arbitrary finite mixture of isotropic MJ populations.
+
+    The component emissivities are added as number-density-weighted differential
+    cross sections, not by averaging temperatures or spectral widths:
+      S_mix(lambda) = sum_j eta_j sigma_j S_j(lambda) / sum_j eta_j sigma_j.
+    All components share the supplied q-parallel bulk flow and polarization.
+    """
+    wavelength = _vector(wavelength_nm, "wavelength_nm")
+    if np.any(wavelength <= 0.0) or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must be positive and strictly increasing")
+    temperatures = _vector(population_temperatures_eV, "population_temperatures_eV")
+    fractions = _vector(population_fractions, "population_fractions")
+    if temperatures.size != fractions.size or temperatures.size < 2:
+        raise ValueError("population temperatures and fractions must have matching length >=2")
+    if np.any(temperatures <= 0.0) or np.any(fractions < 0.0):
+        raise ValueError("population temperatures must be positive and fractions non-negative")
+    fraction_sum = float(np.sum(fractions))
+    if not np.isclose(fraction_sum, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("population_fractions must sum to one")
+    flow = float(flow_projection_m_s)
+    if not np.isfinite(flow) or abs(flow) >= C:
+        raise ValueError("flow_projection_m_s must be finite and subluminal")
+    common = dict(
+        wavelength_nm=wavelength,
+        laser_wavelength_nm=_positive(laser_wavelength_nm, "laser_wavelength_nm"),
+        scattering_angle_rad=float(scattering_angle_rad),
+        flow_projection_m_s=flow,
+        incident_polarization=incident_polarization,
+        radial_order=radial_order,
+        angular_order=angular_order,
+        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+        include_compton_recoil=include_compton_recoil,
+    )
+    components = [
+        relativistic_maxwell_juttner_spectrum(
+            electron_temperature_eV=float(temperature), **common
+        )
+        for temperature in temperatures
+    ]
+    cross_sections = np.asarray([
+        item["effective_differential_cross_section_m2_sr"] for item in components
+    ], dtype=float)
+    weighted_cross_sections = fractions * cross_sections
+    total_cross_section = float(np.sum(weighted_cross_sections))
+    if not np.isfinite(total_cross_section) or total_cross_section <= 0.0:
+        raise ValueError("mixture effective differential cross-section must be positive and finite")
+    component_shapes = np.asarray([
+        item["spectral_density_per_nm"] for item in components
+    ], dtype=float)
+    spectrum = np.sum(
+        weighted_cross_sections[:, None] * component_shapes, axis=0
+    ) / total_cross_section
+    return {
+        "spectral_density_per_nm": spectrum,
+        "population_temperatures_eV": temperatures.copy(),
+        "population_number_density_fractions": fractions.copy(),
+        "population_effective_cross_sections_m2_sr": cross_sections,
+        "mixture_effective_differential_cross_section_m2_sr": total_cross_section,
+        "component_spectra_per_nm": component_shapes,
+        "flow_projection_m_s": flow,
+        "population_count": int(temperatures.size),
+        "mixture_relation": "S_mix=sum_j(eta_j*sigma_j*S_j)/sum_j(eta_j*sigma_j); eta_j=n_j/sum_k(n_k)",
+        "model": "arbitrary-finite-component isotropic relativistic Maxwell-Juttner optical Thomson mixture",
+        "population_assumption": "finite mixture of isotropic Maxwell-Juttner components with a shared q-parallel bulk flow",
+        "absolute_density_inferred": False,
+        "limitations": [
+            "This is a parametric finite mixture, not an unrestricted 3-D EVDF reconstruction.",
+            "Component fractions and temperatures are supplied inputs to this forward model.",
+            "All components share one bulk-flow projection and incident polarization.",
+        ],
+    }
+
+
+def fit_multi_population_relativistic_thomson_spectrum(
+    wavelength_nm, measured_spectrum, laser_wavelength_nm,
+    scattering_angle_rad, instrument_response, *,
+    population_count, incident_polarization,
+    flow_projection_initial_m_s=0.0, signal_uncertainty=None,
+    spectral_covariance=None, radial_order=20, angular_order=10,
+    maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False, background_degree=0, max_nfev=600,
+):
+    """Infer ordered component temperatures, simplex fractions and shared flow.
+
+    Linear signal amplitude/background coefficients are profiled at each
+    nonlinear step. A scaled-Jacobian rank/condition gate prevents reporting
+    an underdetermined population decomposition as measured parameters.
+    """
+    x = _vector(wavelength_nm, "wavelength_nm")
+    y = _vector(measured_spectrum, "measured_spectrum")
+    if x.shape != y.shape or np.any(x <= 0.0) or np.any(np.diff(x) <= 0.0) or np.any(y < 0.0):
+        raise ValueError("measured wavelength and non-negative spectrum must match; wavelength must increase")
+    if isinstance(population_count, (bool, np.bool_)) or not isinstance(population_count, (int, np.integer)) or not 2 <= int(population_count) <= 6:
+        raise ValueError("population_count must be an integer from 2 through 6")
+    count = int(population_count)
+    response = np.asarray(instrument_response, dtype=float)
+    if response.shape != (x.size, x.size) or np.any(~np.isfinite(response)) or np.any(response < 0.0):
+        raise ValueError("instrument_response must be a finite non-negative square matrix")
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("instrument_response columns must sum to one")
+    if signal_uncertainty is not None and spectral_covariance is not None:
+        raise ValueError("supply signal_uncertainty or spectral_covariance, not both")
+    if signal_uncertainty is not None:
+        sigma = _vector(signal_uncertainty, "signal_uncertainty")
+        if sigma.shape != y.shape or np.any(sigma <= 0.0):
+            raise ValueError("signal_uncertainty must match the spectrum and be positive")
+        whiten = lambda value: np.asarray(value) / sigma
+        noise_status = "supplied_pointwise_uncertainty"
+    elif spectral_covariance is not None:
+        covariance = np.asarray(spectral_covariance, dtype=float)
+        if covariance.shape != (y.size, y.size) or np.any(~np.isfinite(covariance)) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
+            raise ValueError("spectral_covariance must be finite, symmetric and match the measured spectrum")
+        try:
+            chol = np.linalg.cholesky(covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite") from exc
+        whiten = lambda value: np.linalg.solve(chol, value)
+        noise_status = "supplied_full_spectral_covariance"
+    else:
+        whiten = lambda value: np.asarray(value)
+        noise_status = "unweighted_residual_scaled_only"
+    if isinstance(background_degree, (bool, np.bool_)) or not isinstance(background_degree, (int, np.integer)) or not 0 <= int(background_degree) <= 5:
+        raise ValueError("background_degree must be an integer from 0 through 5")
+    from .thomson_background import _background_design
+    background = _background_design(
+        x, "polynomial" if int(background_degree) else "constant",
+        degree=int(background_degree),
+    )
+    flow0 = float(flow_projection_initial_m_s)
+    if not np.isfinite(flow0) or abs(flow0) >= C:
+        raise ValueError("flow_projection_initial_m_s must be finite and subluminal")
+    # Ordered temperatures remove permutation-equivalent labels. Softmax
+    # fractions enforce positivity and exact number-density normalization.
+    initial_temperatures = np.geomspace(2.0, 200.0, count)
+    p0 = np.r_[np.log(initial_temperatures[0]),
+               np.log(np.diff(initial_temperatures)),
+               np.zeros(count - 1), flow0 / 1.0e6]
+    lower = np.r_[np.full(count, np.log(1e-4)), np.full(count - 1, -20.0), -C/1e6*(1-1e-12)]
+    upper = np.r_[np.full(count, np.log(5e6)), np.full(count - 1, 20.0), C/1e6*(1-1e-12)]
+    def decode(parameters):
+        logs = parameters[:count]
+        temperatures = np.empty(count)
+        temperatures[0] = np.exp(logs[0])
+        for j in range(1, count):
+            temperatures[j] = temperatures[j-1] + np.exp(logs[j])
+        logits = np.r_[parameters[count:2*count-1], 0.0]
+        logits -= np.max(logits)
+        fractions = np.exp(logits)
+        fractions /= np.sum(fractions)
+        return temperatures, fractions, float(parameters[-1] * 1.0e6)
+    def forward(parameters):
+        temperatures, fractions, flow = decode(parameters)
+        shape = multi_population_relativistic_thomson_spectrum(
+            x, laser_wavelength_nm, scattering_angle_rad, temperatures,
+            fractions, flow_projection_m_s=flow,
+            incident_polarization=incident_polarization,
+            radial_order=radial_order, angular_order=angular_order,
+            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            include_compton_recoil=include_compton_recoil,
+        )["spectral_density_per_nm"]
+        return _apply_response(response, shape, x)
+    def profile(parameters):
+        signal = forward(parameters)
+        design = whiten(np.column_stack((signal, background)))
+        coefficients = np.linalg.lstsq(design, whiten(y), rcond=None)[0]
+        if coefficients[0] < 0.0:
+            coefficients[0] = 0.0
+            coefficients[1:] = np.linalg.lstsq(whiten(background), whiten(y), rcond=None)[0]
+        fitted = coefficients[0]*signal + background@coefficients[1:]
+        return coefficients, fitted
+    def residual(parameters):
+        return whiten(profile(parameters)[1] - y)
+    fit = least_squares(residual, p0, bounds=(lower, upper), x_scale="jac", max_nfev=int(max_nfev))
+    if not fit.success or np.any(~np.isfinite(fit.x)):
+        raise ValueError(f"multi-population Thomson optimizer failed: {fit.message}")
+    jac = np.asarray(fit.jac, dtype=float)
+    norms = np.linalg.norm(jac, axis=0)
+    scaled = np.divide(jac, norms[None, :], out=np.zeros_like(jac), where=norms[None, :] > np.finfo(float).tiny)
+    singular = np.linalg.svd(scaled, compute_uv=False)
+    tol = np.finfo(float).eps * max(scaled.shape) * (singular[0] if singular.size else 0.0)
+    rank = int(np.count_nonzero(singular > tol))
+    condition = float(singular[0]/singular[-1]) if singular.size and singular[-1] > 0.0 else float("inf")
+    if rank < fit.x.size or not np.isfinite(condition) or condition > 1e12:
+        raise ValueError(f"multi-population Thomson fit rejected as non-identifiable (Jacobian rank {rank}/{fit.x.size}, condition={condition:.6g}); reduce population_count or improve spectral coverage")
+    dof = max(1, y.size-fit.x.size-background.shape[1]-1)
+    covariance_p = np.linalg.pinv(jac.T@jac)
+    if signal_uncertainty is None and spectral_covariance is None:
+        covariance_p *= float(residual(fit.x)@residual(fit.x)/dof)
+    temperatures, fractions, flow = decode(fit.x)
+    standard_p = np.sqrt(np.maximum(np.diag(covariance_p), 0.0))
+    # Delta-method Jacobian for ordered temperatures, softmax fractions and flow.
+    transform = np.zeros((2*count, fit.x.size))
+    for j in range(count):
+        transform[j, :j+1] = temperatures[j]
+        transform[j, j+1:j+1] = 0.0
+    for j in range(count):
+        for k in range(count-1):
+            transform[count+j, count+k] = fractions[j] * ((1.0 if j == k else 0.0) - fractions[k])
+    transform[-1, -1] = 1.0e6
+    physical_covariance = transform @ covariance_p @ transform.T
+    coefficients, fitted = profile(fit.x)
+    return {
+        "population_temperatures_eV": temperatures,
+        "population_number_density_fractions": fractions,
+        "shared_flow_projection_m_s": flow,
+        "population_parameter_covariance": physical_covariance,
+        "population_temperature_uncertainties_eV": np.sqrt(np.maximum(np.diag(physical_covariance)[:count], 0.0)),
+        "population_fraction_uncertainties": np.sqrt(np.maximum(np.diag(physical_covariance)[count:2*count], 0.0)),
+        "fitted_spectrum": fitted,
+        "residual": y-fitted,
+        "fitted_signal_amplitude": float(coefficients[0]),
+        "fitted_background_coefficients": coefficients[1:],
+        "population_count": count,
+        "jacobian_rank": rank,
+        "jacobian_condition_number": condition,
+        "degrees_of_freedom": int(dof),
+        "spectral_noise_model": noise_status,
+        "optimizer_success": bool(fit.success),
+        "model": "arbitrary-finite-component isotropic relativistic Maxwell-Juttner optical Thomson mixture",
+        "population_fraction_definition": "component electron number-density fractions, constrained to the probability simplex",
+        "identifiability_status": "identified_by_scaled_spectral_jacobian",
+        "limitations": [
+            "The inversion is conditional on the finite isotropic Maxwell-Juttner mixture family and shared q-parallel flow.",
+            "A full-rank Jacobian is necessary but does not establish model adequacy or experimental validation.",
+            "Absolute electron density and unrestricted 3-D EVDF are not inferred.",
+            "Component labels are ordered by increasing temperature to remove permutation degeneracy.",
+        ],
+    }
