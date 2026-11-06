@@ -1266,9 +1266,11 @@
         "formula_key": "gyrotropic_bi_maxwellian_optical_thomson_joint_fit",
         "dashboard": "tis.ui.advanced_thomson_physics_page",
         "equation": "T_q,i = T_perp + (T_parallel - T_perp)(b_hat_i·q_hat_i)^2; sigma_v,q^2=e T_q/m_e; lambda_s/lambda_0 ~= 1-q_hat·v/c",
-        "input_contract": "Joint calibrated optical Thomson spectra from multiple views, measured response matrix, per-view magnetic-field and scattering-vector unit directions, and optional full channel-major measurement/model-discrepancy covariance.",
-        "identifiability": "T_parallel and T_perpendicular are reported only when the squared-pitch-angle design has rank two and the complete spectral Jacobian is full rank; one pitch angle returns directional temperature only.",
-        "scope": "End-to-end non-relativistic elastic-Thomson spectral inference for a gyrotropic bi-Maxwellian with zero heat flux; no general anisotropic EVDF, geometry inference, or relativistic correction."
+        "input_contract": "Joint calibrated optical Thomson spectra from multiple views, measured response matrix, per-view magnetic-field and scattering-vector unit directions, and optional full channel-major measurement/model-discrepancy covariance. The public dispatcher also accepts optional full scattering-vector covariance and projection/geometry cross-covariance for the derived 3-D flow closure, plus geometry condition-number (default 1e3) and common-flow chi-square p-value (default 1e-3) reporting thresholds.",
+        "identifiability": "T_parallel and T_perpendicular are reported only when the squared-pitch-angle design has rank two and the complete spectral Jacobian is full rank; one pitch angle returns directional temperature only. The derived common 3-D flow vector is separately reported only when the fit-derived flow covariance is identifiable, the covariance-whitened scattering design is rank three and within the condition ceiling, and (for more than three views) the shared-flow chi-square test passes.",
+        "scope": "End-to-end non-relativistic elastic-Thomson spectral inference for a gyrotropic bi-Maxwellian with zero heat flux; the public API can additionally close per-view flow projections into a common 3-D vector with optional geometry/cross-covariance propagation and condition/model-adequacy gates. This is not a general anisotropic EVDF or relativistic correction.",
+        "flow_closure_equation": "v_q,i = q_hat_i dot v_e; v_hat_e = (Q^T C_eff^-1 Q)^-1 Q^T C_eff^-1 v_q; report only if rank(L^-1 Q)=3, cond(L^-1 Q)<=1e3 and, for n_views>3, chi-square survival probability>=1e-3.",
+        "flow_closure_function": "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
       },
       {
         "name": "gyrotropic_anisotropic_bi_kappa",
@@ -1277,8 +1279,17 @@
         "limitations": [
           "Non-relativistic elastic-Thomson kinematics",
           "Gyrotropic zero-heat-flux parametric closure",
-          "Requires multiple independent magnetic pitch angles for separate temperatures"
-        ]
+          "Requires multiple independent magnetic pitch angles for separate temperatures",
+          "Derived 3-D common-flow vector is withheld for ill-conditioned view geometry or a rejected shared-flow residual model."
+        ],
+        "model": "gyrotropic_bi_kappa_spectral_fit",
+        "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "formula_key": "gyrotropic_anisotropic_kappa_optical_thomson_joint_fit",
+        "dashboard": "tis.ui.advanced_thomson_physics_page",
+        "input_contract": "Joint calibrated multi-view spectra and measured response; optional full measurement/model-discrepancy covariance. Through the public dispatcher, optional full scattering-vector covariance and projection/geometry cross-covariance are routed to the derived 3-D flow GLS closure, along with condition-number (default 1e3) and common-flow chi-square p-value (default 1e-3) thresholds.",
+        "identifiability": "Second-moment T_parallel/T_perp and kappa>3/2 require full spectral identifiability and independent magnetic pitch angles. A derived 3-D common-flow vector additionally requires identifiable flow projections, rank-3 well-conditioned scattering geometry, and a passing chi-square consistency test for overdetermined views.",
+        "flow_closure_equation": "v_q,i = q_hat_i dot v_e; covariance-weighted GLS with optional geometry and projection/geometry cross-covariance; condition and common-flow residual gates.",
+        "flow_closure_function": "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
       },
       {
         "model": "cts_tabulated_evdf_landau",
