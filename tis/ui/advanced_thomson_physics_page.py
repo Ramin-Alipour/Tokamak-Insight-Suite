@@ -63,6 +63,7 @@ MODEL_LABELS = {
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from multiple independent measured scattering views",
     "kappa_electrostatic_susceptibility": "CTS — full-tail collisionless isotropic-Kappa Landau susceptibility and analytic phase-velocity derivative",
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
+    "thomson_projected_bi_kappa_evdf": "Optical Thomson — exact projected marginal of a gyrotropic 3-D bi-Kappa EVDF",
     "maxwellian_electrostatic_susceptibility": "CTS — analytic Fried-Conte Maxwellian Landau susceptibility (Faddeeva function)",
     "cts_collective_kappa_spectrum": "CTS — collective kinetic electron/ion Maxwellian–Kappa mixture dynamic structure spectrum",
     "cts_collective_kappa_inference": "CTS — infer electron density, temperature and Kappa index from measured collective spectrum",
@@ -107,6 +108,14 @@ MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_projected_bi_kappa_evdf": (
+        "Exact marginal of a gyrotropic 3-D bi-Kappa distribution. For pitch cosine "
+        "mu=b_hat dot q_hat, T_q=T_perp+(T_parallel-T_perp)*mu^2 and "
+        "theta_q^2=((2*kappa-3)/kappa)*e*T_q/m_e. The returned 1-D PDF is normalized "
+        "on the infinite domain; finite-grid probability coverage is reported without "
+        "renormalizing missing tails. Requires kappa>3/2. One view identifies T_q only, "
+        "not T_parallel and T_perpendicular independently."
+    ),
     "landau_fdt_full_em_field_fluctuations": (
         "Input constitutive_response is the mapping returned by landau_fdt_full_em_constitutive. "
         "The solver computes S_E = mu0^2 omega^2 G S_J G^dagger, S_B = (k_cross/omega) "
@@ -268,6 +277,15 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "thomson_projected_bi_kappa_evdf": {
+        "velocity_grid_m_s": np.linspace(-1.2e8, 1.2e8, 2401).tolist(),
+        "temperature_parallel_eV": 1500.0,
+        "temperature_perpendicular_eV": 700.0,
+        "kappa": 4.0,
+        "magnetic_field_unit": [0.0, 0.0, 1.0],
+        "scattering_vector_unit": [0.7071067811865476, 0.0, 0.7071067811865476],
+        "flow_projection_m_s": 0.0
+    },
     "landau_fdt_full_em_field_fluctuations": {
         "constitutive_response": {
             "angular_frequency_rad_s": [100000.0, 200000.0],
