@@ -1079,7 +1079,9 @@
           "background_interior_knots (cubic_spline)",
           "background_templates (templates)",
           "spatial_psf_matrix (optional measured observed-bin x true-node probability operator; finite-domain edge loss retained)",
-          "spatial_psf_sigma_m (optional calibrated Gaussian PSF standard deviation; mutually exclusive with spatial_psf_matrix)"
+          "spatial_psf_sigma_m (optional calibrated Gaussian PSF standard deviation; mutually exclusive with spatial_psf_matrix)",
+          "spatial_mixing_matrix_covariance ((n_channels*n_nodes)^2 covariance): Full positive-semidefinite calibration covariance of the supplied spatial mixing operator, flattened row-major by channel then true spatial node; propagated by implicit GLS sensitivity.",
+          "spectral_mixing_cross_covariance ((n_channels*n_wavelengths) x (n_channels*n_nodes)): Optional cross-covariance between measured channel-major spectra and row-major spatial mixing operator; requires both marginal covariances and a positive-semidefinite joint block."
         ],
         "outputs": [
           "electron_temperature_profile_eV",
@@ -1094,9 +1096,12 @@
           "data-only identifiability diagnostics",
           "spatial_psf_matrix",
           "effective_spatial_mixing_matrix",
-          "spatial_psf_contract"
+          "spatial_psf_contract",
+          "spatial_mixing_calibration_parameter_covariance",
+          "spatial_mixing_cross_covariance_parameter_contribution",
+          "spatial_mixing_parameter_sensitivity"
         ],
-        "scope": "Jointly fits wavelength-resolved channel spectra with a finite-dimensional isotropic non-relativistic Maxwellian model, fixed measured instrument-response operators, a fixed supplied spatial-mixing operator, and detector-space nuisance backgrounds. Background coefficients are fitted jointly with the physical spectrum and are not interpreted as plasma emission. Absolute density, perpendicular flow, unrestricted anisotropic/non-Maxwellian EVDFs, and spatial structure in the mixing null space are not inferred. An optional measured PSF matrix or finite-volume Gaussian PSF generated from an externally calibrated sigma is composed with the detector mixing matrix as H_eff=H P before fitting raw spectra. Gaussian bin probabilities are evaluated by CDF differences; finite-domain edge loss is not renormalized. The PSF remains fixed and is not estimated from the plasma spectra.",
+        "scope": "Jointly fits wavelength-resolved channel spectra with a finite-dimensional isotropic non-relativistic Maxwellian model, fixed measured instrument-response operators, a supplied spatial-mixing operator with optional full calibration covariance, and detector-space nuisance backgrounds. Background coefficients are fitted jointly with the physical spectrum and are not interpreted as plasma emission. Absolute density, perpendicular flow, unrestricted anisotropic/non-Maxwellian EVDFs, and spatial structure in the mixing null space are not inferred. An optional measured PSF matrix or finite-volume Gaussian PSF generated from an externally calibrated sigma is composed with the detector mixing matrix as H_eff=H P before fitting raw spectra. Gaussian bin probabilities are evaluated by CDF differences; finite-domain edge loss is not renormalized. The PSF remains fixed and is not estimated from the plasma spectra.",
         "background_models": [
           "constant",
           "linear",
@@ -1105,7 +1110,7 @@
           "templates"
         ],
         "covariance_order": "channel_major",
-        "uncertainty_semantics": "Local linearized covariance conditional on the selected physical model, fixed response and mixing operators, supplied measurement covariance, and selected regularization. Regularization does not contribute to the data-only identifiability rank. The optional PSF is a fixed external operator in this version; no PSF covariance is propagated by the joint inverse.",
+        "uncertainty_semantics": "Local linearized covariance conditional on the selected physical model, measured response and regularization. Measurement, model-discrepancy and systematic covariance remain separate; full spatial mixing-operator calibration covariance is propagated through the data-only GLS sensitivity, with optional spectrum/operator cross-covariance validated as a joint positive-semidefinite block. Regularization does not contribute to data-only identifiability.",
         "experimental_validation": "not_performed"
       },
       {
