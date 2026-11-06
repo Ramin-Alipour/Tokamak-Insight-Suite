@@ -10,7 +10,11 @@ def test_polarized_transfer_reduces_to_scalar_lte_slab():
     )
     expected = te*elementary_charge/Boltzmann*(1-np.exp(-alpha*length))
     np.testing.assert_allclose(out['brightness_temperature_out_K'], expected, rtol=1e-12)
-    np.testing.assert_allclose(out['modal_coherency_out_K'], expected*np.eye(2)[None], rtol=1e-12)
+    np.testing.assert_allclose(
+        out['modal_coherency_out_K'],
+        np.broadcast_to(expected*np.eye(2), (2, 2, 2)),
+        rtol=1e-12,
+    )
 
 
 def test_mode_coupling_rotates_polarization_without_absorption():
