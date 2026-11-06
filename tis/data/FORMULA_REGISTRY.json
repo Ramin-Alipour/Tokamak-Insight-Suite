@@ -7766,7 +7766,7 @@
         },
         {
           "name": "electron_populations",
-          "unit": "list of density_fraction, temperature_ratio, kappa and flow_projection_m_s mappings",
+          "unit": "list of density_fraction, isotropic temperature_ratio or bi-Kappa parallel/perpendicular temperatures and magnetic_field_unit, kappa, distribution and flow_projection_m_s mappings",
           "required": false
         },
         {
