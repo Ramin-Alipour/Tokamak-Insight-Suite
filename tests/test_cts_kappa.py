@@ -457,3 +457,56 @@ def test_isotropic_kappa_and_maxwellian_reject_superluminal_flow():
             0.0, electron_density_m3=2e19, electron_temperature_eV=800.0,
             wavenumber_m_inverse=250.0, electron_flow_projection_m_s=299792458.0
         )
+
+
+def test_bi_kappa_drift_uses_projected_rest_frame_and_isotropic_limit():
+    from tokamak_analysis.cts_kappa import bi_kappa_electron_susceptibility
+
+    parameters = dict(
+        v=np.linspace(-5e7, 5e7, 2001),
+        phase_velocity_m_s=1.0e6,
+        electron_density_m3=2.0e18,
+        electron_temperature_parallel_eV=250.0,
+        electron_temperature_perpendicular_eV=250.0,
+        magnetic_field_unit=[0.0, 0.0, 1.0],
+        scattering_vector_unit=[1.0, 0.0, 0.0],
+        kappa=4.5,
+        wavenumber_m_inverse=120.0,
+        pole_imaginary_part_m_s=2.0e3,
+    )
+    flow = 2.6e5
+    drifting = bi_kappa_electron_susceptibility(
+        **parameters, electron_flow_projection_m_s=flow
+    )
+    rest_frame = kappa_electron_susceptibility(
+        parameters["v"],
+        parameters["phase_velocity_m_s"] - flow,
+        electron_density_m3=parameters["electron_density_m3"],
+        electron_temperature_eV=250.0,
+        kappa=parameters["kappa"],
+        wavenumber_m_inverse=parameters["wavenumber_m_inverse"],
+        pole_imaginary_part_m_s=parameters["pole_imaginary_part_m_s"],
+    )
+    assert drifting["electron_susceptibility"] == pytest.approx(
+        rest_frame["electron_susceptibility"], rel=2e-12, abs=1e-13
+    )
+    assert drifting["phase_velocity_in_electron_rest_frame_m_s"] == pytest.approx(
+        parameters["phase_velocity_m_s"] - flow
+    )
+    assert drifting["projected_temperature_eV"] == pytest.approx(250.0)
+
+
+def test_bi_kappa_rejects_superluminal_projected_electron_flow():
+    from tokamak_analysis.cts_kappa import bi_kappa_electron_susceptibility
+
+    with pytest.raises(ValueError, match="strictly subluminal"):
+        bi_kappa_electron_susceptibility(
+            np.linspace(-5e7, 5e7, 2001), 1.0e6,
+            electron_density_m3=2.0e18,
+            electron_temperature_parallel_eV=250.0,
+            electron_temperature_perpendicular_eV=250.0,
+            magnetic_field_unit=[0.0, 0.0, 1.0],
+            scattering_vector_unit=[1.0, 0.0, 0.0],
+            kappa=4.0, wavenumber_m_inverse=120.0,
+            electron_flow_projection_m_s=299792458.0,
+        )
