@@ -3989,6 +3989,20 @@ elif page=='Advanced Analysis':
                         })
                     result_cts=analyze_cts_spectrum_model(model='full_em_gyrotropic_vdf_shape',**kwargs_vdf)
                     st.success('Relativistic gyrotropic VDF inversion completed within its fixed-bulk Full-EM model scope.')
+                    accepted_moments=result_cts.get('population_relativistic_moments_identified')
+                    candidate_moments=result_cts.get('population_relativistic_moments_candidate') or {}
+                    shown_moments=accepted_moments or candidate_moments
+                    if shown_moments:
+                        if accepted_moments is not None:
+                            st.markdown('**Relativistic moments of the identifiable fitted VDF**')
+                        else:
+                            st.warning('The inverse shape is not identifiable; the following moments belong to the regularized candidate only and are not reported as measured plasma parameters.')
+                        m1,m2,m3,m4=st.columns(4)
+                        m1.metric('Mean kinetic energy',f"{shown_moments['mean_kinetic_energy_eV']:.5g} eV")
+                        m2.metric('Parallel pressure temperature',f"{shown_moments['parallel_pressure_temperature_eV']:.5g} eV")
+                        m3.metric('Perpendicular pressure temperature',f"{shown_moments['perpendicular_pressure_temperature_eV']:.5g} eV")
+                        m4.metric('T⊥ / T∥',f"{shown_moments['pressure_anisotropy_Tperp_over_Tparallel']:.5g}" if shown_moments['pressure_anisotropy_Tperp_over_Tparallel'] is not None else 'undefined')
+                        st.caption(f"Mean parallel velocity: {shown_moments['mean_parallel_velocity_m_s']:.5g} m/s. These are relativistic momentum-flux moments of the reconstructed gyrotropic distribution, not Maxwellian fit temperatures.")
                     st.json(result_cts)
                     json_download('Export relativistic gyrotropic CTS VDF and moments',result_cts,'tis_cts_gyrotropic_vdf_inverse.json')
                     add_report_section('Relativistic gyrotropic CTS VDF inverse',result_cts)
