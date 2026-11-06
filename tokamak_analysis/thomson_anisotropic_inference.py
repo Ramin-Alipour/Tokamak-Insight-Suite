@@ -494,7 +494,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "maximum_projected_rms_beta": beta_limit,
             "maximum_fitted_projected_rms_beta": float(np.max(projected_rms_beta)),
             "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
-            "status": "within_declared_nonrelativistic_screen",
+            "status": "projected_tail_exceeds_tolerance" if projected_tail_exceeds_tolerance else "within_declared_nonrelativistic_screen",
             "interpretation": "RMS speed screening alone does not quantify the Gaussian probability beyond the speed-of-light boundary; inspect the exact projected-tail lower bound."
         },
         "relativistic_tail_diagnostic": {
@@ -824,7 +824,7 @@ def fit_gyrotropic_bi_kappa_thomson(
             "maximum_fitted_projected_rms_beta": float(np.max(projected_rms_beta)),
             "maximum_fitted_flow_beta": float(np.max(fitted_flow_beta)),
             "status": "within_declared_nonrelativistic_screen",
-            "interpretation": "Conservative software screening threshold, not a universal physical boundary."
+            "interpretation": "RMS speed screening is necessary but not sufficient; the exact Student-t projected-tail diagnostic is evaluated separately."
         },
         "relativistic_tail_diagnostic": {
             "definition": "P(|v_q| >= c) from the exact Gaussian projected marginal; a lower bound on the 3-D superluminal probability",
