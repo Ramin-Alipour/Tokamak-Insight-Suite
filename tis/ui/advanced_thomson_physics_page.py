@@ -281,7 +281,8 @@ EXAMPLES = {
         "scattering_angle_rad": 1.5707963267948966,
         "sigma_fitted_center_nm": 1.0e-5,
         "sigma_laser_wavelength_nm": 2.0e-6,
-        "sigma_scattering_angle_rad": 1.0e-4
+        "sigma_scattering_angle_rad": 1.0e-4,
+        "input_covariance_nm2_rad2": null
     },
     "microwave_background": {
         "frequency_Hz": [90.0e9, 100.0e9, 110.0e9],

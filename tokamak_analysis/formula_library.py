@@ -906,16 +906,16 @@ def thomson_velocity_projection(fitted_center_nm, laser_wavelength_nm, scatterin
 def thomson_velocity_projection_relativistic_exact(
     fitted_center_nm, laser_wavelength_nm, scattering_angle_rad, *,
     sigma_fitted_center_nm=None, sigma_laser_wavelength_nm=None,
-    sigma_scattering_angle_rad=None,
+    sigma_scattering_angle_rad=None, input_covariance_nm2_rad2=None,
 ):
-    """Exact relativistic Doppler inversion for a mono-velocity q projection.
+    """Exact relativistic Doppler inversion and full wavelength/geometry covariance.
 
-    For q_hat=(n_s-n_i)/|n_s-n_i| and an electron velocity parallel to q_hat,
-    lambda_s/lambda_0=(1-beta sin(theta/2))/(1+beta sin(theta/2)).
-    This inverts that relation without the first-order beta<<1 expansion.
-    The result is a single projected velocity, not a 3-D flow or the mean of
-    an arbitrary broad/non-Maxwellian EVDF. The centroid must represent a
-    physically fitted intrinsic line centre, not an uncorrected raw centroid.
+    For a mono-velocity electron parallel to q, lambda_s/lambda_0 =
+    (1-beta*sin(theta/2))/(1+beta*sin(theta/2)). The covariance option is
+    ordered [fitted centre (nm), laser wavelength (nm), scattering angle (rad)]
+    and retains all cross terms. It is mutually exclusive with the three legacy
+    independent standard deviations. A broad EVDF centroid is not generally
+    its mean, and this result is one q-parallel projection only.
     """
     center = _positive("fitted_center_nm", fitted_center_nm)
     laser = _positive("laser_wavelength_nm", laser_wavelength_nm)
@@ -926,7 +926,9 @@ def thomson_velocity_projection_relativistic_exact(
         sigma_fitted_center_nm, sigma_laser_wavelength_nm,
         sigma_scattering_angle_rad,
     )
-    if any(value is not None for value in supplied) and not all(
+    if input_covariance_nm2_rad2 is not None and any(value is not None for value in supplied):
+        raise ValueError("Provide either input_covariance_nm2_rad2 or all three independent uncertainties, not both.")
+    if input_covariance_nm2_rad2 is None and any(value is not None for value in supplied) and not all(
         value is not None for value in supplied
     ):
         raise ValueError("Provide all three independent uncertainties, or none.")
@@ -936,6 +938,11 @@ def thomson_velocity_projection_relativistic_exact(
     if not math.isfinite(beta) or abs(beta) >= 1.0:
         raise ValueError("The fitted centroid implies a non-subluminal projected velocity.")
     velocity = C_LIGHT * beta
+    jacobian = np.asarray([
+        -2.0 * C_LIGHT / (sine * laser * (1.0 + ratio) ** 2),
+        2.0 * C_LIGHT * ratio / (sine * laser * (1.0 + ratio) ** 2),
+        -0.5 * velocity / math.tan(angle / 2.0),
+    ], dtype=float)
     result = {
         "electron_velocity_projection_m_s": velocity,
         "beta_parallel": beta,
@@ -948,8 +955,28 @@ def thomson_velocity_projection_relativistic_exact(
             "projection; a broad distribution centroid is not generally its mean"
         ),
         "uncertainty_model": "not_supplied",
+        "velocity_jacobian_m_s_per_input_unit": jacobian,
+        "input_covariance_order": [
+            "fitted_center_nm", "laser_wavelength_nm", "scattering_angle_rad"
+        ],
     }
-    if all(value is not None for value in supplied):
+    if input_covariance_nm2_rad2 is not None:
+        covariance = np.asarray(input_covariance_nm2_rad2, dtype=float)
+        if covariance.shape != (3, 3) or not np.all(np.isfinite(covariance)):
+            raise ValueError("input_covariance_nm2_rad2 must be a finite 3x3 matrix.")
+        scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12 * scale):
+            raise ValueError("input_covariance_nm2_rad2 must be symmetric.")
+        covariance = 0.5 * (covariance + covariance.T)
+        eigenvalues = np.linalg.eigvalsh(covariance)
+        if eigenvalues[0] < -1e-10 * scale:
+            raise ValueError("input_covariance_nm2_rad2 must be positive semidefinite.")
+        variance = float(jacobian @ covariance @ jacobian.T)
+        result["input_covariance_nm2_rad2"] = covariance
+        result["variance_electron_velocity_projection_m2_s2"] = max(variance, 0.0)
+        result["uncertainty_electron_velocity_projection_m_s"] = math.sqrt(max(variance, 0.0))
+        result["uncertainty_model"] = "first_order_full_joint_covariance_including_wavelength_geometry_cross_terms"
+    elif all(value is not None for value in supplied):
         sc, sl, sa = [
             _nonnegative(name, value)
             for name, value in zip(
@@ -957,26 +984,13 @@ def thomson_velocity_projection_relativistic_exact(
                  "sigma_scattering_angle_rad"), supplied
             )
         ]
-        dv_dcenter = -2.0 * C_LIGHT / (
-            sine * laser * (1.0 + ratio) ** 2
-        )
-        dv_dlaser = 2.0 * C_LIGHT * ratio / (
-            sine * laser * (1.0 + ratio) ** 2
-        )
-        dv_dangle = -0.5 * velocity / math.tan(angle / 2.0)
-        variance = (
-            (dv_dcenter * sc) ** 2
-            + (dv_dlaser * sl) ** 2
-            + (dv_dangle * sa) ** 2
-        )
+        variance = float(jacobian @ np.diag([sc**2, sl**2, sa**2]) @ jacobian.T)
         result["uncertainty_electron_velocity_projection_m_s"] = math.sqrt(variance)
+        result["variance_electron_velocity_projection_m2_s2"] = variance
         result["uncertainty_model"] = (
             "first_order_independent_input_uncertainties; no unprovided "
             "cross-covariances are assumed"
         )
-        result["sensitivity_m_s_per_nm_center"] = dv_dcenter
-        result["sensitivity_m_s_per_nm_laser"] = dv_dlaser
-        result["sensitivity_m_s_per_rad_scattering_angle"] = dv_dangle
     return result
 
 def thomson_density_from_scattered_power(*args, **kwargs):
