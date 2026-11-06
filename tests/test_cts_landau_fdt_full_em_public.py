@@ -68,3 +68,43 @@ def test_public_full_em_landau_fdt_rejects_nonzero_flow_outside_its_domain():
         run_advanced_thomson_physics(
             "landau_fdt_full_em_constitutive", **inputs
         )
+
+
+def test_landau_current_noise_propagates_to_psd_electric_field_fluctuations():
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    omega = np.array([1.0e5, 2.0e5])
+    current_noise = np.broadcast_to(np.eye(3, dtype=complex), (2, 3, 3)).copy()
+    response = {
+        "angular_frequency_rad_s": omega,
+        "current_fluctuation_spectral_matrix": current_noise,
+        "relative_dielectric_tensor": np.broadcast_to(
+            2.0*np.eye(3, dtype=complex), (2, 3, 3)
+        ).copy(),
+    }
+    result = landau_full_em_electric_field_fluctuation_spectrum(
+        response, 1.0e-3, propagation_direction=(1.0, 2.0, 0.5)
+    )
+    spectrum = result["electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s"]
+    assert spectrum.shape == (2, 3, 3)
+    for matrix in spectrum:
+        np.testing.assert_allclose(matrix, matrix.conj().T, rtol=1e-12, atol=1e-30)
+        assert np.linalg.eigvalsh(matrix).min() >= -1e-10*np.linalg.norm(matrix, 2)
+    assert np.all(np.isfinite(result["maxwell_operator_condition_number"]))
+
+
+def test_landau_current_noise_rejects_an_undamped_maxwell_pole():
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    omega = np.array([1.0e6])
+    response = {
+        "angular_frequency_rad_s": omega,
+        "current_fluctuation_spectral_matrix": np.eye(3, dtype=complex)[None, :, :],
+        "relative_dielectric_tensor": np.eye(3, dtype=complex)[None, :, :],
+    }
+    # For propagation along x, the longitudinal eigenvalue is -k0^2 and
+    # transverse eigenvalues are k^2-k0^2; choose k=omega/c to hit a pole.
+    with np.testing.assert_raises(np.linalg.LinAlgError):
+        landau_full_em_electric_field_fluctuation_spectrum(
+            response, omega[0]/299792458.0, propagation_direction=(1.0, 0.0, 0.0)
+        )
