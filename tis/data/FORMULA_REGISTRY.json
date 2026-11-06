@@ -9565,5 +9565,113 @@
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Optical Thomson / projected EVDF"
     }
+  },
+  {
+    "name": "Three-dimensional Bloch-periodic full-vector Maxwell energy closure",
+    "equation": "∇×∇×E−(ω/c)^2 ε_r E=iωμ_0J; H=(∇×E)/(iωμ_0); B=μ_0H; ⟨S⟩=(1/2)Re(E×H*); q_abs=(ωε_0/2)E*·Im_H(ε_r)·E; P_src=−(1/2)∫Re(E·J*)dV; for a periodic cell, P_src=P_abs",
+    "inputs": "Positive angular frequency; three uniformly spaced Cartesian periodic grids; passive complex 3×3 relative dielectric tensor at each grid point or a spatially uniform tensor; complex impressed current-density vector field; optional Bloch wavevector.",
+    "output": "Full complex electric field, magnetic field intensity H, magnetic flux density B, time-averaged Poynting vector, local and integrated material absorption, integrated impressed-source power, discrete linear-system residual and global source-to-absorption energy-balance residual.",
+    "assumptions": "Linear local dielectric response; exp(−iωt) convention; periodic Cartesian unit cell with Bloch phase; second-order finite-difference frequency-domain curl-curl operator; passive Hermitian dissipative dielectric part. No open ports or PML.",
+    "status": "D",
+    "category": "Collective Thomson / Full-EM wave physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_full_wave.solve_3d_periodic_full_wave",
+      "formula_key": "cts_periodic_3d_full_vector_maxwell_energy_closure",
+      "input_specs": [
+        {
+          "name": "omega_rad_s",
+          "unit": "rad s^-1; positive finite",
+          "required": true
+        },
+        {
+          "name": "x_m, y_m, z_m",
+          "unit": "m; uniformly spaced increasing periodic grids, >=3 points each",
+          "required": true
+        },
+        {
+          "name": "epsilon_r",
+          "unit": "complex dimensionless 3x3 tensor or (nz,ny,nx,3,3) tensor field",
+          "required": true
+        },
+        {
+          "name": "impressed_current_density_A_m2",
+          "unit": "A m^-2; complex (nz,ny,nx,3)",
+          "required": true
+        },
+        {
+          "name": "bloch_wavevector_rad_m",
+          "unit": "rad m^-1; three-component real vector",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electric_field_V_m",
+          "unit": "V m^-1"
+        },
+        {
+          "name": "magnetic_field_intensity_A_m",
+          "unit": "A m^-1"
+        },
+        {
+          "name": "magnetic_flux_density_T",
+          "unit": "T"
+        },
+        {
+          "name": "time_averaged_poynting_vector_W_m2",
+          "unit": "W m^-2"
+        },
+        {
+          "name": "local_absorbed_power_density_W_m3",
+          "unit": "W m^-3"
+        },
+        {
+          "name": "integrated_absorbed_power_W",
+          "unit": "W"
+        },
+        {
+          "name": "integrated_impressed_source_power_W",
+          "unit": "W"
+        },
+        {
+          "name": "global_energy_balance_relative_residual",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "relative_linear_system_residual",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "Dielectric tensor must be passive for the exp(−iωt) convention.",
+        "The domain is a periodic/Bloch-periodic unit cell, not an open-boundary launcher or receiver geometry.",
+        "Undamped resonant singular systems require physically justified damping or a non-resonant frequency."
+      ],
+      "uncertainty_model": "No measurement or dielectric-parameter uncertainty is inferred. Numerical solve residual and source-to-absorption energy-balance residual are reported separately.",
+      "limitations": [
+        "Second-order finite-difference FDFD; numerical convergence with grid refinement must be checked.",
+        "Periodic boundaries only; no PML, open ports, plasma-vacuum interface or outgoing-wave scattering.",
+        "Local dielectric tensor is supplied and is not self-consistently derived from a magnetized kinetic distribution.",
+        "The solver is a 3-D wave-propagation kernel, not a complete Full-EM CTS three-wave scattering vertex or measured CTS inversion."
+      ],
+      "test_links": [
+        "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_reports_h_and_b_with_correct_units",
+        "tests/test_cts_full_wave_energy.py::test_uniform_lossy_periodic_cell_closes_poynting_energy_balance",
+        "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_is_executable_through_public_analysis_dispatcher"
+      ],
+      "note": "Publicly dispatched as periodic_3d_full_wave and exposed in the Advanced Thomson/CTS Dashboard. The H/B unit distinction, local dissipative power, Poynting vector and periodic-cell source/absorption balance are explicit. Numerical verification is not experimental validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "function_links": [
+        "tokamak_analysis.cts_full_wave.solve_3d_periodic_full_wave",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics"
+      ],
+      "execution_scope": "3d_periodic_full_vector_maxwell_forward_solver",
+      "input_data_level": "prepared_complex_dielectric_and_impressed_current",
+      "analysis_family": "Analysis 1 — Thomson scattering / CTS",
+      "subanalysis": "Collective Thomson — Full-EM wave propagation"
+    }
   }
 ]
