@@ -151,6 +151,10 @@ def test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa()
     assert result["parameter_covariance"].shape[0] == len(result["parameter_order"])
     assert np.all((result["captured_spectral_probability"] > 0.0) & (result["captured_spectral_probability"] <= 1.0))
     assert result["validity_screening"]["status"] == "within_declared_nonrelativistic_screen"
+    tail = result["relativistic_tail_diagnostic"]
+    assert tail["status"] == "below_projected_tail_tolerance"
+    assert tail["requires_relativistic_forward_model"] is False
+    assert tail["maximum_projected_superluminal_probability_lower_bound"] < 1.0e-8
     recovered_probability = np.trapz(result["projected_velocity_distribution_m_s_inverse"], result["projected_velocity_grid_m_s"], axis=1)
     np.testing.assert_allclose(recovered_probability, result["captured_spectral_probability"], rtol=2e-3, atol=2e-4)
 
