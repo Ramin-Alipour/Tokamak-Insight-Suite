@@ -81,7 +81,6 @@ MODEL_LABELS = {
     "cts_conserving_bgk_fdt": "CTS — conserving multispecies BGK response + Poisson screening + classical matrix FDT",
     "landau_fdt_cts": "Multispecies Landau operator + matching FDT + Poisson-screened electrostatic CTS",
     "landau_fdt_full_em_constitutive": "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel (not a three-wave spectrum)",
-    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated non-negative 3-D EVDF inversion from multiple measured views",
     "polarized_kinetic_ece": "Magnetized kinetic ECE opacity + two-mode polarized transfer + stratified mode conversion",
     "stratified_nonparaxial_vector": "Non-paraxial vector angular spectrum + anisotropic Berreman propagation",
     "stratified_mode_conversion": "Coherent oblique-incidence Berreman/Jones mode conversion",

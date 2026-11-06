@@ -487,6 +487,55 @@ def analyze_cts_microwave_background(
     }
 
 
+
+// Canonical list shared with the advanced Dashboard selector. Keep this set in
+// lockstep with the explicit solver dispatch below; it also drives complete,
+// actionable errors for unsupported model names.
+ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
+    "thomson_kinetic_background_fit",
+    "thomson_multiview_3d_evdf",
+    "kappa_electrostatic_susceptibility",
+    "bi_kappa_electrostatic_susceptibility",
+    "maxwellian_electrostatic_susceptibility",
+    "cts_collective_kappa_spectrum",
+    "cts_collective_kappa_inference",
+    "cts_tabulated_evdf_susceptibility",
+    "cts_tabulated_evdf_landau",
+    "cts_multi_ion_flow_inference",
+    "cts_electrostatic_measured_spectrum_inference",
+    "thomson_projected_evdf",
+    "thomson_relativistic_exact_flow_projection",
+    "thomson_relativistic_projected_evdf",
+    "thomson_psf_profile_inverse",
+    "thomson_joint_spatial_spectra",
+    "thomson_three_dimensional_flow",
+    "gyrotropic_bi_maxwellian_anisotropy",
+    "gyrotropic_bi_maxwellian_spectral_fit",
+    "gyrotropic_bi_kappa_spectral_fit",
+    "cts_conserving_bgk_fdt",
+    "landau_fdt_cts",
+    "landau_fdt_full_em_constitutive",
+    "landau_fdt_full_em_response",
+    "polarized_kinetic_ece",
+    "stratified_nonparaxial_vector",
+    "stratified_mode_conversion",
+    "relativistic_kinetic_ece_profile",
+    "relativistic_kinetic_ece",
+    "microwave_background",
+    "multispecies_thermal_collision_matrix",
+    "quantum_fdt",
+    "quantum_fdt_unsymmetrized",
+    "polarized_lte_stokes",
+    "stratified_polarized_lte_stokes",
+    "cold_plasma_dielectric",
+    "cold_plasma_magnetoionic_modes",
+    "cold_plasma_absorbed_power_density",
+    "cold_plasma_mode_radiative_coefficients",
+    "cold_plasma_mode_group_velocity",
+    "plasma_charge_state_moments",
+    "thomson_normalized_poloidal_flux",
+})
+
 def run_advanced_thomson_physics(model, *args, **kwargs):
     """Public, explicit dispatcher for the advanced Analysis-1 physics solvers.
 
@@ -625,12 +674,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = cold_plasma_mode_radiative_coefficients
     elif model == "cold_plasma_mode_group_velocity":
         solver = cold_plasma_mode_group_velocity
-    elif model == "thomson_multiview_3d_evdf":
-        solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_relativistic_exact_flow_projection":
         solver = thomson_velocity_projection_relativistic_exact
-    elif model == "thomson_multiview_3d_evdf":
-        solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
     elif model == "thomson_relativistic_projected_evdf":
@@ -652,10 +697,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     elif model == "plasma_charge_state_moments":
         solver = plasma_charge_state_moments
     else:
+        supported = ", ".join(sorted(ADVANCED_THOMSON_PHYSICS_MODELS))
         raise ValueError(
-            "model must be one of: relativistic_kinetic_ece_profile, relativistic_kinetic_ece, microwave_background, kappa_electrostatic_susceptibility, cts_collective_kappa_spectrum, cts_collective_kappa_inference, cts_tabulated_evdf_susceptibility, cts_multi_ion_flow_inference, landau_fdt_cts, landau_fdt_full_em_response, landau_fdt_full_em_constitutive, polarized_kinetic_ece, "
-            "quantum_fdt, quantum_fdt_unsymmetrized, stratified_nonparaxial_vector, stratified_mode_conversion, polarized_lte_stokes, "
-            "cold_plasma_dielectric, cold_plasma_magnetoionic_modes, cold_plasma_absorbed_power_density, cold_plasma_mode_radiative_coefficients, cold_plasma_mode_group_velocity, plasma_charge_state_moments, cts_multi_ion_flow_inference, thomson_multiview_3d_evdf, thomson_relativistic_exact_flow_projection, thomson_projected_evdf, thomson_relativistic_projected_evdf, thomson_psf_profile_inverse, thomson_normalized_poloidal_flux, gyrotropic_bi_maxwellian_anisotropy, gyrotropic_bi_maxwellian_spectral_fit, gyrotropic_bi_kappa_spectral_fit, thomson_three_dimensional_flow; "
+            f"model must be one of: {supported}; "
             "no automatic model substitution is performed"
         )
     result = solver(*args, **kwargs)
