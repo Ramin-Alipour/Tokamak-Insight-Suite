@@ -1175,6 +1175,7 @@ elif page=='Spectral Analysis':
                 'channel_background_interior_knots': channel_background_interior_knots,
                 'channel_background_templates_upload': _ts_upload_digest(channel_background_templates_upload),
                 'spatial_mixing_upload': _ts_upload_digest(spatial_mixing_upload),
+                'spatial_psf_sigma_uncertainty': locals().get('spatial_psf_sigma_uncertainty_text', ''),
                 'spatial_laser_profile_upload': _ts_upload_digest(spatial_laser_profile_upload),
                 'spatial_background_model': spatial_background_model,
                 'spatial_background_degree': spatial_background_degree,
