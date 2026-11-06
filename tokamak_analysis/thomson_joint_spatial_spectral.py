@@ -56,6 +56,33 @@ def _bin_averaged_maxwellian_spectrum(wavelength_nm, center_nm, sigma_nm, peak_a
     return amplitude * np.sqrt(2.0 * np.pi) * sigma * probability / np.diff(edges)
 
 
+def _bin_averaged_callable_spectrum(wavelength_nm, spectral_density, *, quadrature_order=8):
+    """Gauss-Legendre finite-bin average for a general wavelength spectral density.
+
+    The callable is evaluated at interior quadrature nodes, never at detector
+    bin centres alone. This is used for relativistic Maxwell-Juttner and
+    Compton kernels whose line shapes do not have a closed-form bin CDF.
+    """
+    x = np.asarray(wavelength_nm, dtype=float)
+    edges = _wavelength_edges(x)
+    if (isinstance(quadrature_order, (bool, np.bool_))
+            or not isinstance(quadrature_order, (int, np.integer))
+            or quadrature_order < 2):
+        raise ValueError("quadrature_order must be an integer >= 2")
+    nodes, weights = np.polynomial.legendre.leggauss(int(quadrature_order))
+    midpoint = 0.5 * (edges[:-1] + edges[1:])
+    half_width = 0.5 * np.diff(edges)
+    sample_wavelengths = midpoint[:, None] + half_width[:, None] * nodes[None, :]
+    values = np.asarray(spectral_density(sample_wavelengths.reshape(-1)), dtype=float)
+    if values.shape != (x.size * int(quadrature_order),) or np.any(~np.isfinite(values)):
+        raise ValueError("spectral_density must return one finite value per quadrature wavelength")
+    values = values.reshape(x.size, int(quadrature_order))
+    averaged = 0.5 * (values @ weights)
+    if np.any(averaged < 0.0):
+        raise ValueError("spectral_density must be non-negative")
+    return averaged
+
+
 def _bin_averaged_kappa_spectrum(wavelength_nm, center_nm, sigma_nm, kappa, integrated_amplitude):
     """Exact finite-bin average of the projected finite-variance 3-D Kappa marginal."""
     x = np.asarray(wavelength_nm, dtype=float)
@@ -508,16 +535,17 @@ def reconstruct_joint_thomson_spatial_spectra(
             node_spectra = np.empty((r.size,x.size),dtype=float)
             for node in range(r.size):
                 if laser_source_quadrature is None:
-                    spectrum_result = relativistic_maxwell_juttner_spectrum(
-                        x, laser, angle, float(te[node]),
-                        flow_projection_m_s=float(flow[node]),
-                        incident_polarization=incident_polarization,
-                        radial_order=int(radial_order), angular_order=int(angular_order),
-                        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
-                        include_compton_recoil=include_compton_recoil,
-                    )
-                    node_spectrum = np.asarray(
-                        spectrum_result["spectral_density_per_nm"], dtype=float
+                    node_spectrum = _bin_averaged_callable_spectrum(
+                        x,
+                        lambda wavelength: relativistic_maxwell_juttner_spectrum(
+                            wavelength, laser, angle, float(te[node]),
+                            flow_projection_m_s=float(flow[node]),
+                            incident_polarization=incident_polarization,
+                            radial_order=int(radial_order), angular_order=int(angular_order),
+                            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                            include_compton_recoil=include_compton_recoil,
+                        )["spectral_density_per_nm"],
+                        quadrature_order=8,
                     )
                 else:
                     # Integrate incident laser spectral density before detector
@@ -529,17 +557,19 @@ def reconstruct_joint_thomson_spatial_spectra(
                     for source_wavelength, source_weight in zip(
                         source_wavelengths, source_weights
                     ):
-                        source_result = relativistic_maxwell_juttner_spectrum(
-                            x, float(source_wavelength), angle, float(te[node]),
-                            flow_projection_m_s=float(flow[node]),
-                            incident_polarization=incident_polarization,
-                            radial_order=int(radial_order), angular_order=int(angular_order),
-                            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
-                            include_compton_recoil=True,
+                        source_bin_average = _bin_averaged_callable_spectrum(
+                            x,
+                            lambda wavelength: relativistic_maxwell_juttner_spectrum(
+                                wavelength, float(source_wavelength), angle, float(te[node]),
+                                flow_projection_m_s=float(flow[node]),
+                                incident_polarization=incident_polarization,
+                                radial_order=int(radial_order), angular_order=int(angular_order),
+                                maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                                include_compton_recoil=True,
+                            )["spectral_density_per_nm"],
+                            quadrature_order=8,
                         )
-                        node_spectrum += float(source_weight) * np.asarray(
-                            source_result["spectral_density_per_nm"], dtype=float
-                        )
+                        node_spectrum += float(source_weight) * source_bin_average
                 node_spectra[node] = amp[node] * node_spectrum
         mixed = h @ node_spectra
         predicted = np.empty_like(y)
@@ -766,7 +796,7 @@ def reconstruct_joint_thomson_spatial_spectra(
             if physical_model == "maxwellian" else
             "exact_Student_t_CDF_finite_volume_bin_averages_nu_2kappa_minus_1"
             if physical_model == "kappa" else
-            "relativistic_forward_kernel_quadrature_on_measured_wavelength_grid"
+            "8_point_Gauss_Legendre_finite_volume_bin_averages_of_relativistic_forward_kernel"
         ),
         "regularization": {"kind": "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude",
                            "strength": lam_reg, "user_selected": True},
