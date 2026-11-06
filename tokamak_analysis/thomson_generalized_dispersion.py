@@ -56,8 +56,8 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
         raise ValueError("landau_limit must be boolean")
     slopes = np.diff(f) / np.diff(v)
     if landau_limit:
-        if pole_order != 1:
-            raise ValueError("exact Landau limit is implemented only for the first-order pole")
+        if pole_order not in (1, 2):
+            raise ValueError("exact Landau limit supports first-order response and its second-order phase-velocity derivative")
         if pole_imaginary_part_m_s not in (None, 0, 0.0):
             raise ValueError("pole_imaginary_part_m_s must be omitted or zero with landau_limit=True")
         scale_v = max(float(np.max(np.abs(v))), abs(vp), 1.0)
@@ -65,12 +65,33 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
             raise ValueError("exact Landau limit is undefined at a tabulated derivative knot or support endpoint")
         real_part = 0.0
         for left, right, slope in zip(v[:-1], v[1:], slopes):
-            real_part += float(slope)*(np.log(abs(float(right)-vp))-np.log(abs(float(left)-vp)))
+            if pole_order == 1:
+                interval_value = (
+                    np.log(abs(float(right)-vp))-np.log(abs(float(left)-vp))
+                )
+            else:
+                # Hadamard finite part of integral f'(v)/(v-vp)^2 dv.
+                # The resonant interval is split symmetrically around vp;
+                # its divergent 1/epsilon terms cancel exactly.
+                interval_value = (
+                    -1.0/(float(right)-vp) + 1.0/(float(left)-vp)
+                )
+            real_part += float(slope)*interval_value
         inside = bool(v[0] < vp < v[-1])
         interval = int(np.searchsorted(v, vp)-1) if inside else None
-        integral = complex(real_part, np.pi*float(slopes[interval]) if inside else 0.0)
+        # On a piecewise-linear segment f' is constant, so d[f'(vp)]/dvp
+        # vanishes away from knots. The second-order boundary value therefore
+        # has no resonant imaginary part except at excluded derivative knots.
+        integral = complex(
+            real_part,
+            np.pi*float(slopes[interval]) if inside and pole_order == 1 else 0.0,
+        )
         zeta, eta = complex(vp, 0.0), 0.0
-        quadrature = "analytic_principal_value_plus_sokhotski_plemelj_resonance"
+        quadrature = (
+            "analytic_principal_value_plus_sokhotski_plemelj_resonance"
+            if pole_order == 1 else
+            "hadamard_finite_part_second_order_landau_derivative"
+        )
     else:
         eta = (1e-6*float(np.median(np.diff(v))) if pole_imaginary_part_m_s is None
                else float(pole_imaginary_part_m_s))
@@ -125,11 +146,13 @@ def generalized_electron_susceptibility(
     electron_density_m3, wavenumber_m_inverse, pole_imaginary_part_m_s=None,
     include_phase_velocity_derivative=False, landau_limit=False,
 ):
-    """Return longitudinal susceptibility and optionally its analytic pole derivative.
+    """Return longitudinal susceptibility and its phase-velocity derivative.
 
-    The derivative is evaluated from the second-order Landau kernel at fixed
-    positive pole displacement: d chi/d v_phase = -(omega_pe^2/k^2)
-    integral f'(v)/(v-v_phase-i eta)^2 dv. It is not a finite difference.
+    For a finite positive pole displacement, the derivative uses the analytic
+    second-order Landau kernel. In the exact Landau limit it uses the Hadamard
+    finite part of that kernel, valid when the resonant phase velocity lies
+    strictly inside one piecewise-linear VDF segment (not at a grid knot).
+    Neither path estimates the derivative by finite differences.
     """
     ne = float(electron_density_m3)
     k = float(wavenumber_m_inverse)
@@ -139,8 +162,6 @@ def generalized_electron_susceptibility(
         raise ValueError("include_phase_velocity_derivative must be boolean")
     if not isinstance(landau_limit, (bool, np.bool_)):
         raise ValueError("landau_limit must be boolean")
-    if landau_limit and include_phase_velocity_derivative:
-        raise ValueError("exact first-order Landau limit does not expose the second-order pole derivative")
     response = generalized_landau_integral(
         velocity_grid_m_s, probability_density_s_m, phase_velocity_m_s,
         pole_imaginary_part_m_s=pole_imaginary_part_m_s, landau_limit=landau_limit,
@@ -154,8 +175,11 @@ def generalized_electron_susceptibility(
         derivative_response = generalized_landau_integral(
             velocity_grid_m_s, probability_density_s_m,
             phase_velocity_m_s,
-            pole_imaginary_part_m_s=response["pole_imaginary_part_m_s"],
+            pole_imaginary_part_m_s=(
+                0.0 if landau_limit else response["pole_imaginary_part_m_s"]
+            ),
             pole_order=2,
+            landau_limit=landau_limit,
         )
         derivative_integral = derivative_response["integral"]
         susceptibility_derivative = -(omega_pe2/k**2)*derivative_integral
