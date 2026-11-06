@@ -508,6 +508,73 @@ def reconstruct_thomson_evdf(
     boltzmann = 1.380649e-23
     directional_temperature_ev = electron_mass * variance / (boltzmann * 1.602176634e-19)
 
+    # Propagate the normalized-EVDF covariance into the actual physical
+    # velocity moments.  The covariance above is on the sampled probability
+    # density, so use the same trapezoidal quadrature measure as the reported
+    # moments; do not treat the grid samples as independent point estimates.
+    moment_covariance = None
+    moment_standard_uncertainty = None
+    moment_covariance_order = [
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "skewness",
+        "excess_kurtosis",
+    ]
+    if evdf_covariance_available:
+        spacing_weights = np.empty_like(velocity)
+        spacing_weights[0] = 0.5 * (velocity[1] - velocity[0])
+        spacing_weights[-1] = 0.5 * (velocity[-1] - velocity[-2])
+        spacing_weights[1:-1] = 0.5 * (velocity[2:] - velocity[:-2])
+        raw_m1 = spacing_weights * velocity
+        raw_m2 = spacing_weights * velocity**2
+        raw_m3 = spacing_weights * velocity**3
+        raw_m4 = spacing_weights * velocity**4
+        m1 = mean_v
+        m2 = integral(velocity**2 * distribution)
+        m3 = integral(velocity**3 * distribution)
+        m4 = integral(velocity**4 * distribution)
+        central_m3 = m3 - 3.0*m1*m2 + 2.0*m1**3
+        central_m4 = m4 - 4.0*m1*m3 + 6.0*m1**2*m2 - 3.0*m1**4
+        variance_gradient = raw_m2 - 2.0*m1*raw_m1
+        sigma_gradient = variance_gradient / (2.0*sigma_v)
+        temperature_gradient = (
+            electron_mass / (boltzmann * 1.602176634e-19)
+        ) * variance_gradient
+        central_m3_gradient = (
+            raw_m3 + (-3.0*m2 + 6.0*m1**2)*raw_m1 - 3.0*m1*raw_m2
+        )
+        skewness_gradient = (
+            central_m3_gradient / variance**1.5
+            - 1.5*central_m3*variance_gradient / variance**2.5
+        )
+        central_m4_gradient = (
+            raw_m4 + (-4.0*m3 + 12.0*m1*m2 - 12.0*m1**3)*raw_m1
+            - 4.0*m1*raw_m3 + 6.0*m1**2*raw_m2
+        )
+        kurtosis_gradient = (
+            central_m4_gradient / variance**2
+            - 2.0*central_m4*variance_gradient / variance**3
+        )
+        moment_jacobian = np.vstack((
+            raw_m1,
+            variance_gradient,
+            sigma_gradient,
+            temperature_gradient,
+            skewness_gradient,
+            kurtosis_gradient,
+        ))
+        moment_covariance = moment_jacobian @ evdf_covariance @ moment_jacobian.T
+        moment_covariance = 0.5 * (moment_covariance + moment_covariance.T)
+        if not np.all(np.isfinite(moment_covariance)):
+            moment_covariance = None
+        else:
+            moment_standard_uncertainty = {
+                name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
+                for i, name in enumerate(moment_covariance_order)
+            }
+
     singular_values = np.linalg.svd(design, compute_uv=False)
     threshold = np.finfo(float).eps * max(design.shape) * singular_values[0]
     numerical_rank = int(np.count_nonzero(singular_values > threshold))
@@ -689,6 +756,19 @@ def reconstruct_thomson_evdf(
         "mean_velocity_parallel_m_s": mean_v,
         "velocity_parallel_standard_deviation_m_s": sigma_v,
         "directional_equivalent_temperature_eV": directional_temperature_ev,
+        "velocity_moment_covariance_order": moment_covariance_order,
+        "velocity_moment_covariance": moment_covariance,
+        "velocity_moment_standard_uncertainty": moment_standard_uncertainty,
+        "velocity_moment_uncertainty_status": (
+            "delta_method_propagated_from_normalized_evdf_covariance"
+            if moment_covariance is not None else
+            "unavailable_evdf_covariance_not_finite_or_not_identifiable"
+        ),
+        "velocity_moment_covariance_interpretation": (
+            "First-order Jacobian propagation of the conditional normalized-EVDF covariance through the same trapezoidal first-to-fourth velocity moments; correlations among flow, directional variance, equivalent temperature, skewness and kurtosis are retained."
+            if moment_covariance is not None else
+            "No physical-moment uncertainty is reported because a finite normalized-EVDF covariance is unavailable."
+        ),
         "skewness": float(skewness),
         "excess_kurtosis": float(excess_kurtosis),
         "fitted_spectrum": fitted,
