@@ -551,7 +551,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - cts_tabulated_evdf_landau: electrostatic CTS dynamic structure spectrum using
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
-        Maxwellian multispecies ions. This is a forward model, not a 3-D EVDF inverse.
+        either Maxwellian or species-resolved tabulated ion EVDFs. The output also
+        reports directional second-moment temperatures and standardized shape
+        moments. This is a forward model, not a 3-D EVDF inverse.
       - maxwellian_electrostatic_susceptibility: exact Fried-Conte Maxwellian electron susceptibility using the Faddeeva function.
       - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
