@@ -370,14 +370,18 @@ def infer_three_dimensional_flow_from_thomson_projections(
     projection_covariance_m2_s2,
     scattering_vector_covariance=None,
     projection_geometry_cross_covariance=None,
+    maximum_geometry_condition_number=1.0e3,
 ):
     """Infer a 3-D bulk-flow vector from independent measured TS projections.
 
-    Each view measures v_q = q_hat dot v_e.  The vector is identifiable only
-    when the stacked scattering-vector directions span R^3.  A single view
-    therefore returns a non-identifiable result rather than an invented
-    transverse velocity. Optional full Cartesian covariance of all scattering
-    vectors is propagated by first-order iterative errors-in-variables GLS.
+    Each view measures v_q = q_hat dot v_e. The vector is identifiable only
+    when the stacked scattering-vector directions span R^3 and the
+    covariance-whitened design is sufficiently conditioned. Rank alone is
+    insufficient: nearly coplanar views can amplify projection noise into
+    arbitrarily large transverse-velocity uncertainty. A single view therefore
+    returns a non-identifiable result rather than an invented transverse
+    velocity. Optional full Cartesian covariance of all scattering vectors is
+    propagated by first-order iterative errors-in-variables GLS.
     Direction perturbations are projected onto each vector's tangent plane,
     because a normalized scattering direction has no radial degree of freedom.
     If projection_geometry_cross_covariance is supplied, it is the full
@@ -386,6 +390,9 @@ def infer_three_dimensional_flow_from_thomson_projections(
     covariance; this matters when wavelength/flow calibration and ray geometry
     share calibration parameters.
     """
+    maximum_condition = float(maximum_geometry_condition_number)
+    if not np.isfinite(maximum_condition) or maximum_condition <= 1.0:
+        raise ValueError("maximum_geometry_condition_number must be finite and greater than one")
     projections = np.asarray(velocity_projection_m_s)
     directions = np.asarray(scattering_vector_unit)
     covariance = np.asarray(projection_covariance_m2_s2)
@@ -482,6 +489,9 @@ def infer_three_dimensional_flow_from_thomson_projections(
         "projection_relation": "v_q = q_hat dot v_e",
         "scattering_vector_unit": directions.copy(),
         "design_rank": rank,
+        "geometry_condition_number": None,
+        "maximum_geometry_condition_number": maximum_condition,
+        "geometry_condition_status": "rank_deficient" if rank < 3 else "not_evaluated",
         "input_velocity_projection_m_s": projections.copy(),
         "input_projection_covariance_m2_s2": covariance.copy(),
         "geometry_uncertainty_included": direction_covariance is not None,
@@ -516,10 +526,11 @@ def infer_three_dimensional_flow_from_thomson_projections(
         information_local = whitened_design_local.T @ whitened_design_local
         covariance_local = np.linalg.inv(information_local)
         velocity_local = covariance_local @ (whitened_design_local.T @ whitened_data_local)
-        return velocity_local, covariance_local
+        condition_local = float(np.linalg.cond(whitened_design_local))
+        return velocity_local, covariance_local, condition_local
 
     effective_covariance = covariance.copy()
-    velocity, parameter_covariance = flow_gls_solve(effective_covariance)
+    velocity, parameter_covariance, geometry_condition_number = flow_gls_solve(effective_covariance)
     geometry_iterations = 0
     if direction_covariance is not None:
         for geometry_iterations in range(1, 51):
@@ -549,11 +560,12 @@ def infer_three_dimensional_flow_from_thomson_projections(
                     "effective projection covariance including geometry cross terms "
                     "must remain positive definite"
                 )
-            updated_velocity, updated_covariance = flow_gls_solve(effective_covariance)
+            updated_velocity, updated_covariance, updated_condition_number = flow_gls_solve(effective_covariance)
             change = np.linalg.norm(updated_velocity-velocity) / max(
                 np.linalg.norm(velocity), 1.0
             )
             velocity, parameter_covariance = updated_velocity, updated_covariance
+            geometry_condition_number = updated_condition_number
             if change < 1e-10:
                 break
         else:
@@ -561,21 +573,37 @@ def infer_three_dimensional_flow_from_thomson_projections(
     residual = projections-directions@velocity
     chi2 = float(residual @ np.linalg.solve(effective_covariance, residual))
     speed = float(np.linalg.norm(velocity))
+    geometry_well_conditioned = bool(
+        np.isfinite(geometry_condition_number)
+        and geometry_condition_number <= maximum_condition
+    )
     physical = bool(np.all(np.isfinite(velocity)) and speed < C)
+    reportable = physical and geometry_well_conditioned
     return {
         **result,
-        "identifiability": "identifiable_from_three_dimensional_view_geometry",
-        "reportable_as_inferred_parameter": physical,
-        "electron_velocity_vector_m_s": velocity if physical else None,
-        "electron_velocity_covariance_m2_s2": parameter_covariance if physical else None,
+        "identifiability": (
+            "identifiable_from_three_dimensional_view_geometry"
+            if geometry_well_conditioned else "ill_conditioned_three_dimensional_view_geometry"
+        ),
+        "geometry_condition_number": geometry_condition_number,
+        "geometry_condition_status": (
+            "well_conditioned" if geometry_well_conditioned else "ill_conditioned_vector_withheld"
+        ),
+        "reportable_as_inferred_parameter": reportable,
+        "electron_velocity_vector_m_s": velocity if reportable else None,
+        "electron_velocity_covariance_m2_s2": parameter_covariance if reportable else None,
         "effective_projection_covariance_m2_s2": effective_covariance,
         "geometry_covariance_iterations": geometry_iterations,
-        "electron_speed_m_s": speed if physical else None,
+        "electron_speed_m_s": speed if reportable else None,
         "fit_residual_projection_m_s": residual,
         "chi_square": chi2,
         "degrees_of_freedom": int(projections.size-3),
         "reduced_chi_square": chi2/(projections.size-3) if projections.size > 3 else None,
         "physicality_status": "subluminal" if physical else "non_finite_or_superluminal_solution; vector withheld",
+        "geometry_reporting_reason": (
+            None if geometry_well_conditioned else
+            "Covariance-whitened scattering geometry exceeds maximum_geometry_condition_number; 3-D vector and covariance are withheld."
+        ),
     }
 
 def _apply_response(response, spectrum, wavelength_nm):
