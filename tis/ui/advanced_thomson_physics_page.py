@@ -103,10 +103,10 @@ MODEL_LABELS = {
 }
 
 # The documented Full-EM response alias is exposed as a selectable dashboard route.
-MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"\nMODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Landau–FDT current noise propagated through Maxwell Green dyadic"
+MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"\nMODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"\nMODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Landau–FDT current noise propagated through Maxwell Green dyadic"
 
 MODEL_PHYSICS_NOTES = {
-    "landau_fdt_full_em_field_fluctuations": (\n        "Requires the constitutive_response mapping returned by landau_fdt_full_em_constitutive, wave_number_m_inverse, and optional propagation_direction. Computes S_E = mu0^2 omega^2 G S_J G^dagger using the local Maxwell Green dyadic. Singular undamped modes are rejected; this is not a three-wave CTS vertex."\n    ),\n    "cts_tabulated_evdf_susceptibility": (
+    "landau_fdt_full_em_field_fluctuations": (\n        "Requires the constitutive_response mapping returned by landau_fdt_full_em_constitutive, wave_number_m_inverse, and optional propagation_direction. Computes S_E = mu0^2 omega^2 G S_J G^dagger using the local Maxwell Green dyadic. Singular undamped modes are rejected; this is not a three-wave CTS vertex."\n    ),\n    "landau_fdt_full_em_field_fluctuations": (\n        "Input constitutive_response is the mapping returned by landau_fdt_full_em_constitutive. The solver computes S_E = mu0^2 omega^2 G S_J G^dagger, S_B = (k_cross/omega) S_E (k_cross/omega)^dagger, and the spectral Poynting flux. Undamped Maxwell poles are rejected. This is not a three-wave CTS vertex."\n    ),\n    "cts_tabulated_evdf_susceptibility": (
         "Tabulated projected 1-D EVDF susceptibility. landau_limit=true evaluates "
         "the exact first-order retarded boundary value using PV integral + i*pi*f'(v_phase), "
         "rather than an artificial finite pole displacement. It rejects phase velocities "

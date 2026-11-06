@@ -8924,5 +8924,72 @@
       ]
     },
     "description": "Derived central moments and directional kinetic temperatures of supplied projected tabulated electron and ion EVDFs, returned with the collective CTS spectrum."
+  },
+  {
+    "name": "Landau–FDT current-noise propagation to electromagnetic field fluctuations",
+    "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E(ω,k) = μ₀²ω² G S_J G†",
+    "inputs": "ω [rad s⁻¹], k [m⁻¹], εᵣ [dimensionless], S_J [A² m⁻² per rad s⁻¹]",
+    "output": "S_E [(V m⁻¹)² per rad s⁻¹]",
+    "assumptions": "Local homogeneous linear dielectric; exp(−iωt); frequency-diagonal classical current-noise spectrum; invertible Maxwell operator.",
+    "status": "D",
+    "category": "Collective Thomson / Full-EM",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_landau_em.landau_full_em_electric_field_fluctuation_spectrum",
+      "formula_key": "landau_fdt_full_em_field_fluctuations",
+      "input_specs": [
+        {
+          "name": "constitutive_response",
+          "unit": "mapping",
+          "required": true,
+          "description": "Output mapping from the Landau–FDT Full-EM constitutive response, including angular_frequency_rad_s, relative_dielectric_tensor and current_fluctuation_spectral_matrix."
+        },
+        {
+          "name": "wave_number_m_inverse",
+          "unit": "m^-1",
+          "required": true,
+          "description": "Positive local wave-number magnitude."
+        },
+        {
+          "name": "propagation_direction",
+          "unit": "unit vector",
+          "required": false,
+          "description": "Finite non-zero direction; normalized internally."
+        },
+        {
+          "name": "relative_dielectric_tensor",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Optional override, shape (3,3) or (n_frequency,3,3)."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s",
+          "unit": "(V/m)^2 per (rad/s)",
+          "description": "Hermitian positive-semidefinite electric-field fluctuation spectral tensor."
+        },
+        {
+          "name": "maxwell_green_dyadic_m2",
+          "unit": "m^2",
+          "description": "Inverse local Maxwell wave operator."
+        },
+        {
+          "name": "maxwell_operator_condition_number",
+          "unit": "1",
+          "description": "Condition number used to reject unresolved undamped poles."
+        }
+      ],
+      "prerequisites": [
+        "Landau–FDT constitutive current-noise response on the same equilibrium.",
+        "Local homogeneous dielectric tensor and wavevector."
+      ],
+      "uncertainty_model": "Input current-noise covariance is propagated linearly through the Maxwell Green dyadic; no cross-frequency covariance is inferred.",
+      "test_links": [
+        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_current_noise_propagates_to_psd_electric_field_fluctuations"
+      ],
+      "note": "Local Maxwell field-fluctuation propagation only; not a magnetized CTS three-wave vertex, ray solution or calibrated receiver spectrum."
+    }
   }
-]
+]\n

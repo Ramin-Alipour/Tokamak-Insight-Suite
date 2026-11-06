@@ -133,3 +133,27 @@ advanced Analysis-1 dispatcher, shared Dashboard selector and formula registry
 expose this physical path. It remains a local homogeneous-medium field
 fluctuation calculation, not a magnetized CTS three-wave scattering vertex,
 ray solution or absolute receiver spectrum.
+
+
+## Maxwell propagation of Landau–FDT fluctuations
+
+The public model `landau_fdt_full_em_field_fluctuations` propagates the
+current-noise tensor from `landau_fdt_full_em_constitutive` through the local
+Maxwell Green dyadic. With the exp(-i omega t) convention:
+
+```
+D = k^2 I - k k^T - (omega/c)^2 epsilon_r
+G = inverse(D)
+S_E = mu_0^2 omega^2 G S_J G^dagger
+S_B = (k_cross/omega) S_E (k_cross/omega)^dagger
+B = k x E / omega
+Pi = 0.5 Re <E x B*>_omega
+```
+
+The electric and magnetic spectral tensors retain Hermitian positive
+semidefiniteness. The Poynting-flux vector is derived from the E-B cross
+spectrum. Ill-conditioned undamped Maxwell poles are rejected. The API,
+Dashboard selector and both deployed/source formula registries expose this
+route. It remains a local homogeneous-medium fluctuation calculation, not a
+magnetized CTS three-wave scattering vertex, ray solution or absolute
+receiver spectrum.

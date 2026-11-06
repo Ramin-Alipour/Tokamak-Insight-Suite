@@ -108,3 +108,42 @@ def test_landau_current_noise_rejects_an_undamped_maxwell_pole():
         landau_full_em_electric_field_fluctuation_spectrum(
             response, omega[0]/299792458.0, propagation_direction=(1.0, 0.0, 0.0)
         )
+
+
+def test_landau_current_noise_propagates_to_electric_magnetic_fluctuations_and_poynting_flux():
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    omega = np.array([1.0e5, 2.0e5])
+    current_noise = np.broadcast_to(np.eye(3, dtype=complex), (2, 3, 3)).copy()
+    response = {
+        "angular_frequency_rad_s": omega,
+        "current_fluctuation_spectral_matrix": current_noise,
+        "relative_dielectric_tensor": np.broadcast_to(2.0*np.eye(3), (2, 3, 3)).astype(complex),
+    }
+    result = landau_full_em_electric_field_fluctuation_spectrum(
+        response, 1.0e-3, propagation_direction=(1.0, 2.0, 0.5)
+    )
+    electric = result["electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s"]
+    magnetic = result["magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s"]
+    assert electric.shape == magnetic.shape == (2, 3, 3)
+    for tensor in (electric, magnetic):
+        for matrix in tensor:
+            np.testing.assert_allclose(matrix, matrix.conj().T, rtol=1e-12, atol=1e-40)
+            assert np.linalg.eigvalsh(matrix).min() >= -1e-10*np.linalg.norm(matrix, 2)
+    assert result["electric_magnetic_cross_spectral_matrix"].shape == (2, 3, 3)
+    assert result["spectral_poynting_flux_W_m2_per_rad_s"].shape == (2, 3)
+
+
+def test_landau_current_noise_rejects_an_undamped_maxwell_pole():
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    omega = np.array([1.0e6])
+    response = {
+        "angular_frequency_rad_s": omega,
+        "current_fluctuation_spectral_matrix": np.eye(3, dtype=complex)[None, :, :],
+        "relative_dielectric_tensor": np.eye(3, dtype=complex)[None, :, :],
+    }
+    with np.testing.assert_raises(np.linalg.LinAlgError):
+        landau_full_em_electric_field_fluctuation_spectrum(
+            response, omega[0]/299792458.0, propagation_direction=(1.0, 0.0, 0.0)
+        )
