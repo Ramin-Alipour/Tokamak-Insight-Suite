@@ -518,3 +518,42 @@ def test_multi_population_tabulated_cts_requires_density_fractions_to_sum_to_one
             incident_direction=[1.0, 0.0, 0.0],
             scattered_direction=[0.0, 1.0, 0.0],
         )
+
+
+def test_multi_population_cts_moments_include_between_population_drift_energy():
+    from tokamak_analysis.thomson_generalized_dispersion import (
+        collective_multi_population_tabulated_electron_spectral_density,
+    )
+
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    velocity = np.linspace(-8.0e6, 8.0e6, 1601)
+    sigma = 1.0e6
+    pdf = np.exp(-0.5*(velocity/sigma)**2)
+    qhat = np.array([-1.0, 1.0, 0.0])/np.sqrt(2.0)
+    drift = 1.0e6
+    result = collective_multi_population_tabulated_electron_spectral_density(
+        wavelength, 1064.0, np.pi/2.0,
+        electron_density_m3=1.0e18,
+        electron_populations=[
+            {"velocity_grid_m_s": velocity, "probability_density_s_m": pdf,
+             "density_fraction": 0.5, "bulk_velocity_m_s": drift*qhat},
+            {"velocity_grid_m_s": velocity, "probability_density_s_m": pdf,
+             "density_fraction": 0.5, "bulk_velocity_m_s": -drift*qhat},
+        ],
+        ion_species=[{"name": "D+", "charge_state": 1.0, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[10.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+    moments = result["electron_projected_moments"]
+    expected_variance = sigma**2 + drift**2
+    assert np.isclose(moments["total_mean_projection_m_s"], 0.0, atol=1e-6)
+    assert np.isclose(moments["variance_m2_s2"], expected_variance, rtol=2e-5)
+    assert np.isclose(
+        moments["directional_second_moment_temperature_eV"],
+        9.1093837015e-31*expected_variance/1.602176634e-19,
+        rtol=2e-5,
+    )
+    assert np.isclose(result["electron_flow_projection_m_s"], 0.0, atol=1e-6)
