@@ -6774,12 +6774,21 @@
         {
           "name": "spectral_bin_integration",
           "unit": "exact Student-t CDF probability integrated over finite wavelength bins"
+        },
+        {
+          "name": "projected_vdf_s_m",
+          "unit": "s m^-1; exact 1-D marginal of the gyrotropic 3-D bi-Kappa EVDF"
+        },
+        {
+          "name": "velocity_grid_probability_coverage",
+          "unit": "dimensionless; represented probability mass, without tail renormalization"
         }
       ],
       "prerequisites": [
         "Measured calibrated multi-view optical Thomson spectra",
         "Measured wavelength response matrix",
-        "Independent magnetic pitch-angle coverage"
+        "Independent magnetic pitch-angle coverage",
+        "Finite-variance gyrotropic bi-Kappa parameters and a calibrated magnetic/scattering direction pair"
       ],
       "uncertainty_model": "Full supplied channel-major measurement covariance plus optional positive-semidefinite model-discrepancy covariance; local covariance from the whitened spectral Jacobian, residual-scaled only when no measurement covariance is supplied.",
       "limitations": [
@@ -6794,9 +6803,14 @@
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_rejects_infinite_variance_domain",
-        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities"
+        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities",
+        "tests/test_thomson_projected_bikappa_public.py::test_public_projected_bikappa_recovers_directional_second_moment",
+        "tests/test_thomson_projected_bikappa_public.py::test_projected_bikappa_public_api_matches_physical_kernel"
       ],
-      "note": "The projected bi-Kappa marginal is a Student-t distribution with ν=2κ−1 and scale²=κθ_q²/(2κ−1). The forward model integrates exact probability between wavelength-bin edges, applies the measured response to bin-integrated power, and reports measured-window coverage without tail renormalization."
+      "note": "The projected bi-Kappa marginal is a Student-t distribution with ν=2κ−1 and scale²=κθ_q²/(2κ−1). The forward model integrates exact probability between wavelength-bin edges, applies the measured response to bin-integrated power, and reports measured-window coverage without tail renormalization. The same exact projected-marginal kernel is also exposed independently through run_advanced_thomson_physics('thomson_projected_bi_kappa_evdf') and the advanced Thomson Dashboard.",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_models.project_gyrotropic_bi_kappa_electron_vdf"
+      ]
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
@@ -6806,14 +6820,17 @@
     "implementation_trace": {
       "function_link": "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
       "function_links": [
-        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson"
+        "tokamak_analysis.thomson_anisotropic_inference.fit_gyrotropic_bi_kappa_thomson",
+        "tokamak_analysis.thomson_kinetic_models.project_gyrotropic_bi_kappa_electron_vdf"
       ],
       "formula_key": "optical_thomson_gyrotropic_bi_kappa_projected_marginal",
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_does_not_report_anisotropy_from_one_pitch_angle",
-        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities"
+        "tests/test_thomson_anisotropic_inference.py::test_kappa_thomson_forward_model_integrates_exact_student_t_bin_probabilities",
+        "tests/test_thomson_projected_bikappa_public.py::test_public_projected_bikappa_recovers_directional_second_moment",
+        "tests/test_thomson_projected_bikappa_public.py::test_projected_bikappa_public_api_matches_physical_kernel"
       ]
     }
   },
