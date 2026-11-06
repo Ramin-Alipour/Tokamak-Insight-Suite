@@ -89,3 +89,53 @@ def test_bi_kappa_is_executable_through_public_advanced_physics_dispatcher():
     )
     assert result["distribution_model"] == "gyrotropic_3D_bi_Kappa_exact_1D_directional_marginal"
     np.testing.assert_allclose(result["projected_temperature_eV"], 1200.0)
+
+
+def test_drifting_bi_kappa_uses_electron_rest_frame_landau_resonance():
+    args = _common()
+    flow = 3.7e5
+    drifting = bi_kappa_electron_susceptibility(
+        **args,
+        electron_temperature_parallel_eV=1500.0,
+        electron_temperature_perpendicular_eV=500.0,
+        magnetic_field_unit=[0.0, 0.0, 1.0],
+        scattering_vector_unit=[np.sqrt(0.5), 0.0, np.sqrt(0.5)],
+        electron_flow_projection_m_s=flow,
+    )
+    rest_frame = bi_kappa_electron_susceptibility(
+        **{**args, "phase_velocity_m_s": args["phase_velocity_m_s"] - flow},
+        electron_temperature_parallel_eV=1500.0,
+        electron_temperature_perpendicular_eV=500.0,
+        magnetic_field_unit=[0.0, 0.0, 1.0],
+        scattering_vector_unit=[np.sqrt(0.5), 0.0, np.sqrt(0.5)],
+    )
+    np.testing.assert_allclose(
+        drifting["electron_susceptibility"],
+        rest_frame["electron_susceptibility"],
+        rtol=2e-12, atol=1e-13,
+    )
+    np.testing.assert_allclose(
+        drifting["susceptibility_phase_velocity_derivative_s_m"],
+        rest_frame["susceptibility_phase_velocity_derivative_s_m"],
+        rtol=2e-12, atol=1e-13,
+    )
+    assert drifting["phase_velocity_lab_m_s"] == args["phase_velocity_m_s"]
+    assert drifting["phase_velocity_in_electron_rest_frame_m_s"] == args["phase_velocity_m_s"] - flow
+    assert drifting["electron_flow_projection_m_s"] == flow
+
+
+def test_drifting_bi_kappa_rejects_superluminal_projected_flow():
+    args = _common()
+    try:
+        bi_kappa_electron_susceptibility(
+            **args,
+            electron_temperature_parallel_eV=1500.0,
+            electron_temperature_perpendicular_eV=500.0,
+            magnetic_field_unit=[0.0, 0.0, 1.0],
+            scattering_vector_unit=[0.0, 0.0, 1.0],
+            electron_flow_projection_m_s=299792458.0,
+        )
+    except ValueError as exc:
+        assert "strictly subluminal" in str(exc)
+    else:
+        raise AssertionError("superluminal projected flow must be rejected")
