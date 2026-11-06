@@ -106,3 +106,31 @@ def test_psf_profile_does_not_promote_underdetermined_regularized_candidate(monk
     assert result["profile_covariance"] is None
     assert result["regularized_candidate_profile"].shape == (4,)
     assert result["regularized_candidate_covariance"].shape == (4, 4)
+
+
+
+def test_psf_uncertainty_draws_do_not_promote_nonidentifiable_profiles():
+    from tokamak_analysis.thomson_spatial_mixing import reconstruct_profile_with_spatial_mixing
+
+    radius = np.linspace(0.1, 0.4, 4)
+    mixing = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ])
+    result = reconstruct_profile_with_spatial_mixing(
+        np.array([3.0, 2.0, 1.0]), mixing, radius,
+        uncertainty=np.full(3, 0.1), positive=True,
+        regularization_strength=1e-2,
+        radius_covariance_m2=np.zeros((4, 4)), radius_mc_samples=20,
+        spatial_mixing_covariance=np.zeros((12, 12)), mixing_mc_samples=20,
+    )
+
+    assert result["primary_result_status"] == "conditional_regularized_candidate"
+    assert result["primary_output_reportable"] is False
+    assert result["profile"] is None
+    assert result["profile_covariance"] is None
+    assert result["coordinate_uncertainty_successful_draws"] == 0
+    assert result["spatial_mixing_uncertainty_successful_draws"] == 0
+    assert result["coordinate_uncertainty_propagation_status"] == "insufficient_valid_draws"
+    assert result["spatial_mixing_uncertainty_propagation_status"] == "insufficient_valid_draws"
