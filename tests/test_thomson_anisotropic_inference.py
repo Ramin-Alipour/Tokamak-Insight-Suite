@@ -51,6 +51,12 @@ def test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_tempe
     assert result["electron_temperature_perpendicular_eV"] == pytest.approx(250.0, rel=2e-2)
     covariance = result["thermal_velocity_covariance_tensor_per_view_m2_s2"]
     assert covariance.shape == (3, 3, 3)
+    np.testing.assert_allclose(
+        result["projected_velocity_variance_from_tensor_m2_s2"],
+        result["projected_velocity_variance_expected_m2_s2"],
+        rtol=1e-12, atol=1e-6,
+    )
+    assert np.max(np.abs(result["projected_velocity_variance_relative_residual"])) < 1e-12
     assert result["temperature_anisotropy_ratio_parallel_over_perpendicular"] == pytest.approx(900.0 / 250.0)
     for tensor in covariance:
         np.testing.assert_allclose(tensor, tensor.T, rtol=1e-12, atol=1e-12)
