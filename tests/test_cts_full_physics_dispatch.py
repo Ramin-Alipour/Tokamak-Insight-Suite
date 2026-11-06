@@ -183,3 +183,49 @@ def test_joint_spatial_spectral_solver_is_selectable_with_a_complete_dashboard_e
         "scattering_angle_rad", "instrument_response",
     )).issubset(example)
     assert np.asarray(example["measured_spectra"]).shape == (3, 121)
+
+def test_spectral_fit_dispatcher_recovers_3d_flow_when_temperature_anisotropy_is_unidentifiable():
+    from tokamak_analysis.thomson_anisotropic_inference import _gaussian_bin_average
+
+    wavelength = np.linspace(499.8, 500.2, 161)
+    laser, angle = 500.0, np.pi / 2.0
+    magnetic = np.array([0.0, 0.0, 1.0])
+    pitch = 0.5
+    transverse = np.sqrt(1.0-pitch**2)
+    directions = np.array([
+        [transverse, 0.0, pitch],
+        [-0.5*transverse, np.sqrt(3.0)*0.5*transverse, pitch],
+        [-0.5*transverse, -np.sqrt(3.0)*0.5*transverse, pitch],
+    ])
+    expected_velocity = np.array([1.2e4, -8.0e3, 5.0e3])
+    projected_flows = directions @ expected_velocity
+    q_factor = 2.0*np.sin(angle/2.0)
+    sigma_velocity = np.sqrt(1.602176634e-19*425.0/9.1093837015e-31)
+    spectra = []
+    for flow in projected_flows:
+        centre = laser*(1.0-q_factor*flow/299792458.0)
+        width = laser*q_factor*sigma_velocity/299792458.0
+        feature, _ = _gaussian_bin_average(wavelength, centre, width)
+        spectra.append(0.03 + 0.8*feature + 1.0e-4*(wavelength-laser))
+
+    result = run_advanced_thomson_physics(
+        "gyrotropic_bi_maxwellian_spectral_fit",
+        wavelength_nm=wavelength,
+        measured_spectra=np.asarray(spectra),
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        magnetic_field_unit=magnetic,
+        scattering_vector_unit=directions,
+        instrument_response_matrix=np.eye(wavelength.size),
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+    )
+    assert result["anisotropy_identifiability"] == "non_identifiable"
+    assert result["parameter_covariance"] is None
+    flow = result["three_dimensional_flow_inference"]
+    assert flow["reportable_as_inferred_parameter"] is True
+    np.testing.assert_allclose(
+        flow["electron_velocity_vector_m_s"], expected_velocity, atol=2.0e3
+    )
+    assert flow["electron_velocity_covariance_m2_s2"].shape == (3, 3)
+
