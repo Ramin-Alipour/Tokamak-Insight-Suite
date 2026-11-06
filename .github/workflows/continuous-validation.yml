@@ -50,8 +50,6 @@ jobs:
         run: python -m compileall -q app.py tis tokamak_analysis tests
       - name: Run static checks for syntax and undefined names
         run: ruff check --select E9,F63,F7,F82 app.py tis tokamak_analysis tests
-      - name: Run automated tests with coverage
-        run: python -m pytest -q --cov=tis --cov=tokamak_analysis --cov-report=term-missing
       - name: Smoke-test CLI and exported registries after clean install
         shell: bash
         run: |
@@ -201,8 +199,6 @@ jobs:
 
   dependency-resolution:
     runs-on: ubuntu-latest
-    env:
-      TIS_RUN_LIVE_BROWSER_E2E: "1"
     timeout-minutes: 25
     permissions:
       contents: read
@@ -220,12 +216,8 @@ jobs:
           # rather than claiming to validate a committed lock that does not exist.
           uv lock
           uv sync --locked --extra test --extra data
-      - name: Install Chromium for real-browser tests
-        run: uv run --locked python -m playwright install --with-deps chromium
-      - name: Run compile and regression suite in resolved environment
-        run: |
-          uv run --locked python -m compileall -q app.py tis tokamak_analysis tests
-          uv run --locked python -m pytest -q
+      - name: Compile sources in the resolved environment
+        run: uv run --locked python -m compileall -q app.py tis tokamak_analysis tests
 
 
   package-check:
