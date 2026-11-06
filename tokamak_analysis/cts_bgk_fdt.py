@@ -164,7 +164,13 @@ def analyze_conserving_bgk_cts(
             "velocity_quadrature_converged": quadrature_converged,
             "collision_model_validation_required": True,
             "frequency_resolution_convergence_required": True,
-            "quantitative_spectrum_release_allowed": quadrature_converged,
+            "velocity_quadrature_release_allowed": quadrature_converged,
+            "quantitative_spectrum_release_allowed": False,
+            "quantitative_release_blockers": [
+                "Independent collision-model validation is still required.",
+                "Frequency-grid convergence is still required.",
+                "Experimental scattering/receiver normalization is not included.",
+            ],
             "experimental_validation_performed": False,
         },
         "limitations": list(bare["limitations"]) + list(fdt["limitations"]) + [
