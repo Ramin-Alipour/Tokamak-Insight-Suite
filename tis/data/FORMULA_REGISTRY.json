@@ -10556,5 +10556,92 @@
       ]
     },
     "description": "Connection of the existing N-population relativistic optical Thomson forward/inverse solver to the shared Analysis-1 public physics API and advanced Dashboard. Supports 2–8 isotropic Maxwell-Jüttner components, optional independent q-flow projections, structured backgrounds and joint covariance."
+  },
+  {
+    "name": "Velocity-grid convergence of multispecies Landau–FDT Full-EM CTS spectra",
+    "equation": "N_{j+1}=2N_j-1; delta_X=||X_j-X_{j-1}||_F/max(||X_j||_F,||X_{j-1}||_F,tiny); Delta=max_X(delta_X); accept grid convergence iff Delta <= tolerance",
+    "inputs": "Positive angular-frequency vector, species-scaled normalized velocity axes, multispecies Maxwellian equilibrium, wave number and propagation direction, grid tolerance and node budget.",
+    "output": "Successive-grid relative changes in conductivity, current-noise covariance, electric/magnetic field spectra and transverse Stokes spectra; explicit grid-convergence gate.",
+    "assumptions": "Unmagnetized, zero-flow, common-temperature Maxwellian equilibrium; classical multispecies Landau operator and matched classical FDT; velocity-domain endpoints held fixed.",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_full_physics.analyze_landau_fdt_full_em_spectrum_converged",
+      "formula_key": "cts_landau_fdt_full_em_velocity_grid_convergence",
+      "input_specs": [
+        {
+          "name": "normalized_velocity_x/y/z",
+          "unit": "dimensionless thermal-speed axes",
+          "required": true
+        },
+        {
+          "name": "angular_frequency_rad_s",
+          "unit": "rad/s",
+          "required": true
+        },
+        {
+          "name": "convergence_tolerance",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "max_refinements",
+          "unit": "integer",
+          "required": false
+        },
+        {
+          "name": "max_velocity_nodes",
+          "unit": "nodes per species",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "velocity_grid_convergence",
+          "unit": "successive-grid relative changes and status"
+        },
+        {
+          "name": "reportable_as_grid_converged",
+          "unit": "boolean"
+        }
+      ],
+      "prerequisites": [
+        "Valid common-temperature multispecies Landau equilibrium",
+        "Positive finite frequency vector",
+        "Velocity axes satisfying the discrete Landau invariant checks"
+      ],
+      "uncertainty_model": "Deterministic discretization convergence, not a statistical uncertainty. Velocity-domain and frequency-resolution convergence remain separate gates.",
+      "limitations": [
+        "Fixed domain endpoints; does not certify velocity-domain convergence.",
+        "No magnetized CTS three-wave vertex or experimental validation."
+      ],
+      "test_links": [
+        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_compares_all_physical_spectral_tensors",
+        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_withholds_convergence_when_node_budget_stops_refinement"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "physical_solver_numerical_convergence",
+      "input_data_level": "physical_equilibrium_and_numerical_grid",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Collective Thomson scattering — Full-EM Landau–FDT velocity-grid convergence"
+    },
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_full_physics.analyze_landau_fdt_full_em_spectrum_converged",
+      "function_links": [
+        "tokamak_analysis.cts_full_physics.analyze_landau_fdt_full_em_spectrum_converged",
+        "tokamak_analysis.cts_full_physics.run_advanced_thomson_physics",
+        "tis.ui.advanced_thomson_physics_page.render_advanced_thomson_physics_page"
+      ],
+      "formula_key": "cts_landau_fdt_full_em_velocity_grid_convergence",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_compares_all_physical_spectral_tensors",
+        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_withholds_convergence_when_node_budget_stops_refinement"
+      ]
+    },
+    "description": "Quantitative midpoint refinement of the Landau–FDT Full-EM physical solver. Compares all returned physical spectral tensors between grids and withholds the grid-convergence claim when the node budget or tolerance is not met."
   }
 ]
