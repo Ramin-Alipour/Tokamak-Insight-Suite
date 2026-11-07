@@ -3838,8 +3838,10 @@ def analyze_thomson_spectra(
                     instrument_response_matrix=channel_responses[channel_index],
                     background_signal=fitted_background,
                     velocity_grid_m_s=velocity_grid,
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=distribution_channel_uncertainty,
+                    signal_covariance=distribution_channel_covariance,
+                    model_discrepancy_covariance=distribution_discrepancy,
+                    systematic_covariance=distribution_systematic,
                     include_compton_recoil=include_compton_recoil,
                     incident_polarization=incident_polarization,
                     maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
@@ -3899,8 +3901,10 @@ def analyze_thomson_spectra(
                     regularization_strength=None,
                     velocity_grid_m_s=velocity_grid,
                     velocity_points=int(evdf_velocity_points),
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=distribution_channel_uncertainty,
+                    signal_covariance=distribution_channel_covariance,
+                    model_discrepancy_covariance=distribution_discrepancy,
+                    systematic_covariance=distribution_systematic,
                 )
                 evdf["laser_spectral_profile"] = (
                     source_profile_metadata if source_profile_metadata is not None
