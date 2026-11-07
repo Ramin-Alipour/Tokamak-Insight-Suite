@@ -352,6 +352,8 @@ def fit_general_temperature_tensor_thomson_spectra(
         )
         if geometry_covariance.shape != (3*n_view, 3*n_view):
             raise ValueError("scattering_vector_covariance must be (3*n_view,3*n_view) in view-major Cartesian order")
+        if not np.allclose(geometry_covariance,geometry_covariance.T,rtol=1e-10,atol=1e-14):
+            raise ValueError("scattering_vector_covariance must be symmetric")
         geometry_covariance = 0.5*(geometry_covariance+geometry_covariance.T)
         geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
         geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), 1e-300)
@@ -414,6 +416,8 @@ def fit_general_temperature_tensor_thomson_spectra(
         measured_covariance_for_geometry = np.diag(uncertainty.ravel()**2)
         covariance_parts.append(measured_covariance_for_geometry)
     if geometry_cross_covariance is not None:
+        if measured_covariance_for_geometry is None or measured_covariance_for_geometry.shape != (n_data,n_data):
+            raise ValueError("spectral_geometry_cross_covariance requires a valid absolute (n_view*n_wavelength)^2 measurement covariance")
         joint_measurement_geometry = np.block([
             [measured_covariance_for_geometry, geometry_cross_covariance],
             [geometry_cross_covariance.T, geometry_covariance],
