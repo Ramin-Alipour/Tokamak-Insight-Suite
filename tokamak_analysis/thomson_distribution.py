@@ -580,9 +580,22 @@ def analyze_thomson_spectral_distribution(
         )
     if physical_model is None and any(value is not None for value in (
         physical_initial, incident_polarization, include_compton_recoil,
-        physical_background_model, model_discrepancy_covariance, systematic_covariance,
+        physical_background_model,
     )):
         raise ValueError("physical inference controls require an explicitly selected physical_model")
+    # Additive discrepancy/systematic covariance is also a first-class input
+    # to the projected-EVDF inverse. Do not incorrectly classify those
+    # covariance components as physical-fit controls when no parametric model
+    # was selected; the EVDF-only path consumes them below.
+    if physical_model is None and projected_evdf_options is None and any(
+        value is not None for value in (
+            model_discrepancy_covariance, systematic_covariance,
+        )
+    ):
+        raise ValueError(
+            "model_discrepancy_covariance and systematic_covariance require "
+            "either an explicitly selected physical_model or projected_evdf_options"
+        )
 
     # Kappa and relativistic Maxwell-Juttner require their own physical
     # forward models. Never map a Gaussian width to these non-Gaussian models.
