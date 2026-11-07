@@ -915,10 +915,17 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
         x, y[None, :], [0.0], laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
         signal_uncertainty=np.full((1, x.size), 1.0),
+        model_discrepancy_covariance=np.eye(x.size) * 0.25,
+        systematic_covariance=np.eye(x.size) * 0.16,
     )
     distribution = out["channels"][0]["spectral_distribution"]
     assert distribution["analysis_status"] == "completed"
     assert distribution["background_source"].startswith("background nuisance")
+    assert distribution["model_discrepancy_covariance_included_in_moment_uncertainty"] is True
+    assert distribution["systematic_covariance_included_in_moment_uncertainty"] is True
+    assert distribution["moment_uncertainty_components"] == [
+        "measurement", "model_discrepancy", "systematic"
+    ]
     assert "physical_parameter_extraction" not in distribution
     assert "spectral_distribution" in out
     evdf = out["channels"][0]["electron_velocity_distribution"]
@@ -927,6 +934,8 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
     if evdf["analysis_status"] == "completed":
         assert evdf["scattering_vector_projection_only"] is True
         assert evdf["absolute_density_identified"] is False
+        assert evdf["model_discrepancy_covariance_included"] is True
+        assert evdf["systematic_covariance_included"] is True
         assert np.trapz(evdf["evdf_parallel_s_per_m"], evdf["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
         assert evdf["regularization_selection"] == "generalized_cross_validation_over_logarithmic_candidate_grid"
 

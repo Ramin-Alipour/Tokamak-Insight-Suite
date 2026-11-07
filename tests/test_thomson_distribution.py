@@ -1070,3 +1070,41 @@ def test_spectral_distribution_kappa_inference_is_reportable_from_real_joint_fit
         temperature, rel=0.05
     )
     assert inference["fit"]["kappa_index"] == pytest.approx(kappa, rel=0.08)
+
+
+
+def test_distribution_propagates_additive_model_and_systematic_covariance_into_moments():
+    x, y = _spectrum()
+    measurement = np.full(x.size, 0.5)
+    baseline = _run(x, y, signal_uncertainty=measurement, moment_mc_samples=100)
+    discrepancy = np.eye(x.size) * 0.25
+    systematic = np.eye(x.size) * 0.16
+    propagated = _run(
+        x, y,
+        signal_uncertainty=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        moment_mc_samples=100,
+    )
+    assert propagated["model_discrepancy_covariance_included_in_moment_uncertainty"] is True
+    assert propagated["systematic_covariance_included_in_moment_uncertainty"] is True
+    assert propagated["moment_uncertainty_components"] == [
+        "measurement", "model_discrepancy", "systematic"
+    ]
+    assert "C_residual = C_signal + C_background" in propagated["moment_uncertainty_covariance_formula"]
+    assert propagated["moment_uncertainty_successful_draws"] >= 80
+    assert propagated["observed_sigma_uncertainty_nm"] > baseline["observed_sigma_uncertainty_nm"]
+    assert "additive model-discrepancy/systematic" in propagated["moment_uncertainty_method"]
+
+
+@pytest.mark.parametrize(
+    "name,covariance",
+    [
+        ("model_discrepancy_covariance", np.diag([1.0] * 500 + [-0.1])),
+        ("systematic_covariance", np.ones((501, 501)) * -1.0),
+    ],
+)
+def test_distribution_rejects_non_positive_semidefinite_additive_covariance(name, covariance):
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match=f"{name} must be positive semidefinite"):
+        _run(x, y, **{name: covariance})

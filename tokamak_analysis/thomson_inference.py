@@ -1404,6 +1404,12 @@ def analyze_thomson_spectra(
             "or joint_spectral_covariance (the complete channel-major covariance), not both. "
             "The full covariance is authoritative and must not be silently combined with pointwise errors."
         )
+    # Keep measurement-only covariance separate from the effective fit covariance:
+    # the latter is augmented below by model-discrepancy and systematic components.
+    distribution_measurement_uncertainty = (
+        None if unc is None else np.asarray(unc, dtype=float).copy()
+    )
+    distribution_measurement_covariance = None
     joint_covariance = None
     if joint_spectral_covariance is not None:
         if model not in {"non_collective_maxwellian","non_collective_kappa","non_collective_relativistic_maxwell_juttner"}:
@@ -1416,6 +1422,7 @@ def analyze_thomson_spectra(
             joint_cholesky = np.linalg.cholesky(joint_covariance)
         except np.linalg.LinAlgError as exc:
             raise ValueError("joint_spectral_covariance must be positive definite") from exc
+        distribution_measurement_covariance = joint_covariance.copy()
         # Full channel-major covariance is retained for the joint relativistic
         # shared-parameter fit below; marginal channel fits use diagonal blocks.
     independent_discrepancy_blocks = None
@@ -3679,13 +3686,35 @@ def analyze_thomson_spectra(
             channel_result["fitted_background_spectrum"] = np.asarray(
                 fitted_background, dtype=float
             ).copy()
+            distribution_channel_uncertainty = (
+                None if distribution_measurement_uncertainty is None
+                else distribution_measurement_uncertainty[channel_index]
+            )
+            distribution_channel_covariance = None
+            if distribution_measurement_covariance is not None:
+                distribution_slice = slice(
+                    channel_index * y.shape[1], (channel_index + 1) * y.shape[1]
+                )
+                distribution_channel_covariance = distribution_measurement_covariance[
+                    distribution_slice, distribution_slice
+                ]
+            distribution_discrepancy = (
+                None if independent_discrepancy_blocks is None
+                else independent_discrepancy_blocks[channel_index]
+            )
+            distribution_systematic = (
+                None if independent_systematic_blocks is None
+                else independent_systematic_blocks[channel_index]
+            )
             try:
                 distribution = analyze_thomson_spectral_distribution(
                     xs[channel_index],
                     y[channel_index],
                     instrument_response_matrix=channel_responses[channel_index],
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=distribution_channel_uncertainty,
+                    signal_covariance=distribution_channel_covariance,
+                    model_discrepancy_covariance=distribution_discrepancy,
+                    systematic_covariance=distribution_systematic,
                     background_signal=fitted_background,
                     physical_model=(
                         "non_collective_maxwellian"
@@ -3809,8 +3838,10 @@ def analyze_thomson_spectra(
                     instrument_response_matrix=channel_responses[channel_index],
                     background_signal=fitted_background,
                     velocity_grid_m_s=velocity_grid,
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=distribution_channel_uncertainty,
+                    signal_covariance=distribution_channel_covariance,
+                    model_discrepancy_covariance=distribution_discrepancy,
+                    systematic_covariance=distribution_systematic,
                     include_compton_recoil=include_compton_recoil,
                     incident_polarization=incident_polarization,
                     maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
@@ -3870,8 +3901,10 @@ def analyze_thomson_spectra(
                     regularization_strength=None,
                     velocity_grid_m_s=velocity_grid,
                     velocity_points=int(evdf_velocity_points),
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=distribution_channel_uncertainty,
+                    signal_covariance=distribution_channel_covariance,
+                    model_discrepancy_covariance=distribution_discrepancy,
+                    systematic_covariance=distribution_systematic,
                 )
                 evdf["laser_spectral_profile"] = (
                     source_profile_metadata if source_profile_metadata is not None
