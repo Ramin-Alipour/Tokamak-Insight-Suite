@@ -1107,6 +1107,8 @@ def analyze_thomson_spectra(
         "non_collective_maxwellian",
         "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
+        "collective_maxwellian",
+        "collective_kappa",
     }
     maximum_recoil_correction_fraction = _finite_scalar(
         maximum_recoil_correction_fraction, "maximum_recoil_correction_fraction",
@@ -1133,26 +1135,16 @@ def analyze_thomson_spectra(
         )
         if polarization_unc.shape != (3,) or np.any(polarization_unc < 0):
             raise ValueError("incident_polarization_uncertainty must be a non-negative 3-vector of component-wise 1-sigma uncertainties")
-    collective_only_inputs = (
-        ion_species, ion_fractions, ion_temperature_eV, ion_velocity_m_s,
-        electron_velocity_m_s, ion_temperature_uncertainty_eV,
-        ion_velocity_uncertainty_m_s, electron_velocity_uncertainty_m_s,
-        collective_initial_density_m3, collective_initial_temperature_eV,
-        collective_density_bounds_m3, collective_temperature_bounds_eV,
-        collective_external_parameter_mc_samples, collective_kappa_initial,
-        collective_kappa_bounds,
-    )
-    if any(value is not None for value in collective_only_inputs):
-        raise ValueError(
-            "Collective-only inputs are not accepted by optical Thomson Analysis 1; "
-            "use the dedicated microwave CTS subanalysis within primary Analysis 1 for collective Thomson data."
-        )
+    # Collective dielectric models are valid optical Thomson forward models too.
+    # They share the measured-spectrum likelihood and detector response with the
+    # non-collective fits, but require explicit ion composition, temperatures,
+    # flows and bounded electron seeds below; no plasma parameters are defaulted.
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
     if isinstance(instrument_response_mc_samples, (bool, np.bool_)) or not isinstance(instrument_response_mc_samples, (int, np.integer)) or instrument_response_mc_samples < 20:
         raise ValueError("instrument_response_mc_samples must be an integer >= 20")
     instrument_response_mc_min_success_fraction = _finite_scalar(instrument_response_mc_min_success_fraction, "instrument_response_mc_min_success_fraction", minimum=0.5, maximum=1.0)
-    collective_models = set()
+    collective_models = {"collective_maxwellian", "collective_kappa"}
     density_bounds = temperature_bounds = None
     if model in collective_models:
         if collective_initial_density_m3 is None or collective_initial_temperature_eV is None:
