@@ -1123,7 +1123,7 @@ elif page=='Spectral Analysis':
                     help='When enabled, use the recoil-corrected photon kinematics and polarized Klein–Nishina differential cross-section. This is not multiple scattering or a general relativistic EVDF inverse.',
                 )
                 st.caption('The relativistic fit Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. With recoil disabled, the maximum represented electron-rest-frame Compton correction is screened against the explicit limit. With recoil enabled, the forward model uses single-scattering Klein–Nishina physics. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
-            absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,disabled=joint_spatial_spectral,key='ts_infer_absolute_density')
+            absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,disabled=joint_spatial_spectral or collective_kappa_mode,key='ts_infer_absolute_density')
             if joint_spatial_spectral:
                 absolute_density=False
             density_kwargs={}
@@ -1172,6 +1172,8 @@ elif page=='Spectral Analysis':
                 'channel_col': channel_col, 'radius_col': radius_col,
                 'wavelength_col': wavelength_col, 'signal_col': signal_col,
                 'uncertainty_col': uncertainty_col, 'model': model,
+                'collective_kappa_mode': collective_kappa_mode,
+                'collective_kappa_inputs': collective_kappa_inputs_text,
                 'laser_wavelength_nm': laser_nm_text,
                 'laser_wavelength_uncertainty_nm': laser_unc_text,
                 'scattering_angle_rad': angle_rad_text,
@@ -1325,8 +1327,6 @@ elif page=='Spectral Analysis':
                         'instrument_response_uncertainty':response_uncertainty,
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
-                'collective_kappa_mode':collective_kappa_mode,
-                'collective_kappa_inputs':collective_kappa_inputs_text,
                     }
                     if collective_kappa_mode:
                         try:
@@ -1344,6 +1344,7 @@ elif page=='Spectral Analysis':
                             'collective_electron_populations','collective_ion_populations',
                             'collective_electron_population_parameter_covariance',
                             'collective_population_mc_samples','collective_population_mc_seed',
+                            'collective_external_parameter_mc_samples',
                         }
                         unknown_collective_keys=set(collective_inputs)-allowed_collective_keys
                         if unknown_collective_keys:
