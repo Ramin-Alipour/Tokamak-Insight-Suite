@@ -101,7 +101,10 @@ def render_general_temperature_tensor_page(st) -> None:
                 "electron_temperature_tensor_eV","principal_temperature_eigenvalues_eV",
                 "electron_velocity_projection_m_s","view_dyad_rank","view_dyad_condition_number",
                 "jacobian_rank","jacobian_parameter_count","temperature_tensor_parameter_covariance_eV2",
-                "covariance_provenance","validity_screening","reportable_as_inferred_parameter",
+                "covariance_provenance","covariance_status",
+                "scattering_vector_covariance_used","spectral_geometry_cross_covariance_used",
+                "geometry_parameter_covariance","geometry_cross_parameter_covariance",
+                "geometry_covariance_method","reportable_as_inferred_parameter",
                 "fitted_spectra","residual_spectra") if key in result})
             st.download_button("Export tensor inference JSON",data=json.dumps(result,default=lambda x:x.tolist() if isinstance(x,np.ndarray) else str(x),indent=2),
                                file_name="thomson_general_temperature_tensor.json",mime="application/json")
