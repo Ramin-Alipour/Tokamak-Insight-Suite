@@ -387,3 +387,74 @@ def test_n_population_relativistic_thomson_inverse_is_connected_to_api_dashboard
     )
     assert matches[0]["execution_contract"]["implementation_link_status"] == "mapped"
     assert root_formula == packaged_formula
+
+
+
+def test_multiview_3d_evdf_adds_discrepancy_and_systematic_covariance_and_uses_sandwich():
+    import numpy as np
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    kernels = np.array([
+        [[1.0, 0.2], [0.5, 0.8], [0.1, 1.0]],
+        [[0.2, 1.0], [0.8, 0.4], [1.0, 0.1]],
+    ])
+    velocity = np.array([[-1.0e5, 0.0, 0.0], [1.0e5, 0.0, 0.0]])
+    volume = np.array([1.0, 1.0])
+    regularizer = np.array([[1.0, -1.0]])
+    coefficients = np.array([0.8, 1.2])
+    measured = (kernels.reshape(-1, 2) @ coefficients).reshape(2, 3)
+    measurement = np.eye(measured.size) * 0.04
+    discrepancy = np.eye(measured.size) * 0.01
+    systematic = np.eye(measured.size) * 0.02
+
+    result = run_advanced_thomson_physics(
+        "thomson_multiview_3d_evdf",
+        spectral_kernels=kernels,
+        measured_spectra=measured,
+        velocity_grid_m_s=velocity,
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=regularizer,
+        measurement_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        regularization_strength=0.01,
+    )
+    np.testing.assert_allclose(
+        result["effective_spectral_covariance"],
+        measurement + discrepancy + systematic,
+    )
+    assert result["covariance_components_included"] == {
+        "measurement": True, "model_discrepancy": True, "systematic": True
+    }
+    assert result["coefficient_covariance_method"] == (
+        "fixed_active_set_frequentist_sandwich_Hinv_AwT_Aw_Hinv"
+    )
+    design = kernels.reshape(-1, 2) / np.sqrt(0.07)
+    active = np.asarray(result["unnormalized_nonnegative_coefficients"]) > 1e-9
+    aw = design[:, active]
+    penalty = regularizer[:, active]
+    hessian = aw.T @ aw + 0.01 * (penalty.T @ penalty)
+    inverse = np.linalg.inv(hessian)
+    expected_active = inverse @ (aw.T @ aw) @ inverse
+    actual = result["unnormalized_coefficient_covariance"][np.ix_(active, active)]
+    np.testing.assert_allclose(actual, expected_active, rtol=2e-7, atol=1e-12)
+
+
+def test_multiview_3d_evdf_rejects_non_psd_model_discrepancy_covariance():
+    import numpy as np
+    import pytest
+    from tokamak_analysis.advanced_inference import reconstruct_multiview_3d_evdf
+
+    kernels = np.array([[[1.0, 0.2], [0.5, 0.8], [0.1, 1.0]],
+                        [[0.2, 1.0], [0.8, 0.4], [1.0, 0.1]]])
+    measured = np.ones((2, 3))
+    invalid = np.eye(6)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="model_discrepancy_covariance must be positive semidefinite"):
+        reconstruct_multiview_3d_evdf(
+            kernels, measured, np.array([[-1e5, 0, 0], [1e5, 0, 0]]),
+            voxel_volume_m3_s3=np.ones(2),
+            regularization_matrix=np.array([[1.0, -1.0]]),
+            model_discrepancy_covariance=invalid,
+            regularization_strength=0.01,
+        )

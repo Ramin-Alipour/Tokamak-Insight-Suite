@@ -206,7 +206,11 @@ MODEL_PHYSICS_NOTES = {
         "The stacked spectral kernel is assembled from the supplied view kernels; a data-only "
         "rank/conditioning gate determines whether the 3-D distribution is identifiable. "
         "Regularization can stabilize a conditional candidate but cannot create missing angular "
-        "information. Supply calibrated kernels and uncertainty for every view."
+        "information. Supply calibrated kernels and uncertainty for every view. "
+        "measurement_covariance (or measurement_uncertainty), model_discrepancy_covariance "
+        "and systematic_covariance are independent additive components in stacked view-major "
+        "spectral space. The fixed-active-set coefficient covariance uses the frequentist "
+        "sandwich H^-1 A_w^T A_w H^-1, not H^-1."
     ),
     "bi_kappa_electrostatic_susceptibility": (
         "Gyrotropic 3-D bi-Kappa distribution projected exactly onto the supplied scattering vector, including electron bulk drift through v_phi,rest = v_phi,lab - u_e dot q_hat. "
@@ -611,6 +615,8 @@ EXAMPLES = {
         "voxel_volume_m3_s3": [1.0, 1.0],
         "regularization_matrix": [[1.0, -1.0]],
         "measurement_uncertainty": [[0.1, 0.1, 0.1], [0.1, 0.1, 0.1]],
+        "model_discrepancy_covariance": None,
+        "systematic_covariance": None,
         "regularization_strength": 0.01
     },
     "thomson_projected_evdf": {

@@ -226,6 +226,7 @@ def reconstruct_multiview_3d_evdf(
     spectral_kernels, measured_spectra, velocity_grid_m_s, *,
     voxel_volume_m3_s3, regularization_matrix,
     measurement_uncertainty=None, measurement_covariance=None,
+    model_discrepancy_covariance=None, systematic_covariance=None,
     regularization_strength, max_iter=3000,
 ):
     """Reconstruct a non-negative 3-D velocity distribution from multi-view spectra.
@@ -236,6 +237,13 @@ def reconstruct_multiview_3d_evdf(
     computed with the relativistic kinematics, polarization and cross-section
     appropriate to each view. A single-view or rank-deficient system is never
     promoted to a unique 3-D result by regularization.
+
+    Independent spectral covariance components are additive in stacked
+    view-major order: C_total = C_measurement + C_model_discrepancy
+    + C_systematic. For the fixed non-negative active set, the frequentist
+    sampling covariance of the Tikhonov coefficients is the sandwich
+    H^-1 A_w.T A_w H^-1, where H=A_w.T A_w+lambda L.T L. H^-1 alone
+    is not the sampling covariance of a regularized estimator.
     """
     kernels = _real_array(spectral_kernels, "spectral_kernels", 3)
     data = _real_array(measured_spectra, "measured_spectra", 2)
@@ -259,20 +267,42 @@ def reconstruct_multiview_3d_evdf(
     target = data.ravel()
     if measurement_uncertainty is not None and measurement_covariance is not None:
         raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
+    covariance_components = {}
     if measurement_uncertainty is not None:
         sigma = _real_array(measurement_uncertainty, "measurement_uncertainty", 2)
         if sigma.shape != data.shape or np.any(sigma <= 0):
             raise ValueError("measurement_uncertainty must be positive and match measured_spectra")
-        whiten = lambda z: np.asarray(z) / sigma.ravel()
-        noise_status = "supplied_pointwise_uncertainty"
+        covariance_components["measurement"] = np.diag(sigma.ravel() ** 2)
     elif measurement_covariance is not None:
-        covariance = _real_array(measurement_covariance, "measurement_covariance", 2)
-        if covariance.shape != (target.size, target.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
-            raise ValueError("measurement_covariance must be symmetric and match the stacked multi-view spectrum")
-        chol = np.linalg.cholesky(covariance)
+        covariance_components["measurement"] = _real_array(
+            measurement_covariance, "measurement_covariance", 2
+        )
+    for name, value in (
+        ("model_discrepancy_covariance", model_discrepancy_covariance),
+        ("systematic_covariance", systematic_covariance),
+    ):
+        if value is not None:
+            covariance_components[name] = _real_array(value, name, 2)
+    for name, component in covariance_components.items():
+        if component.shape != (target.size, target.size):
+            raise ValueError(f"{name} must match the stacked (view-major) multi-view spectrum")
+        if not np.allclose(component, component.T, rtol=1e-10, atol=1e-13):
+            raise ValueError(f"{name} must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(0.5 * (component + component.T))
+        if eigenvalues[0] < -1e-10 * max(float(np.max(np.abs(eigenvalues))), 1.0):
+            raise ValueError(f"{name} must be positive semidefinite")
+    if covariance_components:
+        total_covariance = np.sum(list(covariance_components.values()), axis=0)
+        try:
+            chol = np.linalg.cholesky(total_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "the sum of supplied multi-view covariance components must be positive definite"
+            ) from exc
         whiten = lambda z: np.linalg.solve(chol, np.asarray(z))
-        noise_status = "supplied_full_multi_view_covariance"
+        noise_status = "full_stacked_measurement_plus_model_discrepancy_plus_systematic_covariance"
     else:
+        total_covariance = None
         whiten = lambda z: np.asarray(z)
         noise_status = "unweighted_no_measurement_uncertainty_supplied"
     a = whiten(design)
@@ -298,10 +328,15 @@ def reconstruct_multiview_3d_evdf(
     aa = a[:, active]
     pp = penalty[:, active]
     hessian = aa.T @ aa + lam * (pp.T @ pp)
-    active_covariance = np.linalg.pinv(hessian, hermitian=True)
-    if noise_status == "unweighted_no_measurement_uncertainty_supplied":
+    inverse_hessian = np.linalg.pinv(hessian, hermitian=True)
+    active_information = aa.T @ aa
+    active_covariance = inverse_hessian @ active_information @ inverse_hessian
+    if total_covariance is None:
         whitened_residual = b - a @ raw
-        active_covariance *= float(whitened_residual @ whitened_residual / max(1, target.size - rank))
+        active_covariance *= float(
+            whitened_residual @ whitened_residual / max(1, target.size - rank)
+        )
+    active_covariance = 0.5 * (active_covariance + active_covariance.T)
     coefficient_covariance = np.zeros((nvoxel, nvoxel))
     coefficient_covariance[np.ix_(np.flatnonzero(active), np.flatnonzero(active))] = active_covariance
     jacobian = (np.eye(nvoxel) * norm - np.outer(raw, volume)) / norm**2
@@ -355,6 +390,14 @@ def reconstruct_multiview_3d_evdf(
         "fitted_spectra": fitted,
         "residual_spectra": residual,
         "distribution_covariance": distribution_covariance if identifiable else None,
+        "unnormalized_coefficient_covariance": coefficient_covariance if identifiable else None,
+        "effective_spectral_covariance": total_covariance,
+        "covariance_components_included": {
+            "measurement": "measurement" in covariance_components,
+            "model_discrepancy": "model_discrepancy_covariance" in covariance_components,
+            "systematic": "systematic_covariance" in covariance_components,
+        },
+        "coefficient_covariance_method": "fixed_active_set_frequentist_sandwich_Hinv_AwT_Aw_Hinv",
         "mean_velocity_vector_m_s": candidate_mean_velocity.copy() if identifiable else None,
         "velocity_covariance_tensor_m2_s2": candidate_velocity_covariance.copy() if identifiable else None,
         "mean_velocity_covariance_m2_s2": mean_velocity_covariance,
