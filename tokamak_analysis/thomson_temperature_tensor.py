@@ -406,13 +406,14 @@ def fit_general_temperature_tensor_thomson_spectra(
         chol = np.eye(n_data)
         covariance_source = "identity_metric_no_absolute_spectral_uncertainty_supplied"
 
-    if initial_temperature_tensor_eV is None:
-        # Build a physics-scaled seed from the measured spectral second moments.
-        # Spectral intensity amplitude is not an energy and must never be used
-        # as a temperature seed. This moment is used only to initialize the
-        # nonlinear fit; the reported tensor is determined by the full
-        # response-convolved measured-spectrum likelihood below.
-        projected_seed = np.empty(n_view, dtype=float)
+    moment_centres = None
+    projected_seed = None
+    if initial_temperature_tensor_eV is None or initial_flow_m_s is None:
+        # One finite-volume spectral moment pass supplies optimizer seeds for
+        # both directional thermal variance and q-parallel bulk flow. Spectral
+        # intensity is never interpreted as an energy.
+        moment_centres = np.empty(n_view, dtype=float)
+        moment_variances = np.empty(n_view, dtype=float)
         for view, row in enumerate(spectra):
             edge_count = max(2, n_wave // 12)
             edge_level = float(np.median(np.r_[row[:edge_count], row[-edge_count:]]))
@@ -420,8 +421,8 @@ def fit_general_temperature_tensor_thomson_spectra(
             area = float(np.sum(positive_measure))
             if not np.isfinite(area) or area <= np.finfo(float).tiny:
                 raise ValueError(
-                    "cannot derive a physical tensor initialization from the measured spectra; "
-                    "supply initial_temperature_tensor_eV explicitly"
+                    "cannot derive spectral-moment optimizer seeds from the measured spectra; "
+                    "supply explicit initial_temperature_tensor_eV and initial_flow_m_s"
                 )
             centre_seed = float(np.sum(wavelength * positive_measure) / area)
             variance_seed = float(
@@ -430,13 +431,19 @@ def fit_general_temperature_tensor_thomson_spectra(
             if not np.isfinite(variance_seed) or variance_seed <= 0.0:
                 raise ValueError(
                     "measured spectral second moment is not positive; "
-                    "supply initial_temperature_tensor_eV explicitly"
+                    "supply explicit initial_temperature_tensor_eV and initial_flow_m_s"
                 )
-            sigma_seed = np.sqrt(variance_seed)
-            projected_seed[view] = (
+            moment_centres[view] = centre_seed
+            moment_variances[view] = variance_seed
+        if initial_temperature_tensor_eV is None:
+            # T_q=(m_e/e)[c sigma_lambda/(lambda_L q_s)]^2, with
+            # q_s=2 sin(theta/2). These T_q values are only optimizer seeds;
+            # the final tensor comes from the response-convolved likelihood.
+            projected_seed = (
                 _M_E / _E
-                * (299792458.0 * sigma_seed / (laser * q_factor)) ** 2
+                * (299792458.0 * np.sqrt(moment_variances) / (laser * q_factor)) ** 2
             )
+    if initial_temperature_tensor_eV is None:
         tensor_components_seed, *_ = np.linalg.lstsq(dyads, projected_seed, rcond=None)
         tensor_seed_matrix = np.array([
             [tensor_components_seed[0], tensor_components_seed[3], tensor_components_seed[4]],
@@ -472,11 +479,22 @@ def fit_general_temperature_tensor_thomson_spectra(
         initial_cholesky[2,1], np.log(initial_cholesky[2,2]),
     ])
     if initial_flow_m_s is None:
-        flow_seed = np.zeros(n_view)
+        flow_seed = (
+            299792458.0 / q_factor * (1.0 - moment_centres / laser)
+        )
+        flow_initialization_source = (
+            "background_subtracted_spectral_centroid_via_exact_nonrelativistic_Doppler_relation"
+        )
     else:
         flow_seed = _finite_array(initial_flow_m_s,"initial_flow_m_s",1)
         if flow_seed.shape != (n_view,):
             raise ValueError("initial_flow_m_s must contain one q-parallel flow seed per view")
+        flow_initialization_source = "researcher_supplied_q_parallel_flow_seed"
+    if np.any(np.abs(flow_seed) >= float(maximum_flow_beta) * 299792458.0):
+        raise ValueError(
+            "initial q-parallel flow seed lies outside maximum_flow_beta; "
+            "check the spectral centroid, Doppler sign convention or declared validity domain"
+        )
     nuisance_seed=[]
     for row in spectra:
         edge_level=float(np.median(np.r_[row[:max(2,n_wave//12)],row[-max(2,n_wave//12):]]))
@@ -600,6 +618,8 @@ def fit_general_temperature_tensor_thomson_spectra(
         "initial_projected_temperature_seed_eV": (
             projected_seed.copy() if initial_temperature_tensor_eV is None else None
         ),
+        "initial_flow_seed_m_s":flow_seed.copy(),
+        "flow_initialization_source":flow_initialization_source,
         "principal_temperature_eigenvalues_eV":eigenvalues,
         "principal_axes_cartesian_columns":eigenvectors,
         "projected_temperature_eV":projected,
