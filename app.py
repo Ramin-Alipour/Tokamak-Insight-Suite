@@ -3886,6 +3886,20 @@ elif page=='Advanced Analysis':
                     elif conditional_physics.get('status')=='rejected_outside_declared_nonrelativistic_validity_domain':
                         st.warning('The Gaussian-Maxwellian physical interpretation was withheld because the fitted parameters fall outside the declared non-relativistic validity domain.')
                         st.json(conditional_physics)
+                    moment_components=distribution.get('moment_uncertainty_components') or []
+                    if moment_components:
+                        st.markdown('**Spectral-moment uncertainty budget**')
+                        st.write({
+                            'propagated_components':moment_components,
+                            'uncertainty_method':distribution.get('moment_uncertainty_method'),
+                            'successful_monte_carlo_draws':distribution.get('moment_uncertainty_successful_draws'),
+                            'centroid_1sigma_nm':distribution.get('spectral_centroid_uncertainty_nm'),
+                            'observed_width_1sigma_nm':distribution.get('observed_sigma_uncertainty_nm'),
+                            'model_discrepancy_included':distribution.get('model_discrepancy_covariance_included_in_moment_uncertainty',False),
+                            'systematic_covariance_included':distribution.get('systematic_covariance_included_in_moment_uncertainty',False),
+                        })
+                    else:
+                        st.caption('No measurement, background, model-discrepancy or systematic covariance was supplied for spectral-moment uncertainty propagation.')
                     st.json(distribution)
                     json_download('Export Analysis 1 spectral-distribution diagnostics',distribution,'tis_thomson_spectral_distribution.json')
                     add_report_section('Analysis 1 spectral-distribution subanalysis',distribution)
