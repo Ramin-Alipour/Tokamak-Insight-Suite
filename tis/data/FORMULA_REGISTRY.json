@@ -10786,5 +10786,126 @@
       ]
     },
     "note": "Forward-model relation implemented by the Landau-contour population susceptibilities, multispecies dielectric screening, fluctuation source terms and photon-frequency Jacobian. The measured-spectrum inverse fit is exposed separately through fit_collective_kappa and the canonical Analysis-1 analyze_thomson_spectra API."
+  },
+  {
+    "name": "General non-gyrotropic anisotropic 3-D Kappa Thomson tensor",
+    "equation": "f_3(v)=Γ(κ+1)/[π^(3/2)Γ(κ−1/2)(2κ−3)^(3/2)√det(Θ)]·[1+(v−u)^TΘ^−1(v−u)/(2κ−3)]^(−κ−1); Θ=(e/m_e)T_e; T_q=q^TT_eq; ν=2κ−1; s_q²=[(2κ−3)/(2κ−1)](e/m_e)T_q; P_i=F_t(v_i^+/s_q;ν)−F_t(v_i^−/s_q;ν)",
+    "inputs": "Positive-definite symmetric 3-D second-moment temperature tensor T_e [eV], Kappa index κ>3/2, measured scattering-vector directions q, shared Cartesian bulk flow, measured wavelength response and calibrated multi-view spectra",
+    "output": "General non-gyrotropic temperature tensor, principal temperatures/axes, shared 3-D flow, Kappa index, exact finite-bin projected Student-t spectra and joint covariance",
+    "assumptions": "Non-relativistic elastic single scattering; ellipsoidal 3-D Kappa ansatz with zero heat flux and finite second moment; each linear projection is Student-t with ν=2κ−1; at least six independent scattering-vector dyads and a full-rank spectral Jacobian are required.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra",
+      "formula_key": "optical_thomson_general_anisotropic_kappa_tensor",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; increasing measured bin centers",
+          "required": true
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated view-by-wavelength spectral density",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "unit 3-vector per independent view",
+          "required": true
+        },
+        {
+          "name": "initial_temperature_tensor_eV",
+          "unit": "symmetric positive-definite 3x3 second-moment tensor seed",
+          "required": false
+        },
+        {
+          "name": "distribution_model",
+          "unit": "kappa",
+          "required": true
+        },
+        {
+          "name": "initial_kappa_index",
+          "unit": "dimensionless; >1.5",
+          "required": true
+        },
+        {
+          "name": "fit_kappa_index",
+          "unit": "boolean",
+          "required": false
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless; increasing bounds with lower >1.5",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_tensor_eV",
+          "unit": "eV; symmetric 3x3"
+        },
+        {
+          "name": "principal_temperature_eigenvalues_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; fixed or jointly inferred"
+        },
+        {
+          "name": "projected_temperature_eV",
+          "unit": "eV per view; q^T T q"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "temperature_tensor_parameter_covariance_eV2",
+          "unit": "6x6 when identifiable"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean; view and spectral rank gated"
+        }
+      ],
+      "prerequisites": [
+        "At least six independent scattering-vector dyads",
+        "Positive-definite tensor",
+        "Kappa index strictly greater than 3/2",
+        "Measured response and calibrated multi-view spectra"
+      ],
+      "uncertainty_model": "Full supplied measurement, model-discrepancy and systematic spectral covariance is combined by GLS. When Kappa is fitted, its transformed log(kappa−1.5) parameter is included in the full spectral Jacobian covariance.",
+      "limitations": [
+        "Ellipsoidal Kappa closure is parametric, not an unrestricted 3-D EVDF",
+        "Non-relativistic elastic Thomson regime only",
+        "Insufficient view dyad rank or spectral Jacobian rank withholds tensor and Kappa estimates"
+      ],
+      "test_links": [
+        "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "execution_scope": "multi_view_measured_spectrum_physical_inference",
+    "input_data_level": "calibrated_multi_view_spectra_and_explicit_tensor_kappa_inputs",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "General non-gyrotropic 3-D anisotropic Kappa tensor inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra",
+      "function_links": [
+        "tokamak_analysis.thomson_temperature_tensor._tensor_finite_bin_kappa_density",
+        "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra",
+        "tokamak_analysis.thomson_workflow.fit_general_temperature_tensor_thomson_spectra"
+      ],
+      "formula_key": "optical_thomson_general_anisotropic_kappa_tensor",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa"
+      ]
+    }
   }
 ]
