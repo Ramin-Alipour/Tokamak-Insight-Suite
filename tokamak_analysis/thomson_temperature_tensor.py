@@ -297,6 +297,8 @@ def fit_general_temperature_tensor_thomson_spectra(
     electron_density_m3=None,
     electron_density_uncertainty_m3=None,
     electron_density_temperature_tensor_cross_covariance=None,
+    scattering_vector_covariance=None,
+    spectral_geometry_cross_covariance=None,
     max_nfev=5000,
 ):
     r"""Jointly infer a general PSD 3-D Gaussian electron temperature tensor from raw TS spectra.
@@ -342,6 +344,40 @@ def fit_general_temperature_tensor_thomson_spectra(
     if not np.isfinite(geom_condition) or geom_condition > 1.0e6:
         raise ValueError(f"temperature-tensor view geometry is ill-conditioned ({geom_condition:.6g})")
 
+    geometry_covariance = None
+    geometry_cross_covariance = None
+    if scattering_vector_covariance is not None:
+        geometry_covariance = _finite_array(
+            scattering_vector_covariance, "scattering_vector_covariance", 2
+        )
+        if geometry_covariance.shape != (3*n_view, 3*n_view):
+            raise ValueError("scattering_vector_covariance must be (3*n_view,3*n_view) in view-major Cartesian order")
+        geometry_covariance = 0.5*(geometry_covariance+geometry_covariance.T)
+        geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+        geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), 1e-300)
+        if geometry_eigenvalues[0] < -1e-10*geometry_scale:
+            raise ValueError("scattering_vector_covariance must be positive semidefinite")
+        tangent_projector = np.zeros((3*n_view,3*n_view))
+        for view, direction in enumerate(directions):
+            tangent = np.eye(3)-np.outer(direction,direction)
+            tangent_projector[3*view:3*view+3,3*view:3*view+3] = tangent
+        tangent_residual = geometry_covariance - tangent_projector@geometry_covariance@tangent_projector
+        if np.linalg.norm(tangent_residual) > 1e-7*max(np.linalg.norm(geometry_covariance),1e-300):
+            raise ValueError("scattering_vector_covariance must describe tangent-plane uncertainty of unit scattering directions")
+    if spectral_geometry_cross_covariance is not None:
+        if geometry_covariance is None:
+            raise ValueError("spectral_geometry_cross_covariance requires scattering_vector_covariance")
+        geometry_cross_covariance = _finite_array(
+            spectral_geometry_cross_covariance, "spectral_geometry_cross_covariance", 2
+        )
+        if geometry_cross_covariance.shape != (n_view*n_wave,3*n_view):
+            raise ValueError("spectral_geometry_cross_covariance must have shape (n_view*n_wave,3*n_view), channel-major by view-major Cartesian")
+        if measurement_covariance is None and signal_uncertainty is None:
+            raise ValueError("spectral_geometry_cross_covariance requires an absolute measurement covariance or signal_uncertainty")
+        for view, direction in enumerate(directions):
+            block = geometry_cross_covariance[:,3*view:3*view+3]
+            if np.linalg.norm(block@direction) > 1e-7*max(np.linalg.norm(block),1e-300):
+                raise ValueError("spectral_geometry_cross_covariance must lie in each unit-direction tangent plane")
     response = np.asarray(instrument_response_matrix, dtype=float)
     if response.shape == (n_wave, n_wave):
         response = np.broadcast_to(response, (n_view,n_wave,n_wave))
@@ -359,6 +395,7 @@ def fit_general_temperature_tensor_thomson_spectra(
 
     n_data = n_view*n_wave
     covariance_parts = []
+    measured_covariance_for_geometry = None
     if measurement_covariance is not None and signal_uncertainty is not None:
         raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
     if measurement_covariance is not None:
@@ -368,12 +405,14 @@ def fit_general_temperature_tensor_thomson_spectra(
         scale = max(float(np.max(np.abs(measured_covariance))), 1e-300)
         if not np.allclose(measured_covariance, measured_covariance.T, rtol=1e-10, atol=1e-12*scale):
             raise ValueError("measurement_covariance must be symmetric")
-        covariance_parts.append(0.5*(measured_covariance+measured_covariance.T))
+        measured_covariance_for_geometry = 0.5*(measured_covariance+measured_covariance.T)
+        covariance_parts.append(measured_covariance_for_geometry)
     if signal_uncertainty is not None:
         uncertainty = _finite_array(signal_uncertainty,"signal_uncertainty")
         if uncertainty.shape not in {(n_view,n_wave),(n_data,)} or np.any(uncertainty <= 0.0):
             raise ValueError("signal_uncertainty must be positive with shape (n_view,n_wave) or flattened channel-major")
-        covariance_parts.append(np.diag(uncertainty.ravel()**2))
+        measured_covariance_for_geometry = np.diag(uncertainty.ravel()**2)
+        covariance_parts.append(measured_covariance_for_geometry)
     for name, component in (("model_discrepancy_covariance", model_discrepancy_covariance),
                             ("systematic_covariance", systematic_covariance)):
         if component is None:
@@ -439,14 +478,15 @@ def fit_general_temperature_tensor_thomson_spectra(
         l=np.array([[np.exp(p[0]),0.0,0.0],[p[1],np.exp(p[2]),0.0],[p[3],p[4],np.exp(p[5])]])
         return l@l.T
 
-    def forward(parameters):
+    def forward(parameters, view_directions=None):
+        view_directions = directions if view_directions is None else np.asarray(view_directions,dtype=float)
         tensor=unpack(parameters)
         result=np.empty_like(spectra)
-        projected=np.einsum("vi,ij,vj->v",directions,tensor,directions)
+        projected=np.einsum("vi,ij,vj->v",view_directions,tensor,view_directions)
         if np.any(projected <= 0.0):
             raise ValueError("projected temperature tensor must be positive definite")
         velocity_vector = parameters[6:9]
-        flow_projections = directions @ velocity_vector
+        flow_projections = view_directions @ velocity_vector
         for view in range(n_view):
             log_amp, offset, slope = parameters[9+3*view:12+3*view]
             centre=laser*(1.0-q_factor*flow_projections[view]/299792458.0)
@@ -499,6 +539,60 @@ def fit_general_temperature_tensor_thomson_spectra(
     dof=n_data-p0.size
     parameter_covariance=np.linalg.inv(jac.T@jac)
     covariance_status="absolute_GLS_covariance_conditional_on_supplied_spectral_covariance"
+    geometry_parameter_covariance = None
+    geometry_cross_parameter_covariance = None
+    geometry_jacobian = None
+    if geometry_covariance is not None:
+        # Differentiate the physical forward model with respect to tangent
+        # perturbations of each measured unit scattering vector. The geometry
+        # covariance is propagated through the same whitened GLS estimator as
+        # the spectral data; it is not folded into a fictitious temperature error.
+        geometry_jacobian = np.zeros((n_data,3*n_view),dtype=float)
+        for view in range(n_view):
+            direction = directions[view]
+            for component in range(3):
+                tangent_step = np.eye(3)[component]-direction[component]*direction
+                norm_step = float(np.linalg.norm(tangent_step))
+                if norm_step <= 1e-14:
+                    continue
+                step = np.cbrt(np.finfo(float).eps)
+                plus_directions = directions.copy()
+                minus_directions = directions.copy()
+                plus_directions[view] = direction + step*tangent_step
+                minus_directions[view] = direction - step*tangent_step
+                plus_directions[view] /= np.linalg.norm(plus_directions[view])
+                minus_directions[view] /= np.linalg.norm(minus_directions[view])
+                geometry_jacobian[:,3*view+component] = (
+                    (forward(fit.x,plus_directions)-forward(fit.x,minus_directions)).ravel()
+                    /(2.0*step)
+                )
+        whitened_geometry_jacobian = np.linalg.solve(chol,geometry_jacobian)
+        estimator = np.linalg.solve(jac.T@jac,jac.T)
+        geometry_parameter_sensitivity = -estimator@whitened_geometry_jacobian
+        geometry_parameter_covariance = (
+            geometry_parameter_sensitivity@geometry_covariance
+            @geometry_parameter_sensitivity.T
+        )
+        parameter_covariance += geometry_parameter_covariance
+        covariance_status += "+tangent_plane_scattering_geometry_covariance"
+        if geometry_cross_covariance is not None:
+            # The supplied cross block is Cov(measured spectrum, q geometry).
+            # Whiten it with the same total spectral covariance used by GLS.
+            whitened_cross = np.linalg.solve(chol,geometry_cross_covariance)
+            geometry_cross_parameter_covariance = (
+                estimator@whitened_cross@geometry_parameter_sensitivity.T
+            )
+            geometry_cross_parameter_covariance += geometry_cross_parameter_covariance.T
+            parameter_covariance += geometry_cross_parameter_covariance
+            covariance_status += "+measured_spectrum_geometry_cross_covariance"
+        parameter_covariance = 0.5*(parameter_covariance+parameter_covariance.T)
+        covariance_eigenvalues = np.linalg.eigvalsh(parameter_covariance)
+        covariance_scale = max(float(np.max(np.abs(covariance_eigenvalues))),1e-300)
+        if covariance_eigenvalues[0] < -1e-9*covariance_scale:
+            raise ValueError("propagated spectral/geometry parameter covariance is not positive semidefinite")
+        if covariance_eigenvalues[0] < 0.0:
+            values,vectors=np.linalg.eigh(parameter_covariance)
+            parameter_covariance=(vectors*np.maximum(values,0.0))@vectors.T
     if not covariance_parts:
         if dof<=0:
             parameter_covariance=None
@@ -621,6 +715,12 @@ def fit_general_temperature_tensor_thomson_spectra(
         "view_dyad_rank":geom_rank,
         "view_dyad_condition_number":geom_condition,
         "parameter_covariance":parameter_covariance,
+        "scattering_vector_covariance_used":geometry_covariance is not None,
+        "spectral_geometry_cross_covariance_used":geometry_cross_covariance is not None,
+        "geometry_parameter_covariance":geometry_parameter_covariance,
+        "geometry_cross_parameter_covariance":geometry_cross_parameter_covariance,
+        "geometry_covariance_order":[f"q{axis}_view_{view}" for view in range(n_view) for axis in ("x","y","z")],
+        "geometry_covariance_method":"finite_difference_forward_sensitivity_in_unit_vector_tangent_planes_with_GLS_Jacobian_propagation" if geometry_covariance is not None else "not_supplied",
         "parameter_covariance_order":[
             "L_xx_log","L_yx","L_yy_log","L_zx","L_zy","L_zz_log",
             "u_x_m_s","u_y_m_s","u_z_m_s",
