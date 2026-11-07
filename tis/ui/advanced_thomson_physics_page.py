@@ -1121,6 +1121,40 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "Physical-moment uncertainty is unavailable because the projected-EVDF "
                         "covariance did not pass its numerical availability gate."
                     )
+            if isinstance(result, Mapping) and "regularization_selection_uncertainty" in result:
+                regularization = result["regularization_selection_uncertainty"]
+                st.subheader("Projected EVDF — regularization-selection spread")
+                st.caption(
+                    "Across-GCV-candidate spread is a numerical selection-sensitivity "
+                    "diagnostic, separate from measurement/background covariance; "
+                    "it is not a confidence interval or posterior."
+                )
+                st.write({
+                    "status": regularization.get("status"),
+                    "candidate_count": regularization.get("candidate_count"),
+                    "interpretation": regularization.get("interpretation"),
+                })
+                spread = regularization.get("standard_spread_s_per_m")
+                if spread is not None:
+                    st.write({
+                        "pointwise_standard_spread_s_per_m": np.asarray(spread, dtype=float),
+                        "lower_envelope_s_per_m": np.asarray(
+                            regularization["lower_envelope_s_per_m"], dtype=float
+                        ),
+                        "upper_envelope_s_per_m": np.asarray(
+                            regularization["upper_envelope_s_per_m"], dtype=float
+                        ),
+                    })
+                    covariance = regularization.get("covariance_s2_per_m2")
+                    if covariance is not None:
+                        st.caption(
+                            "This covariance describes variation across tested "
+                            "regularization candidates, not repeated-measurement noise."
+                        )
+                        st.dataframe(
+                            np.asarray(covariance, dtype=float),
+                            use_container_width=True,
+                        )
             if isinstance(result, Mapping) and "parametric_model_selection_uncertainty" in result:
                 selection = result["parametric_model_selection_uncertainty"]
                 st.subheader("Projected EVDF — physical model-selection uncertainty")

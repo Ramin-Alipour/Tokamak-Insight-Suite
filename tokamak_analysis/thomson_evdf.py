@@ -545,6 +545,7 @@ def reconstruct_thomson_evdf(
     # regularization candidates used by GCV. This is a numerical sensitivity
     # diagnostic, not an additional physical model or uncertainty interval.
     regularization_sensitivity_candidates = []
+    regularization_candidate_distributions = []
     for candidate, candidate_score, candidate_fit in zip(
         regularization_candidates, gcv_scores, candidate_fits
     ):
@@ -559,6 +560,7 @@ def reconstruct_thomson_evdf(
             )
         except ValueError:
             continue
+        regularization_candidate_distributions.append(candidate_distribution.copy())
         candidate_mean = integral(velocity * candidate_distribution)
         candidate_centred = velocity - candidate_mean
         candidate_variance = integral(
@@ -621,6 +623,45 @@ def reconstruct_thomson_evdf(
             "not a measurement uncertainty, posterior interval, or experimental validation."
         ),
     }
+    # Keep regularization-choice spread separate from the conditional
+    # measurement/background covariance.  GCV candidates are a sensitivity
+    # ensemble, not posterior samples and not a frequentist confidence set.
+    regularization_selection_uncertainty = {
+        "status": (
+            "candidate_spread_available"
+            if len(regularization_candidate_distributions) > 1
+            else "single_candidate_no_selection_spread"
+            if regularization_candidate_distributions
+            else "unavailable_no_valid_candidate"
+        ),
+        "candidate_count": len(regularization_candidate_distributions),
+        "standard_spread_s_per_m": None,
+        "covariance_s2_per_m2": None,
+        "lower_envelope_s_per_m": None,
+        "upper_envelope_s_per_m": None,
+        "interpretation": (
+            "Across-candidate numerical spread from the declared GCV grid; "
+            "separate from measurement/background covariance and not a "
+            "posterior or frequentist confidence interval."
+        ),
+    }
+    if regularization_candidate_distributions:
+        candidate_stack = np.vstack(regularization_candidate_distributions)
+        regularization_selection_uncertainty["lower_envelope_s_per_m"] = np.min(
+            candidate_stack, axis=0
+        )
+        regularization_selection_uncertainty["upper_envelope_s_per_m"] = np.max(
+            candidate_stack, axis=0
+        )
+        if candidate_stack.shape[0] > 1:
+            regularization_selection_uncertainty[
+                "standard_spread_s_per_m"
+            ] = np.std(candidate_stack, axis=0, ddof=1)
+            selection_covariance = np.cov(candidate_stack, rowvar=False, ddof=1)
+            regularization_selection_uncertainty[
+                "covariance_s2_per_m2"
+            ] = 0.5 * (selection_covariance + selection_covariance.T)
+
     electron_mass = 9.1093837139e-31
     boltzmann = 1.380649e-23
     directional_temperature_ev = electron_mass * variance / (boltzmann * 1.602176634e-19)
@@ -1011,6 +1052,7 @@ def reconstruct_thomson_evdf(
         "regularization_candidates": regularization_candidates.copy(),
         "regularization_gcv_scores": np.asarray(gcv_scores, dtype=float),
         "regularization_sensitivity": regularization_sensitivity,
+        "regularization_selection_uncertainty": regularization_selection_uncertainty,
         "regularization": "non-negative second-difference Tikhonov",
         "evdf_covariance": evdf_covariance,
         "evdf_standard_uncertainty_s_per_m": evdf_standard_uncertainty,

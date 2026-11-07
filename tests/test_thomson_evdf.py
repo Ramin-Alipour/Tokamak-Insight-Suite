@@ -269,6 +269,39 @@ def test_evdf_reports_regularization_sensitivity_across_gcv_candidates():
     assert "not a measurement uncertainty" in sensitivity["interpretation"]
 
 
+def test_evdf_reports_regularization_selection_spread_separately_from_measurement_covariance():
+    wavelength, signal, background = _case()
+    result = reconstruct_thomson_evdf(
+        wavelength, signal,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        regularization_strength=None,
+        velocity_limit_m_s=8.0e4,
+        velocity_points=81,
+        signal_uncertainty=np.full(signal.size, 1.0),
+    )
+    selection = result["regularization_selection_uncertainty"]
+    assert selection["status"] == "candidate_spread_available"
+    assert selection["candidate_count"] > 1
+    spread = np.asarray(selection["standard_spread_s_per_m"])
+    covariance = np.asarray(selection["covariance_s2_per_m2"])
+    assert spread.shape == result["evdf_parallel_s_per_m"].shape
+    assert covariance.shape == (spread.size, spread.size)
+    np.testing.assert_allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14)
+    assert np.linalg.eigvalsh(covariance).min() >= -1e-10 * max(
+        np.linalg.norm(covariance, ord=2), 1.0
+    )
+    assert np.all(np.asarray(selection["lower_envelope_s_per_m"]) <=
+                  np.asarray(selection["upper_envelope_s_per_m"]))
+    assert "separate from measurement/background covariance" in selection["interpretation"]
+    # The sampling covariance and regularization-choice covariance are distinct
+    # quantities with different interpretations and are never silently summed.
+    assert result["evdf_covariance_available"] is True
+    assert "regularization-choice numerical spread" not in result["evdf_uncertainty_interpretation"]
+
+
 def test_evdf_explicit_regularization_reports_single_candidate_not_sensitivity_range():
     wavelength, signal, background = _case()
     result = reconstruct_thomson_evdf(
