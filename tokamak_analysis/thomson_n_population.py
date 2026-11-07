@@ -74,7 +74,8 @@ def fit_n_population_relativistic_thomson_spectrum(
     signal_uncertainty=None, spectral_covariance=None,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
-    model_discrepancy_covariance=None, radial_order=24, angular_order=12,
+    model_discrepancy_covariance=None, systematic_covariance=None,
+    radial_order=24, angular_order=12,
     maximum_recoil_correction_fraction=0.01, include_compton_recoil=False,
     max_nfev=1200,
 ):
@@ -154,16 +155,36 @@ def fit_n_population_relativistic_thomson_spectrum(
         if (covariance.shape != (x.size, x.size) or np.any(~np.isfinite(covariance))
                 or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13)):
             raise ValueError("spectral_covariance must be finite, symmetric and wavelength-sized")
-    if model_discrepancy_covariance is not None:
-        discrepancy = np.asarray(model_discrepancy_covariance, dtype=float)
-        if (discrepancy.shape != (x.size, x.size) or np.any(~np.isfinite(discrepancy))
-                or not np.allclose(discrepancy, discrepancy.T, rtol=1e-10, atol=1e-13)):
-            raise ValueError("model_discrepancy_covariance must be finite, symmetric and wavelength-sized")
-        eigenvalues = np.linalg.eigvalsh(discrepancy)
+    covariance_components = {
+        "measurement": None if covariance is None else covariance.copy(),
+        "model_discrepancy": None,
+        "systematic": None,
+    }
+
+    def _validated_additive_covariance(value, name):
+        matrix = np.asarray(value, dtype=float)
+        if (matrix.shape != (x.size, x.size) or np.any(~np.isfinite(matrix))
+                or not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-13)):
+            raise ValueError(f"{name} must be finite, symmetric and wavelength-sized")
+        eigenvalues = np.linalg.eigvalsh(matrix)
         scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
         if float(np.min(eigenvalues)) < -1e-10 * scale:
-            raise ValueError("model_discrepancy_covariance must be positive semidefinite")
+            raise ValueError(f"{name} must be positive semidefinite")
+        return 0.5 * (matrix + matrix.T)
+
+    if model_discrepancy_covariance is not None:
+        discrepancy = _validated_additive_covariance(
+            model_discrepancy_covariance, "model_discrepancy_covariance"
+        )
+        covariance_components["model_discrepancy"] = discrepancy.copy()
         covariance = discrepancy.copy() if covariance is None else covariance + discrepancy
+    if systematic_covariance is not None:
+        systematic = _validated_additive_covariance(
+            systematic_covariance, "systematic_covariance"
+        )
+        covariance_components["systematic"] = systematic.copy()
+        covariance = systematic.copy() if covariance is None else covariance + systematic
+
     if covariance is None:
         whiten = lambda values: np.asarray(values, dtype=float)
         noise_model = "unweighted_no_measurement_uncertainty_supplied"
@@ -171,9 +192,16 @@ def fit_n_population_relativistic_thomson_spectrum(
         try:
             chol = np.linalg.cholesky(covariance)
         except np.linalg.LinAlgError as exc:
-            raise ValueError("combined measurement and discrepancy covariance must be positive definite") from exc
+            raise ValueError(
+                "combined measurement, model-discrepancy and systematic covariance "
+                "must be positive definite"
+            ) from exc
         whiten = lambda values: np.linalg.solve(chol, np.asarray(values, dtype=float))
-        noise_model = "full_GLS_covariance" if model_discrepancy_covariance is None else "measurement_plus_model_discrepancy_GLS_covariance"
+        active_sources = [
+            name for name, matrix in covariance_components.items()
+            if matrix is not None
+        ]
+        noise_model = "GLS_" + "_plus_".join(active_sources) + "_covariance"
 
     # Coordinates: log(T0), log-positive temperature gaps, N-1 logits,
     # one or N atanh(v_j/c) flow coordinates, log(amplitude), background.
@@ -309,10 +337,16 @@ def fit_n_population_relativistic_thomson_spectrum(
         "degrees_of_freedom": dof,
         "noise_model": noise_model,
         "model_discrepancy_covariance_included": model_discrepancy_covariance is not None,
+        "systematic_covariance_included": systematic_covariance is not None,
+        "covariance_component_trace": {
+            name: (None if matrix is None else float(np.trace(matrix)))
+            for name, matrix in covariance_components.items()
+        },
+        "total_spectral_covariance": covariance.copy() if covariance is not None else None,
         "covariance_status": (
             "residual_scaled_unweighted_joint_covariance_not_measurement_uncertainty"
             if covariance is None else
-            "local_joint_GLS_covariance_conditional_on_supplied_noise_and_fixed_response"
+            "local_joint_GLS_covariance_conditional_on_additive_measurement_model_discrepancy_and_systematic_covariance_and_fixed_response"
         ),
         "population_assumptions": [
             "Finite N-component isotropic Maxwell-Juttner mixture.",
