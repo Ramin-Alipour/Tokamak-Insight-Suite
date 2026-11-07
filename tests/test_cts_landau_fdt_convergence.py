@@ -78,3 +78,19 @@ def test_grid_convergence_solver_rejects_invalid_tolerance(bad, monkeypatch):
             common_temperature_J=1.0e-17, wave_number_m_inverse=1.0e-3,
             convergence_tolerance=bad,
         )
+
+
+def test_converged_solver_is_connected_to_public_dispatcher_and_dashboard(monkeypatch):
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    model = "landau_fdt_full_em_spectrum_converged"
+    assert model in MODEL_LABELS
+    assert model in EXAMPLES
+    monkeypatch.setattr(physics, "analyze_landau_fdt_full_em_spectrum", lambda *a, **k: _fake_full_em_result())
+    config = dict(EXAMPLES[model])
+    result = run_advanced_thomson_physics(model, **config)
+    assert result["public_physics_entrypoint"] == model
+    assert result["velocity_grid_convergence"]["status"] == "converged"
+    assert result["reportable_as_grid_converged"] is True
+    assert result["cts_three_wave_vertex_connected"] is False
