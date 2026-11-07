@@ -1193,6 +1193,43 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "delta_aic": selection.get("delta_aic"),
                     "model_averaged_velocity_moments": selection.get("model_averaged"),
                 })
+                model_averaged_pdf = selection.get(
+                    "model_averaged_projected_evdf_s_per_m"
+                )
+                model_velocity = selection.get("projected_evdf_velocity_grid_m_s")
+                if model_averaged_pdf is not None and model_velocity is not None:
+                    model_averaged_pdf = np.asarray(model_averaged_pdf, dtype=float)
+                    model_velocity = np.asarray(model_velocity, dtype=float)
+                    model_spread = np.asarray(
+                        selection.get(
+                            "between_model_projected_evdf_standard_spread_s_per_m"
+                        ), dtype=float
+                    )
+                    if (model_averaged_pdf.shape == model_velocity.shape
+                            and model_spread.shape == model_velocity.shape):
+                        st.subheader("Akaike-weighted projected EVDF")
+                        st.caption(
+                            "The curve is the Akaike-weighted mixture of the fitted "
+                            "candidate marginals. The shaded/spread column is between-model "
+                            "candidate-set sensitivity, not measurement noise or a posterior interval."
+                        )
+                        st.dataframe({
+                            "v_parallel_m_s": model_velocity,
+                            "model_averaged_f_s_per_m": model_averaged_pdf,
+                            "between_model_spread_s_per_m": model_spread,
+                        }, use_container_width=True)
+                    total_evdf_covariance = selection.get(
+                        "model_averaged_projected_evdf_covariance_s2_per_m2"
+                    )
+                    if total_evdf_covariance is not None:
+                        st.caption(
+                            "Full velocity-grid covariance includes between-model spread "
+                            "and delta-method within-model covariance for all contributing fits."
+                        )
+                        st.dataframe(
+                            np.asarray(total_evdf_covariance, dtype=float),
+                            use_container_width=True,
+                        )
                 if selection.get("status") != "akaike_weighted_model_uncertainty":
                     st.warning(
                         "Model-selection uncertainty is unavailable because no candidate "
