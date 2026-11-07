@@ -1416,11 +1416,11 @@ def analyze_thomson_spectra(
         if model not in {
             "non_collective_maxwellian", "non_collective_kappa",
             "non_collective_relativistic_maxwell_juttner", "collective_maxwellian",
+            "collective_kappa",
         }:
             raise ValueError(
                 "model_discrepancy_covariance is supported for non-collective optical Thomson "
-                "models and the collective Maxwellian fit; collective Kappa requires its "
-                "own kinetic covariance implementation"
+                "models and both collective Maxwellian and collective Kappa fits"
             )
         discrepancy = _finite_array(model_discrepancy_covariance, "model_discrepancy_covariance")
         nchan_disc, nlam_disc = y.shape
@@ -1444,7 +1444,7 @@ def analyze_thomson_spectra(
                 raise ValueError(
                     "full channel-major model_discrepancy_covariance must be positive semidefinite"
                 )
-            if model == "collective_maxwellian":
+            if model in {"collective_maxwellian", "collective_kappa"}:
                 for row in range(nchan_disc):
                     for col in range(nchan_disc):
                         if row != col:
@@ -1454,7 +1454,7 @@ def analyze_thomson_spectra(
                             ]
                             if np.any(np.abs(cross) > 1e-13 * scale):
                                 raise ValueError(
-                                    "collective_maxwellian currently fits channels independently; "
+                                    f"{model} currently fits channels independently; "
                                     "cross-channel model-discrepancy covariance cannot be silently discarded"
                                 )
             independent_discrepancy_blocks = np.stack([
@@ -1540,7 +1540,7 @@ def analyze_thomson_spectra(
             scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
             if float(np.min(eigenvalues)) < -1e-10 * scale:
                 raise ValueError("full channel-major systematic_covariance must be positive semidefinite")
-            if model == "collective_maxwellian":
+            if model in {"collective_maxwellian", "collective_kappa"}:
                 for row in range(nchan_sys):
                     for col in range(nchan_sys):
                         if row != col:
@@ -1550,7 +1550,7 @@ def analyze_thomson_spectra(
                             ]
                             if np.any(np.abs(cross) > 1e-13 * scale):
                                 raise ValueError(
-                                    "collective_maxwellian currently fits channels independently; "
+                                    f"{model} currently fits channels independently; "
                                     "cross-channel systematic covariance cannot be silently discarded"
                                 )
             independent_systematic_blocks = np.stack([
@@ -1872,6 +1872,7 @@ def analyze_thomson_spectra(
                 initial_temperature_eV=collective_initial_temperature_eV,
                 density_bounds_m3=density_bounds, temperature_bounds_eV=temperature_bounds,
                 initial_kappa=collective_kappa_initial, kappa_bounds=collective_kappa_bounds,
+                spectral_covariance=channel_covariance,
             )
         elif model == "collective_maxwellian":
             # PlasmaPy's kinetic Maxwellian spectral-density model evaluates
