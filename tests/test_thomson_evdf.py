@@ -343,6 +343,9 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
     model = "thomson_projected_evdf"
     assert model in MODEL_LABELS
     configuration = EXAMPLES[model]
+    velocity_grid = np.asarray(configuration["velocity_grid_m_s"], dtype=float)
+    assert np.all(np.diff(velocity_grid) > 0.0)
+    assert not np.allclose(np.diff(velocity_grid), np.diff(velocity_grid)[0])
     assert "model_discrepancy_covariance" in configuration
     assert "systematic_covariance" in configuration
     result = run_advanced_thomson_physics(model, **configuration)
