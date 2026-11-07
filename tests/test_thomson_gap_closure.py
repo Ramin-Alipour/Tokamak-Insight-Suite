@@ -352,6 +352,45 @@ def test_projected_evdf_adds_independent_model_discrepancy_covariance_once():
     assert result["noise_model"] == "model_discrepancy_only_no_measurement_noise_covariance"
 
 
+def test_relativistic_projected_evdf_adds_systematic_covariance_once():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    systematic = np.eye(wavelength.size) * 1.7e-4
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(measured),
+        velocity_grid_m_s=velocity,
+        systematic_covariance=systematic,
+        regularization_strength=1e-3,
+    )
+    assert result["systematic_covariance_included"] is True
+    assert result["model_discrepancy_included"] is False
+    np.testing.assert_allclose(result["systematic_covariance"], systematic)
+    np.testing.assert_allclose(result["effective_spectral_covariance"], systematic)
+    assert result["noise_model"] == "systematic_spectral_covariance"
+
+
+def test_relativistic_projected_evdf_rejects_non_psd_systematic_covariance():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    systematic = np.eye(wavelength.size)
+    systematic[0, 0] = -1.0
+    with pytest.raises(ValueError, match="systematic_covariance must be positive semidefinite"):
+        reconstruct_relativistic_projected_thomson_evdf(
+            wavelength, measured, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.zeros_like(measured),
+            velocity_grid_m_s=velocity,
+            systematic_covariance=systematic,
+            regularization_strength=1e-3,
+        )
+
+
 def test_projected_evdf_rejects_non_psd_model_discrepancy_covariance():
     wavelength = np.linspace(520.0, 544.0, 81)
     velocity = np.linspace(-2.0e6, 2.0e6, 41)
