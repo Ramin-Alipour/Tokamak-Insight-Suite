@@ -868,6 +868,9 @@ def test_spectral_distribution_connects_same_spectrum_to_projected_evdf():
     assert np.isclose(inverse["evdf_normalization"], 1.0, rtol=1e-6, atol=1e-8)
     assert inverse["velocity_parallel_m_s"].shape == (81,)
     assert inverse["evdf_parallel_s_per_m"].shape == (81,)
+    selection = inverse["parametric_model_selection_uncertainty"]
+    assert selection["status"] == "akaike_weighted_model_uncertainty"
+    assert sum(selection["weights"].values()) == pytest.approx(1.0, abs=1e-12)
     closure = inverse["spectral_moment_closure"]
     assert closure["comparison_performed"] is True
     assert closure["status"] == "conditional_moment_closure"
