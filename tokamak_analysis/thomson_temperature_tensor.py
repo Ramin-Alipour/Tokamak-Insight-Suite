@@ -466,11 +466,17 @@ def fit_general_temperature_tensor_thomson_spectra(
         delta=(forward(parameters)-spectra).ravel()
         return np.linalg.solve(chol,delta)
 
+    flow_limit=float(maximum_flow_beta)
+    beta_limit=float(maximum_projected_rms_beta)
+    if not 0.0<beta_limit<1.0 or not 0.0<flow_limit<1.0:
+        raise ValueError("relativistic validity limits must lie strictly between zero and one")
+    if np.any(np.abs(velocity_seed) > flow_limit*299792458.0):
+        raise ValueError("initial_electron_velocity_vector_m_s exceeds maximum_flow_beta")
     lower=np.full(p0.size,-np.inf); upper=np.full(p0.size,np.inf)
     lower[0]=lower[2]=lower[5]=-10.0
     upper[0]=upper[2]=upper[5]=10.0
-    lower[6:9]=-maximum_flow_beta*299792458.0
-    upper[6:9]= maximum_flow_beta*299792458.0
+    lower[6:9]=-flow_limit*299792458.0
+    upper[6:9]= flow_limit*299792458.0
     for view in range(n_view):
         lower[9+3*view]=-50.0; upper[9+3*view]=50.0
     fit=least_squares(residual,p0,bounds=(lower,upper),method="trf",x_scale="jac",max_nfev=int(max_nfev))
@@ -587,10 +593,6 @@ def fit_general_temperature_tensor_thomson_spectra(
     velocity_vector=fit.x[6:9].copy()
     flows=directions@velocity_vector
     flow_beta=float(np.linalg.norm(velocity_vector)/299792458.0)
-    beta_limit=float(maximum_projected_rms_beta)
-    flow_limit=float(maximum_flow_beta)
-    if not 0.0<beta_limit<1.0 or not 0.0<flow_limit<1.0:
-        raise ValueError("relativistic validity limits must lie strictly between zero and one")
     within_validity=thermal_beta<beta_limit and flow_beta<flow_limit
     return {
         "model":"nonrelativistic_non_gyrotropic_3d_gaussian_thomson_joint_spectral_fit",
