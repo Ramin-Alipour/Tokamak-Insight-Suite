@@ -355,6 +355,7 @@ EXAMPLES = {
         "signal_uncertainty": np.full(81, 0.02).tolist(),
         "model_discrepancy_covariance": None,
         "systematic_covariance": None,
+        "geometry_covariance_nm2_rad2": None,
         "background_model": "linear",
         "background_degree": 1,
         "radial_order": 12,
@@ -991,7 +992,8 @@ def render_advanced_thomson_physics_page(st) -> None:
         st.caption(
             "For the N-population relativistic optical Thomson fit, systematic_covariance is an additive wavelength-by-wavelength covariance. "
             "The fit minimizes GLS residuals with Sigma_total = Sigma_measurement + Sigma_model_discrepancy + Sigma_systematic; "
-            "the three sources remain separately identified in the returned diagnostics."
+            "geometry_covariance_nm2_rad2 additionally propagates correlated laser-wavelength and scattering-angle calibration errors "
+            "through the fitted physical parameters by the implicit GLS sensitivity Jacobian."
         )
 
     st.caption(
