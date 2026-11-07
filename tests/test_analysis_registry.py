@@ -632,5 +632,7 @@ def test_general_non_gyrotropic_tensor_spectral_fit_is_exposed_in_analysis_one_c
     )
     assert any("initial_temperature_tensor_eV" in item and "if omitted" in item for item in mode["inputs"])
     assert any("q_hat^T T_eV q_hat" in item for item in mode["inputs"])
+    assert any("initial_flow_m_s" in item and "spectral centroid" in item for item in mode["inputs"])
+    assert any("initial_flow_seed_m_s" in item for item in mode["outputs"])
     assert any("temperature_tensor_parameter_covariance_eV2" in item for item in mode["outputs"])
     assert "not an unrestricted 3-D EVDF" in mode["scope"]
