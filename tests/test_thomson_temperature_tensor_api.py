@@ -48,3 +48,50 @@ def test_pressure_tensor_closure_is_exposed_through_public_analysis1_dispatcher(
         rtol=1e-10, atol=1e-10,
     )
     assert result["public_physics_entrypoint"] == "thomson_full_temperature_tensor"
+
+
+
+def test_raw_temperature_tensor_fit_shared_flow_is_reachable_through_public_dispatcher():
+    from scipy.special import ndtr
+
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    wavelength = np.linspace(529.0, 535.0, 161)
+    q = np.array([
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0],
+    ])
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    tensor = np.array([[800.0, 90.0, -35.0],
+                       [90.0, 420.0, 55.0],
+                       [-35.0, 55.0, 260.0]])
+    velocity = np.array([1.0e4, -0.7e4, 0.5e4])
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    qfactor = 2.0 * np.sin(np.pi / 4.0)
+    spectra = []
+    for direction in q:
+        flow = float(direction @ velocity)
+        tq = float(direction @ tensor @ direction)
+        centre = 532.0 * (1.0 - qfactor * flow / c)
+        sigma = 532.0 * qfactor * np.sqrt(e * tq / me) / c
+        z = (edges - centre) / sigma
+        probability = ndtr(z[1:]) - ndtr(z[:-1])
+        positive = z[:-1] > 0
+        probability[positive] = ndtr(-z[:-1][positive]) - ndtr(-z[1:][positive])
+        spectra.append(2.0 * probability / np.diff(edges) + 0.02)
+
+    result = run_advanced_thomson_physics(
+        "thomson_full_temperature_tensor_spectral_fit",
+        wavelength, np.asarray(spectra),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full((q.shape[0], wavelength.size), 2e-4),
+    )
+    np.testing.assert_allclose(result["electron_velocity_vector_m_s"], velocity, rtol=2e-4, atol=5.0)
+    np.testing.assert_allclose(result["electron_velocity_projection_m_s"], q @ velocity, rtol=2e-4, atol=5.0)
+    assert result["public_physics_entrypoint"] == "thomson_full_temperature_tensor_spectral_fit"
