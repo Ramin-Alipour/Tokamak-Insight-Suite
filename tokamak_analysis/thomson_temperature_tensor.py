@@ -385,7 +385,7 @@ def fit_general_temperature_tensor_thomson_spectra(
         response = np.broadcast_to(response, (n_view,n_wave,n_wave))
     if response.shape != (n_view,n_wave,n_wave) or not np.all(np.isfinite(response)) or np.any(response < 0.0):
         raise ValueError("instrument_response_matrix must be (n_wave,n_wave) or (n_view,n_wave,n_wave), finite and non-negative")
-    if not np.allclose(response.sum(axis=1), 1.0, rtol=1e-8, atol=1e-10):
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("each response matrix must conserve bin-integrated spectral power (columns sum to one)")
     edges = np.empty(n_wave+1, dtype=float)
     edges[1:-1] = 0.5*(wavelength[:-1]+wavelength[1:])
