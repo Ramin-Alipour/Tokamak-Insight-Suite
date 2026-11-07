@@ -374,6 +374,32 @@ def test_relativistic_projected_evdf_adds_systematic_covariance_once():
     assert result["noise_model"] == "systematic_only_no_measurement_noise_covariance"
 
 
+def test_relativistic_projected_evdf_sums_measurement_discrepancy_and_systematic_covariance_once():
+    wavelength = np.linspace(520.0, 544.0, 81)
+    velocity = np.linspace(-2.0e6, 2.0e6, 41)
+    measured = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2)
+    measurement = np.eye(wavelength.size) * 1.0e-4
+    discrepancy = np.eye(wavelength.size) * 2.0e-4
+    systematic = np.eye(wavelength.size) * 3.0e-4
+    result = reconstruct_relativistic_projected_thomson_evdf(
+        wavelength, measured, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.zeros_like(measured),
+        velocity_grid_m_s=velocity,
+        signal_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        regularization_strength=1e-3,
+    )
+    np.testing.assert_allclose(
+        result["effective_spectral_covariance"],
+        measurement + discrepancy + systematic,
+        rtol=0.0, atol=1e-15,
+    )
+    assert result["noise_model"] == "measurement_plus_model_discrepancy_and_systematic_covariance"
+
+
 def test_relativistic_projected_evdf_rejects_non_psd_systematic_covariance():
     wavelength = np.linspace(520.0, 544.0, 81)
     velocity = np.linspace(-2.0e6, 2.0e6, 41)
