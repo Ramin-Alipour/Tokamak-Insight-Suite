@@ -56,6 +56,36 @@ def _finite_scalar(value, name, *, minimum=None, maximum=None):
     return result
 
 
+def _collective_spectral_whitener(signal, uncertainty=None, covariance=None):
+    """Build a statistically correct residual whitener for collective Thomson fits.
+
+    For covariance C=L L^T, residuals are transformed as L^-1 r and the
+    profiled linear nuisance parameters are solved in the same GLS metric.
+    Pointwise standard deviations remain the diagonal-noise special case.
+    """
+    values = _finite_array(signal, "collective measured spectrum", 1)
+    if uncertainty is not None and covariance is not None:
+        raise ValueError("collective fit accepts uncertainty or covariance, not both")
+    if covariance is not None:
+        matrix = _finite_array(covariance, "collective spectral covariance", 2)
+        if matrix.shape != (values.size, values.size):
+            raise ValueError("collective spectral covariance must match the wavelength grid")
+        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-13):
+            raise ValueError("collective spectral covariance must be symmetric")
+        try:
+            factor = np.linalg.cholesky(0.5 * (matrix + matrix.T))
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("collective spectral covariance must be positive definite") from exc
+        return lambda residual: np.linalg.solve(factor, np.asarray(residual, dtype=float)), "full_covariance"
+    if uncertainty is not None:
+        sigma = _finite_array(uncertainty, "collective signal uncertainty", 1)
+        if sigma.shape != values.shape or np.any(sigma <= 0.0):
+            raise ValueError("collective signal uncertainty must be positive and match the wavelength grid")
+        return lambda residual: np.asarray(residual, dtype=float) / sigma, "pointwise_uncertainty"
+    scale = max(float(np.max(np.abs(values))), np.finfo(float).tiny)
+    return lambda residual: np.asarray(residual, dtype=float) / scale, "relative_unweighted"
+
+
 def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
     if callable(response):
         if wavelength is None:
@@ -1393,12 +1423,12 @@ def analyze_thomson_spectra(
     if model_discrepancy_covariance is not None:
         if model not in {
             "non_collective_maxwellian", "non_collective_kappa",
-            "non_collective_relativistic_maxwell_juttner",
+            "non_collective_relativistic_maxwell_juttner", "collective_maxwellian",
         }:
             raise ValueError(
-                "model_discrepancy_covariance is supported for non-collective "
-                "Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits; "
-                "collective CTS requires a model-specific discrepancy covariance"
+                "model_discrepancy_covariance is supported for non-collective optical Thomson "
+                "models and the collective Maxwellian fit; collective Kappa requires its "
+                "own kinetic covariance implementation"
             )
         discrepancy = _finite_array(model_discrepancy_covariance, "model_discrepancy_covariance")
         nchan_disc, nlam_disc = y.shape
@@ -1483,11 +1513,11 @@ def analyze_thomson_spectra(
     if systematic_covariance is not None:
         if model not in {
             "non_collective_maxwellian", "non_collective_kappa",
-            "non_collective_relativistic_maxwell_juttner",
+            "non_collective_relativistic_maxwell_juttner", "collective_maxwellian",
         }:
             raise ValueError(
-                "systematic_covariance is supported for non-collective Maxwellian, "
-                "Kappa and relativistic Maxwell-Juttner optical Thomson fits"
+                "systematic_covariance is supported for non-collective optical Thomson "
+                "models and the collective Maxwellian fit"
             )
         systematic = _finite_array(systematic_covariance, "systematic_covariance")
         nchan_sys, nlam_sys = y.shape
@@ -1876,15 +1906,18 @@ def analyze_thomson_spectra(
                     probe_vec=probe_vec, scatter_vec=scatter_vec)
                 z = np.asarray(spec.value, dtype=float)
                 return _apply_response(response, z, xi)
-            residual_scale = ui if ui is not None else np.full_like(y[i],max(float(np.max(np.abs(y[i]))),np.finfo(float).tiny))
+            whiten, noise_model = _collective_spectral_whitener(
+                y[i], uncertainty=ui if channel_covariance is None else None,
+                covariance=channel_covariance,
+            )
             def fit_nuisance(shape):
                 shape_scale=max(float(np.max(np.abs(shape))),np.finfo(float).tiny)
                 design=np.column_stack((shape/shape_scale,np.ones_like(shape),xi-float(laser_wavelength_nm)))
-                weighted_design=design/residual_scale[:,None]
-                weighted_signal=y[i]/residual_scale
+                weighted_design=whiten(design)
+                weighted_signal=whiten(y[i])
                 coefficients=np.linalg.lstsq(weighted_design,weighted_signal,rcond=None)[0]
                 if coefficients[0] < 0:
-                    background_design=design[:,1:]/residual_scale[:,None]
+                    background_design=whiten(design[:,1:])
                     background=np.linalg.lstsq(background_design,weighted_signal,rcond=None)[0]
                     coefficients=np.array([0.0,background[0],background[1]])
                 coefficients[0] /= shape_scale
@@ -1893,7 +1926,7 @@ def analyze_thomson_spectra(
                 shape = collective_shape(params)
                 coefficients=fit_nuisance(shape)
                 model_signal=coefficients[0]*shape+coefficients[1]+coefficients[2]*(xi-float(laser_wavelength_nm))
-                return (model_signal-y[i])/residual_scale
+                return whiten(model_signal-y[i])
             fitopt = least_squares(
                 lambda log_params: objective(10.0**log_params),
                 np.log10([collective_initial_density_m3, collective_initial_temperature_eV]),
@@ -1909,7 +1942,7 @@ def analyze_thomson_spectra(
             jacobian_condition = float(np.linalg.cond(fitopt.jac))
             try:
                 covariance_log = np.linalg.pinv(fitopt.jac.T @ fitopt.jac)
-                if ui is None:
+                if noise_model == "relative_unweighted":
                     covariance_log *= (2.0*fitopt.cost/dof)
                 transform = np.diag(np.log(10.0)*np.array([ne_fit, te_fit]))
                 parameter_covariance = transform @ covariance_log @ transform.T
@@ -1975,7 +2008,10 @@ def analyze_thomson_spectra(
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
                    "collective_parameter_jacobian_rank": jacobian_rank,
                    "collective_parameter_jacobian_condition_number": jacobian_condition,
-                   "reduced_chi_square": float(np.sum((residual_collective/ui)**2)/dof) if ui is not None else None,
+                   "reduced_chi_square": float((2.0 * fitopt.cost) / dof) if noise_model != "relative_unweighted" else None,
+                   "spectral_noise_model": noise_model,
+                   "spectral_covariance_used_in_fit": bool(channel_covariance is not None),
+                   "fit_objective": "generalized_least_squares" if noise_model == "full_covariance" else ("weighted_least_squares" if noise_model == "pointwise_uncertainty" else "relative_unweighted_least_squares"),
                    "ion_species": list(ion_species), "ion_fractions": ion_fract.tolist(),
                    "scattering_parameter_alpha": alpha_value,
                    "scattering_parameter_alpha_uncertainty": alpha_uncertainty,
