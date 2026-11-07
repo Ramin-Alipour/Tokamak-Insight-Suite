@@ -87,6 +87,27 @@ def _normalize_evdf_coefficients(coefficients, velocity):
     return distribution, jacobian
 
 
+def _nonuniform_second_derivative_matrix(velocity):
+    """Return the three-point second-derivative operator on a monotone grid.
+
+    At interior node i this is 2/(h_left+h_right) times the difference
+    between the right and left first-derivative slopes. It is exact for
+    quadratic polynomials on arbitrary strictly increasing node locations.
+    """
+    grid = np.asarray(velocity, dtype=float)
+    if (grid.ndim != 1 or grid.size < 3 or not np.all(np.isfinite(grid))
+            or np.any(np.diff(grid) <= 0.0)):
+        raise ValueError("velocity grid must be finite, strictly increasing and contain at least three nodes")
+    intervals = np.diff(grid)
+    operator = np.zeros((grid.size - 2, grid.size), dtype=float)
+    for row, (h_left, h_right) in enumerate(zip(intervals[:-1], intervals[1:])):
+        factor = 2.0 / (h_left + h_right)
+        operator[row, row] = factor / h_left
+        operator[row, row + 1] = -factor * (1.0 / h_left + 1.0 / h_right)
+        operator[row, row + 2] = factor / h_right
+    return operator
+
+
 def reconstruct_thomson_evdf(
     wavelength_nm,
     signal,
@@ -326,12 +347,7 @@ def reconstruct_thomson_evdf(
     # the difference of adjacent first-derivative slopes.  This keeps the
     # Tikhonov penalty in physical (m/s)^-2 units rather than penalizing
     # changes per array index when velocity nodes are unequally spaced.
-    smooth = np.zeros((velocity.size - 2, velocity.size), dtype=float)
-    for row, (h_left, h_right) in enumerate(zip(dv[:-1], dv[1:])):
-        factor = 2.0 / (h_left + h_right)
-        smooth[row, row] = factor / h_left
-        smooth[row, row + 1] = -factor * (1.0 / h_left + 1.0 / h_right)
-        smooth[row, row + 2] = factor / h_right
+    smooth = _nonuniform_second_derivative_matrix(velocity)
     smooth_scale = np.linalg.norm(design, ord="fro") / max(np.linalg.norm(smooth, ord="fro"), np.finfo(float).tiny)
     regularization_candidates = (
         np.logspace(-8.0, 4.0, 13)
