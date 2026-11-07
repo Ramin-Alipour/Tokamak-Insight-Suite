@@ -666,3 +666,42 @@ def test_advanced_dashboard_evdf_route_exposes_velocity_integral_discretization(
     assert result["forward_operator_column_integrated_spectral_power_per_unit_evdf"].shape == (
         result["velocity_parallel_m_s"].shape
     )
+
+
+def test_regularized_evdf_covariance_uses_frequentist_sandwich_not_posterior_inverse():
+    from tokamak_analysis.thomson_evdf import (
+        _regularized_active_set_measurement_covariance,
+    )
+
+    design = np.array([[1.0, 0.0], [0.0, 2.0], [1.0, 1.0]])
+    penalty = np.array([[1.0, -1.0]])
+    strength = 3.0
+    information = design.T @ design
+    hessian = information + strength * (penalty.T @ penalty)
+    inverse = np.linalg.inv(hessian)
+    expected = inverse @ information @ inverse
+    posterior_covariance = inverse
+
+    actual = _regularized_active_set_measurement_covariance(
+        design, penalty, strength
+    )
+    np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-14)
+    assert not np.allclose(actual, posterior_covariance)
+    np.testing.assert_allclose(actual, actual.T, rtol=0.0, atol=1e-14)
+    assert np.linalg.eigvalsh(actual)[0] >= -1e-12
+
+
+def test_regularized_evdf_covariance_scales_with_whitened_residual_variance():
+    from tokamak_analysis.thomson_evdf import (
+        _regularized_active_set_measurement_covariance,
+    )
+
+    design = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    penalty = np.array([[1.0, -1.0]])
+    base = _regularized_active_set_measurement_covariance(
+        design, penalty, 0.7, residual_variance=1.0
+    )
+    scaled = _regularized_active_set_measurement_covariance(
+        design, penalty, 0.7, residual_variance=4.0
+    )
+    np.testing.assert_allclose(scaled, 4.0 * base, rtol=1e-12, atol=1e-14)
