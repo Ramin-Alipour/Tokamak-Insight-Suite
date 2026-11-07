@@ -1588,6 +1588,11 @@ elif page=='Spectral Analysis':
                             'spectral_skewness':distribution.get('spectral_skewness'),
                             'spectral_excess_kurtosis':distribution.get('spectral_excess_kurtosis'),
                             'integrated_signed_spectral_signal':distribution.get('integrated_signed_spectral_signal'),
+                            'gaussian_fit_statistical_weighting_status':distribution.get('gaussian_fit_statistical_weighting_status'),
+                            'gaussian_fit_covariance_valid':distribution.get('gaussian_fit_covariance_valid'),
+                            'chi_square':distribution.get('chi_square'),
+                            'reduced_chi_square':distribution.get('reduced_chi_square'),
+                            'likelihood_covariance_components':distribution.get('gaussian_fit_likelihood_covariance_components'),
                         })
                     st.markdown('**Thomson spectral-distribution diagnostics**')
                     st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
