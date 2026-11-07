@@ -925,6 +925,21 @@ elif page=='Spectral Analysis':
                 'non_collective_kappa',
                 'non_collective_relativistic_maxwell_juttner',
             ],index=None,placeholder='Select a physical model',key='ts_infer_model')
+            collective_kappa_mode=st.checkbox(
+                'Use optical collective-Kappa dielectric inference (multi-population)',
+                value=False,key='ts_infer_collective_kappa_mode',
+                help='Activates the Landau–FDT collective dielectric solver. Supply explicit ion composition, ion/electron flows, geometry and optional population mixtures below.'
+            )
+            collective_kappa_inputs_text=''
+            if collective_kappa_mode:
+                model='collective_kappa'
+                collective_kappa_inputs_text=st.text_area(
+                    'Collective-Kappa physical inputs (JSON)',
+                    value='',
+                    height=210,key='ts_infer_collective_kappa_inputs',
+                    placeholder='{"incident_direction":[-0.70710678,0.70710678,0.0],"scattered_direction":[0.70710678,0.70710678,0.0],"ion_species":[{"name":"D+","charge_state":1,"mass_amu":2.014}],"ion_fractions":[1.0],"ion_temperature_eV":[100.0],"electron_velocity_m_s":[0,0,0],"ion_velocity_m_s":[[0,0,0]],"collective_initial_density_m3":1e19,"collective_initial_temperature_eV":150.0,"collective_density_bounds_m3":[5e18,2e19],"collective_temperature_bounds_eV":[75,300],"collective_kappa_initial":3.5,"collective_kappa_bounds":[2,6],"collective_electron_populations":[{"density_fraction":0.8,"temperature_ratio":0.7,"kappa":4.0,"flow_projection_m_s":0.0},{"density_fraction":0.2,"temperature_ratio":3.0,"kappa":2.5,"flow_projection_m_s":0.0}]}',
+                    help='All physical quantities are explicit inputs, not inferred defaults. Each population enters the dielectric susceptibility and fluctuation source.'
+                )
             st.caption('Optical Analysis 1 uses three explicitly selected non-collective forward models. Microwave collective Thomson scattering is a dedicated CTS subanalysis within primary Analysis 1; its electrostatic and full-electromagnetic models are not optical Thomson models.')
             if model in {'non_collective_maxwellian','non_collective_kappa'}:
                 st.info(
@@ -1310,7 +1325,30 @@ elif page=='Spectral Analysis':
                         'instrument_response_uncertainty':response_uncertainty,
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
+                'collective_kappa_mode':collective_kappa_mode,
+                'collective_kappa_inputs':collective_kappa_inputs_text,
                     }
+                    if collective_kappa_mode:
+                        try:
+                            collective_inputs=json.loads(collective_kappa_inputs_text)
+                        except json.JSONDecodeError as exc:
+                            raise ValueError(f'Collective-Kappa physical inputs must be valid JSON: {exc}') from exc
+                        if not isinstance(collective_inputs,dict):
+                            raise ValueError('Collective-Kappa physical inputs must be a JSON object.')
+                        allowed_collective_keys={
+                            'incident_direction','scattered_direction','ion_species','ion_fractions',
+                            'ion_temperature_eV','electron_velocity_m_s','ion_velocity_m_s',
+                            'collective_initial_density_m3','collective_initial_temperature_eV',
+                            'collective_density_bounds_m3','collective_temperature_bounds_eV',
+                            'collective_kappa_initial','collective_kappa_bounds',
+                            'collective_electron_populations','collective_ion_populations',
+                            'collective_electron_population_parameter_covariance',
+                            'collective_population_mc_samples','collective_population_mc_seed',
+                        }
+                        unknown_collective_keys=set(collective_inputs)-allowed_collective_keys
+                        if unknown_collective_keys:
+                            raise ValueError('Unsupported Collective-Kappa input keys: '+', '.join(sorted(unknown_collective_keys)))
+                        kwargs.update(collective_inputs)
                     if not joint_spatial_spectral and channel_laser_profile_upload is not None:
                         laser_profile_table=pd.read_csv(
                             channel_laser_profile_upload,header=None
