@@ -931,6 +931,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - thomson_joint_spatial_spectra: joint wavelength-resolved inversion of measured channel spectra through a supplied spatial mixing operator, with shared physical profiles and joint covariance.
       - thomson_normalized_poloidal_flux: equilibrium-supplied mapping of Thomson channel fluxes to rho_pol with full joint flux/axis/separatrix covariance propagation.
       - gyrotropic_bi_maxwellian_anisotropy: GLS inversion of directional Thomson temperatures at independent magnetic pitch angles.
+      - thomson_full_temperature_tensor_spectral_fit: joint raw-spectrum inversion of a general non-gyrotropic positive-definite 3-D temperature tensor with either Gaussian Maxwellian or ellipsoidal Kappa closure; Kappa uses exact finite-bin Student-t marginals, fitted/fixed kappa and a projected superluminal-tail validity gate.
+      - optical_collective_kappa_multi_population_inference: measured-spectrum optical collective dielectric fit with explicit electron and ion populations, species-resolved Landau susceptibilities and shared dielectric/FDT screening.
       - thomson_three_dimensional_flow: covariance-weighted GLS inversion of measured flow projections from three or more independent scattering-vector directions; rank-3 geometry is additionally gated by the condition number of the whitened design, and overdetermined view sets are checked against the shared-flow chi-square residual.
       - plasma_charge_state_moments: Zeff, ion charge balance and net charge
         density from explicit multispecies densities and charge states.
