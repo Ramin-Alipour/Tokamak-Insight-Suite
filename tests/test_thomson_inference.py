@@ -1827,3 +1827,56 @@ def test_spectral_distribution_receives_disjoint_measurement_model_and_systemati
         rtol=1e-10, atol=1e-14,
     )
     assert captured["signal_uncertainty"] is None
+
+def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1048.0, 1080.0, 101)
+    angle = np.pi / 2.0
+    laser = 1064.0
+    incident = np.array([-np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0])
+    scattered = np.array([np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0])
+    populations = [
+        {"density_fraction": 0.8, "temperature_ratio": 0.7, "kappa": 4.0,
+         "distribution": "kappa", "flow_projection_m_s": -1.0e5},
+        {"density_fraction": 0.2, "temperature_ratio": 3.0, "kappa": 2.5,
+         "distribution": "maxwellian", "flow_projection_m_s": 4.0e5},
+    ]
+    physical = collective_kappa_spectral_density(
+        wavelength, laser, angle,
+        electron_density_m3=1.0e19, electron_temperature_eV=150.0,
+        kappa=3.5,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident, scattered_direction=scattered,
+        electron_populations=populations,
+    )
+    measured = 2.0e4 * physical["spectral_density_per_nm"] + 10.0
+    result = analyze_thomson_spectra(
+        wavelength, measured[None, :], [0.1],
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full((1, wavelength.size), 0.01 * np.max(measured)),
+        model="collective_kappa",
+        incident_direction=incident, scattered_direction=scattered,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        collective_initial_density_m3=1.0e19,
+        collective_initial_temperature_eV=150.0,
+        collective_density_bounds_m3=[5.0e18, 2.0e19],
+        collective_temperature_bounds_eV=[75.0, 300.0],
+        collective_kappa_initial=3.5,
+        collective_kappa_bounds=[2.0, 6.0],
+        collective_external_parameter_mc_samples=20,
+        collective_electron_populations=populations,
+        enable_evdf_reconstruction=False,
+    )
+    channel = result["channels"][0]
+    assert channel["optimizer_success"] is True
+    assert channel["electron_populations"] == populations
+    assert channel["electron_mixture_moments"]["population_count"] == 2
+    assert channel["electron_mixture_moments"]["between_population_drift_temperature_eV"] > 0.0
