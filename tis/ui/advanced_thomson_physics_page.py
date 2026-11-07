@@ -1192,6 +1192,9 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "relative_support_weights": selection.get("weights"),
                     "delta_aic": selection.get("delta_aic"),
                     "model_averaged_velocity_moments": selection.get("model_averaged"),
+                    "projected_evdf_model_averaging_equations": selection.get(
+                        "projected_evdf_model_averaging_equations"
+                    ),
                 })
                 model_averaged_pdf = selection.get(
                     "model_averaged_projected_evdf_s_per_m"
