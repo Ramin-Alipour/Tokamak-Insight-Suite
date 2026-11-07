@@ -10559,10 +10559,10 @@
   },
   {
     "name": "Velocity-grid convergence of multispecies Landau–FDT Full-EM CTS spectra",
-    "equation": "N_{j+1}=2N_j-1; delta_X=||X_j-X_{j-1}||_F/max(||X_j||_F,||X_{j-1}||_F,tiny); Delta=max_X(delta_X); accept grid convergence iff Delta <= tolerance",
+    "equation": "N_{j+1}=2N_j-1; delta_X=||X_j-X_{j-1}||_F/max(||X_j||_F,||X_{j-1}||_F,tiny); Delta=max_X(delta_X); accept grid convergence iff Delta <= tolerance; passive-background constraint: Im_H(epsilon_r)=(epsilon_r-epsilon_r^dagger)/(2i) >= 0",
     "inputs": "Positive angular-frequency vector, species-scaled normalized velocity axes, multispecies Maxwellian equilibrium, wave number and propagation direction, grid tolerance and node budget.",
     "output": "Successive-grid relative changes in conductivity, current-noise covariance, electric/magnetic field spectra and transverse Stokes spectra; explicit grid-convergence gate.",
-    "assumptions": "Unmagnetized, zero-flow, common-temperature Maxwellian equilibrium; classical multispecies Landau operator and matched classical FDT; velocity-domain endpoints held fixed.",
+    "assumptions": "Unmagnetized, zero-flow, common-temperature Maxwellian equilibrium; classical multispecies Landau operator and matched classical FDT; velocity-domain endpoints held fixed. For exp(-i*omega*t), the Full-EM field-fluctuation closure rejects dielectric gain: the Hermitian loss tensor Im_H(epsilon_r) must be positive semidefinite.",
     "status": "D",
     "category": "Collective Thomson scattering",
     "execution_contract": {
@@ -10619,7 +10619,8 @@
       ],
       "test_links": [
         "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_compares_all_physical_spectral_tensors",
-        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_withholds_convergence_when_node_budget_stops_refinement"
+        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_withholds_convergence_when_node_budget_stops_refinement",
+        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_full_em_rejects_active_dielectric_background"
       ],
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
@@ -10639,7 +10640,8 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_compares_all_physical_spectral_tensors",
-        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_withholds_convergence_when_node_budget_stops_refinement"
+        "tests/test_cts_landau_fdt_convergence.py::test_grid_convergence_solver_withholds_convergence_when_node_budget_stops_refinement",
+        "tests/test_cts_landau_fdt_full_em_public.py::test_landau_full_em_rejects_active_dielectric_background"
       ]
     },
     "description": "Quantitative midpoint refinement of the Landau–FDT Full-EM physical solver. Compares all returned physical spectral tensors between grids and withholds the grid-convergence claim when the node budget or tolerance is not met."
