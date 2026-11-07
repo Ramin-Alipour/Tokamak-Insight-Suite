@@ -609,3 +609,18 @@ def test_gyrotropic_registry_entry_exposes_explicit_bikappa_model_dispatch():
     assert "bi_kappa" in selector["unit"]
     assert any("fit_gyrotropic_bi_kappa_thomson" in link for link in contract["function_links"])
     assert callable(resolve_analysis(82))
+
+
+
+def test_spectral_distribution_physical_initial_contract_matches_collective_solver():
+    distribution = get_analysis(81)
+    inputs = {
+        item["name"]: item
+        for item in distribution["execution_contract"]["input_specs"]
+    }
+    spec = inputs["physical_initial"]
+    assert spec["unit"] == "mapping of native optimizer seeds"
+    assert "collective_initial_density_m3" in spec["description"]
+    assert "collective_initial_temperature_eV" in spec["description"]
+    assert "collective_kappa_initial" in spec["description"]
+    assert "duplicate keys" in spec["description"]
