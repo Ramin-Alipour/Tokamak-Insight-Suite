@@ -574,3 +574,45 @@ def test_evdf_model_selection_excludes_nonconverged_candidates(monkeypatch):
     assert selection["status"] == "akaike_weighted_model_uncertainty"
     assert "kappa_student_t" not in selection["weights"]
     assert sum(selection["weights"].values()) == pytest.approx(1.0, abs=1e-12)
+
+
+
+def test_evdf_forward_operator_integrates_velocity_density_with_nonuniform_quadrature():
+    from tokamak_analysis.thomson_evdf import (
+        _projected_evdf_forward_matrix,
+        _velocity_quadrature_weights,
+    )
+
+    wavelength = np.linspace(499.0, 501.0, 801)
+    velocity = np.array([-2.0e5, -1.3e5, -7.0e4, -2.0e4, 1.0e4, 5.0e4, 1.2e5, 2.0e5])
+    response = np.eye(wavelength.size)
+    forward, metadata = _projected_evdf_forward_matrix(
+        wavelength, velocity, response, 500.0, 2.0 * np.sin(np.pi / 4.0)
+    )
+    wavelength_widths = metadata["wavelength_bin_widths_nm"]
+    quadrature = _velocity_quadrature_weights(velocity)
+
+    # A unit-integral line kernel has spectral area one; after discretizing
+    # int f(v) K(lambda|v) dv, each density column must carry its dv weight.
+    integrated_columns = np.sum(forward * wavelength_widths[:, None], axis=0)
+    np.testing.assert_allclose(integrated_columns, quadrature, rtol=2e-12, atol=1e-10)
+    np.testing.assert_allclose(
+        metadata["column_integrated_spectral_power_per_unit_evdf"],
+        quadrature, rtol=2e-12, atol=1e-10,
+    )
+
+
+def test_evdf_forward_operator_preserves_velocity_integrated_power_for_nonuniform_density():
+    from tokamak_analysis.thomson_evdf import _projected_evdf_forward_matrix
+
+    wavelength = np.linspace(499.0, 501.0, 1001)
+    velocity = np.array([-2.0e5, -1.4e5, -8.0e4, -3.0e4, 2.0e4, 9.0e4, 1.5e5, 2.0e5])
+    density = np.exp(-0.5 * (velocity / 8.0e4) ** 2)
+    forward, metadata = _projected_evdf_forward_matrix(
+        wavelength, velocity, np.eye(wavelength.size), 500.0,
+        2.0 * np.sin(np.pi / 4.0),
+    )
+    predicted = forward @ density
+    spectral_power = np.sum(predicted * metadata["wavelength_bin_widths_nm"])
+    velocity_power = np.dot(density, metadata["velocity_quadrature_weights_m_s"])
+    assert spectral_power == pytest.approx(velocity_power, rel=2e-12)
