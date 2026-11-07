@@ -8,6 +8,8 @@ multiple-pole summation or the paper's full kinetic closure.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 
 
