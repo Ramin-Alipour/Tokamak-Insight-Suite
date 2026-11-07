@@ -1429,3 +1429,91 @@ def test_collective_cts_ion_bikappa_is_reachable_through_public_analysis1_api():
     assert result["public_physics_entrypoint"] == "cts_collective_kappa_spectrum"
     assert result["ion_populations"][0]["distribution"] == "bi_kappa"
     assert result["ion_populations"][0]["projected_temperature_eV"] > 0.0
+
+
+def test_collective_kappa_fit_uses_full_correlated_spectral_covariance(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_models as kinetic
+
+    wavelength = np.linspace(1048.0, 1080.0, 121)
+    laser, angle = 1064.0, np.pi/2.0
+    true_parameters = (1.2e19, 180.0, 3.8)
+    coordinate = (wavelength-laser)/16.0
+
+    def synthetic_forward(x, laser_wavelength_nm, scattering_angle_rad, *,
+                          electron_density_m3, electron_temperature_eV, kappa, **kwargs):
+        center = 0.12*np.log(electron_density_m3/1.0e19)
+        width = 0.15*np.sqrt(electron_temperature_eV/150.0)
+        tail = (1.0 + ((coordinate-center)/width)**2/(2.0*kappa))**(-kappa)
+        tail /= np.trapezoid(tail, x)
+        return {
+            "spectral_density_per_nm": tail,
+            "electron_mixture_moments": {
+                "bulk_flow_projection_m_s": 0.0,
+                "total_second_moment_temperature_eV": electron_temperature_eV,
+            },
+            "electron_debye_length_m": 1.0e-4,
+            "scattering_parameter_alpha": 2.0,
+            "static_screening_status": "synthetic_reference",
+            "electron_populations": [{
+                "density_fraction": 1.0,
+                "temperature_ratio": 1.0,
+                "flow_projection_m_s": 0.0,
+            }],
+        }
+
+    monkeypatch.setattr(kinetic, "collective_kappa_spectral_density", synthetic_forward)
+    truth = synthetic_forward(
+        wavelength, laser, angle,
+        electron_density_m3=true_parameters[0],
+        electron_temperature_eV=true_parameters[1],
+        kappa=true_parameters[2],
+    )["spectral_density_per_nm"]
+    signal = 2.4e4*truth + 3.0 + 0.02*coordinate
+    # Correlated detector noise: an exponential wavelength correlation kernel.
+    indices = np.arange(wavelength.size)
+    covariance = (0.012**2)*np.exp(-np.abs(indices[:, None]-indices[None, :])/5.0)
+
+    result = kinetic.fit_collective_kappa(
+        wavelength, signal, laser, angle, np.eye(wavelength.size),
+        incident_direction=[-np.sin(angle/2), np.cos(angle/2), 0.0],
+        scattered_direction=[np.sin(angle/2), np.cos(angle/2), 0.0],
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        initial_density_m3=1.0e19, initial_temperature_eV=150.0,
+        initial_kappa=3.5,
+        density_bounds_m3=[5.0e18, 2.0e19],
+        temperature_bounds_eV=[80.0, 300.0],
+        kappa_bounds=[2.0, 8.0],
+        spectral_covariance=covariance,
+    )
+
+    assert result["spectral_covariance_used"] is True
+    assert result["spectral_weighting"] == "full_correlated_generalized_least_squares"
+    assert result["reduced_chi_square"] is not None
+    assert result["electron_density_m3"] == pytest.approx(true_parameters[0], rel=2e-3)
+    assert result["electron_temperature_eV"] == pytest.approx(true_parameters[1], rel=2e-3)
+    assert result["kappa_index"] == pytest.approx(true_parameters[2], rel=2e-3)
+    assert np.all(np.linalg.eigvalsh(result["fit_covariance"]) >= -1e-12)
+
+
+def test_collective_kappa_fit_rejects_non_positive_definite_spectral_covariance():
+    from tokamak_analysis.thomson_kinetic_models import fit_collective_kappa
+
+    wavelength = np.linspace(1048.0, 1080.0, 21)
+    invalid = np.eye(wavelength.size)
+    invalid[0, 0] = 0.0
+    with pytest.raises(ValueError, match="positive definite for GLS whitening"):
+        fit_collective_kappa(
+            wavelength, np.ones_like(wavelength), 1064.0, np.pi/2.0,
+            np.eye(wavelength.size),
+            incident_direction=[-np.sin(np.pi/4), np.cos(np.pi/4), 0.0],
+            scattered_direction=[np.sin(np.pi/4), np.cos(np.pi/4), 0.0],
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0], ion_temperature_eV=[100.0],
+            electron_velocity_m_s=[0.0, 0.0, 0.0],
+            ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+            initial_density_m3=1.0e19, initial_temperature_eV=150.0,
+            initial_kappa=3.5, spectral_covariance=invalid,
+        )
