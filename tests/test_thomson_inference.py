@@ -185,16 +185,18 @@ def test_instrument_response_uncertainty_propagates_into_absolute_density():
     assert np.isfinite(channel["power_cross_section_relative_covariance"])
 
 
-def test_optical_analysis_1_rejects_collective_dielectric_models():
+def test_optical_analysis_1_routes_collective_dielectric_models_to_physical_validation():
     x, y, _ = _spectral_case(100.0)
+    # These models must reach their dedicated physical-input validation rather
+    # than being rejected by the non-collective model shortlist. A real fit
+    # cannot proceed without explicit ion composition/flows and bounded seeds.
     for model in ("collective_maxwellian", "collective_kappa"):
-        with pytest.raises(ValueError, match="Optical collective dielectric models are outside this shortlist") as exc_info:
+        with pytest.raises(ValueError, match="Collective Thomson models require explicit initial electron density and temperature estimates"):
             analyze_thomson_spectra(
                 x, y[None, :], [0.1], laser_wavelength_nm=532.0,
                 scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
                 model=model,
             )
-        assert "child subanalysis of primary Analysis 1" in str(exc_info.value)
 
 def test_channel_specific_wavelength_axes_are_supported():
     x1, y1, _ = _spectral_case(100.0)
