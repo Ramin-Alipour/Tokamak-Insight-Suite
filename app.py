@@ -3900,6 +3900,21 @@ elif page=='Advanced Analysis':
                         })
                     else:
                         st.caption('No measurement, background, model-discrepancy or systematic covariance was supplied for spectral-moment uncertainty propagation.')
+                    evdf_dashboard=channel_result.get('electron_velocity_distribution') or {}
+                    if evdf_dashboard.get('analysis_status') in {'completed','conditional_regularized_candidate'}:
+                        st.markdown('**Projected EVDF — physical inverse and uncertainty**')
+                        st.write({
+                            'status':evdf_dashboard.get('analysis_status'),
+                            'primary_result_status':evdf_dashboard.get('primary_result_status'),
+                            'noise_model':evdf_dashboard.get('measurement_uncertainty_model',evdf_dashboard.get('noise_model')),
+                            'model_discrepancy_included':evdf_dashboard.get('model_discrepancy_covariance_included',evdf_dashboard.get('model_discrepancy_included',False)),
+                            'systematic_covariance_included':evdf_dashboard.get('systematic_covariance_included',False),
+                            'regularization_selection':evdf_dashboard.get('regularization_selection'),
+                            'data_only_jacobian_rank':evdf_dashboard.get('data_only_jacobian_rank'),
+                            'data_only_parameter_count':evdf_dashboard.get('data_only_parameter_count'),
+                            'identifiability':evdf_dashboard.get('identifiability'),
+                        })
+                        st.caption('The reconstructed distribution is the one-dimensional marginal along the scattering vector. A regularized candidate is not a unique 3-D EVDF unless the data-identifiability diagnostics support that claim.')
                     st.json(distribution)
                     json_download('Export Analysis 1 spectral-distribution diagnostics',distribution,'tis_thomson_spectral_distribution.json')
                     add_report_section('Analysis 1 spectral-distribution subanalysis',distribution)
