@@ -413,6 +413,20 @@ def fit_general_temperature_tensor_thomson_spectra(
             raise ValueError("signal_uncertainty must be positive with shape (n_view,n_wave) or flattened channel-major")
         measured_covariance_for_geometry = np.diag(uncertainty.ravel()**2)
         covariance_parts.append(measured_covariance_for_geometry)
+    if geometry_cross_covariance is not None:
+        joint_measurement_geometry = np.block([
+            [measured_covariance_for_geometry, geometry_cross_covariance],
+            [geometry_cross_covariance.T, geometry_covariance],
+        ])
+        joint_measurement_geometry = 0.5*(
+            joint_measurement_geometry+joint_measurement_geometry.T
+        )
+        joint_eigenvalues = np.linalg.eigvalsh(joint_measurement_geometry)
+        joint_scale = max(float(np.max(np.abs(joint_eigenvalues))),1e-300)
+        if joint_eigenvalues[0] < -1e-10*joint_scale:
+            raise ValueError(
+                "joint measured-spectrum/scattering-geometry covariance must be positive semidefinite"
+            )
     for name, component in (("model_discrepancy_covariance", model_discrepancy_covariance),
                             ("systematic_covariance", systematic_covariance)):
         if component is None:
