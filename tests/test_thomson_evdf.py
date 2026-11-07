@@ -404,6 +404,12 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
     assert result["velocity_moment_uncertainty_status"] == (
         "delta_method_propagated_from_normalized_evdf_covariance"
     )
+    selection = result["parametric_model_selection_uncertainty"]
+    assert selection["model_averaged_projected_evdf_s_per_m"].shape == velocity_grid.shape
+    assert selection["between_model_projected_evdf_covariance_s2_per_m2"].shape == (
+        velocity_grid.size, velocity_grid.size
+    )
+    assert selection["within_model_projected_evdf_covariance_available"] is True
 
 
 def test_relativistic_projected_evdf_and_psf_profile_are_dashboard_api_routes():
