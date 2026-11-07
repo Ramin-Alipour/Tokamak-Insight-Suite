@@ -711,6 +711,134 @@ def reconstruct_thomson_evdf(
                     np.diag(moment_covariance_from_choice), 0.0
                 ))
 
+
+        # Carry model-selection uncertainty from scalar fit parameters into the
+        # *entire reconstructed velocity marginal*.  Each candidate is first
+        # normalized on the same finite velocity grid; Akaike weights then
+        # define a model-averaged density.  The between-model covariance is
+        # distinct from conditional within-model covariance and is never
+        # labelled as measurement noise or a posterior probability.
+        candidate_pdfs = {}
+        candidate_pdf_covariances = {}
+        within_pdf_covariance_complete = True
+        for candidate_name, candidate in eligible_models.items():
+            candidate_parameters = candidate["parameters"]
+            shape_parameters = [candidate_parameters["mean_velocity_parallel_m_s"],
+                                candidate_parameters["scale_velocity_m_s"]]
+            if candidate_name == "kappa_student_t":
+                shape_parameters.append(candidate_parameters["kappa_degrees_of_freedom"])
+            elif candidate_name == "super_gaussian":
+                shape_parameters.append(candidate_parameters["super_gaussian_exponent"])
+            shape_parameters = np.asarray(shape_parameters, dtype=float)
+            candidate_pdf = np.asarray(projected_pdf(candidate_name, shape_parameters), dtype=float)
+            candidate_area = float(trapezoid(candidate_pdf, velocity))
+            if (candidate_pdf.shape != velocity.shape or not np.all(np.isfinite(candidate_pdf))
+                    or np.any(candidate_pdf < 0.0) or not np.isfinite(candidate_area)
+                    or candidate_area <= 0.0):
+                within_pdf_covariance_complete = False
+                continue
+            candidate_pdfs[candidate_name] = candidate_pdf / candidate_area
+
+            raw_parameter_covariance = candidate.get("parameter_covariance")
+            if raw_parameter_covariance is None:
+                within_pdf_covariance_complete = False
+                continue
+            raw_parameter_covariance = np.asarray(raw_parameter_covariance, dtype=float)
+            if (raw_parameter_covariance.ndim != 2
+                    or raw_parameter_covariance.shape[0] != shape_parameters.size + 1
+                    or raw_parameter_covariance.shape[1] != shape_parameters.size + 1
+                    or not np.all(np.isfinite(raw_parameter_covariance))):
+                within_pdf_covariance_complete = False
+                continue
+            shape_covariance = raw_parameter_covariance[1:, 1:]
+            jacobian_pdf = np.empty((velocity.size, shape_parameters.size), dtype=float)
+            for parameter_index, parameter_value in enumerate(shape_parameters):
+                step = np.cbrt(np.finfo(float).eps) * max(abs(float(parameter_value)), 1.0)
+                plus = shape_parameters.copy()
+                minus = shape_parameters.copy()
+                plus[parameter_index] += step
+                minus[parameter_index] -= step
+                # Respect the open physical domains of the Student-t degrees
+                # of freedom and generalized-Gaussian exponent.
+                lower_domain = (2.0 if candidate_name == "kappa_student_t" and parameter_index == 2
+                                else 0.0 if candidate_name == "super_gaussian" and parameter_index == 2
+                                else -np.inf)
+                if minus[parameter_index] <= lower_domain:
+                    plus_pdf = projected_pdf(candidate_name, plus)
+                    base_pdf = candidate_pdfs[candidate_name]
+                    jacobian_pdf[:, parameter_index] = (plus_pdf - base_pdf) / step
+                else:
+                    plus_pdf = projected_pdf(candidate_name, plus)
+                    minus_pdf = projected_pdf(candidate_name, minus)
+                    jacobian_pdf[:, parameter_index] = (plus_pdf - minus_pdf) / (2.0 * step)
+            within_covariance = jacobian_pdf @ shape_covariance @ jacobian_pdf.T
+            within_covariance = 0.5 * (within_covariance + within_covariance.T)
+            if not np.all(np.isfinite(within_covariance)):
+                within_pdf_covariance_complete = False
+            else:
+                candidate_pdf_covariances[candidate_name] = within_covariance
+
+        active_pdf_names = [name for name in candidate_pdfs if name in weights]
+        active_pdf_weight_sum = float(sum(weights[name] for name in active_pdf_names))
+        if active_pdf_names and active_pdf_weight_sum > 0.0:
+            normalized_pdf_weights = {
+                name: float(weights[name] / active_pdf_weight_sum)
+                for name in active_pdf_names
+            }
+            model_averaged_pdf = sum(
+                normalized_pdf_weights[name] * candidate_pdfs[name]
+                for name in active_pdf_names
+            )
+            between_model_covariance = np.zeros((velocity.size, velocity.size), dtype=float)
+            for name in active_pdf_names:
+                delta_pdf = candidate_pdfs[name] - model_averaged_pdf
+                between_model_covariance += normalized_pdf_weights[name] * np.outer(delta_pdf, delta_pdf)
+            model_selection_uncertainty.update({
+                "projected_evdf_velocity_grid_m_s": velocity.copy(),
+                "model_averaged_projected_evdf_s_per_m": model_averaged_pdf,
+                "between_model_projected_evdf_standard_spread_s_per_m": np.sqrt(
+                    np.maximum(np.diag(between_model_covariance), 0.0)
+                ),
+                "between_model_projected_evdf_covariance_s2_per_m2": between_model_covariance,
+                "projected_evdf_candidate_weights": normalized_pdf_weights,
+                "projected_evdf_covariance_order": "velocity_grid_row_major",
+                "within_model_projected_evdf_covariance_available": bool(
+                    all(name in candidate_pdf_covariances for name in active_pdf_names)
+                ),
+                "projected_evdf_uncertainty_interpretation": (
+                    "Akaike-weighted mixture of the fitted Maxwellian, projected Student-t Kappa, "
+                    "and generalized-Gaussian candidate marginals on a common velocity grid. "
+                    "Between-model covariance is a candidate-set sensitivity measure, not a "
+                    "posterior EVDF covariance."
+                ),
+            })
+            if all(name in candidate_pdf_covariances for name in active_pdf_names):
+                total_model_averaged_covariance = between_model_covariance.copy()
+                for name in active_pdf_names:
+                    delta_pdf = candidate_pdfs[name] - model_averaged_pdf
+                    total_model_averaged_covariance += normalized_pdf_weights[name] * (
+                        candidate_pdf_covariances[name] + np.outer(delta_pdf, delta_pdf)
+                    )
+                total_model_averaged_covariance = 0.5 * (
+                    total_model_averaged_covariance + total_model_averaged_covariance.T
+                )
+                model_selection_uncertainty[
+                    "model_averaged_projected_evdf_covariance_s2_per_m2"
+                ] = total_model_averaged_covariance
+                model_selection_uncertainty[
+                    "model_averaged_projected_evdf_standard_uncertainty_s_per_m"
+                ] = np.sqrt(np.maximum(np.diag(total_model_averaged_covariance), 0.0))
+                model_selection_uncertainty[
+                    "projected_evdf_uncertainty_interpretation"
+                ] += (
+                    " The total candidate-set covariance additionally includes Akaike-weighted "
+                    "within-model delta-method covariance for every contributing candidate."
+                )
+        else:
+            model_selection_uncertainty["projected_evdf_status"] = (
+                "unavailable_no_valid_candidate_projected_marginals"
+            )
+
     electron_mass = 9.1093837139e-31
     boltzmann = 1.380649e-23
     directional_temperature_ev = electron_mass * variance / (boltzmann * 1.602176634e-19)
