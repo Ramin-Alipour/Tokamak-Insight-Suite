@@ -219,3 +219,72 @@ def test_raw_tensor_fit_rejects_asymmetric_measurement_covariance():
             instrument_response_matrix=np.eye(wavelength.size),
             measurement_covariance=covariance,
         )
+
+
+
+def test_raw_spectral_tensor_fit_derives_temperature_seed_from_spectral_width_and_conserves_response_power():
+    from tokamak_analysis.thomson_temperature_tensor import (
+        fit_general_temperature_tensor_thomson_spectra,
+        _tensor_finite_bin_gaussian_density,
+    )
+
+    c_light, elementary_charge, electron_mass = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    wavelength = np.linspace(529.0, 535.0, 121)
+    laser, angle = 532.0, np.pi / 2.0
+    q = np.array([
+        [1, 0, 0], [0, 1, 0], [0, 0, 1],
+        [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, -1, 1],
+    ], dtype=float)
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    expected = np.array([
+        [800.0, 90.0, -35.0],
+        [90.0, 420.0, 55.0],
+        [-35.0, 55.0, 260.0],
+    ])
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    widths = np.diff(edges)
+    response = np.zeros((wavelength.size, wavelength.size))
+    for column in range(wavelength.size):
+        response[column, column] += 0.70
+        if column > 0:
+            response[column - 1, column] += 0.20
+        if column < wavelength.size - 1:
+            response[column + 1, column] += 0.10
+    np.testing.assert_allclose(response.sum(axis=0), 1.0, atol=1e-14)
+
+    spectra = []
+    for direction in q:
+        projected_temperature = float(direction @ expected @ direction)
+        sigma = laser * 2.0 * np.sin(angle / 2.0) * np.sqrt(
+            elementary_charge * projected_temperature / electron_mass
+        ) / c_light
+        density, _, _ = _tensor_finite_bin_gaussian_density(
+            wavelength, laser, sigma
+        )
+        measured_feature = (response @ (density * widths)) / widths
+        spectra.append(2.0 * measured_feature + 0.02)
+
+    result = fit_general_temperature_tensor_thomson_spectra(
+        wavelength, np.asarray(spectra),
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        scattering_vector_unit=q,
+        instrument_response_matrix=response,
+        signal_uncertainty=np.full((len(q), wavelength.size), 2e-4),
+        # Deliberately omit initial_temperature_tensor_eV: the solver must
+        # derive an energy-scaled seed from measured wavelength moments.
+    )
+    np.testing.assert_allclose(
+        result["electron_temperature_tensor_eV"], expected,
+        rtol=8e-3, atol=2.0,
+    )
+    assert result["initialization_source"].startswith(
+        "positive_background_subtracted_spectral_second_moments"
+    )
+    assert result["initial_projected_temperature_seed_eV"].shape == (len(q),)
+    assert np.all(result["initial_projected_temperature_seed_eV"] > 0.0)
+    assert result["jacobian_rank"] == result["jacobian_parameter_count"]
+    assert result["reportable_as_inferred_parameter"] is True
