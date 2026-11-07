@@ -32,7 +32,7 @@ def test_collective_whitener_pointwise_uncertainty_is_diagonal_gls():
 @pytest.mark.parametrize(
     "kwargs, message",
     [
-        ({"covariance": np.eye(2)}, "match the wavelength grid"),
+        ({"covariance": np.eye(3)}, "match the wavelength grid"),
         ({"covariance": np.array([[1.0, 2.0], [2.0, 1.0]])}, "positive definite"),
         ({"uncertainty": np.array([1.0, 0.0])}, "strictly positive|positive"),
     ],
