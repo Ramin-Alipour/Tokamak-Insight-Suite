@@ -1784,3 +1784,46 @@ def test_structured_background_gls_covariance_keeps_absolute_measurement_scale()
     np.testing.assert_allclose(
         result["coefficient_covariance"], expected, rtol=1e-10, atol=1e-12,
     )
+
+
+
+def test_spectral_distribution_receives_disjoint_measurement_model_and_systematic_covariances(monkeypatch):
+    import tokamak_analysis.thomson_distribution as distribution_module
+
+    wavelength, measured, _ = _spectral_case(120.0, n=241)
+    n = wavelength.size
+    measurement_sigma = np.full((1, n), 0.1)
+    discrepancy = np.eye(n) * 0.02**2
+    systematic = np.eye(n) * 0.03**2
+    captured = {}
+    original = distribution_module.analyze_thomson_spectral_distribution
+
+    def capture(*args, **kwargs):
+        captured.update(kwargs)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        distribution_module, "analyze_thomson_spectral_distribution", capture
+    )
+    analyze_thomson_spectra(
+        wavelength, measured[None, :], [0.2],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(n),
+        signal_uncertainty=measurement_sigma,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+    )
+    np.testing.assert_allclose(
+        captured["signal_covariance"], np.diag(measurement_sigma[0]**2),
+        rtol=1e-10, atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        captured["model_discrepancy_covariance"], discrepancy,
+        rtol=1e-10, atol=1e-14,
+    )
+    np.testing.assert_allclose(
+        captured["systematic_covariance"], systematic,
+        rtol=1e-10, atol=1e-14,
+    )
+    assert captured["signal_uncertainty"] is None
