@@ -381,10 +381,33 @@ def analyze_thomson_spectral_distribution(
     if fit_scale <= 0:
         raise ValueError("Signal must have nonzero scale for Gaussian fitting")
     fit_y = y / fit_scale
+    # Include additive model-discrepancy and systematic spectral errors in
+    # the likelihood itself, rather than only inflating moment error bars.
+    # Independent components obey C_fit = C_measurement + C_model + C_systematic.
+    fit_covariance_components = []
+    if uncertainty is not None:
+        fit_covariance_components.append(np.diag(uncertainty**2))
+    elif signal_covariance_matrix is not None:
+        fit_covariance_components.append(signal_covariance_matrix)
+    if model_discrepancy_matrix is not None:
+        fit_covariance_components.append(model_discrepancy_matrix)
+    if systematic_matrix is not None:
+        fit_covariance_components.append(systematic_matrix)
+    fit_total_covariance = None
+    fit_total_covariance_cholesky = None
+    if fit_covariance_components:
+        fit_total_covariance = np.sum(fit_covariance_components, axis=0)
+        fit_total_covariance = 0.5 * (fit_total_covariance + fit_total_covariance.T)
+        try:
+            fit_total_covariance_cholesky = np.linalg.cholesky(fit_total_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "The combined measurement, model-discrepancy and systematic "
+                "spectral covariance used by the Gaussian fit must be positive definite."
+            ) from exc
     fit_sigma = (
-        uncertainty / fit_scale if uncertainty is not None
-        else signal_covariance_matrix / fit_scale**2 if signal_covariance_matrix is not None
-        else None
+        fit_total_covariance / fit_scale**2
+        if fit_total_covariance is not None else None
     )
     fit_p0 = [p0[0] / fit_scale, p0[1], p0[2], p0[3] / fit_scale, p0[4] / fit_scale]
     fit_lower = [lower[0] / fit_scale, lower[1], lower[2], lower[3], lower[4] / fit_scale]
@@ -401,7 +424,7 @@ def analyze_thomson_spectral_distribution(
     try:
         scaled_params, scaled_covariance = curve_fit(
             fit_model, x, fit_y, p0=fit_p0, bounds=(fit_lower, fit_upper),
-            sigma=fit_sigma, absolute_sigma=(uncertainty is not None or signal_covariance_matrix is not None), maxfev=50000,
+            sigma=fit_sigma, absolute_sigma=(fit_total_covariance is not None), maxfev=50000,
         )
         # fit_model is evaluated in normalized-intensity space. Keep the
         # optimizer parameters for model evaluation and expose the converted
@@ -416,10 +439,8 @@ def analyze_thomson_spectral_distribution(
         raise ValueError("Gaussian spectral-shape fit returned non-finite results")
     residual = y - fitted
     dof = max(1, x.size - len(params))
-    if uncertainty is not None:
-        chi_square_raw = float(np.sum((residual / uncertainty) ** 2))
-    elif signal_covariance_matrix is not None:
-        whitened_residual = np.linalg.solve(covariance_cholesky, residual)
+    if fit_total_covariance_cholesky is not None:
+        whitened_residual = np.linalg.solve(fit_total_covariance_cholesky, residual)
         chi_square_raw = float(whitened_residual @ whitened_residual)
     else:
         chi_square_raw = None
@@ -566,7 +587,17 @@ def analyze_thomson_spectral_distribution(
             "background_slope_per_nm": parameter_uncertainties[4],
         },
         "gaussian_fit_covariance_valid": covariance_valid,
+        "gaussian_fit_likelihood_covariance_components": {
+            "measurement_included": bool(uncertainty is not None or signal_covariance_matrix is not None),
+            "model_discrepancy_included": model_discrepancy_matrix is not None,
+            "systematic_included": systematic_matrix is not None,
+            "independence_assumption_between_components": "additive_independent_covariance_components",
+            "covariance_definition": "C_fit=C_measurement+C_model_discrepancy+C_systematic",
+            "used_in_optimizer_and_chi_square": fit_total_covariance is not None,
+        },
         "gaussian_fit_statistical_weighting_status": (
+            "weighted_by_measurement_plus_model_discrepancy_plus_systematic_covariance"
+            if fit_total_covariance is not None and (model_discrepancy_matrix is not None or systematic_matrix is not None) else
             "weighted_by_full_within_channel_spectral_covariance"
             if signal_covariance_matrix is not None else
             "weighted_by_independent_pointwise_measurement_uncertainty"
@@ -574,8 +605,10 @@ def analyze_thomson_spectral_distribution(
             "unweighted_least_squares_no_measurement_uncertainty_supplied"
         ),
         "gaussian_fit_covariance_interpretation": (
+            "conditional_local_covariance_for_fixed_background_and_fixed_measured_response_with_all_supplied_spectral_covariance_components"
+            if fit_total_covariance is not None and (model_discrepancy_matrix is not None or systematic_matrix is not None) else
             "conditional_local_covariance_for_fixed_background_and_fixed_measured_response"
-            if uncertainty is not None or signal_covariance_matrix is not None else
+            if fit_total_covariance is not None else
             "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         ),
         "moment_interpretation": (
