@@ -361,6 +361,9 @@ EXAMPLES = {
         "initial_flow_projection_m_s": 0.0,
         "incident_polarization": [0.0, 0.0, 1.0],
         "signal_uncertainty": np.full(81, 0.02).tolist(),
+        "model_discrepancy_covariance": None,
+        "systematic_covariance": None,
+        "geometry_covariance_nm2_rad2": None,
         "background_model": "linear",
         "background_degree": 1,
         "radial_order": 12,
@@ -993,6 +996,14 @@ def render_advanced_thomson_physics_page(st) -> None:
     )
     if model in MODEL_PHYSICS_NOTES:
         st.info(MODEL_PHYSICS_NOTES[model])
+    if model == "thomson_n_population_relativistic_fit":
+        st.caption(
+            "For the N-population relativistic optical Thomson fit, systematic_covariance is an additive wavelength-by-wavelength covariance. "
+            "The fit minimizes GLS residuals with Sigma_total = Sigma_measurement + Sigma_model_discrepancy + Sigma_systematic; "
+            "geometry_covariance_nm2_rad2 additionally propagates correlated laser-wavelength and scattering-angle calibration errors "
+            "through the fitted physical parameters by the implicit GLS sensitivity Jacobian."
+        )
+
     st.caption(
         "For joint spatial Thomson inversion, systematic_covariance accepts a full channel-major covariance matrix for independent calibration/systematic errors; it is added to measurement and model-discrepancy covariance, not substituted for either."
     )

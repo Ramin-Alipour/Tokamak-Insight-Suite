@@ -134,3 +134,138 @@ def test_n_population_inverse_is_connected_to_public_physics_dispatcher():
     assert result["public_physics_entrypoint"] == model
     assert result["population_count"] == 2
     assert result["joint_parameter_covariance"].shape[0] == len(result["parameter_names"])
+
+
+
+def test_n_population_fit_adds_systematic_covariance_to_measurement_and_model_discrepancy():
+    from tokamak_analysis.thomson_n_population import (
+        fit_n_population_relativistic_thomson_spectrum,
+    )
+
+    x = np.linspace(450.0, 614.0, 101)
+    response = np.eye(x.size)
+    physical = n_population_relativistic_thomson_spectrum(
+        x, 532.0, np.pi / 2.0, [120.0, 1200.0], [0.72, 0.28],
+        flow_projection_m_s=1.0e4,
+        incident_polarization=[1.0, 0.0, 0.0],
+        radial_order=12, angular_order=8,
+    )
+    measured = 8.0e3 * physical["spectral_density_per_nm"] + 1.0
+    measurement = np.eye(x.size) * 0.04
+    discrepancy = np.eye(x.size) * 0.01
+    systematic = np.full((x.size, x.size), 0.0025)
+    common = dict(
+        wavelength_nm=x, measured_spectrum=measured,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=response, population_count=2,
+        initial_temperatures_eV=[100.0, 1500.0],
+        initial_fractions=[0.7, 0.3],
+        initial_flow_projection_m_s=8.0e3,
+        incident_polarization=[1.0, 0.0, 0.0],
+        spectral_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        background_model="constant",
+        radial_order=12, angular_order=8, max_nfev=1000,
+    )
+    result = fit_n_population_relativistic_thomson_spectrum(
+        **common, systematic_covariance=systematic
+    )
+    expected = measurement + discrepancy + systematic
+    np.testing.assert_allclose(result["total_spectral_covariance"], expected)
+    assert result["systematic_covariance_included"] is True
+    assert result["model_discrepancy_covariance_included"] is True
+    assert result["noise_model"] == (
+        "GLS_measurement_plus_model_discrepancy_plus_systematic_covariance"
+    )
+    assert result["covariance_component_trace"]["systematic"] == pytest.approx(
+        np.trace(systematic)
+    )
+
+
+def test_n_population_rejects_indefinite_systematic_covariance():
+    from tokamak_analysis.thomson_n_population import (
+        fit_n_population_relativistic_thomson_spectrum,
+    )
+
+    x = np.linspace(450.0, 614.0, 41)
+    bad = np.eye(x.size)
+    bad[0, 0] = -1.0
+    with pytest.raises(ValueError, match="systematic_covariance must be positive semidefinite"):
+        fit_n_population_relativistic_thomson_spectrum(
+            x, np.ones(x.size), 532.0, np.pi / 2.0, np.eye(x.size),
+            population_count=2,
+            initial_temperatures_eV=[100.0, 1000.0],
+            initial_fractions=[0.7, 0.3],
+            initial_flow_projection_m_s=0.0,
+            incident_polarization=[1.0, 0.0, 0.0],
+            signal_uncertainty=np.ones(x.size),
+            systematic_covariance=bad,
+            radial_order=12, angular_order=8,
+        )
+
+
+
+def test_n_population_fit_propagates_correlated_laser_and_angle_calibration_covariance():
+    from tokamak_analysis.thomson_n_population import (
+        fit_n_population_relativistic_thomson_spectrum,
+    )
+
+    x = np.linspace(450.0, 614.0, 81)
+    response = np.eye(x.size)
+    physical = n_population_relativistic_thomson_spectrum(
+        x, 532.0, np.pi / 2.0, [150.0, 1400.0], [0.75, 0.25],
+        flow_projection_m_s=1.0e4,
+        incident_polarization=[1.0, 0.0, 0.0],
+        radial_order=10, angular_order=6,
+    )
+    measured = 5.0e3 * physical["spectral_density_per_nm"] + 0.5
+    geometry_covariance = np.array([
+        [1.0e-4, 1.0e-6],
+        [1.0e-6, 4.0e-6],
+    ])
+    result = fit_n_population_relativistic_thomson_spectrum(
+        x, measured, 532.0, np.pi / 2.0, response,
+        population_count=2,
+        initial_temperatures_eV=[130.0, 1600.0],
+        initial_fractions=[0.7, 0.3],
+        initial_flow_projection_m_s=8.0e3,
+        incident_polarization=[1.0, 0.0, 0.0],
+        signal_uncertainty=np.full(x.size, 0.1),
+        geometry_covariance_nm2_rad2=geometry_covariance,
+        background_model="constant",
+        radial_order=10, angular_order=6, max_nfev=1000,
+    )
+    assert result["geometry_covariance_included"] is True
+    np.testing.assert_allclose(
+        result["geometry_covariance_nm2_rad2"], geometry_covariance
+    )
+    sensitivity = result["geometry_parameter_sensitivity_internal_per_nm_rad"]
+    induced = result["geometry_induced_internal_parameter_covariance"]
+    assert sensitivity.shape == (result["jacobian_parameter_count"], 2)
+    assert induced.shape == (
+        result["jacobian_parameter_count"],
+        result["jacobian_parameter_count"],
+    )
+    assert np.trace(induced) > 0.0
+    assert np.all(np.linalg.eigvalsh(induced) >= -1e-10 * max(1.0, np.linalg.norm(induced)))
+
+
+def test_n_population_rejects_non_psd_geometry_covariance():
+    from tokamak_analysis.thomson_n_population import (
+        fit_n_population_relativistic_thomson_spectrum,
+    )
+
+    bad_geometry = np.array([[1.0e-4, 2.0e-3], [2.0e-3, 1.0e-4]])
+    with pytest.raises(ValueError, match="geometry_covariance_nm2_rad2 must be positive semidefinite"):
+        fit_n_population_relativistic_thomson_spectrum(
+            np.linspace(450.0, 614.0, 41), np.ones(41),
+            532.0, np.pi / 2.0, np.eye(41),
+            population_count=2,
+            initial_temperatures_eV=[100.0, 1000.0],
+            initial_fractions=[0.7, 0.3],
+            initial_flow_projection_m_s=0.0,
+            incident_polarization=[1.0, 0.0, 0.0],
+            signal_uncertainty=np.ones(41),
+            geometry_covariance_nm2_rad2=bad_geometry,
+            radial_order=10, angular_order=6,
+        )
