@@ -1070,3 +1070,99 @@ def test_spectral_distribution_kappa_inference_is_reportable_from_real_joint_fit
         temperature, rel=0.05
     )
     assert inference["fit"]["kappa_index"] == pytest.approx(kappa, rel=0.08)
+
+
+
+def test_collective_physical_initial_is_routed_to_native_canonical_solver(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+
+    x, y = _spectrum()
+    captured = {}
+
+    def fake_canonical(wavelength, spectra, radius, **kwargs):
+        captured.update(kwargs)
+        return {
+            "channels": [{"electron_temperature_eV": 120.0}],
+            "result_classification": {
+                "channels": [{
+                    "primary": [
+                        {"parameter": "electron_density_m3"},
+                        {"parameter": "electron_temperature_eV"},
+                    ]
+                }]
+            },
+        }
+
+    monkeypatch.setattr(inference, "analyze_thomson_spectra", fake_canonical)
+    out = _run(
+        x, y,
+        physical_model="collective_maxwellian",
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        physical_initial={
+            "collective_initial_density_m3": 2.0e19,
+            "collective_initial_temperature_eV": 120.0,
+        },
+        physical_fit_options={"radius_m": 0.2},
+    )
+
+    assert captured["collective_initial_density_m3"] == pytest.approx(2.0e19)
+    assert captured["collective_initial_temperature_eV"] == pytest.approx(120.0)
+    assert out["physical_inference"]["selected_model"] == "collective_maxwellian"
+    assert out["physical_inference"]["reportable_as_primary_inference"] is True
+
+
+def test_collective_kappa_physical_initial_routes_kappa_seed(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+
+    x, y = _spectrum()
+    captured = {}
+
+    def fake_canonical(wavelength, spectra, radius, **kwargs):
+        captured.update(kwargs)
+        return {
+            "channels": [{"electron_temperature_eV": 150.0}],
+            "result_classification": {
+                "channels": [{
+                    "primary": [
+                        {"parameter": "electron_density_m3"},
+                        {"parameter": "electron_temperature_eV"},
+                    ]
+                }]
+            },
+        }
+
+    monkeypatch.setattr(inference, "analyze_thomson_spectra", fake_canonical)
+    _run(
+        x, y,
+        physical_model="collective_kappa",
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        physical_initial={
+            "collective_initial_density_m3": 1.5e19,
+            "collective_initial_temperature_eV": 150.0,
+            "collective_kappa_initial": 3.5,
+        },
+        physical_fit_options={"radius_m": 0.2},
+    )
+    assert captured["collective_kappa_initial"] == pytest.approx(3.5)
+
+
+def test_collective_physical_initial_rejects_unknown_or_duplicate_seed_keys():
+    x, y = _spectrum()
+    base = {
+        "physical_model": "collective_maxwellian",
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": np.pi / 2,
+        "physical_fit_options": {"radius_m": 0.2},
+    }
+    with pytest.raises(ValueError, match="Unsupported physical_initial keys"):
+        _run(x, y, **base, physical_initial={"temperature": 100.0})
+    with pytest.raises(ValueError, match="not both"):
+        _run(
+            x, y,
+            **{**base, "physical_fit_options": {
+                "radius_m": 0.2, "collective_initial_temperature_eV": 100.0
+            }},
+            physical_initial={"collective_initial_temperature_eV": 100.0},
+        )
