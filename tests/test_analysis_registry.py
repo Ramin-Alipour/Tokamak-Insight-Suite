@@ -205,7 +205,11 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     assert (profile["module"], profile["function"]) == (
         "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
-    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82]
+    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82, 83]
+    tensor = get_analysis(83)
+    assert (tensor["module"], tensor["function"]) == (
+        "thomson_workflow", "fit_general_temperature_tensor_thomson_spectra"
+    )
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
         get_analysis(7)
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
