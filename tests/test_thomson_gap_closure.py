@@ -371,7 +371,7 @@ def test_relativistic_projected_evdf_adds_systematic_covariance_once():
     assert "C_eff = C_signal + C_background" in result["effective_spectral_covariance_formula"]
     np.testing.assert_allclose(result["systematic_covariance"], systematic)
     np.testing.assert_allclose(result["effective_spectral_covariance"], systematic)
-    assert result["noise_model"] == "systematic_spectral_covariance"
+    assert result["noise_model"] == "systematic_only_no_measurement_noise_covariance"
 
 
 def test_relativistic_projected_evdf_rejects_non_psd_systematic_covariance():
