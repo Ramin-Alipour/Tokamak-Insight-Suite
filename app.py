@@ -1639,11 +1639,23 @@ elif page=='Spectral Analysis':
                         channel_index=channel.get('channel_index')
                         radius=channel.get('radius_m')
                         with st.expander(f"Projected EVDF — channel {channel_index}, radius {radius} m"):
-                            if evdf.get('analysis_status')!='completed':
-                                st.info(evdf.get('reason',evdf.get('analysis_status','Projected EVDF unavailable for this channel/model.')))
+                            evdf_status=evdf.get('analysis_status','unavailable')
+                            if evdf_status not in {'completed','conditional_regularized_candidate'}:
+                                st.info(evdf.get('reason',evdf_status or 'Projected EVDF unavailable for this channel/model.'))
                                 continue
-                            velocity=np.asarray(evdf.get('velocity_parallel_m_s',[]),dtype=float)
-                            distribution_values=np.asarray(evdf.get('evdf_parallel_s_per_m',[]),dtype=float)
+                            velocity=np.asarray(
+                                evdf.get('velocity_parallel_m_s',evdf.get('velocity_grid_m_s',[])),
+                                dtype=float,
+                            )
+                            distribution_source=evdf.get('evdf_parallel_s_per_m')
+                            if distribution_source is None:
+                                distribution_source=evdf.get('projected_evdf_s_m')
+                            if distribution_source is None and evdf_status=='conditional_regularized_candidate':
+                                distribution_source=evdf.get('regularized_candidate_evdf_s_m')
+                            distribution_values=np.asarray(
+                                [] if distribution_source is None else distribution_source,
+                                dtype=float,
+                            )
                             if (velocity.ndim!=1 or distribution_values.shape!=velocity.shape
                                     or velocity.size<2 or not np.all(np.isfinite(velocity))
                                     or not np.all(np.isfinite(distribution_values))):
@@ -1654,7 +1666,10 @@ elif page=='Spectral Analysis':
                                 index=pd.Index(velocity,name='velocity_parallel_m_s'),
                             )
                             st.line_chart(evdf_curve)
-                            uncertainty=evdf.get('evdf_standard_uncertainty_s_per_m')
+                            uncertainty=evdf.get(
+                                'evdf_standard_uncertainty_s_per_m',
+                                evdf.get('projected_evdf_standard_uncertainty_s_m'),
+                            )
                             if uncertainty is not None:
                                 uncertainty=np.asarray(uncertainty,dtype=float)
                                 if uncertainty.shape==distribution_values.shape and np.all(np.isfinite(uncertainty)):
@@ -1669,6 +1684,8 @@ elif page=='Spectral Analysis':
                                         'It excludes regularization-selection uncertainty and is not a posterior interval.'
                                     )
                                     st.line_chart(band)
+                            if evdf_status=='conditional_regularized_candidate':
+                                st.warning('This is a regularized candidate only: the measured spectrum did not identify the full projected EVDF independently of regularization.')
                             st.caption(evdf.get('interpretation','One-dimensional marginal along the scattering vector; not an unrestricted three-dimensional EVDF.'))
                             comparison=evdf.get('parametric_model_comparison')
                             if comparison:

@@ -174,6 +174,10 @@ def test_dashboard_source_renders_projected_evdf_profiles_and_uncertainty():
     assert "velocity_parallel_m_s" in source
     assert "evdf_parallel_s_per_m" in source
     assert "evdf_standard_uncertainty_s_per_m" in source
+    assert "projected_evdf_s_m" in source
+    assert "regularized_candidate_evdf_s_m" in source
+    assert "projected_evdf_standard_uncertainty_s_m" in source
+    assert "conditional_regularized_candidate" in source
     assert "regularization_sensitivity" in source
     assert "Frequentist fixed-active-set Tikhonov sandwich" in source
     assert "parametric_model_selection_uncertainty" in source
