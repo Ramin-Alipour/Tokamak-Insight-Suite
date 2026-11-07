@@ -930,7 +930,8 @@ def analyze_thomson_spectral_distribution(
             "scattering_angle_rad", "instrument_response_matrix",
             "background_signal", "signal_uncertainty", "signal_covariance",
             "background_uncertainty", "background_covariance",
-            "signal_background_cross_covariance",
+            "signal_background_cross_covariance", "model_discrepancy_covariance",
+            "systematic_covariance",
         }
         conflicts = sorted(reserved.intersection(options))
         if conflicts:
@@ -958,6 +959,18 @@ def analyze_thomson_spectral_distribution(
             evdf_kwargs["background_covariance"] = background_covariance_matrix.copy()
         if signal_background_cross_covariance is not None:
             evdf_kwargs["signal_background_cross_covariance"] = cross_covariance.copy()
+        # Keep the same additive spectral discrepancy/systematic terms in the
+        # inverse EVDF likelihood as in the physical fit. These are independent
+        # covariance components by contract; the EVDF solver validates PSD and
+        # the complete residual covariance before whitening.
+        if model_discrepancy_covariance is not None:
+            evdf_kwargs["model_discrepancy_covariance"] = np.asarray(
+                model_discrepancy_covariance, dtype=float
+            ).copy()
+        if systematic_covariance is not None:
+            evdf_kwargs["systematic_covariance"] = np.asarray(
+                systematic_covariance, dtype=float
+            ).copy()
         result["projected_evdf_inference"] = reconstruct_thomson_evdf(**evdf_kwargs)
         result["projected_evdf_inference"]["source_spectrum"] = (
             "same_calibrated_measured_spectrum_as_spectral_distribution"
