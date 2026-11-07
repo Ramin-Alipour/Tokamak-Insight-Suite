@@ -270,15 +270,6 @@ def reconstruct_thomson_evdf(
     if np.max(np.abs(velocity)) >= 0.1 * _C:
         raise ValueError("The current Doppler inversion is non-relativistic and requires every represented |v_parallel| < 0.1 c; use a relativistic forward model otherwise")
 
-    # omega_s = omega_i + q.v; first-order wavelength mapping.
-    lambda_centres = float(laser_wavelength_nm) * (1.0 - q_over_ki * velocity / _C)
-    if np.any(lambda_centres < wavelength[0]) or np.any(lambda_centres > wavelength[-1]):
-        raise ValueError("velocity grid maps outside the measured wavelength interval; narrow the velocity grid or widen the measured spectral window")
-
-    # Use the same midpoint finite-volume measure as the spectral-distribution
-    # analysis; endpoint bins are half-width, including on non-uniform grids.
-    widths = _wavelength_bin_widths(wavelength)
-
     # Integrate the nodal EVDF density over velocity space with the same
     # trapezoidal measure used for normalization and physical moments.
     # Without these weights, nonuniform velocity grids solve an unweighted
