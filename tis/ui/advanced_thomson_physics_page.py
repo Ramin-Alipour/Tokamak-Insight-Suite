@@ -353,6 +353,8 @@ EXAMPLES = {
         "initial_flow_projection_m_s": 0.0,
         "incident_polarization": [0.0, 0.0, 1.0],
         "signal_uncertainty": np.full(81, 0.02).tolist(),
+        "model_discrepancy_covariance": None,
+        "systematic_covariance": None,
         "background_model": "linear",
         "background_degree": 1,
         "radial_order": 12,
