@@ -1452,6 +1452,19 @@ def analyze_thomson_spectra(
                 raise ValueError(
                     "full channel-major model_discrepancy_covariance must be positive semidefinite"
                 )
+            if model == "collective_maxwellian":
+                for row in range(nchan_disc):
+                    for col in range(nchan_disc):
+                        if row != col:
+                            cross = full_discrepancy_covariance[
+                                row*nlam_disc:(row+1)*nlam_disc,
+                                col*nlam_disc:(col+1)*nlam_disc,
+                            ]
+                            if np.any(np.abs(cross) > 1e-13 * scale):
+                                raise ValueError(
+                                    "collective_maxwellian currently fits channels independently; "
+                                    "cross-channel model-discrepancy covariance cannot be silently discarded"
+                                )
             independent_discrepancy_blocks = np.stack([
                 full_discrepancy_covariance[
                     channel_index*nlam_disc:(channel_index+1)*nlam_disc,
@@ -1535,6 +1548,19 @@ def analyze_thomson_spectra(
             scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
             if float(np.min(eigenvalues)) < -1e-10 * scale:
                 raise ValueError("full channel-major systematic_covariance must be positive semidefinite")
+            if model == "collective_maxwellian":
+                for row in range(nchan_sys):
+                    for col in range(nchan_sys):
+                        if row != col:
+                            cross = full_systematic_covariance[
+                                row*nlam_sys:(row+1)*nlam_sys,
+                                col*nlam_sys:(col+1)*nlam_sys,
+                            ]
+                            if np.any(np.abs(cross) > 1e-13 * scale):
+                                raise ValueError(
+                                    "collective_maxwellian currently fits channels independently; "
+                                    "cross-channel systematic covariance cannot be silently discarded"
+                                )
             independent_systematic_blocks = np.stack([
                 full_systematic_covariance[
                     channel_index*nlam_sys:(channel_index+1)*nlam_sys,
