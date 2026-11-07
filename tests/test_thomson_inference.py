@@ -198,6 +198,59 @@ def test_optical_analysis_1_routes_collective_dielectric_models_to_physical_vali
                 model=model,
             )
 
+def test_collective_kappa_is_executable_through_canonical_optical_analysis():
+    from tokamak_analysis.thomson_kinetic_models import collective_kappa_spectral_density
+
+    wavelength = np.linspace(1048.0, 1080.0, 101)
+    angle = np.pi / 2.0
+    laser = 1064.0
+    incident = np.array([-np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0])
+    scattered = np.array([np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0])
+    plasma = dict(
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=150.0,
+        kappa=3.5,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident,
+        scattered_direction=scattered,
+    )
+    physical_spectrum = collective_kappa_spectral_density(
+        wavelength, laser, angle, **plasma
+    )["spectral_density_per_nm"]
+    signal = 2.0e4 * physical_spectrum + 10.0 + 0.001 * (wavelength - laser)
+    result = _analyze_thomson_spectra(
+        wavelength, signal[None, :], [0.1],
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full((1, wavelength.size), 0.01 * np.max(signal)),
+        model="collective_kappa",
+        ion_species=plasma["ion_species"],
+        ion_fractions=plasma["ion_fractions"],
+        ion_temperature_eV=plasma["ion_temperature_eV"],
+        electron_velocity_m_s=plasma["electron_velocity_m_s"],
+        ion_velocity_m_s=plasma["ion_velocity_m_s"],
+        collective_initial_density_m3=1.0e19,
+        collective_initial_temperature_eV=150.0,
+        collective_density_bounds_m3=[5.0e18, 2.0e19],
+        collective_temperature_bounds_eV=[75.0, 300.0],
+        collective_kappa_initial=3.5,
+        collective_kappa_bounds=[2.0, 6.0],
+        collective_external_parameter_mc_samples=20,
+        enable_evdf_reconstruction=False,
+    )
+    channel = result["channels"][0]
+    assert result["model"] == "collective_kappa"
+    assert channel["optimizer_success"] is True
+    assert channel["electron_density_m3"] == pytest.approx(1.0e19, rel=2e-3)
+    assert channel["electron_temperature_eV"] == pytest.approx(150.0, rel=2e-3)
+    assert channel["kappa_index"] == pytest.approx(3.5, rel=2e-3)
+    assert channel["parameter_provenance"]["electron_distribution"].startswith("kappa")
+
 def test_channel_specific_wavelength_axes_are_supported():
     x1, y1, _ = _spectral_case(100.0)
     x2, y2, _ = _spectral_case(150.0, center_nm=532.02)
