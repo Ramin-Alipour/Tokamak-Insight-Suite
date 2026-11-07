@@ -229,7 +229,7 @@ def test_raw_spectral_tensor_fit_derives_temperature_seed_from_spectral_width_an
     )
 
     c_light, elementary_charge, electron_mass = 299792458.0, 1.602176634e-19, 9.1093837015e-31
-    wavelength = np.linspace(529.0, 535.0, 121)
+    wavelength = np.linspace(432.0, 632.0, 121)
     laser, angle = 532.0, np.pi / 2.0
     q = np.array([
         [1, 0, 0], [0, 1, 0], [0, 0, 1],
