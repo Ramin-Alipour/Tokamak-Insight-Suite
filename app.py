@@ -3897,6 +3897,7 @@ elif page=='Advanced Analysis':
                             'observed_width_1sigma_nm':distribution.get('observed_sigma_uncertainty_nm'),
                             'model_discrepancy_included':distribution.get('model_discrepancy_covariance_included_in_moment_uncertainty',False),
                             'systematic_covariance_included':distribution.get('systematic_covariance_included_in_moment_uncertainty',False),
+                            'effective_covariance_equation':distribution.get('moment_uncertainty_covariance_formula'),
                         })
                     else:
                         st.caption('No measurement, background, model-discrepancy or systematic covariance was supplied for spectral-moment uncertainty propagation.')
@@ -3912,6 +3913,7 @@ elif page=='Advanced Analysis':
                             'regularization_selection':evdf_dashboard.get('regularization_selection'),
                             'data_only_jacobian_rank':evdf_dashboard.get('data_only_jacobian_rank'),
                             'data_only_parameter_count':evdf_dashboard.get('data_only_parameter_count'),
+                            'effective_covariance_equation':evdf_dashboard.get('effective_spectral_covariance_formula'),
                             'identifiability':evdf_dashboard.get('identifiability'),
                         })
                         st.caption('The reconstructed distribution is the one-dimensional marginal along the scattering vector. A regularized candidate is not a unique 3-D EVDF unless the data-identifiability diagnostics support that claim.')
