@@ -277,6 +277,31 @@ def _tensor_finite_bin_gaussian_density(wavelength_nm, centre_nm, sigma_nm):
     return probability / widths, probability, widths
 
 
+def _tensor_finite_bin_kappa_density(wavelength_nm, centre_nm, sigma_nm, kappa_index):
+    """Exact finite-bin projected marginal of an ellipsoidal 3-D Kappa EVDF."""
+    wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
+    sigma, centre, kappa = float(sigma_nm), float(centre_nm), float(kappa_index)
+    if wavelength.size < 3 or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least three increasing bin centres")
+    if not np.isfinite(sigma) or sigma <= 0.0 or not np.isfinite(centre):
+        raise ValueError("Kappa centre must be finite and projected standard deviation strictly positive")
+    if not np.isfinite(kappa) or kappa <= 1.5:
+        raise ValueError("Kappa index must be finite and >1.5 for a finite second moment")
+    edges = np.empty(wavelength.size + 1, dtype=float)
+    edges[1:-1] = 0.5*(wavelength[:-1]+wavelength[1:])
+    edges[0] = wavelength[0]-0.5*(wavelength[1]-wavelength[0])
+    edges[-1] = wavelength[-1]+0.5*(wavelength[-1]-wavelength[-2])
+    widths = np.diff(edges)
+    degrees = 2.0*kappa-1.0
+    scale = sigma*np.sqrt((degrees-2.0)/degrees)
+    z = (edges-centre)/scale
+    from scipy.special import stdtr
+    probability = stdtr(degrees,z[1:])-stdtr(degrees,z[:-1])
+    positive = z[:-1] > 0.0
+    probability[positive] = stdtr(degrees,-z[:-1][positive])-stdtr(degrees,-z[1:][positive])
+    return probability/widths, probability, widths
+
+
 def fit_general_temperature_tensor_thomson_spectra(
     wavelength_nm,
     measured_spectra,
@@ -291,6 +316,10 @@ def fit_general_temperature_tensor_thomson_spectra(
     systematic_covariance=None,
     initial_temperature_tensor_eV=None,
     initial_electron_velocity_vector_m_s=None,
+    distribution_model="maxwellian",
+    initial_kappa_index=None,
+    fit_kappa_index=False,
+    kappa_bounds=None,
     maximum_projected_rms_beta=0.1,
     maximum_flow_beta=0.1,
     maximum_jacobian_condition_number=1.0e12,
@@ -301,13 +330,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     spectral_geometry_cross_covariance=None,
     max_nfev=5000,
 ):
-    r"""Jointly infer a general PSD 3-D Gaussian electron temperature tensor from raw TS spectra.
+    r"""Jointly infer a general PSD 3-D electron temperature tensor from raw TS spectra.
 
-    Physical closure:
-      f(v) ~ exp[-(v-u)^T Theta^{-1}(v-u)/2], Theta=(e/m_e) T_eV,
-      Var(v_q)=q^T Theta q, T_q=q^T T_eV q,
-      lambda_c=lambda_L(1-q_s u_q/c),
-      sigma_lambda=lambda_L q_s sqrt(e T_q/m_e)/c.
+    Physical closure: T_q=q^T T_eV q and Var(v_q)=e*T_q/m_e. Maxwellian
+    projections are Gaussian; Kappa projections are Student-t with nu=2*kappa-1
+    and scale^2=sigma_v^2*(nu-2)/nu. The measured response acts on bin-integrated power.
     The exact Gaussian probability is integrated over finite wavelength bins,
     then the measured response acts on bin-integrated spectral power. This is
     a non-relativistic, elastic, single-scattering forward model; it is not a
@@ -329,6 +356,29 @@ def fit_general_temperature_tensor_thomson_spectra(
     laser, angle = float(laser_wavelength_nm), float(scattering_angle_rad)
     if not np.isfinite(laser) or laser <= 0.0 or not np.isfinite(angle) or not 0.0 < angle < np.pi:
         raise ValueError("laser wavelength must be positive and scattering angle must lie in (0, pi)")
+    if distribution_model not in {"maxwellian","kappa"}:
+        raise ValueError("distribution_model must be 'maxwellian' or 'kappa'")
+    if not isinstance(fit_kappa_index,(bool,np.bool_)):
+        raise ValueError("fit_kappa_index must be boolean")
+    kappa_seed=None
+    kappa_lower=kappa_upper=None
+    if distribution_model=="kappa":
+        if initial_kappa_index is None:
+            raise ValueError("Kappa tensor inference requires an explicit initial_kappa_index >1.5")
+        kappa_seed=float(initial_kappa_index)
+        if not np.isfinite(kappa_seed) or kappa_seed<=1.5:
+            raise ValueError("initial_kappa_index must be finite and >1.5")
+        if fit_kappa_index:
+            if kappa_bounds is None:
+                raise ValueError("fit_kappa_index=True requires explicit kappa_bounds")
+            bounds=_finite_array(kappa_bounds,"kappa_bounds",1)
+            if bounds.shape!=(2,) or bounds[0]<=1.5 or bounds[0]>=bounds[1]:
+                raise ValueError("kappa_bounds must be an increasing pair with lower bound >1.5")
+            if not bounds[0]<=kappa_seed<=bounds[1]:
+                raise ValueError("initial_kappa_index must lie inside kappa_bounds")
+            kappa_lower,kappa_upper=map(float,bounds)
+    elif initial_kappa_index is not None or fit_kappa_index or kappa_bounds is not None:
+        raise ValueError("Kappa controls are valid only when distribution_model='kappa'")
     q_factor = 2.0*np.sin(angle/2.0)
     dyads = np.column_stack((
         directions[:,0]**2, directions[:,1]**2, directions[:,2]**2,
@@ -490,6 +540,8 @@ def fit_general_temperature_tensor_thomson_spectra(
         peak=max(float(np.max(row)-edge_level),1e-12)
         nuisance_seed.extend([np.log(peak),edge_level,0.0])
     p0=np.r_[tensor_seed, velocity_seed, np.asarray(nuisance_seed).reshape(n_view,3).ravel()]
+    if distribution_model=="kappa" and fit_kappa_index:
+        p0=np.r_[p0,np.log(kappa_seed-1.5)]
 
     def unpack(parameters):
         p=np.asarray(parameters,dtype=float)
@@ -509,7 +561,11 @@ def fit_general_temperature_tensor_thomson_spectra(
             log_amp, offset, slope = parameters[9+3*view:12+3*view]
             centre=laser*(1.0-q_factor*flow_projections[view]/299792458.0)
             sigma=laser*q_factor*np.sqrt(_E*projected[view]/_M_E)/299792458.0
-            density, probability, _ = _tensor_finite_bin_gaussian_density(wavelength,centre,sigma)
+            if distribution_model=="maxwellian":
+                density, probability, _ = _tensor_finite_bin_gaussian_density(wavelength,centre,sigma)
+            else:
+                kappa_value = 1.5+np.exp(parameters[-1]) if fit_kappa_index else kappa_seed
+                density, probability, _ = _tensor_finite_bin_kappa_density(wavelength,centre,sigma,kappa_value)
             captured=float(np.sum(probability))
             if captured <= 0.0 or not np.isfinite(captured):
                 raise ValueError("spectral wavelength window captures no physical Thomson signal")
@@ -537,6 +593,9 @@ def fit_general_temperature_tensor_thomson_spectra(
     upper[6:9]= flow_limit*299792458.0
     for view in range(n_view):
         lower[9+3*view]=-50.0; upper[9+3*view]=50.0
+    if distribution_model=="kappa" and fit_kappa_index:
+        lower[-1]=np.log(kappa_lower-1.5)
+        upper[-1]=np.log(kappa_upper-1.5)
     fit=least_squares(residual,p0,bounds=(lower,upper),method="trf",x_scale="jac",max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"general temperature-tensor spectral fit failed: {fit.message}")
@@ -707,7 +766,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     flow_beta=float(np.linalg.norm(velocity_vector)/299792458.0)
     within_validity=thermal_beta<beta_limit and flow_beta<flow_limit
     return {
-        "model":"nonrelativistic_non_gyrotropic_3d_gaussian_thomson_joint_spectral_fit",
+        "model":f"nonrelativistic_non_gyrotropic_3d_{distribution_model}_thomson_joint_spectral_fit",
+        "distribution_model":distribution_model,
+        "kappa_index":(1.5+np.exp(fit.x[-1]) if distribution_model=="kappa" and fit_kappa_index else kappa_seed),
+        "kappa_index_uncertainty":(float(np.exp(fit.x[-1])*np.sqrt(max(parameter_covariance[-1,-1],0.0))) if distribution_model=="kappa" and fit_kappa_index and parameter_covariance is not None else None),
+        "kappa_fit_status":("fitted_with_full_spectral_jacobian" if distribution_model=="kappa" and fit_kappa_index else "fixed_explicit_input" if distribution_model=="kappa" else "not_applicable"),
         "electron_temperature_tensor_eV":tensor,
         "principal_temperature_eigenvalues_eV":eigenvalues,
         "principal_axes_cartesian_columns":eigenvectors,
@@ -742,7 +805,7 @@ def fit_general_temperature_tensor_thomson_spectra(
         "parameter_covariance_order":[
             "L_xx_log","L_yx","L_yy_log","L_zx","L_zy","L_zz_log",
             "u_x_m_s","u_y_m_s","u_z_m_s",
-        ]+[name for i in range(n_view) for name in (f"log_amplitude_{i}",f"background_offset_{i}",f"background_slope_{i}")],
+        ]+[name for i in range(n_view) for name in (f"log_amplitude_{i}",f"background_offset_{i}",f"background_slope_{i}")]+(["log_kappa_minus_1p5"] if distribution_model=="kappa" and fit_kappa_index else []),
         "temperature_tensor_parameter_covariance_eV2":tensor_covariance,
         "electron_density_m3":density,
         "electron_density_uncertainty_m3":density_uncertainty,
@@ -761,8 +824,8 @@ def fit_general_temperature_tensor_thomson_spectra(
         "model_validity_limits":{"maximum_principal_thermal_rms_beta":beta_limit,"maximum_flow_beta":flow_limit,"relativistic_corrections":False},
         "reportable_as_inferred_parameter":bool(within_validity),
         "primary_result_status":"identified_from_measurement" if within_validity else "withheld_outside_nonrelativistic_validity_domain",
-        "physical_scope":"raw measured multi-view spectra; general symmetric Gaussian second-moment tensor; no gyrotropy assumption; no higher EVDF moments",
-        "spectral_forward_model":"exact finite-wavelength-bin Gaussian probability; measured response on bin-integrated power; view-specific flow, amplitude and affine background",
+        "physical_scope":f"raw measured multi-view spectra; general symmetric positive-definite temperature tensor; {distribution_model} projected closure; no gyrotropy assumption; not an unrestricted measured 3-D EVDF",
+        "spectral_forward_model":("exact finite-wavelength-bin Gaussian probability" if distribution_model=="maxwellian" else "exact finite-wavelength-bin Student-t probability with nu=2*kappa-1 and second-moment-normalized scale")+"; measured response on bin-integrated power; view-specific flow, amplitude and affine background",
         "experimental_validation":"synthetic_physics_recovery_only",
         "optimizer":{"success":bool(fit.success),"message":str(fit.message),"nfev":int(fit.nfev),"cost":float(fit.cost)},
     }
