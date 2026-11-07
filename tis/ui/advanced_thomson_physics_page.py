@@ -226,7 +226,7 @@ MODEL_PHYSICS_NOTES = {
         "Fits raw calibrated spectra jointly using a general symmetric positive-definite 3-D Gaussian velocity covariance. "
         "For each measured scattering direction q, T_q=q^T T_eV q, sigma_lambda=lambda_L*2*sin(theta/2)*sqrt(e*T_q/m_e)/c, "
         "and lambda_c=lambda_L*(1-2*sin(theta/2)*u_q/c). Gaussian probability is integrated exactly over finite wavelength bins; "
-        "the measured response acts on bin-integrated power. Six independent view dyads and a full-rank spectral Jacobian are mandatory. "
+        "the measured response acts on bin-integrated power. All view shifts obey u_q,i=q_hat_i dot u_e for one shared Cartesian 3-D flow vector; six independent view dyads and a full-rank spectral Jacobian are mandatory. "
         "This is a non-relativistic second-moment closure, not a general non-Gaussian 3-D EVDF."
     ),
     "thomson_full_temperature_tensor": (
@@ -743,6 +743,7 @@ EXAMPLES = {
         "scattering_vector_unit": [[1,0,0],[0,1,0],[0,0,1],[0.7071067812,0.7071067812,0],[0.7071067812,0,0.7071067812],[0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],
         "instrument_response_matrix": np.eye(181).tolist(),
         "initial_temperature_tensor_eV": [[600,0,0],[0,600,0],[0,0,600]],
+        "initial_electron_velocity_vector_m_s": [0.0, 0.0, 0.0],
         "maximum_projected_rms_beta": 0.1,
         "maximum_flow_beta": 0.1
     },
