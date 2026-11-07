@@ -1305,3 +1305,22 @@ def test_gaussian_shape_fit_rejects_singular_combined_likelihood_covariance():
             model_discrepancy_covariance=zero,
             systematic_covariance=zero,
         )
+
+
+
+@pytest.mark.parametrize(
+    "covariance_name",
+    ["model_discrepancy_covariance", "systematic_covariance"],
+)
+def test_moment_uncertainty_method_reports_discrepancy_and_systematic_only_draws(covariance_name):
+    x, y = _spectrum()
+    covariance = np.eye(x.size) * 0.25
+    result = _run(x, y, moment_mc_samples=40, **{covariance_name: covariance})
+    assert result["moment_uncertainty_successful_draws"] >= 20
+    assert result["spectral_centroid_uncertainty_nm"] > 0.0
+    assert result["moment_uncertainty_method"] == (
+        "parametric Monte Carlo from supplied measurement, background, model-discrepancy and systematic covariance components"
+    )
+    components = result["moment_uncertainty_covariance_components"]
+    assert components["model_discrepancy_covariance_included"] is (covariance_name == "model_discrepancy_covariance")
+    assert components["systematic_covariance_included"] is (covariance_name == "systematic_covariance")
