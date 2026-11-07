@@ -27,10 +27,43 @@ def render_general_temperature_tensor_page(st) -> None:
     )
     st.caption(
         "Forward model: T_q = q_hat.T @ T_e @ q_hat; sigma_v^2 = e*T_q/m_e; "
-        "lambda_c = lambda_L*(1 - 2*sin(theta/2)*u_q/c). The measured response "
-        "acts on bin-integrated spectral power. This is a non-relativistic Gaussian "
-        "closure, not a general non-Gaussian EVDF reconstruction."
+        "lambda_c = lambda_L*(1 - 2*sin(theta/2)*u_q/c). Maxwellian projections "
+        "are Gaussian; the ellipsoidal 3-D Kappa closure projects exactly to a "
+        "Student-t marginal with nu=2*kappa-1. The measured response acts on "
+        "bin-integrated spectral power. Neither closure is an unrestricted EVDF."
     )
+    distribution_model=st.selectbox(
+        "3-D electron distribution closure",["maxwellian","kappa"],
+        index=0,key="ts_tensor_distribution_model",
+    )
+    initial_kappa_index=None
+    fit_kappa_index=False
+    kappa_bounds=None
+    if distribution_model=="kappa":
+        k1,k2=st.columns(2)
+        with k1:
+            initial_kappa_index=st.number_input(
+                "Initial Kappa index (>1.5)",min_value=1.5001,max_value=100.0,
+                value=4.0,step=0.1,key="ts_tensor_kappa_initial",
+            )
+        with k2:
+            fit_kappa_index=st.checkbox(
+                "Fit Kappa index jointly with the tensor",value=True,
+                key="ts_tensor_fit_kappa",
+            )
+        if fit_kappa_index:
+            kb1,kb2=st.columns(2)
+            with kb1:
+                kappa_lower=st.number_input(
+                    "Kappa lower bound",min_value=1.5001,max_value=99.0,
+                    value=2.0,step=0.1,key="ts_tensor_kappa_lower",
+                )
+            with kb2:
+                kappa_upper=st.number_input(
+                    "Kappa upper bound",min_value=1.5002,max_value=100.0,
+                    value=12.0,step=0.1,key="ts_tensor_kappa_upper",
+                )
+            kappa_bounds=[float(kappa_lower),float(kappa_upper)]
     spectra_file = st.file_uploader(
         "Measured spectra CSV: wavelength_nm followed by one intensity column per view",
         type=["csv", "txt"], key="ts_tensor_spectra",
@@ -92,13 +125,18 @@ def render_general_temperature_tensor_page(st) -> None:
                 wavelength,measured,laser_wavelength_nm=float(laser),
                 scattering_angle_rad=float(np.deg2rad(angle)),
                 scattering_vector_unit=q,instrument_response_matrix=response,
-                initial_temperature_tensor_eV=np.eye(3)*500.0,**kwargs)
+                initial_temperature_tensor_eV=np.eye(3)*500.0,
+                distribution_model=distribution_model,
+                initial_kappa_index=initial_kappa_index,
+                fit_kappa_index=fit_kappa_index,
+                kappa_bounds=kappa_bounds,**kwargs)
             if result.get("reportable_as_inferred_parameter") is True:
-                st.success("The general temperature tensor is identifiable within the selected non-relativistic Gaussian model.")
+                st.success(f"The general temperature tensor is identifiable within the selected non-relativistic {distribution_model} model.")
             else:
                 st.warning("The solver withheld the tensor because the data do not identify it.")
             st.json({key:result.get(key) for key in (
                 "electron_temperature_tensor_eV","principal_temperature_eigenvalues_eV",
+                "distribution_model","kappa_index","kappa_index_uncertainty","kappa_fit_status",
                 "electron_velocity_projection_m_s","view_dyad_rank","view_dyad_condition_number",
                 "jacobian_rank","jacobian_parameter_count","temperature_tensor_parameter_covariance_eV2",
                 "covariance_provenance","covariance_status",
