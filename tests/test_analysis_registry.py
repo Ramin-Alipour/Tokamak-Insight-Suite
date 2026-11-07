@@ -185,6 +185,17 @@ def test_thomson_spectral_distribution_registry_is_descriptive_only_for_calibrat
 
 
 
+
+def test_landau_fdt_full_em_grid_convergence_is_registered_and_resolvable():
+    from tokamak_analysis.analysis_registry import get_analysis, resolve_analysis
+
+    entry = get_analysis(84)
+    assert entry["module"] == "cts_full_physics"
+    assert entry["function"] == "analyze_landau_fdt_full_em_spectrum_converged"
+    assert callable(resolve_analysis(84))
+    assert entry["execution_contract"]["execution_level"] == "physical_solver"
+
+
 def test_primary_analysis_family_lookup_rejects_invalid_ids():
     import pytest
     from tokamak_analysis.analysis_registry import get_analysis_family
@@ -205,7 +216,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     assert (profile["module"], profile["function"]) == (
         "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
-    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82, 83]
+    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82, 83, 84]
     tensor = get_analysis(83)
     assert (tensor["module"], tensor["function"]) == (
         "thomson_workflow", "fit_general_temperature_tensor_thomson_spectra"
