@@ -526,3 +526,51 @@ def test_nonuniform_velocity_curvature_operator_is_exact_for_quadratics():
     np.testing.assert_allclose(operator @ np.ones_like(velocity), 0.0, atol=1e-13)
     np.testing.assert_allclose(operator @ velocity, 0.0, atol=1e-13)
     np.testing.assert_allclose(operator @ (velocity**2), 2.0, rtol=1e-12, atol=1e-12)
+
+
+
+def test_evdf_reports_akaike_model_selection_and_between_model_uncertainty():
+    wavelength, signal, background = _case()
+    result = _run(
+        wavelength, signal, background,
+        signal_uncertainty=np.full(signal.size, 1.0),
+    )
+    selection = result["parametric_model_selection_uncertainty"]
+    assert selection["status"] == "akaike_weighted_model_uncertainty"
+    assert set(selection["weights"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
+    assert sum(selection["weights"].values()) == pytest.approx(1.0, abs=1e-12)
+    assert all(0.0 <= weight <= 1.0 for weight in selection["weights"].values())
+    assert all(value >= 0.0 for value in selection["delta_aic"].values())
+    mean = selection["model_averaged"]["mean_velocity_parallel_m_s"]
+    scale = selection["model_averaged"]["scale_velocity_m_s"]
+    assert mean["candidate_count"] == 3
+    assert scale["candidate_count"] == 3
+    assert mean["between_model_standard_uncertainty"] >= 0.0
+    assert scale["between_model_standard_uncertainty"] >= 0.0
+    assert mean["total_model_averaged_standard_uncertainty"] is not None
+    assert "not Bayesian posterior" in selection["interpretation"]
+
+
+def test_evdf_model_selection_excludes_nonconverged_candidates(monkeypatch):
+    from types import SimpleNamespace
+    import tokamak_analysis.thomson_evdf as evdf
+
+    wavelength, signal, background = _case()
+    original = evdf.least_squares
+    calls = {"count": 0}
+
+    def one_failed_candidate(objective, initial, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            return SimpleNamespace(
+                success=False, x=np.asarray(initial, dtype=float),
+                message="forced candidate failure",
+            )
+        return original(objective, initial, **kwargs)
+
+    monkeypatch.setattr(evdf, "least_squares", one_failed_candidate)
+    result = _run(wavelength, signal, background)
+    selection = result["parametric_model_selection_uncertainty"]
+    assert selection["status"] == "akaike_weighted_model_uncertainty"
+    assert "kappa_student_t" not in selection["weights"]
+    assert sum(selection["weights"].values()) == pytest.approx(1.0, abs=1e-12)
