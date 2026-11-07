@@ -781,6 +781,114 @@ def reconstruct_thomson_evdf(
                 "uncertainty_intervals": None,
             }
 
+    # Model-selection uncertainty: average the candidate projected marginals
+    # using normalized Akaike relative support. These weights quantify support
+    # only within the declared candidate set and likelihood; they are not
+    # posterior probabilities and do not include models absent from that set.
+    eligible_models = {
+        name: item for name, item in parametric_comparison.items()
+        if item.get("success") is True
+        and item.get("aic") is not None
+        and np.isfinite(item.get("aic"))
+        and isinstance(item.get("parameters"), dict)
+    }
+    model_selection_uncertainty = {
+        "status": "unavailable_no_converged_candidate_models",
+        "candidate_set": ["maxwellian", "kappa_student_t", "super_gaussian"],
+        "weights": {},
+        "delta_aic": {},
+        "model_averaged": None,
+        "interpretation": (
+            "Akaike relative support within the explicitly fitted candidate set; "
+            "not Bayesian posterior model probability and not evidence for models "
+            "outside the candidate set."
+        ),
+    }
+    if eligible_models:
+        minimum_aic = min(float(item["aic"]) for item in eligible_models.values())
+        relative_likelihoods = {
+            name: float(np.exp(-0.5 * (float(item["aic"]) - minimum_aic)))
+            for name, item in eligible_models.items()
+        }
+        likelihood_sum = float(sum(relative_likelihoods.values()))
+        weights = {
+            name: value / likelihood_sum
+            for name, value in relative_likelihoods.items()
+        }
+        def _model_average(parameter_index, parameter_name):
+            values = {
+                name: float(item["parameters"][parameter_name])
+                for name, item in eligible_models.items()
+                if parameter_name in item["parameters"]
+                and np.isfinite(item["parameters"][parameter_name])
+            }
+            active_weights = {name: weights[name] for name in values}
+            normalization = float(sum(active_weights.values()))
+            if not values or normalization <= 0.0:
+                return None
+            active_weights = {
+                name: value / normalization for name, value in active_weights.items()
+            }
+            mean_value = float(sum(active_weights[name] * values[name] for name in values))
+            between_variance = float(sum(
+                active_weights[name] * (values[name] - mean_value) ** 2
+                for name in values
+            ))
+            within_variance = 0.0
+            within_available = True
+            for name in values:
+                covariance = eligible_models[name].get("parameter_covariance")
+                if covariance is None:
+                    within_available = False
+                    break
+                covariance = np.asarray(covariance, dtype=float)
+                if (covariance.ndim != 2 or covariance.shape[0] <= parameter_index
+                        or covariance.shape[1] <= parameter_index
+                        or not np.isfinite(covariance[parameter_index, parameter_index])
+                        or covariance[parameter_index, parameter_index] < 0.0):
+                    within_available = False
+                    break
+                within_variance += active_weights[name] * float(
+                    covariance[parameter_index, parameter_index]
+                )
+            total_variance = between_variance + within_variance if within_available else None
+            return {
+                "mean": mean_value,
+                "between_model_standard_uncertainty": float(np.sqrt(max(between_variance, 0.0))),
+                "within_model_standard_uncertainty": (
+                    float(np.sqrt(max(within_variance, 0.0))) if within_available else None
+                ),
+                "total_model_averaged_standard_uncertainty": (
+                    float(np.sqrt(max(total_variance, 0.0)))
+                    if total_variance is not None else None
+                ),
+                "within_model_covariance_available": within_available,
+                "candidate_count": len(values),
+            }
+        model_selection_uncertainty = {
+            "status": "akaike_weighted_model_uncertainty",
+            "candidate_set": ["maxwellian", "kappa_student_t", "super_gaussian"],
+            "weights": weights,
+            "delta_aic": {
+                name: float(item["aic"] - minimum_aic)
+                for name, item in eligible_models.items()
+            },
+            "model_averaged": {
+                "mean_velocity_parallel_m_s": _model_average(
+                    1, "mean_velocity_parallel_m_s"
+                ),
+                "scale_velocity_m_s": _model_average(2, "scale_velocity_m_s"),
+            },
+            "interpretation": (
+                "Between-model spread is added to weighted within-model local "
+                "covariance where every contributing covariance is available. "
+                "Akaike weights are relative support conditional on this candidate "
+                "set and likelihood, not Bayesian posterior probabilities; the "
+                "result does not cover unmodeled EVDF families or regularization "
+                "selection uncertainty."
+            ),
+        }
+
     return {
         "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
         "velocity_parallel_m_s": velocity,
@@ -850,6 +958,7 @@ def reconstruct_thomson_evdf(
         "velocity_grid_points": int(velocity.size),
         "design_matrix_condition_number": condition,
         "parametric_model_comparison": parametric_comparison,
+        "parametric_model_selection_uncertainty": model_selection_uncertainty,
         "parametric_models": ["maxwellian", "kappa_student_t", "super_gaussian"],
         "fit_success": bool(fit.success),
         "fit_status": int(fit.status),
