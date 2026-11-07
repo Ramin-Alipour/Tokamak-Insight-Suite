@@ -987,6 +987,13 @@ def render_advanced_thomson_physics_page(st) -> None:
     )
     if model in MODEL_PHYSICS_NOTES:
         st.info(MODEL_PHYSICS_NOTES[model])
+    if model == "thomson_n_population_relativistic_fit":
+        st.caption(
+            "For the N-population relativistic optical Thomson fit, systematic_covariance is an additive wavelength-by-wavelength covariance. "
+            "The fit minimizes GLS residuals with Sigma_total = Sigma_measurement + Sigma_model_discrepancy + Sigma_systematic; "
+            "the three sources remain separately identified in the returned diagnostics."
+        )
+
     st.caption(
         "For joint spatial Thomson inversion, systematic_covariance accepts a full channel-major covariance matrix for independent calibration/systematic errors; it is added to measurement and model-discrepancy covariance, not substituted for either."
     )
