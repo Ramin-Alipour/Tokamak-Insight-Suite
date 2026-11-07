@@ -412,14 +412,25 @@ def reconstruct_relativistic_projected_thomson_evdf(
         _whitener(n, covariance=residual_covariance)
         if residual_covariance is not None else _whitener(n)
     )
-    noise_components = [
-        name for name, present in (
-            ("measurement", measurement_covariance is not None),
-            ("model_discrepancy", discrepancy_covariance is not None),
-            ("systematic", systematic_covariance_matrix is not None),
-        ) if present
-    ]
-    noise_status = "_plus_".join(noise_components) + "_spectral_covariance" if noise_components else "not_supplied_unweighted_fit"
+    has_measurement = measurement_covariance is not None
+    has_discrepancy = discrepancy_covariance is not None
+    has_systematic = systematic_covariance_matrix is not None
+    if has_discrepancy and not has_measurement and not has_systematic:
+        noise_status = "model_discrepancy_only_no_measurement_noise_covariance"
+    elif has_systematic and not has_measurement and not has_discrepancy:
+        noise_status = "systematic_only_no_measurement_noise_covariance"
+    elif has_measurement and has_discrepancy and has_systematic:
+        noise_status = "measurement_plus_model_discrepancy_and_systematic_covariance"
+    elif has_measurement and has_discrepancy:
+        noise_status = "measurement_plus_independent_model_discrepancy_covariance"
+    elif has_measurement and has_systematic:
+        noise_status = "measurement_plus_independent_systematic_covariance"
+    elif has_discrepancy and has_systematic:
+        noise_status = "model_discrepancy_plus_systematic_only_no_measurement_noise_covariance"
+    elif has_measurement:
+        noise_status = "supplied_measurement_covariance"
+    else:
+        noise_status = "not_supplied_unweighted_fit"
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
     if include_compton_recoil and incident_polarization is None:
