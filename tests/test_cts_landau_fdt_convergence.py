@@ -94,3 +94,17 @@ def test_converged_solver_is_connected_to_public_dispatcher_and_dashboard(monkey
     assert result["velocity_grid_convergence"]["status"] == "converged"
     assert result["reportable_as_grid_converged"] is True
     assert result["cts_three_wave_vertex_connected"] is False
+
+
+def test_full_em_grid_convergence_formula_is_published_and_packaged():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    key = "cts_landau_fdt_full_em_velocity_grid_convergence"
+    matches = [item for item in formula if item.get("execution_contract", {}).get("formula_key") == key]
+    assert len(matches) == 1
+    assert "Im_H(epsilon_r)" in matches[0]["equation"]
+    assert formula == packaged
