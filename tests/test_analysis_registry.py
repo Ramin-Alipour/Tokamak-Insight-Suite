@@ -609,3 +609,28 @@ def test_gyrotropic_registry_entry_exposes_explicit_bikappa_model_dispatch():
     assert "bi_kappa" in selector["unit"]
     assert any("fit_gyrotropic_bi_kappa_thomson" in link for link in contract["function_links"])
     assert callable(resolve_analysis(82))
+
+
+
+def test_general_non_gyrotropic_tensor_spectral_fit_is_exposed_in_analysis_one_contract():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    root_rows = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_rows = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_rows == packaged_rows
+    thomson = next(row for row in root_rows if row["diagnostic"] == "Thomson scattering")
+    contract = thomson["execution_contract"]
+    mode = next(
+        item for item in contract["workflow_modes"]
+        if item["name"] == "general_non_gyrotropic_temperature_tensor_spectral_fit"
+    )
+    assert mode["function"] == (
+        "tokamak_analysis.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra"
+    )
+    assert any("initial_temperature_tensor_eV" in item and "if omitted" in item for item in mode["inputs"])
+    assert any("q_hat^T T_eV q_hat" in item for item in mode["inputs"])
+    assert any("temperature_tensor_parameter_covariance_eV2" in item for item in mode["outputs"])
+    assert "not an unrestricted 3-D EVDF" in mode["scope"]
