@@ -228,6 +228,8 @@ def test_collective_kappa_is_executable_through_canonical_optical_analysis():
         scattering_angle_rad=angle,
         instrument_response=np.eye(wavelength.size),
         signal_uncertainty=np.full((1, wavelength.size), 0.01 * np.max(signal)),
+        model_discrepancy_covariance=np.eye(wavelength.size) * (0.002*np.max(signal))**2,
+        systematic_covariance=np.eye(wavelength.size) * (0.003*np.max(signal))**2,
         model="collective_kappa",
         ion_species=plasma["ion_species"],
         ion_fractions=plasma["ion_fractions"],
@@ -246,6 +248,8 @@ def test_collective_kappa_is_executable_through_canonical_optical_analysis():
     channel = result["channels"][0]
     assert result["model"] == "collective_kappa"
     assert channel["optimizer_success"] is True
+    assert channel["spectral_covariance_used"] is True
+    assert channel["spectral_weighting"] == "full_correlated_generalized_least_squares"
     assert channel["electron_density_m3"] == pytest.approx(1.0e19, rel=2e-3)
     assert channel["electron_temperature_eV"] == pytest.approx(150.0, rel=2e-3)
     assert channel["kappa_index"] == pytest.approx(3.5, rel=2e-3)
