@@ -471,7 +471,7 @@ def fit_general_temperature_tensor_thomson_spectra(
     lower[6:9]=-maximum_flow_beta*299792458.0
     upper[6:9]= maximum_flow_beta*299792458.0
     for view in range(n_view):
-        lower[10+3*view]=-50.0; upper[10+3*view]=50.0
+        lower[9+3*view]=-50.0; upper[9+3*view]=50.0
     fit=least_squares(residual,p0,bounds=(lower,upper),method="trf",x_scale="jac",max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"general temperature-tensor spectral fit failed: {fit.message}")
