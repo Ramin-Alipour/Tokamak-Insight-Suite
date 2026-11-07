@@ -243,4 +243,6 @@ def test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa():
     assert result["distribution_model"] == "kappa"
     assert result["kappa_index"] == pytest.approx(kappa, rel=0.03)
     assert result["kappa_index_uncertainty"] is not None
+    assert result["maximum_projected_superluminal_tail_probability"] < 1.0e-6
+    assert np.all(result["projected_superluminal_tail_probability_per_view"] >= 0.0)
     assert result["reportable_as_inferred_parameter"] is True
