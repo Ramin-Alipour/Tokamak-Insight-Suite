@@ -396,5 +396,5 @@ def test_raw_tensor_pressure_covariance_rejects_non_psd_density_temperature_join
             signal_uncertainty=np.full((q.shape[0], wavelength.size), 2e-4),
             electron_density_m3=2.0e19,
             electron_density_uncertainty_m3=1.0e18,
-            electron_density_temperature_tensor_cross_covariance=np.full(6, 1.0e30),
+            electron_density_temperature_tensor_cross_covariance=np.full(6, 1.0e40),
         )
