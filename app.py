@@ -968,6 +968,8 @@ elif page=='Spectral Analysis':
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
+            if collective_kappa_mode:
+                joint_spatial_spectral=False
             channel_laser_profile_upload=None
             if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                 channel_laser_profile_upload=st.file_uploader(
@@ -1125,6 +1127,8 @@ elif page=='Spectral Analysis':
                 st.caption('The relativistic fit Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. With recoil disabled, the maximum represented electron-rest-frame Compton correction is screened against the explicit limit. With recoil enabled, the forward model uses single-scattering Klein–Nishina physics. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
             absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,disabled=joint_spatial_spectral or collective_kappa_mode,key='ts_infer_absolute_density')
             if joint_spatial_spectral:
+                absolute_density=False
+            if collective_kappa_mode:
                 absolute_density=False
             density_kwargs={}
             density_covariance_upload=None
