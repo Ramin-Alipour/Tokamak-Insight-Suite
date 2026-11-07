@@ -226,3 +226,18 @@ def test_end_to_end_landau_fdt_full_em_spectrum_rejects_undamped_green_pole():
             relative_dielectric_tensor=np.eye(3, dtype=complex),
             propagation_direction=(1.0, 0.0, 0.0),
         )
+
+
+def test_landau_full_em_rejects_active_dielectric_background():
+    from tokamak_analysis.cts_landau_em import landau_full_em_electric_field_fluctuation_spectrum
+
+    response = {
+        "angular_frequency_rad_s": np.array([1.0e5]),
+        "current_fluctuation_spectral_matrix": np.eye(3, dtype=complex)[None, :, :],
+        # With exp(-i omega t), negative Im_H(epsilon) denotes gain.
+        "relative_dielectric_tensor": (
+            2.0*np.eye(3, dtype=complex) - 0.1j*np.eye(3)
+        )[None, :, :],
+    }
+    with pytest.raises(ValueError, match="is active"):
+        landau_full_em_electric_field_fluctuation_spectrum(response, 1.0e-3)
