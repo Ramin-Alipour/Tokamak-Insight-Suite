@@ -742,7 +742,7 @@ EXAMPLES = {
         "scattering_angle_rad": 1.5707963267948966,
         "scattering_vector_unit": [[1,0,0],[0,1,0],[0,0,1],[0.7071067812,0.7071067812,0],[0.7071067812,0,0.7071067812],[0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],
         "instrument_response_matrix": np.eye(181).tolist(),
-        "initial_temperature_tensor_eV": [[600,0,0],[0,600,0],[0,0,600]],
+        # Let the solver derive its optimizer seed from measured spectral widths.
         "maximum_projected_rms_beta": 0.1,
         "maximum_flow_beta": 0.1
     },
