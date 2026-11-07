@@ -152,10 +152,20 @@ def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
         positive=z[:-1]>0
         probability[positive]=ndtr(-z[:-1][positive])-ndtr(-z[1:][positive])
         spectra.append(2.0*probability/np.diff(edges)+0.02)
+    # A calibrated response is column-stochastic (true input bin -> measured
+    # output bin). This deliberately asymmetric operator has non-unit row sums
+    # and verifies that the forward model checks/applies the physical convention.
+    response = np.eye(wavelength.size)
+    response[1, 0] = 0.1
+    response[0, 0] = 0.9
+    response[0, 1] = 0.2
+    response[1, 1] = 0.8
+    widths = np.diff(edges)
+    spectra = [(response @ (spectrum * widths)) / widths for spectrum in spectra]
     result=fit_general_temperature_tensor_thomson_spectra(
         wavelength,np.asarray(spectra),laser_wavelength_nm=laser,
         scattering_angle_rad=angle,scattering_vector_unit=q,
-        instrument_response_matrix=np.eye(wavelength.size),
+        instrument_response_matrix=response,
         signal_uncertainty=np.full((len(q),len(wavelength)),2e-4),
         initial_temperature_tensor_eV=np.eye(3)*500.0,
         electron_density_m3=2.0e19,
