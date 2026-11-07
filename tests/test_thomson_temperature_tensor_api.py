@@ -91,7 +91,11 @@ def test_raw_temperature_tensor_fit_shared_flow_is_reachable_through_public_disp
         scattering_vector_unit=q,
         instrument_response_matrix=np.eye(wavelength.size),
         signal_uncertainty=np.full((q.shape[0], wavelength.size), 2e-4),
+        electron_density_m3=2.0e19,
+        electron_density_uncertainty_m3=1.0e18,
+        electron_density_temperature_tensor_cross_covariance=np.zeros(6),
     )
     np.testing.assert_allclose(result["electron_velocity_vector_m_s"], velocity, rtol=2e-4, atol=5.0)
+    assert result["electron_pressure_covariance_status"] == "joint_density_temperature_cross_covariance_delta_method"
     np.testing.assert_allclose(result["electron_velocity_projection_m_s"], q @ velocity, rtol=2e-4, atol=5.0)
     assert result["public_physics_entrypoint"] == "thomson_full_temperature_tensor_spectral_fit"
