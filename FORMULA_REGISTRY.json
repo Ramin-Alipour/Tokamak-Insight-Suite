@@ -10840,6 +10840,12 @@
           "name": "kappa_bounds",
           "unit": "dimensionless; increasing bounds with lower >1.5",
           "required": false
+        },
+        {
+          "name": "maximum_projected_superluminal_tail_probability",
+          "unit": "dimensionless; explicit non-relativistic validity threshold",
+          "required": false,
+          "default": 0.000001
         }
       ],
       "output_specs": [
@@ -10870,6 +10876,14 @@
         {
           "name": "reportable_as_inferred_parameter",
           "unit": "boolean; view and spectral rank gated"
+        },
+        {
+          "name": "projected_superluminal_tail_probability_per_view",
+          "unit": "dimensionless; exact Student-t P(|v_q|>=c)"
+        },
+        {
+          "name": "maximum_projected_superluminal_tail_probability",
+          "unit": "dimensionless; maximum across views"
         }
       ],
       "prerequisites": [
@@ -10878,11 +10892,12 @@
         "Kappa index strictly greater than 3/2",
         "Measured response and calibrated multi-view spectra"
       ],
-      "uncertainty_model": "Full supplied measurement, model-discrepancy and systematic spectral covariance is combined by GLS. When Kappa is fitted, its transformed log(kappa−1.5) parameter is included in the full spectral Jacobian covariance.",
+      "uncertainty_model": "Full supplied measurement, model-discrepancy and systematic spectral covariance is combined by GLS. When Kappa is fitted, its transformed log(kappa−1.5) parameter is included in the full spectral Jacobian covariance. The non-relativistic Kappa validity gate separately reports exact projected Student-t superluminal-tail probability; it is a domain screen, not an uncertainty interval.",
       "limitations": [
         "Ellipsoidal Kappa closure is parametric, not an unrestricted 3-D EVDF",
         "Non-relativistic elastic Thomson regime only",
-        "Insufficient view dyad rank or spectral Jacobian rank withholds tensor and Kappa estimates"
+        "Insufficient view dyad rank or spectral Jacobian rank withholds tensor and Kappa estimates",
+        "Non-relativistic Kappa reportability is withheld when any projected Student-t marginal exceeds the explicit superluminal-tail probability threshold."
       ],
       "test_links": [
         "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa"
