@@ -695,6 +695,9 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "effective_spectral_covariance": (
             None if residual_covariance is None else residual_covariance.copy()
         ),
+        "effective_spectral_covariance_formula": (
+            "C_eff = C_signal + C_background - C_signal_background - C_signal_background.T + C_model_discrepancy + C_systematic"
+        ),
         "model_discrepancy_included": discrepancy_covariance is not None,
         "covariance_components_independent": True,
         "absolute_density_inferred": False,
