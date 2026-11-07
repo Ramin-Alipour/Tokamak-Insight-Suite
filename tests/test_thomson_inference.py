@@ -1842,6 +1842,7 @@ def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api(
         {"density_fraction": 0.2, "temperature_ratio": 3.0, "kappa": 2.5,
          "distribution": "maxwellian", "flow_projection_m_s": 4.0e5},
     ]
+    ion_populations = [{"distribution": "kappa", "kappa": 3.2}]
     physical = collective_kappa_spectral_density(
         wavelength, laser, angle,
         electron_density_m3=1.0e19, electron_temperature_eV=150.0,
@@ -1852,6 +1853,7 @@ def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api(
         ion_velocity_m_s=[[0.0, 0.0, 0.0]],
         incident_direction=incident, scattered_direction=scattered,
         electron_populations=populations,
+        ion_populations=ion_populations,
     )
     measured = 2.0e4 * physical["spectral_density_per_nm"] + 10.0
     result = analyze_thomson_spectra(
@@ -1873,6 +1875,7 @@ def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api(
         collective_kappa_bounds=[2.0, 6.0],
         collective_external_parameter_mc_samples=20,
         collective_electron_populations=populations,
+        collective_ion_populations=ion_populations,
         enable_evdf_reconstruction=False,
     )
     channel = result["channels"][0]
@@ -1880,3 +1883,4 @@ def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api(
     assert channel["electron_populations"] == populations
     assert channel["electron_mixture_moments"]["population_count"] == 2
     assert channel["electron_mixture_moments"]["between_population_drift_temperature_eV"] > 0.0
+    assert channel["ion_populations"] == ion_populations
