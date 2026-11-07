@@ -71,20 +71,19 @@ def _normalize_evdf_coefficients(coefficients, velocity):
             or np.any(~np.isfinite(values)) or np.any(values < 0.0)
             or np.any(~np.isfinite(grid)) or np.any(np.diff(grid) <= 0.0)):
         raise ValueError("coefficients and velocity must be matching finite non-negative/strictly increasing vectors")
-    spacing_values = np.diff(grid)
-    if not np.allclose(spacing_values, spacing_values[0], rtol=1e-6, atol=1e-12):
-        raise ValueError("velocity grid must be uniform for trapezoidal coefficient normalization")
-    spacing = float(spacing_values[0])
-    quadrature_weights = np.ones(values.size, dtype=float)
-    quadrature_weights[[0, -1]] = 0.5
+    quadrature_weights = np.empty(values.size, dtype=float)
+    intervals = np.diff(grid)
+    quadrature_weights[0] = 0.5 * intervals[0]
+    quadrature_weights[-1] = 0.5 * intervals[-1]
+    quadrature_weights[1:-1] = 0.5 * (intervals[:-1] + intervals[1:])
     weighted_sum = float(quadrature_weights @ values)
     if not np.isfinite(weighted_sum) or weighted_sum <= np.finfo(float).tiny:
         raise ValueError("EVDF coefficients must have positive trapezoidal integral")
-    distribution = values / (spacing * weighted_sum)
+    distribution = values / weighted_sum
     jacobian = (
         np.eye(values.size) * weighted_sum
         - np.outer(values, quadrature_weights)
-    ) / (spacing * weighted_sum**2)
+    ) / weighted_sum**2
     return distribution, jacobian
 
 
@@ -322,11 +321,17 @@ def reconstruct_thomson_evdf(
         target = residual_data / scale
 
     dv = np.diff(velocity)
-    if not np.allclose(dv, dv[0], rtol=1e-6, atol=1e-12):
-        raise ValueError("Non-uniform velocity_grid_m_s is not supported by the current regularizer")
-    spacing = float(dv[0])
-    # Second-difference Tikhonov penalty suppresses oscillatory, unresolved modes.
-    smooth = np.diff(np.eye(velocity.size), n=2, axis=0) / (spacing * spacing)
+    spacing = float(np.min(dv))
+    # Non-uniform-grid second derivative: 2/(h_left+h_right) times
+    # the difference of adjacent first-derivative slopes.  This keeps the
+    # Tikhonov penalty in physical (m/s)^-2 units rather than penalizing
+    # changes per array index when velocity nodes are unequally spaced.
+    smooth = np.zeros((velocity.size - 2, velocity.size), dtype=float)
+    for row, (h_left, h_right) in enumerate(zip(dv[:-1], dv[1:])):
+        factor = 2.0 / (h_left + h_right)
+        smooth[row, row] = factor / h_left
+        smooth[row, row + 1] = -factor * (1.0 / h_left + 1.0 / h_right)
+        smooth[row, row + 2] = factor / h_right
     smooth_scale = np.linalg.norm(design, ord="fro") / max(np.linalg.norm(smooth, ord="fro"), np.finfo(float).tiny)
     regularization_candidates = (
         np.logspace(-8.0, 4.0, 13)
@@ -444,11 +449,12 @@ def reconstruct_thomson_evdf(
         candidate_coefficients = np.maximum(
             np.asarray(candidate_fit.x, dtype=float), 0.0
         )
-        candidate_distribution = candidate_coefficients / spacing
-        candidate_norm = float(trapezoid(candidate_distribution, velocity))
-        if not np.isfinite(candidate_norm) or candidate_norm <= np.finfo(float).tiny:
+        try:
+            candidate_distribution, _ = _normalize_evdf_coefficients(
+                candidate_coefficients, velocity
+            )
+        except ValueError:
             continue
-        candidate_distribution = candidate_distribution / candidate_norm
         candidate_mean = integral(velocity * candidate_distribution)
         candidate_centred = velocity - candidate_mean
         candidate_variance = integral(
@@ -630,7 +636,11 @@ def reconstruct_thomson_evdf(
 
         def model_residual(parameters):
             pdf = projected_pdf(model_name, parameters[1:])
-            probability = pdf * spacing
+            quadrature = np.empty_like(velocity)
+            quadrature[0] = 0.5 * (velocity[1] - velocity[0])
+            quadrature[-1] = 0.5 * (velocity[-1] - velocity[-2])
+            quadrature[1:-1] = 0.5 * (velocity[2:] - velocity[:-2])
+            probability = pdf * quadrature
             probability /= max(float(np.sum(probability)), np.finfo(float).tiny)
             return design @ (probability * parameters[0]) - target
 
