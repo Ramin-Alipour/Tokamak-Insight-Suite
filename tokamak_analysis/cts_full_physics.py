@@ -268,6 +268,142 @@ def analyze_landau_fdt_full_em_spectrum(
     }
 
 
+
+def analyze_landau_fdt_full_em_spectrum_converged(
+    angular_frequency_rad_s,
+    normalized_velocity_x,
+    normalized_velocity_y,
+    normalized_velocity_z,
+    species,
+    *,
+    common_temperature_J,
+    wave_number_m_inverse,
+    propagation_direction=(1.0, 0.0, 0.0),
+    common_bulk_flow_m_s=(0.0, 0.0, 0.0),
+    coulomb_logarithm=15.0,
+    relative_dielectric_tensor=None,
+    condition_limit=1.0e12,
+    convergence_tolerance=2.0e-2,
+    max_refinements=2,
+    max_velocity_nodes=512,
+):
+    r"""Run a grid-refined Landau--FDT Full-EM calculation with a quantitative gate.
+
+    At refinement level j, every normalized-velocity interval is bisected:
+    N_{j+1}=2 N_j-1 per axis, with the velocity-domain endpoints held fixed.
+    For each returned tensor X, the inter-grid error is
+        delta_X = ||X_j-X_{j-1}||_F / max(||X_j||_F,||X_{j-1}||_F, tiny).
+    Convergence is accepted only when the maximum delta_X over conductivity,
+    current-noise, electric-field, magnetic-field and Stokes spectra is below
+    the requested tolerance. This checks grid resolution only; it does not
+    certify velocity-domain, frequency-resolution or experimental convergence.
+    """
+    axes = []
+    for values, name in (
+        (normalized_velocity_x, "normalized_velocity_x"),
+        (normalized_velocity_y, "normalized_velocity_y"),
+        (normalized_velocity_z, "normalized_velocity_z"),
+    ):
+        axis = np.asarray(values, dtype=float)
+        if axis.ndim != 1 or axis.size < 3 or np.any(~np.isfinite(axis)) or np.any(np.diff(axis) <= 0):
+            raise ValueError(f"{name} must be finite, strictly increasing and contain at least three points")
+        axes.append(axis)
+    tolerance = float(convergence_tolerance)
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("convergence_tolerance must be positive and finite")
+    if isinstance(max_refinements, (bool, np.bool_)) or not isinstance(max_refinements, (int, np.integer)) or max_refinements < 1:
+        raise ValueError("max_refinements must be a positive integer")
+    if isinstance(max_velocity_nodes, (bool, np.bool_)) or not isinstance(max_velocity_nodes, (int, np.integer)) or max_velocity_nodes < 27:
+        raise ValueError("max_velocity_nodes must be an integer >= 27")
+    history = []
+    previous = None
+    final = None
+    converged = False
+    limiting_reason = "maximum_refinements_reached"
+    compared_keys = (
+        "conductivity_tensor_S_m",
+        "current_fluctuation_spectral_matrix",
+        "electric_field_fluctuation_spectral_matrix_V2_m2_per_rad_s",
+        "magnetic_field_fluctuation_spectral_matrix_T2_per_rad_s",
+        "transverse_stokes_spectral_density_IQUV",
+    )
+
+    def relative_change(current, reference):
+        a = np.asarray(current)
+        b = np.asarray(reference)
+        if a.shape != b.shape or np.any(~np.isfinite(a)) or np.any(~np.isfinite(b)):
+            raise ArithmeticError("successive Landau--FDT grids returned incompatible or non-finite spectra")
+        numerator = float(np.linalg.norm(a - b))
+        denominator = max(float(np.linalg.norm(a)), float(np.linalg.norm(b)), np.finfo(float).tiny)
+        return numerator / denominator
+
+    for level in range(int(max_refinements) + 1):
+        node_count = int(np.prod([axis.size for axis in axes]))
+        if node_count > max_velocity_nodes:
+            limiting_reason = "max_velocity_nodes_reached"
+            break
+        final = analyze_landau_fdt_full_em_spectrum(
+            angular_frequency_rad_s,
+            *axes,
+            species,
+            common_temperature_J=common_temperature_J,
+            wave_number_m_inverse=wave_number_m_inverse,
+            propagation_direction=propagation_direction,
+            common_bulk_flow_m_s=common_bulk_flow_m_s,
+            coulomb_logarithm=coulomb_logarithm,
+            relative_dielectric_tensor=relative_dielectric_tensor,
+            condition_limit=condition_limit,
+        )
+        entry = {"level": level, "axis_nodes": [int(axis.size) for axis in axes], "velocity_nodes_per_species": node_count}
+        if previous is not None:
+            changes = {
+                key: relative_change(final["constitutive_response"][key] if key in ("conductivity_tensor_S_m", "current_fluctuation_spectral_matrix") else final[key],
+                                    previous["constitutive_response"][key] if key in ("conductivity_tensor_S_m", "current_fluctuation_spectral_matrix") else previous[key])
+                for key in compared_keys
+            }
+            entry["relative_changes"] = changes
+            entry["maximum_relative_change"] = max(changes.values())
+            if entry["maximum_relative_change"] <= tolerance:
+                converged = True
+                limiting_reason = "velocity_grid_converged"
+                history.append(entry)
+                break
+        history.append(entry)
+        previous = final
+        refined = [np.sort(np.concatenate((axis, 0.5*(axis[:-1] + axis[1:])))) for axis in axes]
+        if int(np.prod([axis.size for axis in refined])) > max_velocity_nodes:
+            limiting_reason = "max_velocity_nodes_reached"
+            break
+        axes = refined
+
+    if final is None:
+        raise ValueError("initial velocity grid exceeds max_velocity_nodes")
+    gate = dict(final["quantitative_release_gate"])
+    gate.update({
+        "velocity_grid_convergence_required": not converged,
+        "velocity_grid_converged": converged,
+        "velocity_domain_convergence_required": True,
+        "frequency_resolution_convergence_required": True,
+        "experimental_validation_performed": False,
+    })
+    final["quantitative_release_gate"] = gate
+    final["velocity_grid_convergence"] = {
+        "status": "converged" if converged else "not_converged",
+        "converged": converged,
+        "tolerance": tolerance,
+        "maximum_refinements": int(max_refinements),
+        "maximum_velocity_nodes": int(max_velocity_nodes),
+        "limiting_reason": limiting_reason,
+        "history": history,
+        "compared_spectral_quantities": list(compared_keys),
+        "domain_endpoints_preserved": True,
+        "relative_error_definition": "Frobenius norm of successive-grid difference divided by the larger successive-grid Frobenius norm",
+    }
+    final["reportable_as_grid_converged"] = converged
+    final["public_physics_entrypoint"] = "landau_fdt_full_em_spectrum_converged"
+    return final
+
+
 def propagate_stratified_nonparaxial_vector_field(
     x_m,
     y_m,
