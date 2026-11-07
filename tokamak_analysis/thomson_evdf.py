@@ -546,6 +546,7 @@ def reconstruct_thomson_evdf(
     # diagnostic, not an additional physical model or uncertainty interval.
     regularization_sensitivity_candidates = []
     regularization_candidate_distributions = []
+    regularization_candidate_physical_moments = []
     for candidate, candidate_score, candidate_fit in zip(
         regularization_candidates, gcv_scores, candidate_fits
     ):
@@ -577,6 +578,13 @@ def reconstruct_thomson_evdf(
             integral(candidate_centred**4 * candidate_distribution)
             / candidate_variance**2 - 3.0
         )
+        regularization_candidate_physical_moments.append([
+            float(candidate_mean),
+            float(candidate_variance),
+            float(candidate_sigma),
+            float(candidate_skewness),
+            float(candidate_excess_kurtosis),
+        ])
         regularization_sensitivity_candidates.append({
             "regularization_strength": float(candidate),
             "gcv_score": (
@@ -639,10 +647,21 @@ def reconstruct_thomson_evdf(
         "covariance_s2_per_m2": None,
         "lower_envelope_s_per_m": None,
         "upper_envelope_s_per_m": None,
+        "physical_moment_order": [
+            "mean_velocity_parallel_m_s",
+            "velocity_parallel_variance_m2_s2",
+            "velocity_parallel_standard_deviation_m_s",
+            "skewness",
+            "excess_kurtosis",
+        ],
+        "physical_moment_candidate_values": None,
+        "physical_moment_covariance_from_regularization_choice": None,
+        "physical_moment_standard_spread_from_regularization_choice": None,
         "interpretation": (
             "Across-candidate numerical spread from the declared GCV grid; "
             "separate from measurement/background covariance and not a "
-            "posterior or frequentist confidence interval."
+            "posterior or frequentist confidence interval. Physical-moment "
+            "spread is propagated through the same velocity quadrature."
         ),
     }
     if regularization_candidate_distributions:
@@ -661,6 +680,36 @@ def reconstruct_thomson_evdf(
             regularization_selection_uncertainty[
                 "covariance_s2_per_m2"
             ] = 0.5 * (selection_covariance + selection_covariance.T)
+
+            # Propagate the GCV candidate ensemble through the same physical
+            # velocity-moment definitions used by the selected EVDF. This is
+            # a separate regularization-choice spread, never added to the
+            # conditional measurement covariance or labelled as a confidence
+            # interval.
+            moment_stack = np.asarray(
+                regularization_candidate_physical_moments, dtype=float
+            )
+            if (moment_stack.ndim == 2 and moment_stack.shape[0] > 1
+                    and moment_stack.shape[1] == 5
+                    and np.all(np.isfinite(moment_stack))):
+                moment_covariance_from_choice = np.cov(
+                    moment_stack, rowvar=False, ddof=1
+                )
+                moment_covariance_from_choice = 0.5 * (
+                    moment_covariance_from_choice
+                    + moment_covariance_from_choice.T
+                )
+                regularization_selection_uncertainty[
+                    "physical_moment_candidate_values"
+                ] = moment_stack
+                regularization_selection_uncertainty[
+                    "physical_moment_covariance_from_regularization_choice"
+                ] = moment_covariance_from_choice
+                regularization_selection_uncertainty[
+                    "physical_moment_standard_spread_from_regularization_choice"
+                ] = np.sqrt(np.maximum(
+                    np.diag(moment_covariance_from_choice), 0.0
+                ))
 
     electron_mass = 9.1093837139e-31
     boltzmann = 1.380649e-23
