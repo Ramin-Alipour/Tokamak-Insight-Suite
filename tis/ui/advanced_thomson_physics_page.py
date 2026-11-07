@@ -112,6 +112,7 @@ MODEL_LABELS = {
 
 # Full-EM response and field-fluctuation routes are explicit Dashboard choices.
 MODEL_LABELS["landau_fdt_full_em_spectrum"] = "Full-EM CTS — end-to-end Landau–FDT current noise → Maxwell field/Stokes spectrum"
+MODEL_LABELS["landau_fdt_full_em_spectrum_converged"] = "Full-EM CTS — grid-refined Landau–FDT/Maxwell spectrum with quantitative convergence gate"
 MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau–FDT Cartesian current-response kernel"
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
@@ -138,6 +139,9 @@ MODEL_PHYSICS_NOTES = {
         "on the infinite domain; finite-grid probability coverage is reported without "
         "renormalizing missing tails. Requires kappa>3/2. One view identifies T_q only, "
         "not T_parallel and T_perpendicular independently."
+    ),
+    "landau_fdt_full_em_spectrum_converged": (
+        "Same conserving multispecies Landau collision operator, matched classical FDT noise and Maxwell Green-dyadic field closure as the Full-EM reference route, but it bisects all three normalized-velocity grid axes and compares conductivity, current-noise, electric-field, magnetic-field and Stokes spectra between successive grids. A result is grid-converged only when the maximum relative Frobenius change is below convergence_tolerance. Fixed velocity-domain endpoints mean this does not establish domain/frequency convergence or magnetized CTS three-wave validity."
     ),
     "landau_fdt_full_em_spectrum": (
         "End-to-end local Full-EM fluctuation calculation: assemble the conserving multispecies Landau operator and its matched FDT current-noise covariance, derive the constitutive response, then propagate it through the Maxwell Green dyadic. The default dielectric is the constitutive dielectric from the same solver; an explicit relative_dielectric_tensor may be supplied for a separately validated passive background. Scope is unmagnetized, zero-flow, common-temperature Maxwellian plasma; this is not yet a magnetized CTS three-wave vertex or calibrated receiver spectrum."
