@@ -165,7 +165,7 @@ def landau_full_em_electric_field_fluctuation_spectrum(
         dissipative = (tensor - tensor.conj().T) / (2j)
         dissipative = 0.5 * (dissipative + dissipative.conj().T)
         loss_eigenvalues = np.linalg.eigvalsh(dissipative)
-        loss_scale = max(float(np.linalg.norm(dissipative, ord=2)), 1.0)
+        loss_scale = max(float(np.linalg.norm(dissipative, ord=2)), np.finfo(float).tiny)
         if loss_eigenvalues[0] < -1e-10 * loss_scale:
             raise ValueError(
                 f"relative_dielectric_tensor[{index}] is active: "
