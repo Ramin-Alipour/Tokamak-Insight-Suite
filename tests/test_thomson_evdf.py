@@ -634,8 +634,12 @@ def test_evdf_forward_operator_conserves_quadrature_with_measured_response_and_n
         response[column, column] += 0.7
         if column > 0:
             response[column - 1, column] += 0.2
+        else:
+            response[column, column] += 0.2
         if column + 1 < n:
             response[column + 1, column] += 0.1
+        else:
+            response[column, column] += 0.1
 
     forward, metadata = _projected_evdf_forward_matrix(
         wavelength, velocity, response, 500.0, 2.0 * np.sin(np.pi / 4.0)
