@@ -562,6 +562,9 @@ def analyze_thomson_spectral_distribution(
                 ("systematic", systematic_covariance_matrix is not None),
             ) if present
         ],
+        "moment_uncertainty_covariance_formula": (
+            "C_residual = C_signal + C_background - C_signal_background - C_signal_background.T + C_model_discrepancy + C_systematic; omitted independent components are zero by explicit assumption"
+        ),
         "signal_uncertainty_model": (
             "full_within_channel_spectral_covariance"
             if signal_covariance_matrix is not None else
