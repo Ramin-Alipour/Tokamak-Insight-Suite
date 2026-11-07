@@ -1091,6 +1091,7 @@ def test_distribution_propagates_additive_model_and_systematic_covariance_into_m
     assert propagated["moment_uncertainty_components"] == [
         "measurement", "model_discrepancy", "systematic"
     ]
+    assert "C_residual = C_signal + C_background" in propagated["moment_uncertainty_covariance_formula"]
     assert propagated["moment_uncertainty_successful_draws"] >= 80
     assert propagated["observed_sigma_uncertainty_nm"] > baseline["observed_sigma_uncertainty_nm"]
     assert "additive model-discrepancy/systematic" in propagated["moment_uncertainty_method"]
