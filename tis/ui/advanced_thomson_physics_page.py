@@ -234,7 +234,7 @@ MODEL_PHYSICS_NOTES = {
         "Fits raw calibrated spectra jointly using a general symmetric positive-definite 3-D Gaussian velocity covariance. "
         "For each measured scattering direction q, T_q=q^T T_eV q, sigma_lambda=lambda_L*2*sin(theta/2)*sqrt(e*T_q/m_e)/c, "
         "and lambda_c=lambda_L*(1-2*sin(theta/2)*u_q/c). Gaussian probability is integrated exactly over finite wavelength bins; "
-        "the measured response acts on bin-integrated power. Six independent view dyads and a full-rank spectral Jacobian are mandatory. "
+        "the measured response acts on bin-integrated power. All view shifts obey u_q,i=q_hat_i dot u_e for one shared Cartesian 3-D flow vector; six independent view dyads and a full-rank spectral Jacobian are mandatory. "
         "This is a non-relativistic second-moment closure, not a general non-Gaussian 3-D EVDF."
     ),
     "thomson_full_temperature_tensor": (
@@ -754,6 +754,7 @@ EXAMPLES = {
         "scattering_vector_unit": [[1,0,0],[0,1,0],[0,0,1],[0.7071067812,0.7071067812,0],[0.7071067812,0,0.7071067812],[0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],
         "instrument_response_matrix": np.eye(181).tolist(),
         "initial_temperature_tensor_eV": [[600,0,0],[0,600,0],[0,0,600]],
+        "initial_electron_velocity_vector_m_s": [0.0, 0.0, 0.0],
         "maximum_projected_rms_beta": 0.1,
         "maximum_flow_beta": 0.1
     },
@@ -1186,6 +1187,8 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "electron_density_uncertainty_m3": result.get("electron_density_uncertainty_m3"),
                     "electron_pressure_tensor_Pa": result.get("electron_pressure_tensor_Pa"),
                     "pressure_parameter_covariance_Pa2": result.get("electron_pressure_parameter_covariance_Pa2"),
+                    "density_temperature_cross_covariance": result.get("electron_density_temperature_tensor_cross_covariance"),
+                    "pressure_covariance_equation": result.get("electron_pressure_covariance_equation"),
                     "covariance_provenance": result.get("electron_pressure_covariance_status"),
                 })
                 if result.get("electron_pressure_parameter_covariance_Pa2") is None:
@@ -1217,10 +1220,13 @@ def render_advanced_thomson_physics_page(st) -> None:
                     )
             if isinstance(result, Mapping) and "electron_temperature_tensor_eV" in result:
                 st.subheader("General non-gyrotropic 3-D electron temperature tensor")
-                st.latex(r"T_q=\hat{\mathbf q}^{T}\mathbf T_e\hat{\mathbf q},\qquad \mathbf T_e=\mathbf L\mathbf L^T")
+                st.latex(r"T_q=\hat{\mathbf q}^{T}\mathbf T_e\hat{\mathbf q},\qquad u_{q,i}=\hat{\mathbf q}_i\cdot\mathbf u_e,\qquad \mathbf T_e=\mathbf L\mathbf L^T")
                 st.write({
                     "temperature_tensor_eV": result.get("electron_temperature_tensor_eV"),
                     "principal_temperature_eigenvalues_eV": result.get("principal_temperature_eigenvalues_eV"),
+                    "electron_velocity_vector_m_s": result.get("electron_velocity_vector_m_s"),
+                    "electron_velocity_vector_covariance_m2_s2": result.get("electron_velocity_vector_covariance_m2_s2"),
+                    "flow_projection_consistency": result.get("flow_model"),
                     "principal_axes_cartesian_columns": result.get("principal_axes_cartesian_columns"),
                     "projected_temperature_eV": result.get("projected_temperature_eV"),
                     "view_dyad_rank": result.get("view_dyad_rank"),

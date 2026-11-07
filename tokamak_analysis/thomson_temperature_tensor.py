@@ -290,12 +290,13 @@ def fit_general_temperature_tensor_thomson_spectra(
     model_discrepancy_covariance=None,
     systematic_covariance=None,
     initial_temperature_tensor_eV=None,
-    initial_flow_m_s=None,
+    initial_electron_velocity_vector_m_s=None,
     maximum_projected_rms_beta=0.1,
     maximum_flow_beta=0.1,
     maximum_jacobian_condition_number=1.0e12,
     electron_density_m3=None,
     electron_density_uncertainty_m3=None,
+    electron_density_temperature_tensor_cross_covariance=None,
     max_nfev=5000,
 ):
     r"""Jointly infer a general PSD 3-D Gaussian electron temperature tensor from raw TS spectra.
@@ -417,18 +418,21 @@ def fit_general_temperature_tensor_thomson_spectra(
         np.log(initial_cholesky[1,1]), initial_cholesky[2,0],
         initial_cholesky[2,1], np.log(initial_cholesky[2,2]),
     ])
-    if initial_flow_m_s is None:
-        flow_seed = np.zeros(n_view)
+    if initial_electron_velocity_vector_m_s is None:
+        velocity_seed = np.zeros(3, dtype=float)
     else:
-        flow_seed = _finite_array(initial_flow_m_s,"initial_flow_m_s",1)
-        if flow_seed.shape != (n_view,):
-            raise ValueError("initial_flow_m_s must contain one q-parallel flow seed per view")
+        velocity_seed = _finite_array(
+            initial_electron_velocity_vector_m_s,
+            "initial_electron_velocity_vector_m_s", 1,
+        )
+        if velocity_seed.shape != (3,):
+            raise ValueError("initial_electron_velocity_vector_m_s must be a Cartesian 3-vector")
     nuisance_seed=[]
     for row in spectra:
         edge_level=float(np.median(np.r_[row[:max(2,n_wave//12)],row[-max(2,n_wave//12):]]))
         peak=max(float(np.max(row)-edge_level),1e-12)
         nuisance_seed.extend([np.log(peak),edge_level,0.0])
-    p0=np.r_[tensor_seed, np.column_stack((flow_seed,np.asarray(nuisance_seed).reshape(n_view,3))).ravel()]
+    p0=np.r_[tensor_seed, velocity_seed, np.asarray(nuisance_seed).reshape(n_view,3).ravel()]
 
     def unpack(parameters):
         p=np.asarray(parameters,dtype=float)
@@ -441,9 +445,11 @@ def fit_general_temperature_tensor_thomson_spectra(
         projected=np.einsum("vi,ij,vj->v",directions,tensor,directions)
         if np.any(projected <= 0.0):
             raise ValueError("projected temperature tensor must be positive definite")
+        velocity_vector = parameters[6:9]
+        flow_projections = directions @ velocity_vector
         for view in range(n_view):
-            flow, log_amp, offset, slope = parameters[6+4*view:10+4*view]
-            centre=laser*(1.0-q_factor*flow/299792458.0)
+            log_amp, offset, slope = parameters[9+3*view:12+3*view]
+            centre=laser*(1.0-q_factor*flow_projections[view]/299792458.0)
             sigma=laser*q_factor*np.sqrt(_E*projected[view]/_M_E)/299792458.0
             density, probability, _ = _tensor_finite_bin_gaussian_density(wavelength,centre,sigma)
             captured=float(np.sum(probability))
@@ -460,13 +466,19 @@ def fit_general_temperature_tensor_thomson_spectra(
         delta=(forward(parameters)-spectra).ravel()
         return np.linalg.solve(chol,delta)
 
+    flow_limit=float(maximum_flow_beta)
+    beta_limit=float(maximum_projected_rms_beta)
+    if not 0.0<beta_limit<1.0 or not 0.0<flow_limit<1.0:
+        raise ValueError("relativistic validity limits must lie strictly between zero and one")
+    if np.any(np.abs(velocity_seed) > flow_limit*299792458.0):
+        raise ValueError("initial_electron_velocity_vector_m_s exceeds maximum_flow_beta")
     lower=np.full(p0.size,-np.inf); upper=np.full(p0.size,np.inf)
     lower[0]=lower[2]=lower[5]=-10.0
     upper[0]=upper[2]=upper[5]=10.0
+    lower[6:9]=-flow_limit*299792458.0
+    upper[6:9]= flow_limit*299792458.0
     for view in range(n_view):
-        lower[6+4*view]=-maximum_flow_beta*299792458.0
-        upper[6+4*view]= maximum_flow_beta*299792458.0
-        lower[7+4*view]=-50.0; upper[7+4*view]=50.0
+        lower[9+3*view]=-50.0; upper[9+3*view]=50.0
     fit=least_squares(residual,p0,bounds=(lower,upper),method="trf",x_scale="jac",max_nfev=int(max_nfev))
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"general temperature-tensor spectral fit failed: {fit.message}")
@@ -495,6 +507,8 @@ def fit_general_temperature_tensor_thomson_spectra(
             parameter_covariance*=chi_square/dof
             covariance_status="residual_scaled_covariance_not_absolute_measurement_uncertainty"
     tensor_covariance=None
+    tensor_flow_joint_covariance=None
+    flow_vector_covariance=None
     if parameter_covariance is not None:
         tensor_jac=np.empty((6,6),dtype=float)
         for j in range(6):
@@ -504,7 +518,12 @@ def fit_general_temperature_tensor_thomson_spectra(
             def components(mat):
                 return np.array([mat[0,0],mat[1,1],mat[2,2],mat[0,1],mat[0,2],mat[1,2]])
             tensor_jac[:,j]=(components(unpack(plus))-components(unpack(minus)))/(2*step)
-        tensor_covariance=tensor_jac@parameter_covariance[:6,:6]@tensor_jac.T
+        transform=np.zeros((9,p0.size),dtype=float)
+        transform[:6,:6]=tensor_jac
+        transform[6:9,6:9]=np.eye(3)
+        tensor_flow_joint_covariance=transform@parameter_covariance@transform.T
+        tensor_covariance=tensor_flow_joint_covariance[:6,:6]
+        flow_vector_covariance=tensor_flow_joint_covariance[6:9,6:9]
     projected=np.einsum("vi,ij,vj->v",directions,tensor,directions)
     density=None
     density_uncertainty=None
@@ -512,8 +531,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     pressure_covariance=None
     pressure_covariance_status="not_available_without_independent_electron_density"
     tensor_components=np.array([tensor[0,0],tensor[1,1],tensor[2,2],tensor[0,1],tensor[0,2],tensor[1,2]])
-    if electron_density_m3 is None and electron_density_uncertainty_m3 is not None:
-        raise ValueError("electron_density_uncertainty_m3 requires electron_density_m3")
+    if electron_density_m3 is None and (
+        electron_density_uncertainty_m3 is not None
+        or electron_density_temperature_tensor_cross_covariance is not None
+    ):
+        raise ValueError("density uncertainty/cross-covariance requires electron_density_m3")
     if electron_density_m3 is not None:
         density=float(electron_density_m3)
         if not np.isfinite(density) or density<=0.0:
@@ -522,21 +544,55 @@ def fit_general_temperature_tensor_thomson_spectra(
             density_uncertainty=float(electron_density_uncertainty_m3)
             if not np.isfinite(density_uncertainty) or density_uncertainty<0.0:
                 raise ValueError("electron_density_uncertainty_m3 must be finite and non-negative")
+        density_tensor_cross = None
+        if electron_density_temperature_tensor_cross_covariance is not None:
+            density_tensor_cross = _finite_array(
+                electron_density_temperature_tensor_cross_covariance,
+                "electron_density_temperature_tensor_cross_covariance", 1,
+            )
+            if density_tensor_cross.shape != (6,):
+                raise ValueError(
+                    "electron_density_temperature_tensor_cross_covariance must contain "
+                    "six covariances ordered as T_xx,T_yy,T_zz,T_xy,T_xz,T_yz"
+                )
+            if density_uncertainty is None or tensor_covariance is None:
+                raise ValueError(
+                    "density-temperature cross-covariance requires both density uncertainty "
+                    "and an available temperature-tensor covariance"
+                )
         pressure_tensor=density*_E*tensor
         if tensor_covariance is not None:
             pressure_covariance=(density*_E)**2*tensor_covariance
             if density_uncertainty is not None:
-                pressure_covariance += (_E*density_uncertainty)**2*np.outer(tensor_components,tensor_components)
-                pressure_covariance_status="independent_tensor_GLS_and_density_uncertainty_delta_method"
+                density_variance=density_uncertainty**2
+                cross=np.zeros(6) if density_tensor_cross is None else density_tensor_cross
+                joint_input_covariance=np.block([
+                    [np.array([[density_variance]]), cross[None,:]],
+                    [cross[:,None], tensor_covariance],
+                ])
+                joint_eigenvalues=np.linalg.eigvalsh(
+                    0.5*(joint_input_covariance+joint_input_covariance.T)
+                )
+                joint_scale=max(float(np.max(np.abs(joint_eigenvalues))),1e-300)
+                if joint_eigenvalues[0] < -1e-10*joint_scale:
+                    raise ValueError(
+                        "joint density-temperature covariance must be positive semidefinite"
+                    )
+                pressure_covariance += (_E**2)*density_variance*np.outer(tensor_components,tensor_components)
+                pressure_covariance += (_E**2)*density*(
+                    np.outer(tensor_components,cross)+np.outer(cross,tensor_components)
+                )
+                pressure_covariance_status=(
+                    "joint_density_temperature_cross_covariance_delta_method"
+                    if density_tensor_cross is not None
+                    else "independent_tensor_GLS_and_density_uncertainty_delta_method"
+                )
             else:
                 pressure_covariance_status="tensor_GLS_only_density_treated_as_exact"
     thermal_beta=float(np.sqrt(_E*np.max(eigenvalues)/_M_E)/299792458.0)
-    flows=fit.x[6::4].copy()
-    flow_beta=float(np.max(np.abs(flows))/299792458.0)
-    beta_limit=float(maximum_projected_rms_beta)
-    flow_limit=float(maximum_flow_beta)
-    if not 0.0<beta_limit<1.0 or not 0.0<flow_limit<1.0:
-        raise ValueError("relativistic validity limits must lie strictly between zero and one")
+    velocity_vector=fit.x[6:9].copy()
+    flows=directions@velocity_vector
+    flow_beta=float(np.linalg.norm(velocity_vector)/299792458.0)
     within_validity=thermal_beta<beta_limit and flow_beta<flow_limit
     return {
         "model":"nonrelativistic_non_gyrotropic_3d_gaussian_thomson_joint_spectral_fit",
@@ -545,7 +601,15 @@ def fit_general_temperature_tensor_thomson_spectra(
         "principal_axes_cartesian_columns":eigenvectors,
         "projected_temperature_eV":projected,
         "projected_temperature_equation":"T_q_eV = q_hat.T @ T_e_eV @ q_hat",
+        "electron_velocity_vector_m_s":velocity_vector,
+        "electron_velocity_vector_covariance_m2_s2":flow_vector_covariance,
+        "electron_temperature_flow_joint_covariance":tensor_flow_joint_covariance,
+        "electron_temperature_flow_joint_covariance_order":[
+            "T_xx_eV","T_yy_eV","T_zz_eV","T_xy_eV","T_xz_eV","T_yz_eV",
+            "u_x_m_s","u_y_m_s","u_z_m_s",
+        ],
         "electron_velocity_projection_m_s":flows,
+        "flow_projection_equation":"u_q_i_m_s = dot(scattering_vector_unit_i, electron_velocity_vector_m_s)",
         "fitted_spectra":fitted,
         "residual_spectra":raw_residual,
         "chi_square":chi_square,
@@ -557,18 +621,24 @@ def fit_general_temperature_tensor_thomson_spectra(
         "view_dyad_rank":geom_rank,
         "view_dyad_condition_number":geom_condition,
         "parameter_covariance":parameter_covariance,
-        "parameter_covariance_order":["L_xx_log","L_yx","L_yy_log","L_zx","L_zy","L_zz_log"]+[name for i in range(n_view) for name in (f"flow_q_{i}_m_s",f"log_amplitude_{i}",f"background_offset_{i}",f"background_slope_{i}")],
+        "parameter_covariance_order":[
+            "L_xx_log","L_yx","L_yy_log","L_zx","L_zy","L_zz_log",
+            "u_x_m_s","u_y_m_s","u_z_m_s",
+        ]+[name for i in range(n_view) for name in (f"log_amplitude_{i}",f"background_offset_{i}",f"background_slope_{i}")],
         "temperature_tensor_parameter_covariance_eV2":tensor_covariance,
         "electron_density_m3":density,
         "electron_density_uncertainty_m3":density_uncertainty,
         "electron_pressure_tensor_Pa":pressure_tensor,
         "electron_pressure_parameter_covariance_Pa2":pressure_covariance,
         "electron_pressure_covariance_status":pressure_covariance_status,
+        "electron_density_temperature_tensor_cross_covariance":density_tensor_cross if density is not None else None,
+        "electron_pressure_covariance_equation":"Cov(P_i,P_j)=e^2[n_e^2 Cov(T_i,T_j)+sigma_n^2 T_i T_j+n_e(T_i Cov(n,T_j)+Cov(n,T_i) T_j)]",
         "electron_pressure_equation":"P_e_Pa = n_e_m-3 * elementary_charge_C * T_e_eV",
         "covariance_provenance":covariance_source,
         "covariance_status":covariance_status,
         "thermal_rms_beta":thermal_beta,
         "maximum_flow_beta":flow_beta,
+        "flow_model":"one_shared_cartesian_3d_bulk_velocity_vector_projected onto each measured scattering direction",
         "model_validity_status":"within_declared_nonrelativistic_domain" if within_validity else "outside_declared_nonrelativistic_domain",
         "model_validity_limits":{"maximum_principal_thermal_rms_beta":beta_limit,"maximum_flow_beta":flow_limit,"relativistic_corrections":False},
         "reportable_as_inferred_parameter":bool(within_validity),
