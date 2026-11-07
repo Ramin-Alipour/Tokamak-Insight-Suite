@@ -242,7 +242,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
     signal_uncertainty=None, signal_covariance=None,
     background_uncertainty=None, background_covariance=None,
     signal_background_cross_covariance=None,
-    model_discrepancy_covariance=None,
+    model_discrepancy_covariance=None, systematic_covariance=None,
     include_compton_recoil=False, incident_polarization=None,
     incident_direction=None, scattered_direction=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
@@ -367,7 +367,36 @@ def reconstruct_relativistic_projected_thomson_evdf(
         if float(eigenvalues[0]) < -1e-10 * eigen_scale:
             raise ValueError("model_discrepancy_covariance must be positive semidefinite")
 
-    if measurement_covariance is None and discrepancy_covariance is None:
+    systematic_covariance_matrix = None
+    if systematic_covariance is not None:
+        raw_systematic = np.asarray(systematic_covariance)
+        if (raw_systematic.dtype.kind not in "iuf"
+                or raw_systematic.shape != (n, n)
+                or not np.all(np.isfinite(raw_systematic))):
+            raise ValueError("systematic_covariance must be a finite real wavelength-sized square matrix")
+        systematic_covariance_matrix = 0.5 * (
+            raw_systematic.astype(float, copy=False)
+            + raw_systematic.astype(float, copy=False).T
+        )
+        systematic_scale = max(
+            float(np.max(np.abs(systematic_covariance_matrix))),
+            np.finfo(float).tiny,
+        )
+        if not np.allclose(
+            raw_systematic, raw_systematic.T,
+            rtol=1e-9, atol=1e-11 * systematic_scale,
+        ):
+            raise ValueError("systematic_covariance must be symmetric")
+        systematic_eigenvalues = np.linalg.eigvalsh(systematic_covariance_matrix)
+        systematic_eigen_scale = max(
+            float(np.max(np.abs(systematic_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if float(systematic_eigenvalues[0]) < -1e-10 * systematic_eigen_scale:
+            raise ValueError("systematic_covariance must be positive semidefinite")
+
+    if (measurement_covariance is None and discrepancy_covariance is None
+            and systematic_covariance_matrix is None):
         residual_covariance = None
     else:
         residual_covariance = (
@@ -376,15 +405,21 @@ def reconstruct_relativistic_projected_thomson_evdf(
         )
         if discrepancy_covariance is not None:
             residual_covariance += discrepancy_covariance
+        if systematic_covariance_matrix is not None:
+            residual_covariance += systematic_covariance_matrix
 
     whiten, noise_status = (
         _whitener(n, covariance=residual_covariance)
         if residual_covariance is not None else _whitener(n)
     )
-    if measurement_covariance is None and discrepancy_covariance is not None:
-        noise_status = "model_discrepancy_only_no_measurement_noise_covariance"
-    elif discrepancy_covariance is not None:
-        noise_status = "measurement_plus_independent_model_discrepancy_covariance"
+    noise_components = [
+        name for name, present in (
+            ("measurement", measurement_covariance is not None),
+            ("model_discrepancy", discrepancy_covariance is not None),
+            ("systematic", systematic_covariance_matrix is not None),
+        ) if present
+    ]
+    noise_status = "_plus_".join(noise_components) + "_spectral_covariance" if noise_components else "not_supplied_unweighted_fit"
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
     if include_compton_recoil and incident_polarization is None:
@@ -642,6 +677,10 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "model_discrepancy_covariance": (
             None if discrepancy_covariance is None else discrepancy_covariance.copy()
         ),
+        "systematic_covariance": (
+            None if systematic_covariance_matrix is None else systematic_covariance_matrix.copy()
+        ),
+        "systematic_covariance_included": systematic_covariance_matrix is not None,
         "effective_spectral_covariance": (
             None if residual_covariance is None else residual_covariance.copy()
         ),
