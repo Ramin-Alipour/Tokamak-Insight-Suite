@@ -346,7 +346,11 @@ def fit_general_temperature_tensor_thomson_spectra(
         response = np.broadcast_to(response, (n_view,n_wave,n_wave))
     if response.shape != (n_view,n_wave,n_wave) or not np.all(np.isfinite(response)) or np.any(response < 0.0):
         raise ValueError("instrument_response_matrix must be (n_wave,n_wave) or (n_view,n_wave,n_wave), finite and non-negative")
-    if not np.allclose(response.sum(axis=1), 1.0, rtol=1e-8, atol=1e-10):
+    # response[i, j] is the probability that power entering true bin j
+    # is recorded in detector bin i. Conservation therefore constrains each
+    # input-bin column, not each detector-bin row.
+    response_column_sums = response.sum(axis=1)
+    if not np.allclose(response_column_sums, 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("each response matrix must conserve bin-integrated spectral power (columns sum to one)")
     edges = np.empty(n_wave+1, dtype=float)
     edges[1:-1] = 0.5*(wavelength[:-1]+wavelength[1:])
@@ -403,11 +407,61 @@ def fit_general_temperature_tensor_thomson_spectra(
         covariance_source = "identity_metric_no_absolute_spectral_uncertainty_supplied"
 
     if initial_temperature_tensor_eV is None:
-        initial_tensor = np.eye(3)*max(float(np.median(np.ptp(spectra,axis=1))),100.0)
+        # Build a physics-scaled seed from the measured spectral second moments.
+        # Spectral intensity amplitude is not an energy and must never be used
+        # as a temperature seed. This moment is used only to initialize the
+        # nonlinear fit; the reported tensor is determined by the full
+        # response-convolved measured-spectrum likelihood below.
+        projected_seed = np.empty(n_view, dtype=float)
+        for view, row in enumerate(spectra):
+            edge_count = max(2, n_wave // 12)
+            edge_level = float(np.median(np.r_[row[:edge_count], row[-edge_count:]]))
+            positive_measure = np.maximum(row - edge_level, 0.0) * widths
+            area = float(np.sum(positive_measure))
+            if not np.isfinite(area) or area <= np.finfo(float).tiny:
+                raise ValueError(
+                    "cannot derive a physical tensor initialization from the measured spectra; "
+                    "supply initial_temperature_tensor_eV explicitly"
+                )
+            centre_seed = float(np.sum(wavelength * positive_measure) / area)
+            variance_seed = float(
+                np.sum((wavelength - centre_seed) ** 2 * positive_measure) / area
+            )
+            if not np.isfinite(variance_seed) or variance_seed <= 0.0:
+                raise ValueError(
+                    "measured spectral second moment is not positive; "
+                    "supply initial_temperature_tensor_eV explicitly"
+                )
+            sigma_seed = np.sqrt(variance_seed)
+            projected_seed[view] = (
+                _M_E / _E
+                * (299792458.0 * sigma_seed / (laser * q_factor)) ** 2
+            )
+        tensor_components_seed, *_ = np.linalg.lstsq(dyads, projected_seed, rcond=None)
+        tensor_seed_matrix = np.array([
+            [tensor_components_seed[0], tensor_components_seed[3], tensor_components_seed[4]],
+            [tensor_components_seed[3], tensor_components_seed[1], tensor_components_seed[5]],
+            [tensor_components_seed[4], tensor_components_seed[5], tensor_components_seed[2]],
+        ])
+        seed_eigenvalues, seed_eigenvectors = np.linalg.eigh(
+            0.5 * (tensor_seed_matrix + tensor_seed_matrix.T)
+        )
+        eigenvalue_floor = max(
+            float(np.median(projected_seed)) * 1.0e-6,
+            np.finfo(float).tiny,
+        )
+        initial_tensor = (
+            seed_eigenvectors * np.maximum(seed_eigenvalues, eigenvalue_floor)
+        ) @ seed_eigenvectors.T
+        initialization_source = (
+            "positive_background_subtracted_spectral_second_moments_projected_"
+            "through_view_dyads_and_PSD_clipped_for_optimizer_seed_only"
+        )
     else:
         initial_tensor = _finite_array(initial_temperature_tensor_eV,"initial_temperature_tensor_eV",2)
         if initial_tensor.shape != (3,3) or not np.allclose(initial_tensor,initial_tensor.T,rtol=1e-9,atol=1e-9):
             raise ValueError("initial_temperature_tensor_eV must be symmetric 3x3")
+        initialization_source = "researcher_supplied_symmetric_temperature_tensor_seed"
     try:
         initial_cholesky = np.linalg.cholesky(initial_tensor)
     except np.linalg.LinAlgError as exc:
@@ -541,6 +595,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     return {
         "model":"nonrelativistic_non_gyrotropic_3d_gaussian_thomson_joint_spectral_fit",
         "electron_temperature_tensor_eV":tensor,
+        "initial_temperature_tensor_seed_eV":initial_tensor.copy(),
+        "initialization_source":initialization_source,
+        "initial_projected_temperature_seed_eV": (
+            projected_seed.copy() if initial_temperature_tensor_eV is None else None
+        ),
         "principal_temperature_eigenvalues_eV":eigenvalues,
         "principal_axes_cartesian_columns":eigenvectors,
         "projected_temperature_eV":projected,
