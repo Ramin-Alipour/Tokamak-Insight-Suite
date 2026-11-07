@@ -300,3 +300,27 @@ def test_thomson_dashboard_exposes_joint_spatial_mixing_covariance_refits():
     assert "ts_infer_spatial_mixing_covariance" in source
     assert "spatial_mixing_covariance" in source
     assert "ts_infer_spatial_mixing_mc_samples" in source
+
+
+def test_dashboard_exposes_optical_collective_kappa_population_inference_controls():
+    frame = pd.DataFrame({
+        "channel_id": ["ch0"] * 9,
+        "radius_m": [0.1] * 9,
+        "wavelength_nm": np.linspace(1048.0, 1080.0, 9),
+        "intensity": np.linspace(1.0, 2.0, 9),
+    })
+    app = _app_with_table(frame)
+    next(item for item in app.radio if item.label == "WORKSPACE").set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value(
+        "Thomson multi-channel spectral inference"
+    ).run()
+    toggle = next(
+        item for item in app.checkbox
+        if item.label.startswith("Use optical collective-Kappa dielectric inference")
+    )
+    toggle.set_value(True).run()
+    assert any(
+        item.label == "Collective-Kappa physical inputs (JSON)"
+        for item in app.text_area
+    )
+    assert not app.exception, [str(error.value) for error in app.exception]
