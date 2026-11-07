@@ -1202,6 +1202,9 @@ def render_advanced_thomson_physics_page(st) -> None:
                 st.write({
                     "temperature_tensor_eV": result.get("electron_temperature_tensor_eV"),
                     "principal_temperature_eigenvalues_eV": result.get("principal_temperature_eigenvalues_eV"),
+                    "electron_velocity_vector_m_s": result.get("electron_velocity_vector_m_s"),
+                    "electron_velocity_vector_covariance_m2_s2": result.get("electron_velocity_vector_covariance_m2_s2"),
+                    "flow_projection_consistency": result.get("flow_model"),
                     "principal_axes_cartesian_columns": result.get("principal_axes_cartesian_columns"),
                     "projected_temperature_eV": result.get("projected_temperature_eV"),
                     "view_dyad_rank": result.get("view_dyad_rank"),
