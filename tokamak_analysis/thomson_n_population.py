@@ -86,8 +86,16 @@ def fit_n_population_relativistic_thomson_spectrum(
     parameterization. By default all populations share one flow projection;
     supplying initial_population_flow_projections_m_s fits an independent
     subluminal projection for every population. The measured response operator,
-    amplitude and detector-space background are fitted jointly. This remains
-    a finite-dimensional parametric mixture, not an unrestricted EVDF inverse.
+    amplitude and detector-space background are fitted jointly.
+
+    The physical mixture is cross-section weighted:
+      S_mix(lambda) = sum_j [f_j sigma_j S_j(lambda)] / sum_k [f_k sigma_k].
+    The GLS objective uses the additive covariance closure:
+      Sigma_total = Sigma_measurement + Sigma_model_discrepancy + Sigma_systematic,
+      chi2 = (S_model-y)^T Sigma_total^-1 (S_model-y).
+    Each additive covariance is validated as positive semidefinite; the total
+    must be positive definite to whiten the residuals. This remains a
+    finite-dimensional parametric mixture, not an unrestricted EVDF inverse.
     """
     from scipy.optimize import least_squares
     from scipy.special import softmax
