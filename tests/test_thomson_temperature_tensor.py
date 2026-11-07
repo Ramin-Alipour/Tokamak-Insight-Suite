@@ -241,6 +241,7 @@ def test_raw_spectral_tensor_fit_derives_temperature_seed_from_spectral_width_an
         [90.0, 420.0, 55.0],
         [-35.0, 55.0, 260.0],
     ])
+    expected_flows = np.array([1.0e6, -1.5e6, 2.0e6, -0.5e6, 0.7e6, -0.9e6, 1.2e6])
     edges = np.empty(wavelength.size + 1)
     edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
     edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
@@ -260,13 +261,14 @@ def test_raw_spectral_tensor_fit_derives_temperature_seed_from_spectral_width_an
     np.testing.assert_allclose(response.sum(axis=0), 1.0, atol=1e-14)
 
     spectra = []
-    for direction in q:
+    for direction, flow in zip(q, expected_flows):
         projected_temperature = float(direction @ expected @ direction)
         sigma = laser * 2.0 * np.sin(angle / 2.0) * np.sqrt(
             elementary_charge * projected_temperature / electron_mass
         ) / c_light
+        centre = laser * (1.0 - 2.0 * np.sin(angle / 2.0) * flow / c_light)
         density, _, _ = _tensor_finite_bin_gaussian_density(
-            wavelength, laser, sigma
+            wavelength, centre, sigma
         )
         measured_feature = (response @ (density * widths)) / widths
         spectra.append(2.0 * measured_feature + 0.02)
@@ -290,5 +292,15 @@ def test_raw_spectral_tensor_fit_derives_temperature_seed_from_spectral_width_an
     )
     assert result["initial_projected_temperature_seed_eV"].shape == (len(q),)
     assert np.all(result["initial_projected_temperature_seed_eV"] > 0.0)
+    assert result["flow_initialization_source"].startswith(
+        "background_subtracted_spectral_centroid"
+    )
+    np.testing.assert_allclose(
+        result["initial_flow_seed_m_s"], expected_flows, rtol=0.09, atol=1.0e5
+    )
+    np.testing.assert_allclose(
+        result["electron_velocity_projection_m_s"], expected_flows,
+        rtol=0.02, atol=3.0e4
+    )
     assert result["jacobian_rank"] == result["jacobian_parameter_count"]
     assert result["reportable_as_inferred_parameter"] is True
