@@ -1060,6 +1060,25 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "Physical-moment uncertainty is unavailable because the projected-EVDF "
                         "covariance did not pass its numerical availability gate."
                     )
+            if isinstance(result, Mapping) and "parametric_model_selection_uncertainty" in result:
+                selection = result["parametric_model_selection_uncertainty"]
+                st.subheader("Projected EVDF — physical model-selection uncertainty")
+                st.caption(
+                    "Akaike relative support is conditional on the three fitted candidate "
+                    "families and the declared likelihood; it is not a Bayesian posterior."
+                )
+                st.write({
+                    "status": selection.get("status"),
+                    "candidate_set": selection.get("candidate_set"),
+                    "relative_support_weights": selection.get("weights"),
+                    "delta_aic": selection.get("delta_aic"),
+                    "model_averaged_velocity_moments": selection.get("model_averaged"),
+                })
+                if selection.get("status") != "akaike_weighted_model_uncertainty":
+                    st.warning(
+                        "Model-selection uncertainty is unavailable because no candidate "
+                        "model passed the optimizer convergence and finite-likelihood gates."
+                    )
             if isinstance(result, Mapping) and "fourth_moment_exists" in result:
                 st.subheader("Kappa physical moment hierarchy")
                 st.latex(r"\mathrm{Var}(v)=\frac{k_B T_e}{m_e}")
