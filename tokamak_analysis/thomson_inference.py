@@ -1519,6 +1519,7 @@ def analyze_thomson_spectra(
         if model not in {
             "non_collective_maxwellian", "non_collective_kappa",
             "non_collective_relativistic_maxwell_juttner", "collective_maxwellian",
+            "collective_kappa",
         }:
             raise ValueError(
                 "systematic_covariance is supported for non-collective optical Thomson "
