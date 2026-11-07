@@ -1779,6 +1779,7 @@ def fit_collective_kappa(
     ion_species, ion_fractions, ion_temperature_eV,
     electron_velocity_m_s, ion_velocity_m_s,
     initial_density_m3, initial_temperature_eV, initial_kappa,
+    spectral_covariance=None,
     density_bounds_m3=None, temperature_bounds_eV=None, kappa_bounds=None,
     electron_populations=None, ion_populations=None,
     electron_population_parameter_covariance=None,
@@ -1791,10 +1792,35 @@ def fit_collective_kappa(
         raise ValueError("wavelength_nm and signal must be matching vectors with >=12 samples")
     scale = max(float(np.max(np.abs(y))), np.finfo(float).tiny)
     ys = y/scale
+    if uncertainty is not None and spectral_covariance is not None:
+        raise ValueError("Supply uncertainty or spectral_covariance, not both.")
     unc = None if uncertainty is None else np.asarray(uncertainty, dtype=float)/scale
     if unc is not None and (unc.shape != y.shape or np.any(~np.isfinite(unc)) or np.any(unc <= 0)):
         raise ValueError("uncertainty must be positive and match signal")
-    residual_scale = np.full_like(ys, max(float(np.max(np.abs(ys))), np.finfo(float).tiny)) if unc is None else unc
+    covariance_cholesky = None
+    if spectral_covariance is not None:
+        covariance_raw = np.asarray(spectral_covariance, dtype=float)
+        if covariance_raw.shape != (y.size, y.size) or np.any(~np.isfinite(covariance_raw)):
+            raise ValueError("spectral_covariance must be a finite square matrix matching signal")
+        covariance_scale = max(float(np.max(np.abs(covariance_raw))), np.finfo(float).tiny)
+        if not np.allclose(covariance_raw, covariance_raw.T, rtol=1e-10, atol=1e-12*covariance_scale):
+            raise ValueError("spectral_covariance must be symmetric")
+        covariance = 0.5*(covariance_raw+covariance_raw.T)
+        eigenvalues = np.linalg.eigvalsh(covariance)
+        if float(np.min(eigenvalues)) < -1e-10*covariance_scale:
+            raise ValueError("spectral_covariance must be positive semidefinite")
+        try:
+            covariance_cholesky = np.linalg.cholesky(covariance/scale**2)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite for GLS whitening") from exc
+    residual_scale = (
+        np.full_like(ys, max(float(np.max(np.abs(ys))), np.finfo(float).tiny))
+        if unc is None and covariance_cholesky is None else
+        unc if covariance_cholesky is None else np.ones_like(ys)
+    )
+
+    def whiten(values):
+        return np.linalg.solve(covariance_cholesky, values) if covariance_cholesky is not None else values/residual_scale
     ne0 = _positive(initial_density_m3, "initial_density_m3")
     te0 = _positive(initial_temperature_eV, "initial_temperature_eV")
     kap0 = _positive(initial_kappa-1.5, "initial_kappa_minus_1p5")+1.5
@@ -1850,9 +1876,9 @@ def fit_collective_kappa(
     def nuisance(shape):
         shape_scale=max(float(np.max(np.abs(shape))),np.finfo(float).tiny)
         design=np.column_stack((shape/shape_scale,np.ones_like(shape),x-float(laser_wavelength_nm)))
-        coefficients=np.linalg.lstsq(design/residual_scale[:,None],ys/residual_scale,rcond=None)[0]
+        coefficients=np.linalg.lstsq(whiten(design),whiten(ys),rcond=None)[0]
         if coefficients[0] < 0:
-            bg=np.linalg.lstsq(design[:,1:]/residual_scale[:,None],ys/residual_scale,rcond=None)[0]
+            bg=np.linalg.lstsq(whiten(design[:,1:]),whiten(ys),rcond=None)[0]
             coefficients=np.array([0.0,bg[0],bg[1]])
         coefficients[0]/=shape_scale
         return coefficients
@@ -1861,7 +1887,7 @@ def fit_collective_kappa(
         shape=spectrum(p)
         amp,offset,slope=nuisance(shape)
         predicted=amp*shape+offset+slope*(x-float(laser_wavelength_nm))
-        value=(predicted-ys)/residual_scale
+        value=whiten(predicted-ys)
         return (value, predicted, shape, amp, offset, slope) if return_fit else value
 
     # `lower` and `upper` were already assembled above in the optimizer's
@@ -1879,7 +1905,7 @@ def fit_collective_kappa(
     ne,te,kap=unpack(fit.x)
     dof=max(1,x.size-6)
     covariance_log=np.linalg.pinv(fit.jac.T@fit.jac)
-    if unc is None:
+    if unc is None and covariance_cholesky is None:
         covariance_log*=float(r@r/dof)
     transform=np.diag([np.log(10.0)*ne,np.log(10.0)*te,kap-1.5])
     covariance=transform@covariance_log@transform.T
@@ -1952,7 +1978,8 @@ def fit_collective_kappa(
                 sampled_fit = fit_collective_kappa(
                     wavelength_nm=x, signal=y, laser_wavelength_nm=laser_wavelength_nm,
                     scattering_angle_rad=scattering_angle_rad, response=response,
-                    uncertainty=uncertainty, incident_direction=incident_direction,
+                    uncertainty=uncertainty, spectral_covariance=spectral_covariance,
+                    incident_direction=incident_direction,
                     scattered_direction=scattered_direction, ion_species=ion_species,
                     ion_fractions=ion_fractions, ion_temperature_eV=ion_temperature_eV,
                     electron_velocity_m_s=electron_velocity_m_s, ion_velocity_m_s=ion_velocity_m_s,
@@ -2071,6 +2098,12 @@ def fit_collective_kappa(
         "background_intercept":float(offset*scale),
         "background_slope_per_nm":float(slope*scale),
         "fit_covariance":covariance,
+        "spectral_covariance_used": covariance_cholesky is not None,
+        "spectral_weighting": (
+            "full_correlated_generalized_least_squares" if covariance_cholesky is not None
+            else "independent_pointwise_weighted_least_squares" if unc is not None
+            else "unweighted_least_squares"
+        ),
         "fit_covariance_conditional_on_population_inputs":conditional_fit_covariance,
         "electron_population_parameter_names":population_parameter_names,
         "electron_population_parameter_covariance":None if electron_population_parameter_covariance is None else np.asarray(electron_population_parameter_covariance,dtype=float),
@@ -2083,7 +2116,7 @@ def fit_collective_kappa(
         "optimizer_message":str(fit.message),
         "collective_parameter_jacobian_rank":rank,
         "collective_parameter_jacobian_condition_number":condition,
-        "reduced_chi_square":float(np.sum((residual_signal/np.asarray(uncertainty,dtype=float))**2)/dof) if uncertainty is not None else None,
+        "reduced_chi_square":float(r@r/dof) if (uncertainty is not None or covariance_cholesky is not None) else None,
         "scattering_parameter_alpha":float(alpha),
         "scattering_regime":"collective" if alpha>1.0 else "non_collective_or_weakly_collective",
         "model":"Plasma kinetic dielectric model with configurable electron and ion Kappa/Maxwellian populations",
