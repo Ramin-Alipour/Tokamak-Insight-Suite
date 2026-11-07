@@ -296,6 +296,17 @@ def test_evdf_reports_regularization_selection_spread_separately_from_measuremen
     assert np.all(np.asarray(selection["lower_envelope_s_per_m"]) <=
                   np.asarray(selection["upper_envelope_s_per_m"]))
     assert "separate from measurement/background covariance" in selection["interpretation"]
+    moment_covariance = np.asarray(
+        selection["physical_moment_covariance_from_regularization_choice"]
+    )
+    moment_spread = np.asarray(
+        selection["physical_moment_standard_spread_from_regularization_choice"]
+    )
+    assert moment_covariance.shape == (5, 5)
+    assert moment_spread.shape == (5,)
+    np.testing.assert_allclose(moment_covariance, moment_covariance.T, atol=1e-12)
+    assert np.linalg.eigvalsh(moment_covariance).min() >= -1e-10
+    assert selection["physical_moment_candidate_values"].shape[1] == 5
     # The sampling covariance and regularization-choice covariance are distinct
     # quantities with different interpretations and are never silently summed.
     assert result["evdf_covariance_available"] is True
