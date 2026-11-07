@@ -410,6 +410,10 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
         velocity_grid.size, velocity_grid.size
     )
     assert selection["within_model_projected_evdf_covariance_available"] is True
+    equations = selection["projected_evdf_model_averaging_equations"]
+    assert "w_m=exp" in equations["akaike_weight"]
+    assert "f_bar(v)" in equations["model_averaged_evdf"]
+    assert "C_bar(v,v')" in equations["total_covariance"]
 
 
 def test_relativistic_projected_evdf_and_psf_profile_are_dashboard_api_routes():
