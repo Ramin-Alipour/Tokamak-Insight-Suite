@@ -1018,7 +1018,7 @@ def analyze_thomson_spectral_distribution(
             "background_signal", "signal_uncertainty", "signal_covariance",
             "background_uncertainty", "background_covariance",
             "signal_background_cross_covariance", "model_discrepancy_covariance",
-            "systematic_covariance",
+            "systematic_covariance", "include_compton_recoil", "incident_polarization",
         }
         conflicts = sorted(reserved.intersection(options))
         if conflicts:
@@ -1034,9 +1034,9 @@ def analyze_thomson_spectral_distribution(
         if use_relativistic_inverse:
             from .thomson_gap_closure import reconstruct_relativistic_projected_thomson_evdf
             velocity_grid = options.pop("velocity_grid_m_s", None)
+            velocity_limit = options.pop("velocity_limit_m_s", 8.0e6)
+            velocity_points = options.pop("velocity_points", 241)
             if velocity_grid is None:
-                velocity_limit = options.pop("velocity_limit_m_s", 8.0e6)
-                velocity_points = options.pop("velocity_points", 241)
                 if isinstance(velocity_points, (bool, np.bool_)) or not isinstance(velocity_points, (int, np.integer)) or not 41 <= velocity_points <= 2001:
                     raise ValueError("relativistic projected EVDF velocity_points must be an integer from 41 to 2001")
                 if isinstance(velocity_limit, (bool, np.bool_)) or not np.isfinite(velocity_limit) or not 0 < velocity_limit < 299792458.0:
