@@ -180,6 +180,37 @@ def _nonuniform_second_derivative_matrix(velocity):
     return operator
 
 
+def _regularized_active_set_measurement_covariance(
+    active_design, active_penalty, regularization_strength, residual_variance=1.0
+):
+    """Frequentist covariance of a fixed-active-set Tikhonov estimator.
+
+    For whitened observations with unit covariance, the estimator Jacobian is
+    H^-1 A.T, where H=A.T A + lambda L.T L. Its sampling covariance is the
+    sandwich H^-1 A.T A H^-1, not H^-1 (the latter is a Bayesian posterior
+    covariance only after interpreting the penalty as a Gaussian prior).
+    """
+    design = np.asarray(active_design, dtype=float)
+    penalty = np.asarray(active_penalty, dtype=float)
+    strength = float(regularization_strength)
+    scale = float(residual_variance)
+    if (design.ndim != 2 or penalty.ndim != 2
+            or penalty.shape[1] != design.shape[1]
+            or not np.all(np.isfinite(design))
+            or not np.all(np.isfinite(penalty))
+            or not np.isfinite(strength) or strength < 0.0
+            or not np.isfinite(scale) or scale < 0.0):
+        raise ValueError("active design, penalty, regularization and residual variance must be finite and dimensionally consistent")
+    information = design.T @ design
+    hessian = information + strength * (penalty.T @ penalty)
+    inverse = np.linalg.pinv(hessian, hermitian=True)
+    covariance = inverse @ information @ inverse * scale
+    covariance = 0.5 * (covariance + covariance.T)
+    if not np.all(np.isfinite(covariance)):
+        raise ValueError("regularized active-set measurement covariance is not finite")
+    return covariance
+
+
 def reconstruct_thomson_evdf(
     wavelength_nm,
     signal,
@@ -480,7 +511,10 @@ def reconstruct_thomson_evdf(
         )
     coefficient_covariance = np.zeros((velocity.size, velocity.size), dtype=float)
     try:
-        active_covariance = np.linalg.pinv(hessian, hermitian=True) * covariance_scale
+        active_covariance = _regularized_active_set_measurement_covariance(
+            active_design, active_penalty, selected_regularization_strength,
+            residual_variance=covariance_scale,
+        )
         active_indices = np.flatnonzero(active)
         coefficient_covariance[np.ix_(active_indices, active_indices)] = active_covariance
         evdf_covariance = (
@@ -981,9 +1015,12 @@ def reconstruct_thomson_evdf(
         "evdf_covariance": evdf_covariance,
         "evdf_standard_uncertainty_s_per_m": evdf_standard_uncertainty,
         "evdf_covariance_available": evdf_covariance_available,
+        "evdf_covariance_method": "frequentist_fixed_active_set_tikhonov_sandwich",
         "evdf_uncertainty_interpretation": (
-            "local active-set covariance conditional on the selected grid, response, background, "
-            "regularization and active set; not a posterior or experimental validation"
+            "Frequentist local sampling covariance H^-1 A.T A H^-1 for the fixed active set "
+            "and selected regularization, propagated through EVDF normalization; conditional "
+            "on the selected grid, response, background and regularization. It excludes "
+            "regularization-selection uncertainty and is not a posterior or experimental validation."
         ),
         "measurement_uncertainty_model": uncertainty_model,
         "model_discrepancy_covariance": (
