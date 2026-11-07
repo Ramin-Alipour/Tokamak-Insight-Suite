@@ -179,6 +179,14 @@ MODEL_PHYSICS_NOTES = {
         "as matching (n_ion_species, n_velocity) arrays in each species rest frame; "
         "ion_temperature_eV is optional for that branch. The output also reports projected means, second-moment directional temperatures, skewness and excess kurtosis."
     ),
+    "thomson_projected_evdf": (
+        "Non-negative q-parallel EVDF inverse. The measured spectrum is modelled as "
+        "S(lambda)=integral f(v_parallel) K(lambda|v_parallel) dv_parallel, followed "
+        "by the measured wavelength-response operator. The discrete operator uses "
+        "trapezoidal velocity-space weights on nonuniform grids; fitted coefficients "
+        "are nodal probability densities [s/m], not unweighted discrete masses. "
+        "The output is normalized and does not identify absolute density or a 3-D EVDF."
+    ),
     "thomson_temperature_from_spectral_width": (
         "Conditional Te estimator: Te = (sigma_lambda/lambda_0)^2 m_e c^2 / "
         "[4 sin^2(theta/2)]. Valid only for an intrinsic instrument-response-fitted "

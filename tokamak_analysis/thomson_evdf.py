@@ -87,6 +87,78 @@ def _normalize_evdf_coefficients(coefficients, velocity):
     return distribution, jacobian
 
 
+def _velocity_quadrature_weights(velocity):
+    """Trapezoidal finite-volume measure for nodal EVDF density coefficients.
+
+    The inverse coefficients represent f(v) [s/m], not discrete probability
+    masses. Therefore each monochromatic Doppler kernel must be weighted by
+    its velocity-space quadrature measure when approximating
+    S(lambda) = integral f(v) K(lambda | v) dv.
+    """
+    grid = np.asarray(velocity, dtype=float)
+    if (grid.ndim != 1 or grid.size < 2 or not np.all(np.isfinite(grid))
+            or np.any(np.diff(grid) <= 0.0)):
+        raise ValueError("velocity grid must be finite, strictly increasing and contain at least two nodes")
+    intervals = np.diff(grid)
+    weights = np.empty(grid.size, dtype=float)
+    weights[0] = 0.5 * intervals[0]
+    weights[-1] = 0.5 * intervals[-1]
+    weights[1:-1] = 0.5 * (intervals[:-1] + intervals[1:])
+    return weights
+
+
+def _projected_evdf_forward_matrix(wavelength, velocity, response, laser_wavelength_nm, q_over_ki):
+    """Build the finite-volume Doppler/response operator for a nodal 1-D EVDF.
+
+    Each column is a unit-integral monochromatic line mapped to wavelength
+    bins, convolved by the measured response, and multiplied by the
+    trapezoidal velocity-space quadrature weight. Thus the matrix acts on
+    nodal probability densities and approximates the physical velocity
+    integral rather than an unweighted sum over velocity nodes.
+    """
+    x = _finite_vector(wavelength, "wavelength_nm")
+    v = _finite_vector(velocity, "velocity_grid_m_s", minimum=2)
+    matrix = np.asarray(response, dtype=float)
+    if (matrix.shape != (x.size, x.size) or not np.all(np.isfinite(matrix))
+            or np.any(matrix < 0.0)):
+        raise ValueError("composed instrument/source response must be finite, non-negative and square on the measured wavelength grid")
+    column_sums = matrix.sum(axis=0)
+    if np.any(column_sums <= 0.0) or np.any(column_sums > 1.0 + 1e-8):
+        raise ValueError("composed instrument/source response columns must have positive area no greater than one; finite-window source loss is preserved")
+    laser = float(laser_wavelength_nm)
+    q_factor = float(q_over_ki)
+    if not np.isfinite(laser) or laser <= 0.0 or not np.isfinite(q_factor) or q_factor <= 0.0:
+        raise ValueError("laser wavelength and scattering-vector magnitude must be finite and positive")
+    centres = laser * (1.0 - q_factor * v / _C)
+    if np.any(centres < x[0]) or np.any(centres > x[-1]):
+        raise ValueError("velocity grid maps outside the measured wavelength interval; narrow the velocity grid or widen the measured spectral window")
+    widths = _wavelength_bin_widths(x)
+    latent = np.zeros((x.size, v.size), dtype=float)
+    for j, centre in enumerate(centres):
+        right = int(np.searchsorted(x, centre, side="right"))
+        if right == 0:
+            latent[0, j] = 1.0 / widths[0]
+        elif right >= x.size:
+            latent[-1, j] = 1.0 / widths[-1]
+        else:
+            left = right - 1
+            fraction = (centre - x[left]) / (x[right] - x[left])
+            latent[left, j] = (1.0 - fraction) / widths[left]
+            latent[right, j] = fraction / widths[right]
+    response_projected = matrix @ (latent * widths[:, None])
+    response_projected /= widths[:, None]
+    velocity_weights = _velocity_quadrature_weights(v)
+    forward = response_projected * velocity_weights[None, :]
+    return forward, {
+        "wavelength_bin_widths_nm": widths,
+        "velocity_quadrature_weights_m_s": velocity_weights,
+        "mapped_line_centres_nm": centres,
+        "column_integrated_spectral_power_per_unit_evdf": (
+            np.sum(forward * widths[:, None], axis=0)
+        ),
+    }
+
+
 def _nonuniform_second_derivative_matrix(velocity):
     """Return the three-point second-derivative operator on a monotone grid.
 
@@ -198,31 +270,13 @@ def reconstruct_thomson_evdf(
     if np.max(np.abs(velocity)) >= 0.1 * _C:
         raise ValueError("The current Doppler inversion is non-relativistic and requires every represented |v_parallel| < 0.1 c; use a relativistic forward model otherwise")
 
-    # omega_s = omega_i + q.v; first-order wavelength mapping.
-    lambda_centres = float(laser_wavelength_nm) * (1.0 - q_over_ki * velocity / _C)
-    if np.any(lambda_centres < wavelength[0]) or np.any(lambda_centres > wavelength[-1]):
-        raise ValueError("velocity grid maps outside the measured wavelength interval; narrow the velocity grid or widen the measured spectral window")
-
-    # Use the same midpoint finite-volume measure as the spectral-distribution
-    # analysis; endpoint bins are half-width, including on non-uniform grids.
-    widths = _wavelength_bin_widths(wavelength)
-
-    # Each velocity node contributes unit integrated spectral power. Linear
-    # deposition avoids pretending that a sample is a finite-width line shape.
-    latent = np.zeros((wavelength.size, velocity.size), dtype=float)
-    for j, centre in enumerate(lambda_centres):
-        right = int(np.searchsorted(wavelength, centre, side="right"))
-        if right == 0:
-            latent[0, j] = 1.0 / widths[0]
-        elif right >= wavelength.size:
-            latent[-1, j] = 1.0 / widths[-1]
-        else:
-            left = right - 1
-            fraction = (centre - wavelength[left]) / (wavelength[right] - wavelength[left])
-            latent[left, j] = (1.0 - fraction) / widths[left]
-            latent[right, j] = fraction / widths[right]
-    forward = response @ (latent * widths[:, None])
-    forward = forward / widths[:, None]
+    # Integrate the nodal EVDF density over velocity space with the same
+    # trapezoidal measure used for normalization and physical moments.
+    # Without these weights, nonuniform velocity grids solve an unweighted
+    # sum of delta-lines rather than the physical integral int f(v)K(lambda|v)dv.
+    forward, forward_metadata = _projected_evdf_forward_matrix(
+        wavelength, velocity, response, float(laser_wavelength_nm), q_over_ki
+    )
 
     residual_data = measured - background
     if signal_uncertainty is not None and signal_covariance is not None:
@@ -951,7 +1005,10 @@ def reconstruct_thomson_evdf(
             "conditional on the supplied covariance matrices"
             if residual_covariance is not None else "no signal or background uncertainty supplied; unweighted fit"
         ),
-        "forward_model": "non-relativistic single-particle Doppler projection with supplied measured response matrix",
+        "forward_model": "non-relativistic single-particle Doppler projection with measured response and trapezoidal velocity-space quadrature",
+        "velocity_quadrature_weights_m_s": forward_metadata["velocity_quadrature_weights_m_s"],
+        "forward_operator_column_integrated_spectral_power_per_unit_evdf": forward_metadata["column_integrated_spectral_power_per_unit_evdf"],
+        "velocity_integral_discretization": "trapezoidal_finite_volume_measure_on_nodal_EVDF_density",
         "scattering_vector_projection_only": True,
         "absolute_density_identified": False,
         "numerical_design_rank": numerical_rank,

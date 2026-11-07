@@ -574,3 +574,95 @@ def test_evdf_model_selection_excludes_nonconverged_candidates(monkeypatch):
     assert selection["status"] == "akaike_weighted_model_uncertainty"
     assert "kappa_student_t" not in selection["weights"]
     assert sum(selection["weights"].values()) == pytest.approx(1.0, abs=1e-12)
+
+
+
+def test_evdf_forward_operator_integrates_velocity_density_with_nonuniform_quadrature():
+    from tokamak_analysis.thomson_evdf import (
+        _projected_evdf_forward_matrix,
+        _velocity_quadrature_weights,
+    )
+
+    wavelength = np.linspace(499.0, 501.0, 801)
+    velocity = np.array([-2.0e5, -1.3e5, -7.0e4, -2.0e4, 1.0e4, 5.0e4, 1.2e5, 2.0e5])
+    response = np.eye(wavelength.size)
+    forward, metadata = _projected_evdf_forward_matrix(
+        wavelength, velocity, response, 500.0, 2.0 * np.sin(np.pi / 4.0)
+    )
+    wavelength_widths = metadata["wavelength_bin_widths_nm"]
+    quadrature = _velocity_quadrature_weights(velocity)
+
+    # A unit-integral line kernel has spectral area one; after discretizing
+    # int f(v) K(lambda|v) dv, each density column must carry its dv weight.
+    integrated_columns = np.sum(forward * wavelength_widths[:, None], axis=0)
+    np.testing.assert_allclose(integrated_columns, quadrature, rtol=2e-12, atol=1e-10)
+    np.testing.assert_allclose(
+        metadata["column_integrated_spectral_power_per_unit_evdf"],
+        quadrature, rtol=2e-12, atol=1e-10,
+    )
+
+
+def test_evdf_forward_operator_preserves_velocity_integrated_power_for_nonuniform_density():
+    from tokamak_analysis.thomson_evdf import _projected_evdf_forward_matrix
+
+    wavelength = np.linspace(499.0, 501.0, 1001)
+    velocity = np.array([-2.0e5, -1.4e5, -8.0e4, -3.0e4, 2.0e4, 9.0e4, 1.5e5, 2.0e5])
+    density = np.exp(-0.5 * (velocity / 8.0e4) ** 2)
+    forward, metadata = _projected_evdf_forward_matrix(
+        wavelength, velocity, np.eye(wavelength.size), 500.0,
+        2.0 * np.sin(np.pi / 4.0),
+    )
+    predicted = forward @ density
+    spectral_power = np.sum(predicted * metadata["wavelength_bin_widths_nm"])
+    velocity_power = np.dot(density, metadata["velocity_quadrature_weights_m_s"])
+    assert spectral_power == pytest.approx(velocity_power, rel=2e-12)
+
+
+
+def test_evdf_forward_operator_conserves_quadrature_with_measured_response_and_nonuniform_wavelength_bins():
+    from tokamak_analysis.thomson_evdf import _projected_evdf_forward_matrix
+
+    wavelength = np.array([
+        499.0, 499.08, 499.17, 499.29, 499.42, 499.56, 499.71,
+        499.87, 500.0, 500.13, 500.29, 500.44, 500.58, 500.71,
+        500.83, 500.92, 501.0,
+    ])
+    velocity = np.array([-2.0e5, -1.2e5, -6.0e4, -1.0e4, 4.0e4, 1.1e5, 2.0e5])
+    n = wavelength.size
+    response = np.zeros((n, n))
+    for column in range(n):
+        response[column, column] += 0.7
+        if column > 0:
+            response[column - 1, column] += 0.2
+        else:
+            response[column, column] += 0.2
+        if column + 1 < n:
+            response[column + 1, column] += 0.1
+        else:
+            response[column, column] += 0.1
+
+    forward, metadata = _projected_evdf_forward_matrix(
+        wavelength, velocity, response, 500.0, 2.0 * np.sin(np.pi / 4.0)
+    )
+    integrated = np.sum(
+        forward * metadata["wavelength_bin_widths_nm"][:, None], axis=0
+    )
+    np.testing.assert_allclose(
+        integrated, metadata["velocity_quadrature_weights_m_s"],
+        rtol=2e-12, atol=1e-10,
+    )
+
+
+def test_advanced_dashboard_evdf_route_exposes_velocity_integral_discretization():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    result = run_advanced_thomson_physics(
+        "thomson_projected_evdf", **EXAMPLES["thomson_projected_evdf"]
+    )
+    assert result["velocity_integral_discretization"] == (
+        "trapezoidal_finite_volume_measure_on_nodal_EVDF_density"
+    )
+    assert result["forward_operator_column_integrated_spectral_power_per_unit_evdf"].shape == (
+        result["velocity_parallel_m_s"].shape
+    )

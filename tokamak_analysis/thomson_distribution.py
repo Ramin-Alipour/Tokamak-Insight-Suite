@@ -818,10 +818,35 @@ def analyze_thomson_spectral_distribution(
                 )
             options[option_name] = option_value
         if physical_initial is not None:
-            raise ValueError(
-                "physical_initial is a Kappa/MJ kinetic-fit seed; the selected canonical model "
-                "uses its model-specific initialization inputs in physical_fit_options"
-            )
+            if physical_model not in {"collective_maxwellian", "collective_kappa"}:
+                raise ValueError(
+                    "physical_initial is not an optimizer seed for non-collective Maxwellian fits; "
+                    "use the native Kappa/Maxwell-Juttner kinetic seed or omit it."
+                )
+            if not isinstance(physical_initial, dict):
+                raise ValueError(
+                    "For collective fits, physical_initial must be a mapping of native "
+                    "collective solver initialization names to finite initial values."
+                )
+            allowed_initial = {
+                "collective_initial_density_m3",
+                "collective_initial_temperature_eV",
+            }
+            if physical_model == "collective_kappa":
+                allowed_initial.add("collective_kappa_initial")
+            unknown_initial = sorted(set(physical_initial) - allowed_initial)
+            if unknown_initial:
+                raise ValueError(
+                    f"Unsupported physical_initial keys for {physical_model}: {unknown_initial}. "
+                    f"Allowed keys are {sorted(allowed_initial)}."
+                )
+            for initial_name, initial_value in physical_initial.items():
+                if initial_name in options:
+                    raise ValueError(
+                        f"{initial_name} must be supplied either in physical_initial "
+                        "or physical_fit_options, not both"
+                    )
+                options[initial_name] = initial_value
         if "radius_m" not in options:
             raise ValueError(
                 "physical_fit_options must include radius_m for the canonical measured-spectrum Maxwellian fit"
