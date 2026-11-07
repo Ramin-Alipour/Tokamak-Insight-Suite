@@ -411,3 +411,24 @@ def test_raw_tensor_pressure_covariance_rejects_non_psd_density_temperature_join
             electron_density_uncertainty_m3=1.0e18,
             electron_density_temperature_tensor_cross_covariance=np.full(6, 1.0e40),
         )
+
+
+def test_raw_tensor_fit_rejects_row_stochastic_but_non_column_stochastic_response():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    wavelength = np.linspace(529.0, 535.0, 41)
+    q, _, _ = _views()
+    spectra = np.ones((q.shape[0], wavelength.size))
+    response = np.eye(wavelength.size)
+    response[0, 0], response[0, 1] = 0.8, 0.2
+    response[1, 0], response[1, 1] = 0.1, 0.9
+    np.testing.assert_allclose(response.sum(axis=1), 1.0)
+    assert not np.allclose(response.sum(axis=0), 1.0)
+    with pytest.raises(ValueError, match="columns sum to one"):
+        fit_general_temperature_tensor_thomson_spectra(
+            wavelength, spectra,
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2,
+            scattering_vector_unit=q,
+            instrument_response_matrix=response,
+        )
