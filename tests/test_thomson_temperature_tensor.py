@@ -366,18 +366,34 @@ def test_raw_tensor_pressure_covariance_includes_density_temperature_cross_terms
 
 
 def test_raw_tensor_pressure_covariance_rejects_non_psd_density_temperature_joint_covariance():
+    from scipy.special import ndtr
     from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
 
-    wavelength = np.linspace(529.0, 535.0, 41)
-    q, _, _ = _views()
-    spectra = np.ones((q.shape[0], wavelength.size))
+    wavelength = np.linspace(529.0, 535.0, 161)
+    q, tensor, _ = _views()
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    spectra = []
+    for direction in q:
+        tq = float(direction @ tensor @ direction)
+        sigma = 532.0 * 2.0 * np.sin(np.pi / 4.0) * np.sqrt(e * tq / me) / c
+        z = (edges - 532.0) / sigma
+        probability = ndtr(z[1:]) - ndtr(z[:-1])
+        positive = z[:-1] > 0
+        probability[positive] = ndtr(-z[:-1][positive]) - ndtr(-z[1:][positive])
+        spectra.append(2.0 * probability / np.diff(edges) + 0.02)
+
     with pytest.raises(ValueError, match="joint density-temperature covariance"):
         fit_general_temperature_tensor_thomson_spectra(
-            wavelength, spectra,
+            wavelength, np.asarray(spectra),
             laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2,
             scattering_vector_unit=q,
             instrument_response_matrix=np.eye(wavelength.size),
+            signal_uncertainty=np.full((q.shape[0], wavelength.size), 2e-4),
             electron_density_m3=2.0e19,
             electron_density_uncertainty_m3=1.0e18,
             electron_density_temperature_tensor_cross_covariance=np.full(6, 1.0e30),
