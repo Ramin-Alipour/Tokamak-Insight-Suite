@@ -855,7 +855,7 @@ def analyze_thomson_spectral_distribution(
     if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"} and (
         physical_fit_options is not None or any(value is not None for value in (
             incident_polarization, include_compton_recoil, physical_background_model,
-            model_discrepancy_covariance, systematic_covariance, physical_initial,
+            physical_initial,
         ))
     ):
         if laser_wavelength_nm is None or scattering_angle_rad is None:
