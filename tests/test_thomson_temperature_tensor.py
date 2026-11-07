@@ -298,3 +298,87 @@ def test_tensor_spectral_fit_registry_exposes_shared_cartesian_flow_contract():
         "electron_temperature_flow_joint_covariance",
     } <= outputs
     assert "one shared Cartesian bulk-flow vector" in contract["algorithm"]
+
+
+
+def test_raw_tensor_pressure_covariance_includes_density_temperature_cross_terms():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    wavelength = np.linspace(529.0, 535.0, 241)
+    q, expected_tensor, _ = _views()
+    velocity = np.array([1.0e4, -0.6e4, 0.3e4])
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    qfactor = 2.0 * np.sin(np.pi / 4.0)
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    from scipy.special import ndtr
+
+    spectra = []
+    for direction in q:
+        flow = float(direction @ velocity)
+        tq = float(direction @ expected_tensor @ direction)
+        centre = 532.0 * (1.0 - qfactor * flow / c)
+        sigma = 532.0 * qfactor * np.sqrt(e * tq / me) / c
+        z = (edges - centre) / sigma
+        probability = ndtr(z[1:]) - ndtr(z[:-1])
+        positive = z[:-1] > 0
+        probability[positive] = ndtr(-z[:-1][positive]) - ndtr(-z[1:][positive])
+        spectra.append(2.0 * probability / np.diff(edges) + 0.02)
+
+    common = dict(
+        wavelength_nm=wavelength,
+        measured_spectra=np.asarray(spectra),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full((q.shape[0], wavelength.size), 2e-4),
+        electron_density_m3=2.0e19,
+        electron_density_uncertainty_m3=1.0e18,
+    )
+    independent = fit_general_temperature_tensor_thomson_spectra(**common)
+    tensor_cov = independent["temperature_tensor_parameter_covariance_eV2"]
+    sigma_n = common["electron_density_uncertainty_m3"]
+    cross = 0.1 * sigma_n * np.sqrt(np.diag(tensor_cov))
+    correlated = fit_general_temperature_tensor_thomson_spectra(
+        **common,
+        electron_density_temperature_tensor_cross_covariance=cross,
+    )
+    components = np.array([
+        expected_tensor[0,0], expected_tensor[1,1], expected_tensor[2,2],
+        expected_tensor[0,1], expected_tensor[0,2], expected_tensor[1,2],
+    ])
+    expected_covariance = (common["electron_density_m3"] * e)**2 * tensor_cov
+    expected_covariance += (e * sigma_n)**2 * np.outer(components, components)
+    expected_covariance += e**2 * common["electron_density_m3"] * (
+        np.outer(components, cross) + np.outer(cross, components)
+    )
+    np.testing.assert_allclose(
+        correlated["electron_pressure_parameter_covariance_Pa2"],
+        expected_covariance,
+        rtol=2e-5, atol=1e-20,
+    )
+    assert correlated["electron_pressure_covariance_status"] == (
+        "joint_density_temperature_cross_covariance_delta_method"
+    )
+
+
+def test_raw_tensor_pressure_covariance_rejects_non_psd_density_temperature_joint_covariance():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    wavelength = np.linspace(529.0, 535.0, 41)
+    q, _, _ = _views()
+    spectra = np.ones((q.shape[0], wavelength.size))
+    with pytest.raises(ValueError, match="joint density-temperature covariance"):
+        fit_general_temperature_tensor_thomson_spectra(
+            wavelength, spectra,
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2,
+            scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            electron_density_m3=2.0e19,
+            electron_density_uncertainty_m3=1.0e18,
+            electron_density_temperature_tensor_cross_covariance=np.full(6, 1.0e30),
+        )
