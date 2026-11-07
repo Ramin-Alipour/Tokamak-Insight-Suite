@@ -1523,7 +1523,7 @@ def analyze_thomson_spectra(
         }:
             raise ValueError(
                 "systematic_covariance is supported for non-collective optical Thomson "
-                "models and the collective Maxwellian fit"
+                "models and both collective Maxwellian and collective Kappa fits"
             )
         systematic = _finite_array(systematic_covariance, "systematic_covariance")
         nchan_sys, nlam_sys = y.shape
