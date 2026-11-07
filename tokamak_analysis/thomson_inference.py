@@ -3674,12 +3674,43 @@ def analyze_thomson_spectra(
                 fitted_background, dtype=float
             ).copy()
             try:
+                # Preserve the covariance decomposition when forwarding the
+                # canonical physical-fit likelihood to the descriptive spectral
+                # fit.  The primary fit above has already assembled these blocks;
+                # subtract them here only to avoid counting them twice.
+                distribution_measurement_covariance = None
+                if measurement_covariance_supplied and channel_covariance is not None:
+                    distribution_measurement_covariance = np.asarray(
+                        channel_covariance, dtype=float
+                    ).copy()
+                    if independent_discrepancy_blocks is not None:
+                        distribution_measurement_covariance -= independent_discrepancy_blocks[channel_index]
+                    if independent_systematic_blocks is not None:
+                        distribution_measurement_covariance -= independent_systematic_blocks[channel_index]
+                    distribution_measurement_covariance = 0.5 * (
+                        distribution_measurement_covariance
+                        + distribution_measurement_covariance.T
+                    )
+                distribution_measurement_uncertainty = (
+                    channel_uncertainty
+                    if measurement_covariance_supplied
+                    and distribution_measurement_covariance is None
+                    else None
+                )
                 distribution = analyze_thomson_spectral_distribution(
                     xs[channel_index],
                     y[channel_index],
                     instrument_response_matrix=channel_responses[channel_index],
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=distribution_measurement_uncertainty,
+                    signal_covariance=distribution_measurement_covariance,
+                    model_discrepancy_covariance=(
+                        independent_discrepancy_blocks[channel_index]
+                        if independent_discrepancy_blocks is not None else None
+                    ),
+                    systematic_covariance=(
+                        independent_systematic_blocks[channel_index]
+                        if independent_systematic_blocks is not None else None
+                    ),
                     background_signal=fitted_background,
                     physical_model=(
                         "non_collective_maxwellian"
