@@ -589,8 +589,9 @@ EXAMPLES = {
         "model_discrepancy_covariance": None,
         "systematic_covariance": None,
         "regularization_strength": 0.001,
-        "velocity_limit_m_s": 8000.0,
-        "velocity_points": 81
+        # Non-uniform nodes concentrate resolution around the core while
+        # retaining the same measured-window velocity limits.
+        "velocity_grid_m_s": (8000.0 * np.linspace(-1.0, 1.0, 81)**3).tolist()
     },
     "cts_tabulated_evdf_susceptibility": {
         "velocity_grid_m_s": np.linspace(-8.0e6, 8.0e6, 1601).tolist(),
