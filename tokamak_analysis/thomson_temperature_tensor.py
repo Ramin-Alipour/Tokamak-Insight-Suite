@@ -335,10 +335,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     Physical closure: T_q=q^T T_eV q and Var(v_q)=e*T_q/m_e. Maxwellian
     projections are Gaussian; Kappa projections are Student-t with nu=2*kappa-1
     and scale^2=sigma_v^2*(nu-2)/nu. The measured response acts on bin-integrated power.
-    The exact Gaussian probability is integrated over finite wavelength bins,
-    then the measured response acts on bin-integrated spectral power. This is
-    a non-relativistic, elastic, single-scattering forward model; it is not a
-    general non-Gaussian 3-D EVDF reconstruction.
+    The selected Gaussian or Student-t probability is integrated exactly over
+    finite wavelength bins, then the measured response acts on bin-integrated
+    spectral power. This is a non-relativistic, elastic, single-scattering model
+    family; the Kappa branch is an ellipsoidal parametric closure, not an
+    unrestricted non-Gaussian 3-D EVDF reconstruction.
     """
     from scipy.optimize import least_squares
 
