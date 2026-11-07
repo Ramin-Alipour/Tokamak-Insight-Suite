@@ -10666,5 +10666,124 @@
       ]
     },
     "description": "Quantitative midpoint refinement of the Landau–FDT Full-EM physical solver. Compares all returned physical spectral tensors between grids and withholds the grid-convergence claim when the node budget or tolerance is not met."
+  },
+  {
+    "name": "Collective Thomson spectrum from multi-population Landau–FDT response",
+    "equation": "χ_e(k,ω)=Σ_a[−ω_pe² η_a/k² ∫_L f′_a(v)/(v−ω/k) dv]; χ_i=Σ_jχ_j; ε=1+χ_e+χ_i; S(k,ω)=(2π/k){|1+χ_i|² f_e+Σ_j Z_j²(n_j/n_e)|χ_e|²f_j}/|ε|²; f_e=Σ_aη_af_a",
+    "inputs": "Scattering wave number k [m^-1], phase velocity ω/k [m s^-1], electron density and temperature, finite-variance Kappa index, explicit electron population fractions/temperature ratios/drifts/distribution types, ion species/fractions/temperatures/flows",
+    "output": "Complex longitudinal dielectric response and collective dynamic structure factor; wavelength spectral density after photon-frequency Jacobian",
+    "assumptions": "Collisionless, unmagnetized, electrostatic Landau–FDT model. Each population is a normalized projected 1-D Maxwellian or finite-variance Kappa marginal; the solver sums susceptibilities before dielectric screening. Population fractions sum to one. This is not Full-EM, collisional, or an unrestricted 3-D EVDF model.",
+    "status": "D",
+    "category": "Optical and collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+      "formula_key": "collective_thomson_landau_fdt_population_spectrum",
+      "input_specs": [
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3; positive",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; positive second-moment reference temperature",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; >3/2 for finite variance",
+          "required": true
+        },
+        {
+          "name": "electron_populations",
+          "unit": "explicit population mappings; density fractions sum to one",
+          "required": false
+        },
+        {
+          "name": "ion_species",
+          "unit": "ion species mappings with charge state and mass",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "number-density fractions summing to one",
+          "required": true
+        },
+        {
+          "name": "ion_populations",
+          "unit": "one projected Maxwellian/Kappa/bi-Kappa mapping per ion species",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "unit 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "unit 3-vector",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_population_susceptibilities",
+          "unit": "complex longitudinal susceptibility per population"
+        },
+        {
+          "name": "dielectric_function",
+          "unit": "dimensionless complex longitudinal dielectric"
+        },
+        {
+          "name": "dynamic_structure_factor",
+          "unit": "velocity-frequency spectral measure"
+        },
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "normalized wavelength spectral density"
+        },
+        {
+          "name": "electron_mixture_moments",
+          "unit": "projected density-weighted moments and finite-moment status"
+        }
+      ],
+      "prerequisites": [
+        "Explicit scattering geometry",
+        "Explicit ion composition and flow",
+        "Positive electron density and temperature",
+        "Kappa > 3/2 for every Kappa population"
+      ],
+      "uncertainty_model": "The fitted ne/Te/kappa covariance is conditional on fixed population inputs. Optional full population-parameter covariance is propagated by deterministic Monte Carlo refits; invalid draws are rejected without clipping or renormalizing fractions.",
+      "limitations": [
+        "Unmagnetized electrostatic approximation",
+        "No collisional or Full-EM response",
+        "Projected 1-D marginal does not uniquely identify an unrestricted 3-D EVDF",
+        "Population parameters are fixed unless their covariance is explicitly supplied"
+      ],
+      "test_links": [
+        "tests/test_thomson_inference.py::test_collective_kappa_population_mixture_is_reachable_through_analysis1_api"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "execution_scope": "measured_calibrated_spectrum_to_collective_dielectric_physical_inference",
+    "input_data_level": "measured_calibrated_spectrum_and_explicit_physical_inputs",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical collective-Kappa multi-population inference",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+        "tokamak_analysis.thomson_kinetic_models._landau_susceptibility",
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
+      ],
+      "formula_key": "collective_thomson_landau_fdt_population_spectrum",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_inference.py::test_collective_kappa_population_mixture_is_reachable_through_analysis1_api"
+      ]
+    }
   }
 ]
