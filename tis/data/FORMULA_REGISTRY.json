@@ -10028,9 +10028,9 @@
   },
   {
     "name": "Non-gyrotropic 3-D Thomson temperature-tensor spectral model",
-    "equation": "T_q = qhat^T T_e qhat; sigma_lambda = lambda_L q_s sqrt(e T_q/m_e)/c; lambda_c = lambda_L(1 - q_s u_q/c)",
-    "inputs": "Calibrated multi-view spectra, unit scattering directions, laser wavelength, scattering angle, measured bin-response matrices",
-    "output": "General symmetric positive-definite electron second-moment temperature tensor [eV], per-view q-parallel flow [m/s], fitted spectra and joint covariance",
+    "equation": "T_q = qhat^T T_e qhat; sigma_lambda = lambda_L q_s sqrt(e T_q/m_e)/c; lambda_c = lambda_L(1 - q_s u_q/c); C_p,total=C_p,GLS+G_q C_qq G_q^T+A C_yq G_q^T+G_q C_qy A^T, G_q=−(J_p^T J_p)^−1 J_p^T J_q",
+    "inputs": "Calibrated multi-view spectra, unit scattering directions, laser wavelength, scattering angle, measured bin-response matrices; optional tangent-plane scattering-direction covariance and measured-spectrum/geometry cross-covariance",
+    "output": "General symmetric positive-definite electron second-moment temperature tensor [eV], per-view q-parallel flow [m/s], fitted spectra and joint covariance; geometry-propagated parameter covariance and spectral/geometry cross-covariance contribution",
     "assumptions": "Single-scattering, non-relativistic elastic Thomson limit; Gaussian 3-D electron velocity distribution; fixed measured geometry and response.",
     "status": "D",
     "category": "Thomson scattering",
@@ -10102,6 +10102,18 @@
           "name": "electron_density_uncertainty_m3",
           "unit": "m^-3; independent 1-sigma uncertainty",
           "required": false
+        },
+        {
+          "name": "scattering_vector_covariance",
+          "unit": "(3*n_view)^2 Cartesian covariance in each unit-vector tangent plane",
+          "required": false,
+          "description": "Positive-semidefinite covariance of measured scattering directions in view-major Cartesian order; propagated through finite-difference forward sensitivities and the whitened GLS estimator."
+        },
+        {
+          "name": "spectral_geometry_cross_covariance",
+          "unit": "(n_view*n_wavelength) x (3*n_view)",
+          "required": false,
+          "description": "Covariance between measured channel-major spectra and view-major Cartesian scattering directions. Requires absolute measurement covariance and scattering_vector_covariance; the complete joint covariance block must be positive semidefinite."
         }
       ],
       "output_specs": [
@@ -10148,14 +10160,22 @@
         {
           "name": "electron_pressure_parameter_covariance_Pa2",
           "unit": "Pa²; delta-method propagation of tensor and density uncertainty"
+        },
+        {
+          "name": "geometry_parameter_covariance",
+          "unit": "parameter covariance contribution from scattering-direction uncertainty"
+        },
+        {
+          "name": "geometry_cross_parameter_covariance",
+          "unit": "parameter covariance cross-term from measured-spectrum/scattering-geometry correlation"
         }
       ],
       "prerequisites": [
         "At least six independent scattering-vector dyads spanning all six symmetric tensor components.",
         "Calibrated multi-view spectra and measured wavelength response."
       ],
-      "uncertainty_model": "Full channel-major GLS from supplied measurement covariance plus optional model-discrepancy and systematic covariance; residual-scaled covariance is labelled when no absolute covariance is supplied. If independent density and density uncertainty are supplied, pressure covariance follows P=n_e e T and adds the independent density term by the delta method.",
-      "algorithm": "Parameterize the positive-definite tensor as Theta=L L^T. For each view, Tq=q^T Theta q and the projected Gaussian Doppler spectrum has centre lambda_c=lambda_L(1-q_s u_q/c) and width sigma_lambda=lambda_L q_s sqrt(e Tq/me)/c. Integrate Gaussian probability exactly over finite wavelength bins, apply the measured response to bin-integrated spectral power, and jointly fit tensor, per-view flow, amplitude and affine background. Require rank-six geometry and a full-rank well-conditioned spectral Jacobian.",
+      "uncertainty_model": "Full channel-major GLS from supplied measurement covariance plus optional model-discrepancy and systematic covariance; residual-scaled covariance is labelled when no absolute covariance is supplied. If independent density and density uncertainty are supplied, pressure covariance follows P=n_e e T and adds the independent density term by the delta method. Supplied unit-direction covariance is required to lie in the tangent planes of the unit sphere and is propagated as G_q C_qq G_q^T. Optional measured-spectrum/geometry cross-covariance contributes both GLS cross terms; the joint measurement/geometry covariance block is checked for positive semidefiniteness.",
+      "algorithm": "Parameterize the positive-definite tensor as Theta=L L^T. For each view, Tq=q^T Theta q and the projected Gaussian Doppler spectrum has centre lambda_c=lambda_L(1-q_s u_q/c) and width sigma_lambda=lambda_L q_s sqrt(e Tq/me)/c. Integrate Gaussian probability exactly over finite wavelength bins, apply the measured response to bin-integrated spectral power, and jointly fit tensor, per-view flow, amplitude and affine background. Require rank-six geometry and a full-rank well-conditioned spectral Jacobian. When geometry covariance is supplied, finite-difference derivatives of the full response-convolved spectral forward model are computed in each unit-direction tangent plane. These derivatives are passed through the same whitened GLS estimator; optional spectrum/geometry cross-covariance is included with its two signed cross terms.",
       "limitations": [
         "Non-relativistic elastic Thomson closure; results are withheld outside declared thermal/flow beta limits.",
         "Gaussian second-moment tensor only; does not reconstruct non-Gaussian higher EVDF moments.",
@@ -10170,9 +10190,10 @@
       "calibrated_measurements_to_physics": true,
       "test_links": [
         "tests/test_thomson_temperature_tensor.py::test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor",
-        "tests/test_thomson_temperature_tensor.py::test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry"
+        "tests/test_thomson_temperature_tensor.py::test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry",
+        "tests/test_thomson_temperature_tensor_api.py::test_raw_temperature_tensor_fit_propagates_scattering_geometry_covariance"
       ],
-      "note": "Raw-spectrum physical forward fit, distinct from the algebraic projection-only tensor inversion."
+      "note": "Raw-spectrum physical forward fit, distinct from the algebraic projection-only tensor inversion. Scattering geometry and its cross-covariance with measured spectra are now propagated into the fit-parameter covariance rather than being treated as exact."
     }
   },
   {
