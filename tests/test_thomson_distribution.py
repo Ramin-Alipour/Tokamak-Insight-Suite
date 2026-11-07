@@ -1270,3 +1270,38 @@ def test_collective_physical_initial_rejects_unknown_or_duplicate_seed_keys():
             }},
             physical_initial={"collective_initial_temperature_eV": 100.0},
         )
+
+
+
+def test_gaussian_shape_fit_uses_model_and_systematic_covariance_in_likelihood():
+    x, y = _spectrum()
+    n = x.size
+    measurement = np.full(n, 0.015)
+    model_covariance = np.eye(n) * 0.025**2
+    systematic_covariance = np.eye(n) * 0.010**2
+    out = _run(
+        x, y,
+        signal_uncertainty=measurement,
+        model_discrepancy_covariance=model_covariance,
+        systematic_covariance=systematic_covariance,
+    )
+    expected = np.diag(measurement**2) + model_covariance + systematic_covariance
+    residual = out["residual"]
+    expected_chi_square = float(residual @ np.linalg.solve(expected, residual))
+    assert out["chi_square"] == pytest.approx(expected_chi_square, rel=1e-9)
+    contract = out["gaussian_fit_likelihood_covariance_components"]
+    assert contract["measurement_included"] is True
+    assert contract["model_discrepancy_included"] is True
+    assert contract["systematic_included"] is True
+    assert contract["used_in_optimizer_and_chi_square"] is True
+
+
+def test_gaussian_shape_fit_rejects_singular_combined_likelihood_covariance():
+    x, y = _spectrum()
+    zero = np.zeros((x.size, x.size))
+    with pytest.raises(ValueError, match="combined measurement, model-discrepancy"):
+        _run(
+            x, y,
+            model_discrepancy_covariance=zero,
+            systematic_covariance=zero,
+        )
