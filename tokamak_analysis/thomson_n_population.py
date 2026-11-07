@@ -75,6 +75,7 @@ def fit_n_population_relativistic_thomson_spectrum(
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     model_discrepancy_covariance=None, systematic_covariance=None,
+    geometry_covariance_nm2_rad2=None,
     radial_order=24, angular_order=12,
     maximum_recoil_correction_fraction=0.01, include_compton_recoil=False,
     max_nfev=1200,
@@ -193,6 +194,23 @@ def fit_n_population_relativistic_thomson_spectrum(
         covariance_components["systematic"] = systematic.copy()
         covariance = systematic.copy() if covariance is None else covariance + systematic
 
+    geometry_covariance = None
+    if geometry_covariance_nm2_rad2 is not None:
+        geometry_covariance = np.asarray(geometry_covariance_nm2_rad2, dtype=float)
+        if (geometry_covariance.shape != (2, 2)
+                or np.any(~np.isfinite(geometry_covariance))
+                or not np.allclose(geometry_covariance, geometry_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "geometry_covariance_nm2_rad2 must be a finite symmetric 2x2 "
+                "covariance for [laser_wavelength_nm, scattering_angle_rad]"
+            )
+        geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+        geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
+        if float(np.min(geometry_eigenvalues)) < -1e-10 * geometry_scale:
+            raise ValueError("geometry_covariance_nm2_rad2 must be positive semidefinite")
+        geometry_covariance = 0.5 * (geometry_covariance + geometry_covariance.T)
+
     if covariance is None:
         whiten = lambda values: np.asarray(values, dtype=float)
         noise_model = "unweighted_no_measurement_uncertainty_supplied"
@@ -240,10 +258,12 @@ def fit_n_population_relativistic_thomson_spectrum(
         background_coefficients = np.asarray(parameters[amplitude_index + 1:], dtype=float)
         return population_temperatures, population_fractions, flows, amplitude, background_coefficients
 
-    def predict(parameters, return_parts=False):
+    def predict(parameters, return_parts=False, *, laser_value=None, angle_value=None):
         temp, frac, flows, amplitude, coefficients = unpack(parameters)
+        evaluated_laser = laser if laser_value is None else float(laser_value)
+        evaluated_angle = angle if angle_value is None else float(angle_value)
         physical = n_population_relativistic_thomson_spectrum(
-            x, laser, angle, temp, frac,
+            x, evaluated_laser, evaluated_angle, temp, frac,
             population_flow_projections_m_s=flows, incident_polarization=polarization,
             radial_order=radial_order, angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
@@ -285,10 +305,50 @@ def fit_n_population_relativistic_thomson_spectrum(
             "reduce population_count or improve spectral information"
         )
 
-    covariance_internal = np.linalg.pinv(jacobian.T @ jacobian, rcond=1e-12)
+    normal_inverse = np.linalg.pinv(jacobian.T @ jacobian, rcond=1e-12)
+    covariance_internal = normal_inverse.copy()
     dof = max(1, y.size - fit.x.size)
     if covariance is None:
         covariance_internal *= float(fit.fun @ fit.fun / dof)
+
+    geometry_parameter_sensitivity = None
+    geometry_induced_internal_covariance = None
+    if geometry_covariance is not None and np.any(geometry_covariance):
+        # Implicit differentiation of the GLS normal equations:
+        # dp/dg = -(J_p.T J_p)^-1 J_p.T J_g.
+        # This propagates correlated laser/angle calibration errors into the
+        # fitted population temperatures, fractions, flows and nuisance terms.
+        geometry_jacobian = np.empty((y.size, 2), dtype=float)
+        geometry_values = (laser, angle)
+        for geometry_index, geometry_value in enumerate(geometry_values):
+            step = np.cbrt(np.finfo(float).eps) * max(1.0, abs(geometry_value))
+            plus = list(geometry_values)
+            minus = list(geometry_values)
+            plus[geometry_index] += step
+            minus[geometry_index] -= step
+            if geometry_index == 0 and minus[geometry_index] <= 0.0:
+                minus[geometry_index] = geometry_value
+                denominator = plus[geometry_index] - minus[geometry_index]
+                derivative = (
+                    whiten(predict(fit.x, laser_value=plus[0], angle_value=plus[1]) - y)
+                    - whiten(predict(fit.x, laser_value=minus[0], angle_value=minus[1]) - y)
+                ) / denominator
+            elif geometry_index == 1 and not 0.0 < minus[geometry_index] < np.pi:
+                raise ValueError("scattering-angle uncertainty step leaves the physical interval (0, pi)")
+            else:
+                derivative = (
+                    whiten(predict(fit.x, laser_value=plus[0], angle_value=plus[1]) - y)
+                    - whiten(predict(fit.x, laser_value=minus[0], angle_value=minus[1]) - y)
+                ) / (2.0 * step)
+            geometry_jacobian[:, geometry_index] = derivative
+        geometry_parameter_sensitivity = (
+            -normal_inverse @ jacobian.T @ geometry_jacobian
+        )
+        geometry_induced_internal_covariance = (
+            geometry_parameter_sensitivity @ geometry_covariance
+            @ geometry_parameter_sensitivity.T
+        )
+        covariance_internal += geometry_induced_internal_covariance
 
     # Transform the complete covariance to physical parameters and nuisance
     # coordinates with a bound-aware central finite-difference Jacobian.
@@ -346,6 +406,12 @@ def fit_n_population_relativistic_thomson_spectrum(
         "noise_model": noise_model,
         "model_discrepancy_covariance_included": model_discrepancy_covariance is not None,
         "systematic_covariance_included": systematic_covariance is not None,
+        "geometry_covariance_included": geometry_covariance is not None,
+        "geometry_covariance_nm2_rad2": (
+            None if geometry_covariance is None else geometry_covariance.copy()
+        ),
+        "geometry_parameter_sensitivity_internal_per_nm_rad": geometry_parameter_sensitivity,
+        "geometry_induced_internal_parameter_covariance": geometry_induced_internal_covariance,
         "covariance_component_trace": {
             name: (None if matrix is None else float(np.trace(matrix)))
             for name, matrix in covariance_components.items()
@@ -354,7 +420,7 @@ def fit_n_population_relativistic_thomson_spectrum(
         "covariance_status": (
             "residual_scaled_unweighted_joint_covariance_not_measurement_uncertainty"
             if covariance is None else
-            "local_joint_GLS_covariance_conditional_on_additive_measurement_model_discrepancy_and_systematic_covariance_and_fixed_response"
+            "local_joint_GLS_covariance_with_additive_measurement_model_discrepancy_systematic_and_delta_method_geometry_uncertainty_conditional_on_fixed_response"
         ),
         "population_assumptions": [
             "Finite N-component isotropic Maxwell-Juttner mixture.",
