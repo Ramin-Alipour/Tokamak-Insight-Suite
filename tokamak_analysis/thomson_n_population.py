@@ -314,8 +314,9 @@ def fit_n_population_relativistic_thomson_spectrum(
     geometry_parameter_sensitivity = None
     geometry_induced_internal_covariance = None
     if geometry_covariance is not None and np.any(geometry_covariance):
-        # Implicit differentiation of the GLS normal equations:
-        # dp/dg = -(J_p.T J_p)^-1 J_p.T J_g.
+        # Gauss-Newton implicit sensitivity of the GLS normal equations:
+        # dp/dg ~= -(J_p.T J_p)^-1 J_p.T J_g. The approximation neglects
+        # residual-weighted second derivatives of the nonlinear forward model.
         # This propagates correlated laser/angle calibration errors into the
         # fitted population temperatures, fractions, flows and nuisance terms.
         geometry_jacobian = np.empty((y.size, 2), dtype=float)
@@ -407,6 +408,11 @@ def fit_n_population_relativistic_thomson_spectrum(
         "model_discrepancy_covariance_included": model_discrepancy_covariance is not None,
         "systematic_covariance_included": systematic_covariance is not None,
         "geometry_covariance_included": geometry_covariance is not None,
+        "geometry_uncertainty_method": (
+            "Gauss-Newton implicit GLS sensitivity delta method; residual-weighted "
+            "second derivatives are neglected"
+            if geometry_covariance is not None else "not_requested"
+        ),
         "geometry_covariance_nm2_rad2": (
             None if geometry_covariance is None else geometry_covariance.copy()
         ),
