@@ -834,6 +834,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_conserving_bgk_fdt",
     "landau_fdt_cts",
     "landau_fdt_full_em_constitutive",
+    "landau_fdt_full_em_spectrum_converged",
     "landau_fdt_full_em_field_fluctuations",
     "landau_fdt_full_em_response",
     "polarized_kinetic_ece",
