@@ -901,6 +901,51 @@ def test_spectral_distribution_connects_same_spectrum_to_projected_evdf():
     assert propagated["systematic_covariance_included"] is True
 
 
+def test_model_discrepancy_and_systematic_covariance_propagate_to_spectral_moments():
+    wavelength = np.linspace(499.0, 501.0, 101)
+    signal = 4.0 * np.exp(-0.5 * ((wavelength - 500.0) / 0.16) ** 2) + 0.2
+    common = dict(
+        wavelength_nm=wavelength,
+        signal=signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.2),
+        signal_uncertainty=np.full_like(wavelength, 0.002),
+        moment_mc_samples=100,
+    )
+    baseline = analyze_thomson_spectral_distribution(**common)
+    discrepancy = np.eye(wavelength.size) * 4.0e-4
+    systematic = np.eye(wavelength.size) * 2.0e-4
+    propagated = analyze_thomson_spectral_distribution(
+        **common,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+    )
+    assert propagated["moment_uncertainty_covariance_components"] == {
+        "measurement_covariance_included": True,
+        "background_covariance_included": False,
+        "model_discrepancy_covariance_included": True,
+        "systematic_covariance_included": True,
+        "components_assumed_mutually_independent": True,
+        "sampling_method": "independent_multivariate_gaussian_components_within_component_correlations_preserved",
+    }
+    assert propagated["moment_uncertainty_successful_draws"] >= 80
+    assert propagated["observed_sigma_uncertainty_nm"] > baseline["observed_sigma_uncertainty_nm"]
+
+
+def test_model_discrepancy_covariance_rejects_non_psd_matrix():
+    wavelength = np.linspace(499.0, 501.0, 31)
+    signal = np.exp(-0.5 * ((wavelength - 500.0) / 0.2) ** 2) + 0.1
+    invalid = np.eye(wavelength.size)
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="model_discrepancy_covariance must be positive semidefinite"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.1),
+            model_discrepancy_covariance=invalid,
+        )
+
+
 def test_projected_evdf_connection_requires_explicit_scattering_geometry():
     wavelength = np.linspace(520.0, 544.0, 121)
     signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 0.1

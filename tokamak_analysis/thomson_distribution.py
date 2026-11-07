@@ -272,6 +272,35 @@ def analyze_thomson_spectral_distribution(
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
+    # Model discrepancy and systematic calibration errors are additive
+    # spectral covariance components. Keep them distinct in the reported
+    # contract, but include both in moment uncertainty propagation.
+    def _positive_semidefinite_covariance(value, name):
+        if value is None:
+            return None, None
+        raw = np.asarray(value)
+        if raw.dtype.kind not in "iuf":
+            raise ValueError(f"{name} must contain real numeric values")
+        matrix = raw.astype(float, copy=False)
+        if matrix.shape != (x.size, x.size) or not np.all(np.isfinite(matrix)):
+            raise ValueError(f"{name} must be a finite square matrix matching wavelength_nm")
+        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-14):
+            raise ValueError(f"{name} must be symmetric")
+        eigenvalues, eigenvectors = np.linalg.eigh(0.5 * (matrix + matrix.T))
+        scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        if float(np.min(eigenvalues)) < -1e-10 * scale:
+            raise ValueError(f"{name} must be positive semidefinite")
+        eigenvalues = np.maximum(eigenvalues, 0.0)
+        factor = eigenvectors * np.sqrt(eigenvalues)[None, :]
+        return matrix.copy(), factor
+
+    model_discrepancy_matrix, model_discrepancy_factor = _positive_semidefinite_covariance(
+        model_discrepancy_covariance, "model_discrepancy_covariance"
+    )
+    systematic_matrix, systematic_factor = _positive_semidefinite_covariance(
+        systematic_covariance, "systematic_covariance"
+    )
+
     joint_signal_background_cholesky = None
     if signal_background_cross_covariance is not None:
         if explicit_background is None:
@@ -403,7 +432,8 @@ def analyze_thomson_spectral_distribution(
     moment_uncertainties = {}
     successful_draws = 0
     if (uncertainty is not None or signal_covariance_matrix is not None
-            or background_uncertainty is not None or background_covariance_matrix is not None):
+            or background_uncertainty is not None or background_covariance_matrix is not None
+            or model_discrepancy_factor is not None or systematic_factor is not None):
         rng = np.random.default_rng(58123)
         draws = []
         for _ in range(int(moment_mc_samples)):
@@ -423,6 +453,13 @@ def analyze_thomson_spectral_distribution(
                     sampled_background = explicit_background + rng.normal(0.0, background_uncertainty)
                 elif background_covariance_matrix is not None:
                     sampled_background = explicit_background + background_covariance_cholesky @ rng.normal(size=x.size)
+            # Independent additive discrepancy and calibration components:
+            # C_total = C_measurement + C_model + C_systematic. Correlations
+            # within each component are retained by its matrix square root.
+            if model_discrepancy_factor is not None:
+                sampled_signal = sampled_signal + model_discrepancy_factor @ rng.normal(size=x.size)
+            if systematic_factor is not None:
+                sampled_signal = sampled_signal + systematic_factor @ rng.normal(size=x.size)
             try:
                 sample = _moment_statistics(x, sampled_signal, background_fraction, mask, sampled_background)
                 draws.append(sample)
@@ -506,6 +543,18 @@ def analyze_thomson_spectral_distribution(
             "not_supplied"
         ),
         "moment_uncertainty_successful_draws": int(successful_draws),
+        "moment_uncertainty_covariance_components": {
+            "measurement_covariance_included": bool(
+                uncertainty is not None or signal_covariance_matrix is not None
+            ),
+            "background_covariance_included": bool(
+                background_uncertainty is not None or background_covariance_matrix is not None
+            ),
+            "model_discrepancy_covariance_included": model_discrepancy_matrix is not None,
+            "systematic_covariance_included": systematic_matrix is not None,
+            "components_assumed_mutually_independent": True,
+            "sampling_method": "independent_multivariate_gaussian_components_within_component_correlations_preserved",
+        },
         "gaussian_fit_parameters": {
             "amplitude": float(params[0]), "center_nm": float(params[1]),
             "sigma_nm": float(params[2]), "background_intercept": float(params[3]),
