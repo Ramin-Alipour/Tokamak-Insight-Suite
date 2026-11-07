@@ -1155,6 +1155,30 @@ def render_advanced_thomson_physics_page(st) -> None:
                             np.asarray(covariance, dtype=float),
                             use_container_width=True,
                         )
+                physical_moment_covariance = regularization.get(
+                    "physical_moment_covariance_from_regularization_choice"
+                )
+                physical_moment_spread = regularization.get(
+                    "physical_moment_standard_spread_from_regularization_choice"
+                )
+                if physical_moment_covariance is not None:
+                    st.caption(
+                        "The following covariance propagates the across-GCV-candidate "
+                        "spread through the physical velocity moments. Its order is "
+                        "given explicitly and it is not added to measurement covariance."
+                    )
+                    st.write({
+                        "physical_moment_order": regularization.get(
+                            "physical_moment_order"
+                        ),
+                        "regularization_choice_standard_spread": np.asarray(
+                            physical_moment_spread, dtype=float
+                        ),
+                    })
+                    st.dataframe(
+                        np.asarray(physical_moment_covariance, dtype=float),
+                        use_container_width=True,
+                    )
             if isinstance(result, Mapping) and "parametric_model_selection_uncertainty" in result:
                 selection = result["parametric_model_selection_uncertainty"]
                 st.subheader("Projected EVDF — physical model-selection uncertainty")
