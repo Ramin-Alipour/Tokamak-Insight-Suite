@@ -97,4 +97,4 @@ def test_projected_evdf_accepts_discrepancy_and_systematic_covariance_without_pa
     assert inverse["model_discrepancy_covariance_included"] is True
     assert inverse["systematic_covariance_included"] is True
     assert inverse["additive_covariance_independence_assumption"]
-    assert result["physical_inference"]["status"] if "physical_inference" in result else True
+    assert "physical_inference" not in result
