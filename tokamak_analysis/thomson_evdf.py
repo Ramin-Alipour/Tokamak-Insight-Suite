@@ -118,7 +118,13 @@ def _projected_evdf_forward_matrix(wavelength, velocity, response, laser_wavelen
     """
     x = _finite_vector(wavelength, "wavelength_nm")
     v = _finite_vector(velocity, "velocity_grid_m_s", minimum=2)
-    matrix = _response_matrix(response, x.size)
+    matrix = np.asarray(response, dtype=float)
+    if (matrix.shape != (x.size, x.size) or not np.all(np.isfinite(matrix))
+            or np.any(matrix < 0.0)):
+        raise ValueError("composed instrument/source response must be finite, non-negative and square on the measured wavelength grid")
+    column_sums = matrix.sum(axis=0)
+    if np.any(column_sums <= 0.0) or np.any(column_sums > 1.0 + 1e-8):
+        raise ValueError("composed instrument/source response columns must have positive area no greater than one; finite-window source loss is preserved")
     laser = float(laser_wavelength_nm)
     q_factor = float(q_over_ki)
     if not np.isfinite(laser) or laser <= 0.0 or not np.isfinite(q_factor) or q_factor <= 0.0:
