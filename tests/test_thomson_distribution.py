@@ -960,6 +960,51 @@ def test_model_discrepancy_covariance_psd_check_is_relative_to_covariance_scale(
         )
 
 
+def test_spectral_distribution_dispatches_compton_to_exact_relativistic_evdf(monkeypatch):
+    import tokamak_analysis.thomson_gap_closure as relativistic
+
+    wavelength = np.linspace(520.0, 544.0, 81)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 1.2) ** 2) + 0.02
+    captured = {}
+
+    def fake_relativistic(**kwargs):
+        captured.update(kwargs)
+        velocity = np.linspace(-1.0e6, 1.0e6, 81)
+        pdf = np.exp(-0.5 * (velocity / 2.0e5) ** 2)
+        pdf /= np.trapz(pdf, velocity)
+        scattered = np.exp(-0.5 * ((wavelength - 532.0) / 1.2) ** 2)
+        return {
+            "velocity_grid_m_s": velocity,
+            "projected_evdf_s_m": pdf,
+            "fitted_scattered_spectrum": scattered,
+            "fitted_spectrum": scattered + 0.02,
+        }
+
+    monkeypatch.setattr(relativistic, "reconstruct_relativistic_projected_thomson_evdf", fake_relativistic)
+    discrepancy = np.eye(wavelength.size) * 1.0e-6
+    systematic = np.eye(wavelength.size) * 2.0e-6
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.02),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        incident_polarization=[0.0, 0.0, 1.0],
+        include_compton_recoil=True,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        projected_evdf_options={
+            "kinematics": "compton", "velocity_limit_m_s": 1.0e6,
+            "velocity_points": 81, "regularization_strength": 1.0e-3,
+        },
+    )
+    assert captured["include_compton_recoil"] is True
+    assert captured["incident_polarization"] == [0.0, 0.0, 1.0]
+    np.testing.assert_allclose(captured["systematic_covariance"], systematic)
+    assert result["projected_evdf_inference"]["kinematic_model"] == "exact_relativistic_compton"
+    assert result["projected_evdf_inference"]["spectral_moment_closure"]["status"] == "relativistic_response_aware_moment_closure"
+
+
 def test_projected_evdf_connection_requires_explicit_scattering_geometry():
     wavelength = np.linspace(520.0, 544.0, 121)
     signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 0.1

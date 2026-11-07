@@ -1026,16 +1026,45 @@ def analyze_thomson_spectral_distribution(
                 "projected_evdf_options cannot override the measured spectrum, geometry, "
                 f"response, background or top-level covariance inputs: {conflicts}"
             )
-        from .thomson_evdf import reconstruct_thomson_evdf
-        evdf_kwargs = {
-            "wavelength_nm": x,
-            "signal": y,
-            "laser_wavelength_nm": float(laser_wavelength_nm),
-            "scattering_angle_rad": float(scattering_angle_rad),
-            "instrument_response_matrix": response,
-            "background_signal": background.copy(),
-            **options,
-        }
+        kinematics = options.pop("kinematics", "nonrelativistic")
+        if kinematics not in {"nonrelativistic", "relativistic_thomson", "compton"}:
+            raise ValueError("projected_evdf_options.kinematics must be nonrelativistic, relativistic_thomson or compton")
+        use_relativistic_inverse = kinematics in {"relativistic_thomson", "compton"} or include_compton_recoil is True
+        use_compton_recoil = bool(include_compton_recoil) or kinematics == "compton"
+        if use_relativistic_inverse:
+            from .thomson_gap_closure import reconstruct_relativistic_projected_thomson_evdf
+            velocity_grid = options.pop("velocity_grid_m_s", None)
+            if velocity_grid is None:
+                velocity_limit = options.pop("velocity_limit_m_s", 8.0e6)
+                velocity_points = options.pop("velocity_points", 241)
+                if isinstance(velocity_points, (bool, np.bool_)) or not isinstance(velocity_points, (int, np.integer)) or not 41 <= velocity_points <= 2001:
+                    raise ValueError("relativistic projected EVDF velocity_points must be an integer from 41 to 2001")
+                if isinstance(velocity_limit, (bool, np.bool_)) or not np.isfinite(velocity_limit) or not 0 < velocity_limit < 299792458.0:
+                    raise ValueError("relativistic projected EVDF velocity_limit_m_s must lie in (0, c)")
+                velocity_grid = np.linspace(-float(velocity_limit), float(velocity_limit), int(velocity_points))
+            evdf_solver = reconstruct_relativistic_projected_thomson_evdf
+            evdf_kwargs = {
+                "wavelength_nm": x, "signal": y,
+                "laser_wavelength_nm": float(laser_wavelength_nm),
+                "scattering_angle_rad": float(scattering_angle_rad),
+                "instrument_response_matrix": response,
+                "background_signal": background.copy(),
+                "velocity_grid_m_s": velocity_grid,
+                "include_compton_recoil": use_compton_recoil,
+                "incident_polarization": incident_polarization,
+                **options,
+            }
+        else:
+            from .thomson_evdf import reconstruct_thomson_evdf
+            evdf_solver = reconstruct_thomson_evdf
+            evdf_kwargs = {
+                "wavelength_nm": x, "signal": y,
+                "laser_wavelength_nm": float(laser_wavelength_nm),
+                "scattering_angle_rad": float(scattering_angle_rad),
+                "instrument_response_matrix": response,
+                "background_signal": background.copy(),
+                **options,
+            }
         if uncertainty is not None:
             evdf_kwargs["signal_uncertainty"] = uncertainty.copy()
         elif signal_covariance_matrix is not None:
@@ -1058,7 +1087,7 @@ def analyze_thomson_spectral_distribution(
             evdf_kwargs["systematic_covariance"] = np.asarray(
                 systematic_covariance, dtype=float
             ).copy()
-        result["projected_evdf_inference"] = reconstruct_thomson_evdf(**evdf_kwargs)
+        result["projected_evdf_inference"] = evdf_solver(**evdf_kwargs)
         result["projected_evdf_inference"]["source_spectrum"] = (
             "same_calibrated_measured_spectrum_as_spectral_distribution"
         )
@@ -1066,12 +1095,13 @@ def analyze_thomson_spectral_distribution(
             "one_dimensional_q_parallel_velocity_marginal_only"
         )
         result["projected_evdf_inference"]["gaussian_width_used_as_evdf"] = False
+        result["projected_evdf_inference"]["kinematic_model"] = ("exact_relativistic_compton" if use_compton_recoil else "exact_relativistic_thomson" if use_relativistic_inverse else "nonrelativistic_thomson")
         # Cross-check the reconstructed q-parallel EVDF against measured spectral moments.
         # In the non-relativistic Thomson limit: lambda=lambda0*(1-q*v_parallel/c).
         # This is a forward-model consistency diagnostic, never a Gaussian Te estimator.
         inverse = result["projected_evdf_inference"]
-        velocity_grid = np.asarray(inverse["velocity_parallel_m_s"], dtype=float)
-        projected_pdf = np.asarray(inverse["evdf_parallel_s_per_m"], dtype=float)
+        velocity_grid = np.asarray(inverse["velocity_grid_m_s"] if use_relativistic_inverse else inverse["velocity_parallel_m_s"], dtype=float)
+        projected_pdf = np.asarray(inverse["projected_evdf_s_m"] if use_relativistic_inverse else inverse["evdf_parallel_s_per_m"], dtype=float)
         from scipy.integrate import trapezoid
         if (velocity_grid.ndim != 1 or projected_pdf.shape != velocity_grid.shape
                 or not np.all(np.isfinite(velocity_grid))
@@ -1085,7 +1115,29 @@ def analyze_thomson_spectral_distribution(
         evdf_variance = float(trapezoid((velocity_grid - evdf_mean)**2 * normalized_pdf, velocity_grid))
         q = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
         c_light = 299792458.0
-        if float(np.max(np.abs(velocity_grid))) >= 0.1 * c_light:
+        if use_relativistic_inverse:
+            fitted_scattered = np.asarray(inverse.get("fitted_scattered_spectrum"), dtype=float)
+            if fitted_scattered.shape != x.shape or not np.all(np.isfinite(fitted_scattered)):
+                raise ValueError("Relativistic projected EVDF solver must return a finite fitted_scattered_spectrum on the measured wavelength grid")
+            forward_moments = _moment_statistics(x, fitted_scattered + background, None, None, background)
+            predicted_centroid = float(forward_moments["center"])
+            predicted_variance = float(forward_moments["variance"])
+            closure = {
+                "status": "relativistic_response_aware_moment_closure",
+                "kinematics": "exact_relativistic_single_electron_thomson_or_compton",
+                "recoil_included": bool(use_compton_recoil),
+                "response_forward_modelled_centroid_nm": predicted_centroid,
+                "response_forward_modelled_sigma_nm": float(np.sqrt(max(predicted_variance, 0.0))),
+                "measured_spectral_centroid_nm": float(center),
+                "measured_spectral_sigma_nm": float(sigma_observed),
+                "centroid_closure_residual_nm": float(center - predicted_centroid),
+                "variance_closure_residual_nm2": float(variance_observed - predicted_variance),
+                "instrument_response_in_closure": True,
+                "background_model_shared_with_measured_moments": True,
+                "comparison_performed": True,
+                "interpretation": "Exact relativistic forward-model moments are compared after the same detector response and background convention; no non-relativistic wavelength-velocity formula is applied.",
+            }
+        elif float(np.max(np.abs(velocity_grid))) >= 0.1 * c_light:
             closure = {"status": "outside_nonrelativistic_doppler_closure_domain",
                        "comparison_performed": False, "evdf_mean_velocity_parallel_m_s": evdf_mean,
                        "evdf_variance_velocity_parallel_m2_s2": evdf_variance}
