@@ -513,3 +513,13 @@ def test_projected_evdf_reconstruction_accepts_nonuniform_velocity_grid():
     assert np.all(reconstructed >= 0.0)
     assert np.trapz(reconstructed, velocity) == pytest.approx(1.0, rel=2e-5)
     assert out["velocity_parallel_m_s"].shape == velocity.shape
+
+
+def test_nonuniform_velocity_curvature_operator_is_exact_for_quadratics():
+    from tokamak_analysis.thomson_evdf import _nonuniform_second_derivative_matrix
+
+    velocity = np.array([-5.0, -3.2, -1.1, -0.4, 0.3, 2.0, 5.7])
+    operator = _nonuniform_second_derivative_matrix(velocity)
+    np.testing.assert_allclose(operator @ np.ones_like(velocity), 0.0, atol=1e-13)
+    np.testing.assert_allclose(operator @ velocity, 0.0, atol=1e-13)
+    np.testing.assert_allclose(operator @ (velocity**2), 2.0, rtol=1e-12, atol=1e-12)
