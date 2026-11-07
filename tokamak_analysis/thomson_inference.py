@@ -1021,6 +1021,9 @@ def analyze_thomson_spectra(
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
+    collective_electron_populations=None, collective_ion_populations=None,
+    collective_electron_population_parameter_covariance=None,
+    collective_population_mc_samples=100, collective_population_mc_seed=84623,
     incident_polarization_uncertainty=None,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
@@ -1873,6 +1876,11 @@ def analyze_thomson_spectra(
                 initial_temperature_eV=collective_initial_temperature_eV,
                 density_bounds_m3=density_bounds, temperature_bounds_eV=temperature_bounds,
                 initial_kappa=collective_kappa_initial, kappa_bounds=collective_kappa_bounds,
+                electron_populations=collective_electron_populations,
+                ion_populations=collective_ion_populations,
+                electron_population_parameter_covariance=collective_electron_population_parameter_covariance,
+                population_mc_samples=collective_population_mc_samples,
+                population_mc_seed=collective_population_mc_seed,
                 spectral_covariance=channel_covariance,
             )
         elif model == "collective_maxwellian":
