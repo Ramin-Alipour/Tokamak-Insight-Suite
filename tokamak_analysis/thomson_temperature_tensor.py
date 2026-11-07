@@ -296,6 +296,7 @@ def fit_general_temperature_tensor_thomson_spectra(
     maximum_jacobian_condition_number=1.0e12,
     electron_density_m3=None,
     electron_density_uncertainty_m3=None,
+    electron_density_temperature_tensor_cross_covariance=None,
     max_nfev=5000,
 ):
     r"""Jointly infer a general PSD 3-D Gaussian electron temperature tensor from raw TS spectra.
@@ -524,8 +525,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     pressure_covariance=None
     pressure_covariance_status="not_available_without_independent_electron_density"
     tensor_components=np.array([tensor[0,0],tensor[1,1],tensor[2,2],tensor[0,1],tensor[0,2],tensor[1,2]])
-    if electron_density_m3 is None and electron_density_uncertainty_m3 is not None:
-        raise ValueError("electron_density_uncertainty_m3 requires electron_density_m3")
+    if electron_density_m3 is None and (
+        electron_density_uncertainty_m3 is not None
+        or electron_density_temperature_tensor_cross_covariance is not None
+    ):
+        raise ValueError("density uncertainty/cross-covariance requires electron_density_m3")
     if electron_density_m3 is not None:
         density=float(electron_density_m3)
         if not np.isfinite(density) or density<=0.0:
@@ -534,12 +538,49 @@ def fit_general_temperature_tensor_thomson_spectra(
             density_uncertainty=float(electron_density_uncertainty_m3)
             if not np.isfinite(density_uncertainty) or density_uncertainty<0.0:
                 raise ValueError("electron_density_uncertainty_m3 must be finite and non-negative")
+        density_tensor_cross = None
+        if electron_density_temperature_tensor_cross_covariance is not None:
+            density_tensor_cross = _finite_array(
+                electron_density_temperature_tensor_cross_covariance,
+                "electron_density_temperature_tensor_cross_covariance", 1,
+            )
+            if density_tensor_cross.shape != (6,):
+                raise ValueError(
+                    "electron_density_temperature_tensor_cross_covariance must contain "
+                    "six covariances ordered as T_xx,T_yy,T_zz,T_xy,T_xz,T_yz"
+                )
+            if density_uncertainty is None or tensor_covariance is None:
+                raise ValueError(
+                    "density-temperature cross-covariance requires both density uncertainty "
+                    "and an available temperature-tensor covariance"
+                )
         pressure_tensor=density*_E*tensor
         if tensor_covariance is not None:
             pressure_covariance=(density*_E)**2*tensor_covariance
             if density_uncertainty is not None:
-                pressure_covariance += (_E*density_uncertainty)**2*np.outer(tensor_components,tensor_components)
-                pressure_covariance_status="independent_tensor_GLS_and_density_uncertainty_delta_method"
+                density_variance=density_uncertainty**2
+                cross=np.zeros(6) if density_tensor_cross is None else density_tensor_cross
+                joint_input_covariance=np.block([
+                    [np.array([[density_variance]]), cross[None,:]],
+                    [cross[:,None], tensor_covariance],
+                ])
+                joint_eigenvalues=np.linalg.eigvalsh(
+                    0.5*(joint_input_covariance+joint_input_covariance.T)
+                )
+                joint_scale=max(float(np.max(np.abs(joint_eigenvalues))),1e-300)
+                if joint_eigenvalues[0] < -1e-10*joint_scale:
+                    raise ValueError(
+                        "joint density-temperature covariance must be positive semidefinite"
+                    )
+                pressure_covariance += (_E**2)*density_variance*np.outer(tensor_components,tensor_components)
+                pressure_covariance += (_E**2)*density*(
+                    np.outer(tensor_components,cross)+np.outer(cross,tensor_components)
+                )
+                pressure_covariance_status=(
+                    "joint_density_temperature_cross_covariance_delta_method"
+                    if density_tensor_cross is not None
+                    else "independent_tensor_GLS_and_density_uncertainty_delta_method"
+                )
             else:
                 pressure_covariance_status="tensor_GLS_only_density_treated_as_exact"
     thermal_beta=float(np.sqrt(_E*np.max(eigenvalues)/_M_E)/299792458.0)
@@ -588,6 +629,8 @@ def fit_general_temperature_tensor_thomson_spectra(
         "electron_pressure_tensor_Pa":pressure_tensor,
         "electron_pressure_parameter_covariance_Pa2":pressure_covariance,
         "electron_pressure_covariance_status":pressure_covariance_status,
+        "electron_density_temperature_tensor_cross_covariance":density_tensor_cross if density is not None else None,
+        "electron_pressure_covariance_equation":"Cov(P_i,P_j)=e^2[n_e^2 Cov(T_i,T_j)+sigma_n^2 T_i T_j+n_e(T_i Cov(n,T_j)+Cov(n,T_i) T_j)]",
         "electron_pressure_equation":"P_e_Pa = n_e_m-3 * elementary_charge_C * T_e_eV",
         "covariance_provenance":covariance_source,
         "covariance_status":covariance_status,
