@@ -157,6 +157,20 @@ def landau_full_em_electric_field_fluctuation_spectrum(
     if not np.isfinite(condition_limit) or condition_limit <= 1:
         raise ValueError("condition_limit must be finite and greater than one")
     direction = direction / np.linalg.norm(direction)
+    # For exp(-i omega t) and omega>0, a passive background must have
+    # Im_H(epsilon_r)=(epsilon_r-epsilon_r^dagger)/(2i) positive semidefinite.
+    # Reject gain media instead of returning a finite but physically inconsistent
+    # equilibrium fluctuation spectrum.
+    for index, tensor in enumerate(epsilon):
+        dissipative = (tensor - tensor.conj().T) / (2j)
+        dissipative = 0.5 * (dissipative + dissipative.conj().T)
+        loss_eigenvalues = np.linalg.eigvalsh(dissipative)
+        loss_scale = max(float(np.linalg.norm(dissipative, ord=2)), 1.0)
+        if loss_eigenvalues[0] < -1e-10 * loss_scale:
+            raise ValueError(
+                f"relative_dielectric_tensor[{index}] is active: "
+                "Im_H(epsilon_r) must be positive semidefinite for exp(-i*omega*t)"
+            )
     for index, matrix in enumerate(current_noise):
         scale = max(float(np.linalg.norm(matrix, ord=2)), np.finfo(float).tiny)
         if np.linalg.norm(matrix - matrix.conj().T, ord=2) > 1e-10 * scale:
