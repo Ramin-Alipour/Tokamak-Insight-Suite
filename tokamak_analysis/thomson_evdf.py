@@ -802,6 +802,12 @@ def reconstruct_thomson_evdf(
                 "between_model_projected_evdf_covariance_s2_per_m2": between_model_covariance,
                 "projected_evdf_candidate_weights": normalized_pdf_weights,
                 "projected_evdf_covariance_order": "velocity_grid_row_major",
+                "projected_evdf_model_averaging_equations": {
+                    "akaike_weight": "w_m=exp[-0.5*(AIC_m-AIC_min)]/sum_j(exp[-0.5*(AIC_j-AIC_min)])",
+                    "model_averaged_evdf": "f_bar(v)=sum_m(w_m*f_m(v))",
+                    "total_covariance": "C_bar(v,v')=sum_m(w_m*[C_m(v,v')+(f_m(v)-f_bar(v))*(f_m(v')-f_bar(v'))])",
+                    "scope": "conditional on the declared candidate families, common velocity grid, likelihood and supplied covariance",
+                },
                 "within_model_projected_evdf_covariance_available": bool(
                     within_pdf_covariance_complete
                     and all(name in candidate_pdf_covariances for name in active_pdf_names)
