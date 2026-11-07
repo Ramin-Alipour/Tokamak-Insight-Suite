@@ -1012,6 +1012,24 @@ def render_advanced_thomson_physics_page(st) -> None:
             config = decode_complex_json(parsed)
             result = run_advanced_thomson_physics(model, **config)
             safe = json_safe(result)
+            if isinstance(result, Mapping) and "velocity_grid_convergence" in result:
+                convergence = result["velocity_grid_convergence"]
+                st.subheader("Landau–FDT Full-EM velocity-grid convergence")
+                st.write({
+                    "status": convergence.get("status"),
+                    "converged": convergence.get("converged"),
+                    "tolerance": convergence.get("tolerance"),
+                    "limiting_reason": convergence.get("limiting_reason"),
+                    "reportable_as_grid_converged": result.get("reportable_as_grid_converged"),
+                })
+                st.write(convergence.get("history", []))
+                if convergence.get("converged", False):
+                    st.success("All compared physical spectral tensors satisfy the requested velocity-grid convergence tolerance.")
+                else:
+                    st.warning(
+                        "Velocity-grid convergence was not established. Do not treat this result as grid-converged; "
+                        "increase the node budget or refine the supplied grid, and separately assess domain/frequency convergence."
+                    )
             if isinstance(result, Mapping) and result.get("primary_result_status") == "identified_from_measurement":
                 st.success("Numerical solver completed; the primary physical result passed the solver data-identifiability gate.")
             elif isinstance(result, Mapping) and (
