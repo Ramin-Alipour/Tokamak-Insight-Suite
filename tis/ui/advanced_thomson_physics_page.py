@@ -728,15 +728,15 @@ EXAMPLES = {
         "minimum_velocity_grid_probability_coverage": 0.999
     },
     "thomson_full_temperature_tensor_spectral_fit": {
-        "wavelength_nm": np.linspace(529.0, 535.0, 181).tolist(),
+        "wavelength_nm": np.linspace(432.0, 632.0, 181).tolist(),
         "measured_spectra": [
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,800.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,420.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,260.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,610.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,530.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,340.0)).tolist(),
-            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(529.0,535.0,181),532.0,np.pi/2.0,493.3333333333)).tolist()
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,800.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,420.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,260.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,610.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,530.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,340.0)).tolist(),
+            (0.03 + 2.0*_example_bimaxwellian_spectrum(np.linspace(432.0,632.0,181),532.0,np.pi/2.0,493.3333333333)).tolist()
         ],
         "laser_wavelength_nm": 532.0,
         "scattering_angle_rad": 1.5707963267948966,
