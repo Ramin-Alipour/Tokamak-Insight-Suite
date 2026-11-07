@@ -53,6 +53,8 @@ def render_general_temperature_tensor_page(st) -> None:
         angle=st.number_input("Scattering angle (degrees)",min_value=0.001,max_value=179.999,value=90.0,key="ts_tensor_angle")
     uncertainty_file=st.file_uploader("Optional pointwise uncertainty CSV",type=["csv","txt"],key="ts_tensor_uncertainty")
     covariance_file=st.file_uploader("Optional full measurement covariance CSV (view-major)",type=["csv","txt"],key="ts_tensor_covariance")
+    geometry_covariance_file=st.file_uploader("Optional scattering-direction covariance CSV (3*n_view Cartesian tangent coordinates)",type=["csv","txt"],key="ts_tensor_geometry_covariance")
+    geometry_cross_file=st.file_uploader("Optional measured-spectrum / scattering-geometry cross-covariance CSV",type=["csv","txt"],key="ts_tensor_geometry_cross_covariance")
     discrepancy_file=st.file_uploader("Optional model-discrepancy covariance CSV",type=["csv","txt"],key="ts_tensor_discrepancy")
     systematic_file=st.file_uploader("Optional systematic covariance CSV",type=["csv","txt"],key="ts_tensor_systematic")
     if st.button("Run general 3-D temperature-tensor inference",type="primary",key="run_ts_tensor"):
@@ -75,11 +77,15 @@ def render_general_temperature_tensor_page(st) -> None:
             covariance=_numeric_csv(covariance_file,"Measurement covariance")
             discrepancy=_numeric_csv(discrepancy_file,"Model-discrepancy covariance")
             systematic=_numeric_csv(systematic_file,"Systematic covariance")
+            geometry_covariance=_numeric_csv(geometry_covariance_file,"Scattering-direction covariance")
+            geometry_cross=_numeric_csv(geometry_cross_file,"Spectrum/geometry cross-covariance")
             if covariance is not None and uncertainty is not None:
                 raise ValueError("Supply measurement covariance or pointwise uncertainty, not both.")
             kwargs={}
             for name,value in (("signal_uncertainty",uncertainty),("measurement_covariance",covariance),
-                               ("model_discrepancy_covariance",discrepancy),("systematic_covariance",systematic)):
+                               ("model_discrepancy_covariance",discrepancy),("systematic_covariance",systematic),
+                               ("scattering_vector_covariance",geometry_covariance),
+                               ("spectral_geometry_cross_covariance",geometry_cross)):
                 if value is not None: kwargs[name]=value
             from tokamak_analysis.thomson_workflow import fit_general_temperature_tensor_thomson_spectra
             result=fit_general_temperature_tensor_thomson_spectra(
