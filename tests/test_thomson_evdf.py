@@ -478,3 +478,38 @@ def test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated()
         "delta_method_propagated_from_normalized_evdf_covariance"
     )
 
+
+
+def test_evdf_normalization_jacobian_supports_nonuniform_velocity_grid():
+    from tokamak_analysis.thomson_evdf import _normalize_evdf_coefficients
+
+    velocity = np.array([-4.0, -2.5, -1.0, -0.2, 0.4, 1.8, 4.5])
+    coefficients = np.array([0.3, 0.8, 1.4, 2.0, 1.2, 0.7, 0.2])
+    distribution, analytic = _normalize_evdf_coefficients(coefficients, velocity)
+    assert np.trapz(distribution, velocity) == pytest.approx(1.0, abs=1e-13)
+    numerical = np.empty_like(analytic)
+    step = 1e-6
+    for index in range(coefficients.size):
+        plus, minus = coefficients.copy(), coefficients.copy()
+        plus[index] += step
+        minus[index] -= step
+        numerical[:, index] = (
+            _normalize_evdf_coefficients(plus, velocity)[0]
+            - _normalize_evdf_coefficients(minus, velocity)[0]
+        ) / (2.0 * step)
+    np.testing.assert_allclose(analytic, numerical, rtol=3e-7, atol=2e-9)
+
+
+def test_projected_evdf_reconstruction_accepts_nonuniform_velocity_grid():
+    wavelength, signal, background = _case()
+    coordinate = np.linspace(-1.0, 1.0, 161)
+    velocity = 8.0e4 * coordinate**3
+    out = _run(
+        wavelength, signal, background,
+        velocity_grid_m_s=velocity,
+    )
+    reconstructed = out["evdf_parallel_s_per_m"]
+    assert np.all(np.isfinite(reconstructed))
+    assert np.all(reconstructed >= 0.0)
+    assert np.trapz(reconstructed, velocity) == pytest.approx(1.0, rel=2e-5)
+    assert out["velocity_parallel_m_s"].shape == velocity.shape
