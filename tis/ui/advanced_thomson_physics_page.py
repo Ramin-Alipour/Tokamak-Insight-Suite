@@ -1167,6 +1167,8 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "electron_density_uncertainty_m3": result.get("electron_density_uncertainty_m3"),
                     "electron_pressure_tensor_Pa": result.get("electron_pressure_tensor_Pa"),
                     "pressure_parameter_covariance_Pa2": result.get("electron_pressure_parameter_covariance_Pa2"),
+                    "density_temperature_cross_covariance": result.get("electron_density_temperature_tensor_cross_covariance"),
+                    "pressure_covariance_equation": result.get("electron_pressure_covariance_equation"),
                     "covariance_provenance": result.get("electron_pressure_covariance_status"),
                 })
                 if result.get("electron_pressure_parameter_covariance_Pa2") is None:
