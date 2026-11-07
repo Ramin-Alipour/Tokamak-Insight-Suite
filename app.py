@@ -1662,13 +1662,22 @@ elif page=='Spectral Analysis':
                                         'lower_local_1sigma':np.maximum(distribution_values-uncertainty,0.0),
                                         'upper_local_1sigma':distribution_values+uncertainty,
                                     },index=pd.Index(velocity,name='velocity_parallel_m_s'))
-                                    st.caption('Local active-set 1σ uncertainty conditional on the selected velocity grid, measured response, fitted background, regularization and active set; not a posterior interval.')
+                                    st.caption(
+                                        'Frequentist fixed-active-set Tikhonov sandwich 1σ uncertainty '
+                                        '(H⁻¹ Aᵀ A H⁻¹), conditional on the selected velocity grid, '
+                                        'measured response, fitted background and regularization. '
+                                        'It excludes regularization-selection uncertainty and is not a posterior interval.'
+                                    )
                                     st.line_chart(band)
                             st.caption(evdf.get('interpretation','One-dimensional marginal along the scattering vector; not an unrestricted three-dimensional EVDF.'))
                             comparison=evdf.get('parametric_model_comparison')
                             if comparison:
                                 st.markdown('**Parametric comparison of the reconstructed marginal**')
                                 st.json(comparison)
+                            model_selection=evdf.get('parametric_model_selection_uncertainty')
+                            if model_selection:
+                                st.markdown('**Parametric model-selection uncertainty (separate from measurement covariance)**')
+                                st.json(model_selection)
                             sensitivity=evdf.get('regularization_sensitivity')
                             if sensitivity:
                                 st.markdown('**Regularization sensitivity diagnostics**')
