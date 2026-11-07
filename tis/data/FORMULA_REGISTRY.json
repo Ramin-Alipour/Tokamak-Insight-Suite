@@ -10669,7 +10669,7 @@
   },
   {
     "name": "Collective Thomson spectrum from multi-population Landau–FDT response",
-    "equation": "χ_e(k,ω)=Σ_a[−ω_pe² η_a/k² ∫_L f′_a(v)/(v−ω/k) dv]; χ_i=Σ_jχ_j; ε=1+χ_e+χ_i; S(k,ω)=(2π/k){|1+χ_i|² f_e+Σ_j Z_j²(n_j/n_e)|χ_e|²f_j}/|ε|²; f_e=Σ_aη_af_a",
+    "equation": "χ_e(k,ω)=−Σ_a[ω_pe²η_a/k² ∫_L f′_a(v)/(v−ω/k)dv]; χ_j=−ω_pj²/k² ∫_L f′_j(v)/(v−ω/k)dv; ε=1+χ_e+Σ_jχ_j; S(k,ω)=(2π/k){|1+Σ_jχ_j|²f_e+Σ_j Z_j²(n_j/n_e)|χ_e|²f_j}/|ε|²; f_e=Σ_aη_af_a; S_λ=S|dω/dλ|, |dω/dλ|=2πc/λ²",
     "inputs": "Scattering wave number k [m^-1], phase velocity ω/k [m s^-1], electron density and temperature, finite-variance Kappa index, explicit electron population fractions/temperature ratios/drifts/distribution types, ion species/fractions/temperatures/flows",
     "output": "Complex longitudinal dielectric response and collective dynamic structure factor; wavelength spectral density after photon-frequency Jacobian",
     "assumptions": "Collisionless, unmagnetized, electrostatic Landau–FDT model. Each population is a normalized projected 1-D Maxwellian or finite-variance Kappa marginal; the solver sums susceptibilities before dielectric screening. Population fractions sum to one. This is not Full-EM, collisional, or an unrestricted 3-D EVDF model.",
@@ -10755,7 +10755,7 @@
         "Positive electron density and temperature",
         "Kappa > 3/2 for every Kappa population"
       ],
-      "uncertainty_model": "The fitted ne/Te/kappa covariance is conditional on fixed population inputs. Optional full population-parameter covariance is propagated by deterministic Monte Carlo refits; invalid draws are rejected without clipping or renormalizing fractions.",
+      "uncertainty_model": "The forward kernel is deterministic conditional on explicit plasma/population inputs. The measured-spectrum inverse fit returns conditional ne/Te/kappa covariance; optional electron population covariance is propagated by deterministic Monte Carlo full spectral refits.",
       "limitations": [
         "Unmagnetized electrostatic approximation",
         "No collisional or Full-EM response",
@@ -10767,9 +10767,9 @@
       ]
     },
     "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": true,
-    "execution_scope": "measured_calibrated_spectrum_to_collective_dielectric_physical_inference",
-    "input_data_level": "measured_calibrated_spectrum_and_explicit_physical_inputs",
+    "calibrated_measurements_to_physics": false,
+    "execution_scope": "physical_forward_model_from_explicit_plasma_state",
+    "input_data_level": "explicit_plasma_state_and_projected_distribution_parameters",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Optical collective-Kappa multi-population inference",
     "implementation_trace": {
@@ -10784,6 +10784,7 @@
       "test_links": [
         "tests/test_thomson_inference.py::test_collective_kappa_population_mixture_is_reachable_through_analysis1_api"
       ]
-    }
+    },
+    "note": "Forward-model relation implemented by the Landau-contour population susceptibilities, multispecies dielectric screening, fluctuation source terms and photon-frequency Jacobian. The measured-spectrum inverse fit is exposed separately through fit_collective_kappa and the canonical Analysis-1 analyze_thomson_spectra API."
   }
 ]
