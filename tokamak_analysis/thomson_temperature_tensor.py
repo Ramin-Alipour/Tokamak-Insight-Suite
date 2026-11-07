@@ -322,6 +322,7 @@ def fit_general_temperature_tensor_thomson_spectra(
     kappa_bounds=None,
     maximum_projected_rms_beta=0.1,
     maximum_flow_beta=0.1,
+    maximum_projected_superluminal_tail_probability=1.0e-6,
     maximum_jacobian_condition_number=1.0e12,
     electron_density_m3=None,
     electron_density_uncertainty_m3=None,
@@ -583,8 +584,11 @@ def fit_general_temperature_tensor_thomson_spectra(
 
     flow_limit=float(maximum_flow_beta)
     beta_limit=float(maximum_projected_rms_beta)
+    tail_probability_limit=float(maximum_projected_superluminal_tail_probability)
     if not 0.0<beta_limit<1.0 or not 0.0<flow_limit<1.0:
         raise ValueError("relativistic validity limits must lie strictly between zero and one")
+    if not np.isfinite(tail_probability_limit) or not 0.0<tail_probability_limit<1.0:
+        raise ValueError("maximum_projected_superluminal_tail_probability must lie strictly between zero and one")
     if np.any(np.abs(velocity_seed) > flow_limit*299792458.0):
         raise ValueError("initial_electron_velocity_vector_m_s exceeds maximum_flow_beta")
     lower=np.full(p0.size,-np.inf); upper=np.full(p0.size,np.inf)
@@ -765,7 +769,24 @@ def fit_general_temperature_tensor_thomson_spectra(
     velocity_vector=fit.x[6:9].copy()
     flows=directions@velocity_vector
     flow_beta=float(np.linalg.norm(velocity_vector)/299792458.0)
-    within_validity=thermal_beta<beta_limit and flow_beta<flow_limit
+    projected_superluminal_tail_probability=np.zeros(n_view,dtype=float)
+    if distribution_model=="kappa":
+        from scipy.special import stdtr
+        fitted_kappa=float(1.5+np.exp(fit.x[-1]) if fit_kappa_index else kappa_seed)
+        degrees=2.0*fitted_kappa-1.0
+        for view in range(n_view):
+            projected_sigma_v=np.sqrt(_E*projected[view]/_M_E)
+            projected_scale_v=projected_sigma_v*np.sqrt((degrees-2.0)/degrees)
+            flow_projection=float(flows[view])
+            projected_superluminal_tail_probability[view]=(
+                stdtr(degrees,(-299792458.0-flow_projection)/projected_scale_v)
+                +stdtr(degrees,(flow_projection-299792458.0)/projected_scale_v)
+            )
+    maximum_superluminal_tail_probability=float(np.max(projected_superluminal_tail_probability))
+    within_validity=(
+        thermal_beta<beta_limit and flow_beta<flow_limit
+        and (distribution_model!="kappa" or maximum_superluminal_tail_probability<=tail_probability_limit)
+    )
     return {
         "model":f"nonrelativistic_non_gyrotropic_3d_{distribution_model}_thomson_joint_spectral_fit",
         "distribution_model":distribution_model,
@@ -820,9 +841,11 @@ def fit_general_temperature_tensor_thomson_spectra(
         "covariance_status":covariance_status,
         "thermal_rms_beta":thermal_beta,
         "maximum_flow_beta":flow_beta,
+        "projected_superluminal_tail_probability_per_view":projected_superluminal_tail_probability,
+        "maximum_projected_superluminal_tail_probability":maximum_superluminal_tail_probability,
         "flow_model":"one_shared_cartesian_3d_bulk_velocity_vector_projected onto each measured scattering direction",
         "model_validity_status":"within_declared_nonrelativistic_domain" if within_validity else "outside_declared_nonrelativistic_domain",
-        "model_validity_limits":{"maximum_principal_thermal_rms_beta":beta_limit,"maximum_flow_beta":flow_limit,"relativistic_corrections":False},
+        "model_validity_limits":{"maximum_principal_thermal_rms_beta":beta_limit,"maximum_flow_beta":flow_limit,"maximum_projected_superluminal_tail_probability":tail_probability_limit,"relativistic_corrections":False},
         "reportable_as_inferred_parameter":bool(within_validity),
         "primary_result_status":"identified_from_measurement" if within_validity else "withheld_outside_nonrelativistic_validity_domain",
         "physical_scope":f"raw measured multi-view spectra; general symmetric positive-definite temperature tensor; {distribution_model} projected closure; no gyrotropy assumption; not an unrestricted measured 3-D EVDF",
