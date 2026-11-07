@@ -946,6 +946,20 @@ def test_model_discrepancy_covariance_rejects_non_psd_matrix():
         )
 
 
+def test_model_discrepancy_covariance_psd_check_is_relative_to_covariance_scale():
+    wavelength = np.linspace(499.0, 501.0, 31)
+    signal = np.exp(-0.5 * ((wavelength - 500.0) / 0.2) ** 2) + 0.1
+    invalid = np.eye(wavelength.size) * 1.0e-12
+    invalid[0, 0] = -1.0e-12
+    with pytest.raises(ValueError, match="model_discrepancy_covariance must be positive semidefinite"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.1),
+            model_discrepancy_covariance=invalid,
+        )
+
+
 def test_projected_evdf_connection_requires_explicit_scattering_geometry():
     wavelength = np.linspace(520.0, 544.0, 121)
     signal = np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 0.1

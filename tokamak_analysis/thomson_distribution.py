@@ -287,7 +287,7 @@ def analyze_thomson_spectral_distribution(
         if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-14):
             raise ValueError(f"{name} must be symmetric")
         eigenvalues, eigenvectors = np.linalg.eigh(0.5 * (matrix + matrix.T))
-        scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
         if float(np.min(eigenvalues)) < -1e-10 * scale:
             raise ValueError(f"{name} must be positive semidefinite")
         eigenvalues = np.maximum(eigenvalues, 0.0)
