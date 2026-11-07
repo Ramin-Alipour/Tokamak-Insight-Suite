@@ -803,7 +803,8 @@ def reconstruct_thomson_evdf(
                 "projected_evdf_candidate_weights": normalized_pdf_weights,
                 "projected_evdf_covariance_order": "velocity_grid_row_major",
                 "within_model_projected_evdf_covariance_available": bool(
-                    all(name in candidate_pdf_covariances for name in active_pdf_names)
+                    within_pdf_covariance_complete
+                    and all(name in candidate_pdf_covariances for name in active_pdf_names)
                 ),
                 "projected_evdf_uncertainty_interpretation": (
                     "Akaike-weighted mixture of the fitted Maxwellian, projected Student-t Kappa, "
@@ -812,7 +813,9 @@ def reconstruct_thomson_evdf(
                     "posterior EVDF covariance."
                 ),
             })
-            if all(name in candidate_pdf_covariances for name in active_pdf_names):
+            if (within_pdf_covariance_complete and all(
+                    name in candidate_pdf_covariances for name in active_pdf_names
+            )):
                 total_model_averaged_covariance = np.zeros_like(between_model_covariance)
                 for name in active_pdf_names:
                     delta_pdf = candidate_pdfs[name] - model_averaged_pdf
