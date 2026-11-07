@@ -934,6 +934,8 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
     if evdf["analysis_status"] == "completed":
         assert evdf["scattering_vector_projection_only"] is True
         assert evdf["absolute_density_identified"] is False
+        assert evdf["model_discrepancy_covariance_included"] is True
+        assert evdf["systematic_covariance_included"] is True
         assert np.trapz(evdf["evdf_parallel_s_per_m"], evdf["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
         assert evdf["regularization_selection"] == "generalized_cross_validation_over_logarithmic_candidate_grid"
 
