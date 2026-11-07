@@ -1369,10 +1369,10 @@
         "function_link": "tokamak_analysis.thomson_temperature_tensor.infer_full_temperature_tensor_from_thomson_projections",
         "formula_key": "optical_thomson_general_temperature_tensor",
         "dashboard": "tis.ui.advanced_thomson_physics_page",
-        "equation": "T_q = q_hat^T T_eV q_hat; u_q = q_hat·u_e; lambda_c=lambda_L[1-2 sin(theta/2) u_q/c]; T_eV=(m_e/e)⟨δv δv^T⟩; T_eV ⪰ 0",
-        "input_contract": "Calibrated multi-view Thomson spectra, unit scattering vectors, measured response and optional full channel-major covariance; one optional Cartesian 3-D bulk-flow initial seed.",
+        "equation": "T_q = q_hat^T T_eV q_hat; T_eV=(m_e/e)⟨δv δv^T⟩; T_eV ⪰ 0",
+        "input_contract": "Directional second-moment temperatures inferred from calibrated multi-view Thomson spectra, unit scattering vectors, and optional full view-temperature covariance.",
         "identifiability": "Requires six independent view dyads q_hat q_hat^T (rank six); ill-conditioned geometry is rejected. A common tensor requires views mapped to the same plasma volume/time or equilibrium coordinate. The tensor is constrained to the PSD cone; if the optimum lies on its boundary, symmetric local parameter covariance is withheld.",
-        "scope": "General symmetric positive-semidefinite 3-D second-moment temperature tensor and one shared Cartesian bulk-flow vector inferred jointly from calibrated multi-view spectra; no gyrotropic magnetic-axis assumption. Does not infer higher EVDF moments or density."
+        "scope": "General symmetric positive-semidefinite 3-D second-moment temperature tensor; no gyrotropic magnetic-axis assumption. Does not infer higher EVDF moments, density or flow."
       }
     ],
     "completion_scope": "undefined A parametric 2–6 component relativistic Maxwell-Juttner mixture inference path is available through the advanced Analysis-1 physics API and Dashboard, with a scaled-Jacobian identifiability gate."
