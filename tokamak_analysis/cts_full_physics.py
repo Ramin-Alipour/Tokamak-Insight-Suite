@@ -942,6 +942,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         raise ValueError("model must be an explicit supported model name")
     if model == "landau_fdt_full_em_spectrum":
         solver = analyze_landau_fdt_full_em_spectrum
+    elif model == "landau_fdt_full_em_spectrum_converged":
+        solver = analyze_landau_fdt_full_em_spectrum_converged
     elif model == "thomson_path_averaged_density":
         solver = infer_thomson_path_averaged_density
     elif model == "thomson_multiview_3d_evdf":
