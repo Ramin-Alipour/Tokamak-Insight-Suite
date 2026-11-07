@@ -1580,6 +1580,57 @@ elif page=='Spectral Analysis':
                     st.json(result['parameter_identifiability'])
                 if result.get('primary_outputs_reportable_as_identified') is False:
                     st.warning('The measured-data inverse is not identifiable at the requested profile resolution. Physical primary profile fields are withheld; the optimizer candidate is diagnostic only and is not a measured result.')
+                if model=='collective_kappa':
+                    population_rows=[]
+                    ion_rows=[]
+                    for channel in result.get('channels',[]):
+                        channel_index=channel.get('channel_index')
+                        radius_value=channel.get('radius_m')
+                        for population_index,population in enumerate(channel.get('electron_populations') or []):
+                            population_rows.append({
+                                'channel_index':channel_index,
+                                'radius_m':radius_value,
+                                'population_index':population_index,
+                                'density_fraction':population.get('density_fraction'),
+                                'distribution':population.get('distribution','kappa'),
+                                'temperature_ratio':population.get('temperature_ratio'),
+                                'kappa':population.get('kappa'),
+                                'flow_projection_m_s':population.get('flow_projection_m_s'),
+                            })
+                        for ion_index,population in enumerate(channel.get('ion_populations') or []):
+                            ion_rows.append({
+                                'channel_index':channel_index,
+                                'ion_index':ion_index,
+                                'ion_species':(channel.get('ion_species') or [None]*len(channel.get('ion_populations') or []))[ion_index],
+                                'distribution':population.get('distribution','maxwellian'),
+                                'kappa':population.get('kappa'),
+                                'flow_projection_m_s':population.get('flow_projection_m_s'),
+                                'projected_temperature_eV':population.get('projected_temperature_eV'),
+                            })
+                    if population_rows:
+                        st.markdown('**Fitted collective-Kappa electron population model**')
+                        st.dataframe(pd.DataFrame(population_rows),width="stretch")
+                    if ion_rows:
+                        st.markdown('**Ion susceptibility populations**')
+                        st.dataframe(pd.DataFrame(ion_rows),width="stretch")
+                    mixture_rows=[
+                        {
+                            'channel_index':channel.get('channel_index'),
+                            'bulk_flow_projection_m_s':(channel.get('electron_mixture_moments') or {}).get('bulk_flow_projection_m_s'),
+                            'thermal_second_moment_temperature_eV':(channel.get('electron_mixture_moments') or {}).get('thermal_second_moment_temperature_eV'),
+                            'between_population_drift_temperature_eV':(channel.get('electron_mixture_moments') or {}).get('between_population_drift_temperature_eV'),
+                            'total_second_moment_temperature_eV':(channel.get('electron_mixture_moments') or {}).get('total_second_moment_temperature_eV'),
+                            'velocity_skewness':(channel.get('electron_mixture_moments') or {}).get('velocity_skewness'),
+                            'velocity_excess_kurtosis':(channel.get('electron_mixture_moments') or {}).get('velocity_excess_kurtosis'),
+                            'fourth_moment_status':(channel.get('electron_mixture_moments') or {}).get('fourth_moment_status'),
+                            'population_uncertainty_successful_refits':channel.get('population_uncertainty_successful_refits',0),
+                        }
+                        for channel in result.get('channels',[])
+                        if channel.get('electron_mixture_moments')
+                    ]
+                    if mixture_rows:
+                        st.markdown('**Density-weighted projected mixture moments**')
+                        st.dataframe(pd.DataFrame(mixture_rows),width="stretch")
                 profile=pd.DataFrame({
                     'radius_m':result['radius_m'],
                     'electron_temperature_eV':result['electron_temperature_profile_eV'],
@@ -1589,7 +1640,7 @@ elif page=='Spectral Analysis':
                     'electron_velocity_projection_m_s':result['electron_velocity_projection_profile_m_s'],
                     'electron_velocity_projection_uncertainty_m_s':result['electron_velocity_projection_uncertainty_profile_m_s'],
                 })
-                if model=='non_collective_kappa':
+                if model in {'non_collective_kappa','collective_kappa'}:
                     profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
                     profile['electron_kappa_index_uncertainty']=[channel.get('kappa_index_uncertainty',np.nan) for channel in result['channels']]
                     kappa_profile_rows=[]
