@@ -183,3 +183,39 @@ def test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry():
             scattering_angle_rad=np.pi/2,scattering_vector_unit=q,
             instrument_response_matrix=np.eye(wavelength.size),
         )
+
+
+def test_raw_tensor_fit_rejects_indefinite_model_discrepancy_even_if_measurement_covariance_masks_it():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+    wavelength=np.linspace(529.0,535.0,41)
+    spectra=np.ones((6,wavelength.size))
+    q=np.array([[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1]],dtype=float)
+    q/=np.linalg.norm(q,axis=1)[:,None]
+    size=spectra.size
+    bad=np.eye(size)
+    bad[0,0]=-0.25
+    with pytest.raises(ValueError,match="model_discrepancy_covariance must be positive semidefinite"):
+        fit_general_temperature_tensor_thomson_spectra(
+            wavelength,spectra,laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2,scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            measurement_covariance=10.0*np.eye(size),
+            model_discrepancy_covariance=bad,
+        )
+
+
+def test_raw_tensor_fit_rejects_asymmetric_measurement_covariance():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+    wavelength=np.linspace(529.0,535.0,41)
+    spectra=np.ones((6,wavelength.size))
+    q=np.array([[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1]],dtype=float)
+    q/=np.linalg.norm(q,axis=1)[:,None]
+    covariance=np.eye(spectra.size)
+    covariance[0,1]=0.1
+    with pytest.raises(ValueError,match="measurement_covariance must be symmetric"):
+        fit_general_temperature_tensor_thomson_spectra(
+            wavelength,spectra,laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2,scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            measurement_covariance=covariance,
+        )

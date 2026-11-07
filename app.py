@@ -3582,7 +3582,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Gyrotropic anisotropic multi-view Thomson inference','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Gyrotropic anisotropic multi-view Thomson inference','Analysis 1 / General 3-D temperature-tensor Thomson inversion','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers':
         render_advanced_thomson_physics_page(st)
     elif workflow=='Analysis 1 / Optical multi-channel Thomson inference':
@@ -3821,6 +3821,9 @@ elif page=='Advanced Analysis':
     elif workflow=='Analysis 1 / Gyrotropic anisotropic multi-view Thomson inference':
         from tis.ui.gyrotropic_thomson_page import render_gyrotropic_thomson_page
         render_gyrotropic_thomson_page(st)
+    elif workflow=='Analysis 1 / General 3-D temperature-tensor Thomson inversion':
+        from tis.ui.general_temperature_tensor_page import render_general_temperature_tensor_page
+        render_general_temperature_tensor_page(st)
     elif workflow=='Analysis 1 / Spectral-distribution subanalysis':
         st.caption('Analysis 1 subanalysis: spectral-shape diagnostics are available only together with the physical parameters inferred by the canonical Thomson forward fit of the same calibrated measured spectrum.')
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')

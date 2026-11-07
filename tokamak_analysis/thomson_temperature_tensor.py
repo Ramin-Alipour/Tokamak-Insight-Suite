@@ -358,19 +358,36 @@ def fit_general_temperature_tensor_thomson_spectra(
 
     n_data = n_view*n_wave
     covariance_parts = []
+    if measurement_covariance is not None and signal_uncertainty is not None:
+        raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
     if measurement_covariance is not None:
-        covariance_parts.append(_finite_array(measurement_covariance,"measurement_covariance",2))
+        measured_covariance = _finite_array(measurement_covariance,"measurement_covariance",2)
+        if measured_covariance.shape != (n_data,n_data):
+            raise ValueError("measurement_covariance must be square in flattened channel-major order")
+        scale = max(float(np.max(np.abs(measured_covariance))), 1e-300)
+        if not np.allclose(measured_covariance, measured_covariance.T, rtol=1e-10, atol=1e-12*scale):
+            raise ValueError("measurement_covariance must be symmetric")
+        covariance_parts.append(0.5*(measured_covariance+measured_covariance.T))
     if signal_uncertainty is not None:
         uncertainty = _finite_array(signal_uncertainty,"signal_uncertainty")
         if uncertainty.shape not in {(n_view,n_wave),(n_data,)} or np.any(uncertainty <= 0.0):
             raise ValueError("signal_uncertainty must be positive with shape (n_view,n_wave) or flattened channel-major")
         covariance_parts.append(np.diag(uncertainty.ravel()**2))
-    if model_discrepancy_covariance is not None:
-        covariance_parts.append(_finite_array(model_discrepancy_covariance,"model_discrepancy_covariance",2))
-    if systematic_covariance is not None:
-        covariance_parts.append(_finite_array(systematic_covariance,"systematic_covariance",2))
-    if measurement_covariance is not None and signal_uncertainty is not None:
-        raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
+    for name, component in (("model_discrepancy_covariance", model_discrepancy_covariance),
+                            ("systematic_covariance", systematic_covariance)):
+        if component is None:
+            continue
+        matrix = _finite_array(component, name, 2)
+        if matrix.shape != (n_data,n_data):
+            raise ValueError(f"{name} must be square in flattened channel-major order")
+        scale = max(float(np.max(np.abs(matrix))), 1e-300)
+        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12*scale):
+            raise ValueError(f"{name} must be symmetric")
+        matrix = 0.5*(matrix+matrix.T)
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        if eigenvalues[0] < -1e-10*max(float(np.max(np.abs(eigenvalues))), 1e-300):
+            raise ValueError(f"{name} must be positive semidefinite")
+        covariance_parts.append(matrix)
     if covariance_parts:
         if any(part.shape != (n_data,n_data) for part in covariance_parts):
             raise ValueError("every supplied covariance component must be (n_view*n_wavelength)^2 channel-major")
