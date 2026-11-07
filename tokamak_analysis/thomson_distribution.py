@@ -62,6 +62,31 @@ def _apply_response_matrix(response, spectrum, wavelength_nm):
     return (matrix @ (values*widths))/widths
 
 
+def _psd_covariance_factor(value, name, size):
+    """Validate an additive covariance and return a square-root factor.
+
+    Positive-semidefinite (including rank-deficient) discrepancy/systematic
+    covariances are valid uncertainty components. Eigen-factorization avoids
+    requiring an artificial diagonal jitter merely to draw from them.
+    """
+    raw = np.asarray(value)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values")
+    matrix = raw.astype(float, copy=False)
+    if matrix.shape != (size, size) or not np.all(np.isfinite(matrix)):
+        raise ValueError(f"{name} must be a finite square matrix matching wavelength_nm")
+    scale = max(float(np.max(np.abs(matrix))), np.finfo(float).tiny)
+    if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12 * scale):
+        raise ValueError(f"{name} must be symmetric")
+    matrix = 0.5 * (matrix + matrix.T)
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+    eigen_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+    if eigenvalues[0] < -1e-10 * eigen_scale:
+        raise ValueError(f"{name} must be positive semidefinite")
+    factor = eigenvectors * np.sqrt(np.clip(eigenvalues, 0.0, None))[None, :]
+    return matrix, factor
+
+
 def _moment_statistics(
     x, y, background_fraction, background_mask, background_signal=None,
 ):
@@ -314,6 +339,26 @@ def analyze_thomson_spectral_distribution(
                 "The joint signal/background covariance, including signal_background_cross_covariance, must be positive definite."
             ) from exc
 
+    # Additive physical-model discrepancy and calibration/systematic covariance
+    # are independent residual-error components. Keep their identities separate
+    # for reporting, but sample each exactly once in the moment uncertainty model.
+    discrepancy_covariance_matrix = None
+    discrepancy_covariance_factor = None
+    if model_discrepancy_covariance is not None:
+        discrepancy_covariance_matrix, discrepancy_covariance_factor = _psd_covariance_factor(
+            model_discrepancy_covariance, "model_discrepancy_covariance", x.size
+        )
+    systematic_covariance_matrix = None
+    systematic_covariance_factor = None
+    if systematic_covariance is not None:
+        systematic_covariance_matrix, systematic_covariance_factor = _psd_covariance_factor(
+            systematic_covariance, "systematic_covariance", x.size
+        )
+    additive_uncertainty_factors = [
+        factor for factor in (discrepancy_covariance_factor, systematic_covariance_factor)
+        if factor is not None
+    ]
+
     moments = _moment_statistics(x, y, background_fraction, mask, explicit_background)
     background = moments["background"]
     corrected = moments["corrected"]
@@ -403,7 +448,8 @@ def analyze_thomson_spectral_distribution(
     moment_uncertainties = {}
     successful_draws = 0
     if (uncertainty is not None or signal_covariance_matrix is not None
-            or background_uncertainty is not None or background_covariance_matrix is not None):
+            or background_uncertainty is not None or background_covariance_matrix is not None
+            or additive_uncertainty_factors):
         rng = np.random.default_rng(58123)
         draws = []
         for _ in range(int(moment_mc_samples)):
@@ -423,6 +469,8 @@ def analyze_thomson_spectral_distribution(
                     sampled_background = explicit_background + rng.normal(0.0, background_uncertainty)
                 elif background_covariance_matrix is not None:
                     sampled_background = explicit_background + background_covariance_cholesky @ rng.normal(size=x.size)
+            for covariance_factor in additive_uncertainty_factors:
+                sampled_signal = sampled_signal + covariance_factor @ rng.normal(size=x.size)
             try:
                 sample = _moment_statistics(x, sampled_signal, background_fraction, mask, sampled_background)
                 draws.append(sample)
@@ -492,12 +540,28 @@ def analyze_thomson_spectral_distribution(
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
         "moment_uncertainty_method": (
+            "parametric Monte Carlo from the correlated joint signal/background covariance plus independent additive model-discrepancy/systematic covariance components"
+            if joint_signal_background_cholesky is not None and additive_uncertainty_factors else
             "parametric Monte Carlo from the correlated joint signal/background block covariance"
             if joint_signal_background_cholesky is not None else
+            "parametric Monte Carlo from measurement/background covariance plus independent additive model-discrepancy/systematic covariance components"
+            if additive_uncertainty_factors and (signal_covariance_matrix is not None or uncertainty is not None or background_uncertainty is not None or background_covariance_matrix is not None) else
+            "parametric Monte Carlo from additive model-discrepancy/systematic covariance components"
+            if additive_uncertainty_factors else
             "parametric Monte Carlo from signal and independent fitted-background uncertainty"
             if (signal_covariance_matrix is not None or uncertainty is not None or background_uncertainty is not None or background_covariance_matrix is not None)
             else "not_available"
         ),
+        "model_discrepancy_covariance_included_in_moment_uncertainty": discrepancy_covariance_matrix is not None,
+        "systematic_covariance_included_in_moment_uncertainty": systematic_covariance_matrix is not None,
+        "moment_uncertainty_components": [
+            name for name, present in (
+                ("measurement", uncertainty is not None or signal_covariance_matrix is not None),
+                ("background", background_uncertainty is not None or background_covariance_matrix is not None),
+                ("model_discrepancy", discrepancy_covariance_matrix is not None),
+                ("systematic", systematic_covariance_matrix is not None),
+            ) if present
+        ],
         "signal_uncertainty_model": (
             "full_within_channel_spectral_covariance"
             if signal_covariance_matrix is not None else
