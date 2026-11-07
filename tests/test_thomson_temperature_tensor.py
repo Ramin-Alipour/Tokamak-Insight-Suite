@@ -282,3 +282,19 @@ def test_shared_flow_projection_is_exactly_consistent_across_views():
     np.testing.assert_allclose(result["electron_velocity_vector_m_s"], velocity, rtol=1e-5, atol=2.0)
     np.testing.assert_allclose(result["electron_velocity_projection_m_s"], q @ velocity, rtol=1e-5, atol=2.0)
     assert result["reportable_as_inferred_parameter"] is True
+
+
+
+def test_tensor_spectral_fit_registry_exposes_shared_cartesian_flow_contract():
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    contract = get_analysis(83)["execution_contract"]
+    inputs = {item["name"] for item in contract["input_specs"]}
+    outputs = {item["name"] for item in contract["output_specs"]}
+    assert "initial_electron_velocity_vector_m_s" in inputs
+    assert {
+        "electron_velocity_vector_m_s",
+        "electron_velocity_vector_covariance_m2_s2",
+        "electron_temperature_flow_joint_covariance",
+    } <= outputs
+    assert "one shared Cartesian bulk-flow vector" in contract["algorithm"]
