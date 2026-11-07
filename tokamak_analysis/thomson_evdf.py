@@ -813,7 +813,7 @@ def reconstruct_thomson_evdf(
                 ),
             })
             if all(name in candidate_pdf_covariances for name in active_pdf_names):
-                total_model_averaged_covariance = between_model_covariance.copy()
+                total_model_averaged_covariance = np.zeros_like(between_model_covariance)
                 for name in active_pdf_names:
                     delta_pdf = candidate_pdfs[name] - model_averaged_pdf
                     total_model_averaged_covariance += normalized_pdf_weights[name] * (
