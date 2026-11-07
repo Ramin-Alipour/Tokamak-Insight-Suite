@@ -39,6 +39,7 @@ def render_general_temperature_tensor_page(st) -> None:
     initial_kappa_index=None
     fit_kappa_index=False
     kappa_bounds=None
+    maximum_projected_superluminal_tail_probability=1.0e-6
     if distribution_model=="kappa":
         k1,k2=st.columns(2)
         with k1:
@@ -64,6 +65,11 @@ def render_general_temperature_tensor_page(st) -> None:
                     value=12.0,step=0.1,key="ts_tensor_kappa_upper",
                 )
             kappa_bounds=[float(kappa_lower),float(kappa_upper)]
+        maximum_projected_superluminal_tail_probability=st.number_input(
+            "Maximum projected superluminal tail probability (non-relativistic validity gate)",
+            min_value=1.0e-12,max_value=0.1,value=1.0e-6,format="%.2e",
+            key="ts_tensor_kappa_superluminal_tail_limit",
+        )
     spectra_file = st.file_uploader(
         "Measured spectra CSV: wavelength_nm followed by one intensity column per view",
         type=["csv", "txt"], key="ts_tensor_spectra",
@@ -129,7 +135,9 @@ def render_general_temperature_tensor_page(st) -> None:
                 distribution_model=distribution_model,
                 initial_kappa_index=initial_kappa_index,
                 fit_kappa_index=fit_kappa_index,
-                kappa_bounds=kappa_bounds,**kwargs)
+                kappa_bounds=kappa_bounds,
+                maximum_projected_superluminal_tail_probability=maximum_projected_superluminal_tail_probability,
+                **kwargs)
             if result.get("reportable_as_inferred_parameter") is True:
                 st.success(f"The general temperature tensor is identifiable within the selected non-relativistic {distribution_model} model.")
             else:
@@ -137,6 +145,7 @@ def render_general_temperature_tensor_page(st) -> None:
             st.json({key:result.get(key) for key in (
                 "electron_temperature_tensor_eV","principal_temperature_eigenvalues_eV",
                 "distribution_model","kappa_index","kappa_index_uncertainty","kappa_fit_status",
+"projected_superluminal_tail_probability_per_view","maximum_projected_superluminal_tail_probability","model_validity_status",
                 "electron_velocity_projection_m_s","view_dyad_rank","view_dyad_condition_number",
                 "jacobian_rank","jacobian_parameter_count","temperature_tensor_parameter_covariance_eV2",
                 "covariance_provenance","covariance_status",
