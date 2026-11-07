@@ -594,6 +594,24 @@ def test_evdf_reports_akaike_model_selection_and_between_model_uncertainty():
     assert mean["total_model_averaged_standard_uncertainty"] is not None
     assert "not Bayesian posterior" in selection["interpretation"]
 
+    # Model selection must propagate beyond scalar fit parameters: the
+    # competing physical marginals are averaged on the same velocity grid.
+    velocity = selection["projected_evdf_velocity_grid_m_s"]
+    averaged_pdf = selection["model_averaged_projected_evdf_s_per_m"]
+    assert averaged_pdf.shape == velocity.shape
+    assert np.all(averaged_pdf >= 0.0)
+    assert np.trapz(averaged_pdf, velocity) == pytest.approx(1.0, rel=1e-8)
+    between_covariance = selection["between_model_projected_evdf_covariance_s2_per_m2"]
+    assert between_covariance.shape == (velocity.size, velocity.size)
+    np.testing.assert_allclose(between_covariance, between_covariance.T, rtol=1e-10, atol=1e-14)
+    assert np.min(np.linalg.eigvalsh(between_covariance)) >= -1e-10 * max(
+        np.max(np.abs(np.linalg.eigvalsh(between_covariance))), 1.0
+    )
+    assert selection["within_model_projected_evdf_covariance_available"] is True
+    total_covariance = selection["model_averaged_projected_evdf_covariance_s2_per_m2"]
+    assert total_covariance.shape == between_covariance.shape
+    assert np.all(np.diag(total_covariance) >= -1e-12)
+
 
 def test_evdf_model_selection_excludes_nonconverged_candidates(monkeypatch):
     from types import SimpleNamespace
