@@ -251,8 +251,12 @@ def test_raw_spectral_tensor_fit_derives_temperature_seed_from_spectral_width_an
         response[column, column] += 0.70
         if column > 0:
             response[column - 1, column] += 0.20
+        else:
+            response[column, column] += 0.20
         if column < wavelength.size - 1:
             response[column + 1, column] += 0.10
+        else:
+            response[column, column] += 0.10
     np.testing.assert_allclose(response.sum(axis=0), 1.0, atol=1e-14)
 
     spectra = []
