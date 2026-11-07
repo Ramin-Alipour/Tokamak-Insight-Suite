@@ -163,3 +163,26 @@ def test_raw_temperature_tensor_fit_propagates_scattering_geometry_covariance():
     assert np.trace(propagated["geometry_parameter_covariance"]) > 0.0
     assert np.trace(propagated["parameter_covariance"]) > np.trace(baseline["parameter_covariance"])
     assert "tangent_plane_scattering_geometry_covariance" in propagated["covariance_status"]
+
+
+
+def test_raw_temperature_tensor_fit_rejects_asymmetric_geometry_covariance():
+    q = np.array([
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0],
+    ])
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    asymmetric = np.zeros((3*q.shape[0], 3*q.shape[0]))
+    asymmetric[0, 1] = 1e-8
+    with np.testing.assert_raises_regex(ValueError, "must be symmetric"):
+        run_advanced_thomson_physics(
+            "thomson_full_temperature_tensor_spectral_fit",
+            np.linspace(529.0, 535.0, 161),
+            np.ones((q.shape[0], 161)),
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2,
+            scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(161),
+            scattering_vector_covariance=asymmetric,
+        )
