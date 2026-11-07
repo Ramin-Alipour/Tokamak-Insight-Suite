@@ -134,7 +134,8 @@ def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
     q = np.array([[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,-1,1]],dtype=float)
     q /= np.linalg.norm(q,axis=1)[:,None]
     expected = np.array([[800.0,90.0,-35.0],[90.0,420.0,55.0],[-35.0,55.0,260.0]])
-    flows = np.array([1.0e4,-1.5e4,2.0e4,-0.5e4,0.7e4,-0.9e4,1.2e4])
+    expected_flow_vector = np.array([1.2e4, -0.8e4, 0.6e4])
+    flows = q @ expected_flow_vector
     qfactor=2*np.sin(angle/2)
     edges=np.empty(wavelength.size+1)
     edges[1:-1]=0.5*(wavelength[:-1]+wavelength[1:])
@@ -163,6 +164,10 @@ def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
     )
     np.testing.assert_allclose(result["electron_temperature_tensor_eV"],expected,rtol=2e-3,atol=0.5)
     np.testing.assert_allclose(result["electron_velocity_projection_m_s"],flows,rtol=1e-5,atol=2.0)
+    np.testing.assert_allclose(result["electron_velocity_vector_m_s"], expected_flow_vector, rtol=1e-5, atol=2.0)
+    assert result["flow_model"].startswith("one_shared_cartesian_3d_bulk_velocity_vector")
+    assert result["electron_temperature_flow_joint_covariance"].shape == (9, 9)
+    assert result["electron_velocity_vector_covariance_m2_s2"].shape == (3, 3)
     assert result["view_dyad_rank"]==6
     assert result["jacobian_rank"]==result["jacobian_parameter_count"]
     assert result["reportable_as_inferred_parameter"] is True
@@ -219,3 +224,61 @@ def test_raw_tensor_fit_rejects_asymmetric_measurement_covariance():
             instrument_response_matrix=np.eye(wavelength.size),
             measurement_covariance=covariance,
         )
+
+
+
+def test_raw_spectral_tensor_fit_requires_one_cartesian_flow_seed():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    wavelength = np.linspace(529.0, 535.0, 41)
+    q, _, _ = _views()
+    spectra = np.ones((q.shape[0], wavelength.size))
+    with pytest.raises(ValueError, match="Cartesian 3-vector"):
+        fit_general_temperature_tensor_thomson_spectra(
+            wavelength, spectra,
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2,
+            scattering_vector_unit=q,
+            instrument_response_matrix=np.eye(wavelength.size),
+            initial_electron_velocity_vector_m_s=[1.0, 2.0],
+        )
+
+
+def test_shared_flow_projection_is_exactly_consistent_across_views():
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    wavelength = np.linspace(529.0, 535.0, 241)
+    q, expected_tensor, _ = _views()
+    velocity = np.array([1.1e4, -0.7e4, 0.4e4])
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    qfactor = 2.0 * np.sin(np.pi / 4.0)
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    from scipy.special import ndtr
+
+    spectra = []
+    for direction in q:
+        flow = float(direction @ velocity)
+        tq = float(direction @ expected_tensor @ direction)
+        centre = 532.0 * (1.0 - qfactor * flow / c)
+        sigma = 532.0 * qfactor * np.sqrt(e * tq / me) / c
+        z = (edges - centre) / sigma
+        probability = ndtr(z[1:]) - ndtr(z[:-1])
+        positive = z[:-1] > 0
+        probability[positive] = ndtr(-z[:-1][positive]) - ndtr(-z[1:][positive])
+        spectra.append(2.0 * probability / np.diff(edges) + 0.02)
+
+    result = fit_general_temperature_tensor_thomson_spectra(
+        wavelength, np.asarray(spectra),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full((q.shape[0], wavelength.size), 2e-4),
+        initial_temperature_tensor_eV=np.eye(3) * 500.0,
+    )
+    np.testing.assert_allclose(result["electron_velocity_vector_m_s"], velocity, rtol=1e-5, atol=2.0)
+    np.testing.assert_allclose(result["electron_velocity_projection_m_s"], q @ velocity, rtol=1e-5, atol=2.0)
+    assert result["reportable_as_inferred_parameter"] is True
