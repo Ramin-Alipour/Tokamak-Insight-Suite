@@ -228,7 +228,7 @@ def test_particle_balance_reference():
 def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
     assert len(rows) == 102
-    assert len({row["name"] for row in rows}) == 100
+    assert len({row["name"] for row in rows}) == 102
     for row in rows:
         contract = row["execution_contract"]
         assert contract["implementation_link_status"] == "mapped", row["name"]
