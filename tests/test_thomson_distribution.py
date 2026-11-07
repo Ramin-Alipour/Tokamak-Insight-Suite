@@ -874,6 +874,29 @@ def test_spectral_distribution_connects_same_spectrum_to_projected_evdf():
     assert np.isfinite(closure["centroid_closure_residual_nm"])
     assert np.isfinite(closure["variance_closure_residual_nm2"])
 
+    # The same additive model/systematic covariance must reach the EVDF inverse,
+    # rather than silently disappearing at the spectral-distribution wrapper.
+    discrepancy = np.eye(wavelength.size) * 2.0e-7
+    systematic = np.eye(wavelength.size) * 1.0e-7
+    propagated = analyze_thomson_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.02),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        signal_uncertainty=np.full_like(wavelength, 1e-3),
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        projected_evdf_options={
+            "velocity_limit_m_s": 1.0e6,
+            "velocity_points": 81,
+            "regularization_strength": 1e-3,
+        },
+    )["projected_evdf_inference"]
+    assert propagated["model_discrepancy_covariance_included"] is True
+    assert propagated["systematic_covariance_included"] is True
+
 
 def test_projected_evdf_connection_requires_explicit_scattering_geometry():
     wavelength = np.linspace(520.0, 544.0, 121)
