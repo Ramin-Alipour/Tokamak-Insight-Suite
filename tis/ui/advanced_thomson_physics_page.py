@@ -413,6 +413,25 @@ EXAMPLES = {
         "coulomb_logarithm": 12.0,
         "condition_limit": 1.0e12
     },
+    "landau_fdt_full_em_spectrum_converged": {
+        "angular_frequency_rad_s": [1.0e5, 2.0e5],
+        "normalized_velocity_x": [-4.0, 0.0, 4.0],
+        "normalized_velocity_y": [-4.0, 0.0, 4.0],
+        "normalized_velocity_z": [-4.0, 0.0, 4.0],
+        "species": [
+            {"name": "electrons", "density_m3": 1.0e18, "mass_kg": 9.1093837015e-31, "charge_C": -1.602176634e-19},
+            {"name": "ions", "density_m3": 1.0e18, "mass_kg": 1.67262192369e-27, "charge_C": 1.602176634e-19}
+        ],
+        "common_temperature_J": 1.602176634e-17,
+        "wave_number_m_inverse": 0.001,
+        "propagation_direction": [1.0, 0.0, 0.0],
+        "common_bulk_flow_m_s": [0.0, 0.0, 0.0],
+        "coulomb_logarithm": 12.0,
+        "condition_limit": 1.0e12,
+        "convergence_tolerance": 0.02,
+        "max_refinements": 2,
+        "max_velocity_nodes": 512
+    },
     "landau_fdt_full_em_field_fluctuations": {
         "constitutive_response": {
             "angular_frequency_rad_s": [100000.0, 200000.0],
