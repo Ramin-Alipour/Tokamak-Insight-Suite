@@ -11750,7 +11750,8 @@
       ],
       "test_links": [
         "tests/test_thomson_relativistic_3d_evdf.py::test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance",
-        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_higher_moment_helper_matches_discrete_quadrature"
+        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_higher_moment_helper_matches_discrete_quadrature",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_third_moment_and_heat_flux_covariance_match_finite_difference"
       ],
       "note": "Executable physical moments with analytic covariance propagation; software/physics verification uses synthetic distributions, not experimental validation."
     }

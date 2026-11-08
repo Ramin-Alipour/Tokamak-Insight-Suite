@@ -212,3 +212,56 @@ def test_3d_evdf_higher_moment_helper_matches_discrete_quadrature():
     np.testing.assert_allclose(result["third_central_velocity_moment_tensor_m3_s3"],expected)
     assert result["heat_flux_per_density_W_m"] is not None
     assert result["heat_flux_status"]=="identified_classical_heat_flux_per_density"
+
+
+def test_3d_evdf_third_moment_and_heat_flux_covariance_match_finite_difference():
+    from tis.products.thomson.physics.advanced_inference import derive_3d_evdf_third_moments
+
+    velocity = np.array([
+        [-2.0e3, 1.0e3, 0.0],
+        [1.0e3, -1.0e3, 2.0e3],
+        [3.0e3, 2.0e3, -1.0e3],
+        [0.0, 1.0e3, 3.0e3],
+    ])
+    volume = np.array([0.5, 1.0, 1.5, 2.0])
+    raw = np.array([0.2, 0.3, 0.1, 0.4])
+    evdf = raw / (volume @ raw)
+    covariance = np.diag([1e-10, 2e-10, 1.5e-10, 0.8e-10])
+    result = derive_3d_evdf_third_moments(
+        evdf, velocity, volume, distribution_covariance=covariance,
+    )
+
+    numerical_jacobian = np.empty((27, evdf.size))
+    step = 1e-6
+    for index in range(evdf.size):
+        plus = evdf.copy()
+        minus = evdf.copy()
+        plus[index] += step
+        minus[index] -= step
+        plus /= volume @ plus
+        minus /= volume @ minus
+        plus_moment = derive_3d_evdf_third_moments(plus, velocity, volume)[
+            "third_central_velocity_moment_tensor_m3_s3"
+        ]
+        minus_moment = derive_3d_evdf_third_moments(minus, velocity, volume)[
+            "third_central_velocity_moment_tensor_m3_s3"
+        ]
+        numerical_jacobian[:, index] = (
+            (plus_moment - minus_moment) / (2.0 * step)
+        ).reshape(27)
+
+    expected_moment_covariance = numerical_jacobian @ covariance @ numerical_jacobian.T
+    np.testing.assert_allclose(
+        result["third_central_velocity_moment_covariance_m6_s6"],
+        expected_moment_covariance, rtol=2e-5, atol=1e-16,
+    )
+    contraction = np.zeros((3, 27))
+    for component in range(3):
+        for axis in range(3):
+            contraction[component, component * 9 + axis * 3 + axis] = 1.0
+    heat_flux_jacobian = (9.1093837139e-31 / 2.0) * contraction @ numerical_jacobian
+    expected_heat_flux_covariance = heat_flux_jacobian @ covariance @ heat_flux_jacobian.T
+    np.testing.assert_allclose(
+        result["heat_flux_per_density_covariance_W2_m2"],
+        expected_heat_flux_covariance, rtol=2e-5, atol=1e-70,
+    )
