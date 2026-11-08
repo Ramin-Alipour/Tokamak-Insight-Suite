@@ -104,7 +104,8 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
         cov = np.asarray(covariance, dtype=float)
         if cov.shape != (velocity.size, velocity.size) or not np.all(np.isfinite(cov)):
             raise ValueError("projected EVDF covariance must be finite and square on the velocity grid")
-        if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12*max(float(np.max(np.abs(cov))), 1.0)):
+        covariance_scale = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+        if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12*covariance_scale):
             raise ValueError("projected EVDF covariance must be symmetric")
         raw1, raw2, raw3, raw4 = (
             weights*velocity, weights*velocity**2,
@@ -1320,7 +1321,9 @@ def analyze_thomson_spectral_distribution(
         else:
             projected_pdf = inverse.get("evdf_parallel_s_per_m")
             evdf_primary_identified = inverse.get("primary_result_status", "identified_from_measurement") == "identified_from_measurement"
-            moment_covariance_source = inverse.get("evdf_covariance")
+            moment_covariance_source = inverse.get("evdf_covariance_including_geometry")
+            if moment_covariance_source is None:
+                moment_covariance_source = inverse.get("evdf_covariance")
         if projected_pdf is None:
             raise ValueError("Projected EVDF solver returned neither an identified distribution nor a declared regularized candidate")
         projected_pdf = np.asarray(projected_pdf, dtype=float)
