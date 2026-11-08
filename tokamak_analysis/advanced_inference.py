@@ -514,9 +514,16 @@ def reconstruct_optical_thomson_3d_evdf(
     if (response.shape != (n_view, n_wave, n_wave)
             or not np.all(np.isfinite(response)) or np.any(response < 0.0)):
         raise ValueError("instrument_response_matrix must be non-negative finite (n_wave,n_wave) or (n_view,n_wave,n_wave)")
-    response_sums = response.sum(axis=0)
-    if np.any(response_sums <= 0.0) or not np.allclose(response_sums, 1.0, rtol=1e-8, atol=1e-10):
-        raise ValueError("each measured response matrix must conserve integrated spectral power: columns sum to one")
+    # response has shape (view, output_wavelength, input_wavelength).
+    # Column stochasticity is checked over output wavelength independently
+    # for each view; summing over views could hide a non-conserving operator.
+    response_column_sums = response.sum(axis=1)
+    if (np.any(response_column_sums <= 0.0)
+            or not np.allclose(response_column_sums, 1.0, rtol=1e-8, atol=1e-10)):
+        raise ValueError(
+            "each measured response matrix must independently conserve integrated spectral power: "
+            "every view's columns must sum to one"
+        )
     edges = np.empty(n_wave + 1, dtype=float)
     edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
     edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])

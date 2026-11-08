@@ -333,6 +333,27 @@ def test_physical_optical_thomson_3d_kernel_uses_per_view_response_normalization
         )
 
 
+def test_physical_optical_thomson_3d_rejects_nonconserving_view_hidden_by_other_view():
+    wavelength = np.linspace(499.85, 500.15, 101)
+    # The first view conserves power; the second loses all of it. Summing
+    # over views would incorrectly make this stack appear normalized.
+    response = np.stack([np.eye(101), np.zeros((101, 101))])
+    with pytest.raises(ValueError, match="every view's columns must sum to one"):
+        reconstruct_optical_thomson_3d_evdf(
+            wavelength, np.ones((2, 101)),
+            [[1., 0., 0.], [0., 1., 0.]],
+            [[1.0e4, 0., 0.], [-1.0e4, 0., 0.]],
+            laser_wavelength_nm=500.0,
+            scattering_angle_rad=[np.pi/2, np.pi/2],
+            view_gain=[1.0, 1.0],
+            instrument_response_matrix=response,
+            background_spectra=np.zeros((2, 101)),
+            voxel_volume_m3_s3=np.ones(2),
+            regularization_matrix=np.eye(2),
+            regularization_strength=1e-3,
+        )
+
+
 def test_physical_optical_thomson_3d_route_rejects_relativistic_velocity_grid():
     wavelength = np.linspace(499.0, 501.0, 101)
     with pytest.raises(ValueError, match="non-relativistic"):
