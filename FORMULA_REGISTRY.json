@@ -9566,7 +9566,8 @@
         "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated",
         "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty",
         "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_matches_normalized_finite_difference",
-        "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_rejects_indefinite_input"
+        "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_rejects_indefinite_input",
+        "tests/test_thomson_distribution.py::test_thomson_spectral_distribution_executes_through_specialist_product_api"
       ],
       "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
       "raw_data_to_physics": false,

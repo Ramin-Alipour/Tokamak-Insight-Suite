@@ -1569,3 +1569,23 @@ def test_projected_evdf_physical_moment_covariance_rejects_indefinite_input():
     covariance[0, 1] = covariance[1, 0] = 2.0
     with pytest.raises(ValueError, match="positive semidefinite"):
         _projected_evdf_physical_moments(velocity, density, covariance)
+
+
+def test_thomson_spectral_distribution_executes_through_specialist_product_api():
+    from tis.products.thomson.api import analyze_spectral_distribution
+
+    wavelength = np.linspace(499.0, 501.0, 101)
+    background = 10.0 + 0.2 * (wavelength - 500.0)
+    signal = (
+        500.0 * np.exp(-0.5 * ((wavelength - 500.0) / 0.16) ** 2)
+        + background
+    )
+    result = analyze_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+    )
+    assert result["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.01)
+    assert result["observed_sigma_nm"] == pytest.approx(0.16, rel=0.04)
+    assert result["instrument_response_model"] == "measured_response_matrix_forward_operator"
