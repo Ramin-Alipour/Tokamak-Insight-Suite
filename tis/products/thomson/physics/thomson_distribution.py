@@ -915,7 +915,12 @@ def analyze_thomson_spectral_distribution(
     # forward fitter when the caller supplies the spatial coordinate and fit
     # controls. The Gaussian-width conversion above remains a clearly labelled
     # diagnostic candidate; it is never promoted to the primary measurement.
-    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"}:
+    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"} and (
+        radius_m is not None or physical_fit_options is not None or any(value is not None for value in (
+            incident_polarization, include_compton_recoil, physical_background_model,
+            model_discrepancy_covariance, systematic_covariance, physical_initial,
+        ))
+    ):
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError(
                 "laser_wavelength_nm and scattering_angle_rad are required for canonical Thomson physical inference"
