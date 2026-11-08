@@ -1,24 +1,13 @@
-"""Runaway-electron characteristic energy estimates from calibrated HXR data."""
-import numpy as np
-def estimate_runaway_energy(energy_keV, counts, *, detector_response_corrected=False, fit_range_keV=None):
-    e=np.asarray(energy_keV,dtype=float); c=np.asarray(counts,dtype=float)
-    if e.ndim!=1 or c.shape!=e.shape or len(e)<4 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(e<0) or np.any(c<0): raise ValueError("Invalid HXR spectrum: energies must be non-negative and counts non-negative")
-    m=np.ones_like(e,dtype=bool)
-    if fit_range_keV is not None:
-        lo,hi=map(float,fit_range_keV)
-        if not np.all(np.isfinite([lo,hi])) or hi<=lo: raise ValueError("fit_range_keV must contain finite increasing bounds")
-        m=(e>=lo)&(e<=hi)
-    m &= c>0
-    if np.count_nonzero(m)<3: raise ValueError("Need at least three positive bins in fit range")
-    slope,intercept=np.polyfit(e[m],np.log(c[m]),1)
-    if slope>=0: raise ValueError("HXR spectrum has a non-negative log-slope; an exponential characteristic energy is not defined")
-    temperature=-1/slope
-    return {"exponential_slope_per_keV":float(slope),"characteristic_energy_keV":float(temperature),"fit_intercept":float(intercept),"response_corrected":bool(detector_response_corrected),"caveat":"Exponential-slope energy is a model-dependent characteristic scale, not a unique maximum runaway-electron energy; detector response correction is essential."}
+"""Backward-compatible import facade for relocated physical solvers."""
+from importlib import import_module as _import_module
+from pathlib import Path as _Path
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS as _TARGETS
 
-def runaway_speed_from_kinetic_energy(kinetic_energy_keV):
-    """Relativistic electron speed from kinetic energy: gamma=1+K/(m_e*c^2), beta=sqrt(1-gamma^-2)."""
-    energy=np.asarray(kinetic_energy_keV,dtype=float); rest_energy_keV=510.99895; c=299792458.0
-    if not np.all(np.isfinite(energy)) or np.any(energy<0): raise ValueError("Kinetic energy must be finite and non-negative")
-    gamma=1+energy/rest_energy_keV; beta=np.sqrt(1-1/gamma**2)
-    return {"gamma_factor":gamma,"speed_m_s":c*beta,"speed_over_c":beta,
-            "equation":"gamma=1+K/(m_e*c^2); v/c=sqrt(1-1/gamma^2)"}
+_target = _TARGETS.get(_Path(__file__).stem)
+if _target is None:
+    raise ImportError(f"No relocated implementation registered for {_Path(__file__).stem}")
+_module = _import_module(_target)
+for _key in dir(_module):
+    if not _key.startswith("__"):
+        globals()[_key] = getattr(_module, _key)
+__all__ = getattr(_module, "__all__", [key for key in globals() if not key.startswith("_")])

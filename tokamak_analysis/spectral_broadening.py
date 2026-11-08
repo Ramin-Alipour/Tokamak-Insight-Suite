@@ -1,18 +1,13 @@
-"""Spectral linewidth decomposition for Gaussian broadening contributions."""
-import numpy as np
-def decompose_gaussian_linewidth(observed_fwhm_nm, *, instrumental_fwhm_nm=0.0, natural_fwhm_nm=0.0, zeeman_fwhm_equivalent_nm=0.0):
-    obs,inst,nat,zee=map(float,(observed_fwhm_nm,instrumental_fwhm_nm,natural_fwhm_nm,zeeman_fwhm_equivalent_nm))
-    if not all(np.isfinite(x) for x in (obs,inst,nat,zee)) or obs<=0 or min(inst,nat,zee)<0: raise ValueError("Observed width positive; contributions finite and non-negative")
-    residual=obs**2-inst**2-nat**2-zee**2
-    if residual<0: raise ValueError("Known broadening contributions exceed observed width")
-    return {"observed_fwhm_nm":obs,"instrumental_fwhm_nm":inst,"natural_fwhm_nm":nat,"zeeman_equivalent_fwhm_nm":zee,"residual_gaussian_fwhm_nm":float(np.sqrt(residual)),"caveat":"Quadrature subtraction is valid for independent Gaussian widths; Lorentzian/Voigt contributions need profile-specific fitting."}
+"""Backward-compatible import facade for relocated physical solvers."""
+from importlib import import_module as _import_module
+from pathlib import Path as _Path
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS as _TARGETS
 
-def voigt_fwhm_approximation(gaussian_fwhm_nm, lorentzian_fwhm_nm):
-    """Olivero-Longbothum approximation to Voigt FWHM from Gaussian and Lorentzian widths."""
-    wg,wl=np.broadcast_arrays(np.asarray(gaussian_fwhm_nm,dtype=float),np.asarray(lorentzian_fwhm_nm,dtype=float))
-    if any(not np.all(np.isfinite(v)) for v in (wg,wl)) or np.any(wg<0) or np.any(wl<0) or np.any((wg+wl)<=0):
-        raise ValueError("Widths must be finite, non-negative, and not both zero")
-    wv=0.5346*wl+np.sqrt(0.2166*wl**2+wg**2)
-    return {"voigt_fwhm_approx_nm":wv,
-            "equation":"FWHM_V ~= 0.5346*FWHM_L + sqrt(0.2166*FWHM_L^2 + FWHM_G^2)",
-            "caveat":"Approximation for a Voigt profile; use numerical Voigt fitting for precision metrology."}
+_target = _TARGETS.get(_Path(__file__).stem)
+if _target is None:
+    raise ImportError(f"No relocated implementation registered for {_Path(__file__).stem}")
+_module = _import_module(_target)
+for _key in dir(_module):
+    if not _key.startswith("__"):
+        globals()[_key] = getattr(_module, _key)
+__all__ = getattr(_module, "__all__", [key for key in globals() if not key.startswith("_")])

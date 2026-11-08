@@ -1,30 +1,13 @@
-"""Signal denoising with median and Savitzky-Golay filters."""
-import numpy as np
-from scipy.signal import medfilt, savgol_filter
-def denoise_signal(signal, *, method="savgol", window_length=9, polynomial_order=2):
-    x=np.asarray(signal,dtype=float)
-    if x.ndim!=1 or len(x)<3 or not np.all(np.isfinite(x)): raise ValueError("Signal must be finite 1-D data")
-    if not np.isfinite(window_length) or int(window_length)!=window_length: raise ValueError("window_length must be an integer")
-    w=int(window_length)
-    if w<3: raise ValueError("window_length must be >=3")
-    if method=="median":
-        if w%2==0: w+=1
-        y=medfilt(x,kernel_size=min(w, len(x) if len(x)%2 else len(x)-1))
-    elif method=="savgol":
-        if w%2==0: w+=1
-        w=min(w,len(x) if len(x)%2 else len(x)-1)
-        if not np.isfinite(polynomial_order) or int(polynomial_order)!=polynomial_order: raise ValueError("polynomial_order must be an integer")
-        poly=int(polynomial_order)
-        if poly<0 or w<=poly: raise ValueError("polynomial_order must be non-negative and smaller than the filter window")
-        y=savgol_filter(x,w,poly)
-    else: raise ValueError("method must be median or savgol")
-    return {"filtered_signal":y,"residual":x-y,"residual_rms":float(np.sqrt(np.mean((x-y)**2))),"method":method,"window_length":w}
+"""Backward-compatible import facade for relocated physical solvers."""
+from importlib import import_module as _import_module
+from pathlib import Path as _Path
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS as _TARGETS
 
-def robust_noise_sigma_from_residual(residual):
-    """Robust Gaussian-noise scale estimate sigma~=1.4826*median(|r-median(r)|)."""
-    r=np.asarray(residual,dtype=float)
-    if r.ndim!=1 or len(r)<3 or not np.all(np.isfinite(r)): raise ValueError("Residual must be finite 1-D data with at least 3 samples")
-    med=float(np.median(r)); mad=float(np.median(np.abs(r-med)))
-    return {"robust_noise_sigma":1.4826*mad,"residual_median":med,"mad":mad,
-            "equation":"sigma_hat=1.4826*median(|r-median(r)|)",
-            "assumption":"Consistent Gaussian-noise estimate when residuals are predominantly noise and not structured signal."}
+_target = _TARGETS.get(_Path(__file__).stem)
+if _target is None:
+    raise ImportError(f"No relocated implementation registered for {_Path(__file__).stem}")
+_module = _import_module(_target)
+for _key in dir(_module):
+    if not _key.startswith("__"):
+        globals()[_key] = getattr(_module, _key)
+__all__ = getattr(_module, "__all__", [key for key in globals() if not key.startswith("_")])

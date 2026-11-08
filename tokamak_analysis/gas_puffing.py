@@ -1,20 +1,13 @@
-"""Gas-puff valve command and calibrated flow analysis."""
-import numpy as np
-def analyze_gas_puffing(time_s, valve_signal, *, calibrated_flow_mol_s=None):
-    t=np.asarray(time_s,dtype=float); v=np.asarray(valve_signal,dtype=float)
-    if t.ndim!=1 or v.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(v)) or np.any(np.diff(t)<=0): raise ValueError("Invalid valve time series")
-    out={"time_s":t,"valve_signal":v,"integrated_valve_command_s":float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(v,t)),"open_fraction":float(np.mean(v>0))}
-    if calibrated_flow_mol_s is not None:
-        q=np.asarray(calibrated_flow_mol_s,dtype=float)
-        if q.shape!=t.shape or not np.all(np.isfinite(q)) or np.any(q<0): raise ValueError("Flow must match and be nonnegative")
-        out["flow_mol_s"]=q; out["injected_amount_mol"]=float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(q,t))
-    out["caveat"]="Valve command alone is not a gas throughput measurement; calibrated flow and plumbing response are required."
-    return out
+"""Backward-compatible import facade for relocated physical solvers."""
+from importlib import import_module as _import_module
+from pathlib import Path as _Path
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS as _TARGETS
 
-def molar_flow_to_gas_throughput_Pa_m3_s(molar_flow_mol_s, gas_temperature_K):
-    """Ideal-gas throughput conversion Q=dot(n)*R*T in Pa*m^3/s."""
-    flow,temp=np.broadcast_arrays(np.asarray(molar_flow_mol_s,dtype=float),np.asarray(gas_temperature_K,dtype=float))
-    if not np.all(np.isfinite(flow)) or not np.all(np.isfinite(temp)) or np.any(flow<0) or np.any(temp<=0):
-        raise ValueError("Molar flow non-negative and temperature positive; inputs finite")
-    return {"gas_throughput_Pa_m3_s":flow*8.314462618*temp,
-            "equation":"Q_PV=dot(n)_mol_s*R*T"}
+_target = _TARGETS.get(_Path(__file__).stem)
+if _target is None:
+    raise ImportError(f"No relocated implementation registered for {_Path(__file__).stem}")
+_module = _import_module(_target)
+for _key in dir(_module):
+    if not _key.startswith("__"):
+        globals()[_key] = getattr(_module, _key)
+__all__ = getattr(_module, "__all__", [key for key in globals() if not key.startswith("_")])

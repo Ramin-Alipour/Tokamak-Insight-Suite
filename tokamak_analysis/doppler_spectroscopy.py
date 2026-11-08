@@ -1,34 +1,13 @@
-"""Spectral-line fitting and Doppler shift analysis for calibrated spectra."""
-import numpy as np
-from scipy.optimize import curve_fit
-C_M_S=299792458.0
-def analyze_doppler_spectrum(wavelength_nm,intensity,*,rest_wavelength_nm=None,model="gaussian"):
-    x=np.asarray(wavelength_nm,dtype=float); y=np.asarray(intensity,dtype=float)
-    if x.ndim!=1 or y.shape!=x.shape or len(x)<7 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)) or np.any(np.diff(x)<=0): raise ValueError("Spectrum requires finite increasing wavelength and matching intensity")
-    baseline=float(np.percentile(y,10)); amp=float(np.max(y)-baseline); center0=float(x[np.argmax(y)])
-    if amp<=0: raise ValueError("Spectrum has no positive line contrast")
-    def gauss(z,a,c,s,b): return b+a*np.exp(-.5*((z-c)/s)**2)
-    def lorentz(z,a,c,g,b): return b+a/(1+((z-c)/g)**2)
-    fn=gauss if model.lower()=="gaussian" else lorentz if model.lower()=="lorentzian" else None
-    if fn is None: raise ValueError("model must be gaussian or lorentzian")
-    p0=[amp,center0,max(np.median(np.diff(x))*2,(x[-1]-x[0])/20),baseline]
-    width_floor=max(np.finfo(float).eps, np.median(np.diff(x))*1e-6)
-    popt,_=curve_fit(fn,x,y,p0=p0,bounds=([0.0,float(x[0]),width_floor,-np.inf],[np.inf,float(x[-1]),float(x[-1]-x[0]),np.inf]),maxfev=20000)
-    pred=fn(x,*popt); resid=y-pred; width=2.354820045*abs(popt[2]) if model.lower()=="gaussian" else 2*abs(popt[2])
-    out={"center_nm":float(popt[1]),"amplitude":float(popt[0]),"width_fwhm_nm":float(width),"baseline":float(popt[3]),"r_squared":float(1-np.sum(resid**2)/np.sum((y-np.mean(y))**2)) if np.sum((y-np.mean(y))**2)>0 else float("nan"),"model":model}
-    if rest_wavelength_nm is not None:
-        rest=float(rest_wavelength_nm)
-        if not np.isfinite(rest) or rest<=0: raise ValueError("Rest wavelength must be positive")
-        out["doppler_shift_nm"]=out["center_nm"]-rest; out["nonrelativistic_velocity_m_s"]=C_M_S*(out["center_nm"]/rest-1)
-    out["caveat"]="Input wavelengths must be instrument-calibrated; line-of-sight velocity is non-relativistic and depends on correct rest wavelength and line identification."
-    return out
+"""Backward-compatible import facade for relocated physical solvers."""
+from importlib import import_module as _import_module
+from pathlib import Path as _Path
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS as _TARGETS
 
-def relativistic_doppler_velocity(observed_wavelength_nm, rest_wavelength_nm):
-    """Relativistic line-of-sight velocity from wavelength ratio beta=(lambda^2-lambda0^2)/(lambda^2+lambda0^2)."""
-    obs,rest=np.broadcast_arrays(np.asarray(observed_wavelength_nm,dtype=float),np.asarray(rest_wavelength_nm,dtype=float))
-    if not np.all(np.isfinite(obs)) or not np.all(np.isfinite(rest)) or np.any(obs<=0) or np.any(rest<=0):
-        raise ValueError("Observed and rest wavelengths must be finite and positive")
-    beta=(obs**2-rest**2)/(obs**2+rest**2)
-    return {"line_of_sight_velocity_m_s":C_M_S*beta,"beta_v_over_c":beta,
-            "equation":"v/c=(lambda_obs^2-lambda_0^2)/(lambda_obs^2+lambda_0^2)",
-            "convention":"Positive velocity denotes redshift/recession; assumes a single Doppler shift with negligible other wavelength shifts."}
+_target = _TARGETS.get(_Path(__file__).stem)
+if _target is None:
+    raise ImportError(f"No relocated implementation registered for {_Path(__file__).stem}")
+_module = _import_module(_target)
+for _key in dir(_module):
+    if not _key.startswith("__"):
+        globals()[_key] = getattr(_module, _key)
+__all__ = getattr(_module, "__all__", [key for key in globals() if not key.startswith("_")])

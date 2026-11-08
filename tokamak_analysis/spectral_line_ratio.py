@@ -1,25 +1,13 @@
-"""Spectral line-ratio calculations with uncertainty propagation."""
-import numpy as np
-def analyze_line_ratio(intensity_numerator,intensity_denominator,*,uncertainty_numerator=None,uncertainty_denominator=None):
-    a=np.asarray(intensity_numerator,dtype=float); b=np.asarray(intensity_denominator,dtype=float)
-    if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)) or np.any(a<0) or np.any(b<=0): raise ValueError("Numerator nonnegative and denominator positive; all finite")
-    a,b=np.broadcast_arrays(a,b); ratio=a/b; out={"line_ratio":ratio}
-    if uncertainty_numerator is not None or uncertainty_denominator is not None:
-        if uncertainty_numerator is None or uncertainty_denominator is None: raise ValueError("Provide both intensity uncertainties")
-        sa=np.asarray(uncertainty_numerator,dtype=float); sb=np.asarray(uncertainty_denominator,dtype=float)
-        if np.any(sa<0) or np.any(sb<0) or not np.all(np.isfinite(sa)) or not np.all(np.isfinite(sb)): raise ValueError("Uncertainties must be finite and non-negative")
-        try:
-            sa=np.broadcast_to(sa,ratio.shape); sb=np.broadcast_to(sb,ratio.shape)
-        except ValueError as exc: raise ValueError("Intensity uncertainties must be scalar or broadcast-compatible with the intensity ratio shape") from exc
-        out["line_ratio_uncertainty"]=np.sqrt((sa/b)**2+(a*sb/b**2)**2)
-    out["caveat"]="Physical interpretation requires line calibration, background subtraction, optical-depth assessment and atomic-rate modeling."
-    return out
+"""Backward-compatible import facade for relocated physical solvers."""
+from importlib import import_module as _import_module
+from pathlib import Path as _Path
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS as _TARGETS
 
-def boltzmann_temperature_from_line_ratio(intensity_ratio, line_prefactor, upper_energy_difference_eV):
-    """Two-line Boltzmann estimate: R=C*exp(-DeltaE/Te), hence Te=DeltaE/ln(C/R)."""
-    ratio,pref,delta=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (intensity_ratio,line_prefactor,upper_energy_difference_eV)])
-    if any(not np.all(np.isfinite(v)) for v in (ratio,pref,delta)) or np.any(ratio<=0) or np.any(pref<=0) or np.any(delta<=0) or np.any(pref<=ratio):
-        raise ValueError("Require finite positive ratio, prefactor and energy difference, with prefactor > ratio")
-    te=delta/np.log(pref/ratio)
-    return {"excitation_temperature_eV":te,"equation":"Te_eV=DeltaE_eV/ln(C_line/R)",
-            "assumption":"Optically thin line emission and a Boltzmann population model; not generally valid for non-LTE plasmas without collisional-radiative modeling."}
+_target = _TARGETS.get(_Path(__file__).stem)
+if _target is None:
+    raise ImportError(f"No relocated implementation registered for {_Path(__file__).stem}")
+_module = _import_module(_target)
+for _key in dir(_module):
+    if not _key.startswith("__"):
+        globals()[_key] = getattr(_module, _key)
+__all__ = getattr(_module, "__all__", [key for key in globals() if not key.startswith("_")])
