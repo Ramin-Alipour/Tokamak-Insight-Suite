@@ -977,9 +977,64 @@ def assess_multiview_evdf_regularization_sensitivity(
             "identifiability_status": result["status"],
         })
         candidates.append(candidate)
+    candidate_stack = np.asarray(candidates, dtype=float)
+    if candidate_stack.ndim != 2 or candidate_stack.shape[0] != strengths.size:
+        raise RuntimeError("regularization ensemble did not produce one normalized candidate per strength")
+    # The lambda ensemble is a sensitivity ensemble, not a sampling distribution.
+    # Propagate its spread through the same voxel-volume definitions used by the
+    # physical inverse, keeping this component separate from measurement covariance.
+    distribution_spread = (
+        np.std(candidate_stack, axis=0, ddof=1) if strengths.size > 1
+        else np.zeros(candidate_stack.shape[1], dtype=float)
+    )
+    distribution_covariance = (
+        np.cov(candidate_stack, rowvar=False, ddof=1) if strengths.size > 1
+        else np.zeros((candidate_stack.shape[1], candidate_stack.shape[1]), dtype=float)
+    )
+    distribution_covariance = np.atleast_2d(distribution_covariance)
+    volume = _real_array(voxel_volume_m3_s3, "voxel_volume_m3_s3", 1)
+    velocity = _real_array(velocity_grid_m_s, "velocity_grid_m_s", 2)
+    moment_vectors = []
+    for pdf in candidate_stack:
+        probability_mass = pdf * volume
+        mean_velocity = probability_mass @ velocity
+        centered = velocity - mean_velocity[None, :]
+        velocity_tensor = np.einsum(
+            "i,ij,ik->jk", probability_mass, centered, centered
+        )
+        moment_vectors.append(np.concatenate((mean_velocity, velocity_tensor.reshape(9))))
+    moment_stack = np.asarray(moment_vectors, dtype=float)
+    moment_covariance = (
+        np.cov(moment_stack, rowvar=False, ddof=1) if strengths.size > 1
+        else np.zeros((12, 12), dtype=float)
+    )
+    moment_covariance = np.atleast_2d(moment_covariance)
     return {
         "levels": levels,
         "regularization_strengths": strengths.copy(),
+        "candidate_distributions_m3_s3": candidate_stack,
+        "regularization_selection_uncertainty": {
+            "status": "candidate_spread_available" if strengths.size > 1 else "single_candidate_no_selection_spread",
+            "candidate_count": int(strengths.size),
+            "distribution_standard_spread_m3_s3": distribution_spread,
+            "distribution_covariance_m6_s6": distribution_covariance,
+            "distribution_lower_envelope_m3_s3": np.min(candidate_stack, axis=0),
+            "distribution_upper_envelope_m3_s3": np.max(candidate_stack, axis=0),
+            "physical_moment_order": [
+                "mean_vx_m_s", "mean_vy_m_s", "mean_vz_m_s",
+                "cov_vxx_m2_s2", "cov_vxy_m2_s2", "cov_vxz_m2_s2",
+                "cov_vyx_m2_s2", "cov_vyy_m2_s2", "cov_vyz_m2_s2",
+                "cov_vzx_m2_s2", "cov_vzy_m2_s2", "cov_vzz_m2_s2",
+            ],
+            "physical_moment_candidate_values": moment_stack,
+            "physical_moment_covariance_moment_units_squared": moment_covariance,
+            "interpretation": (
+                "Empirical spread across the explicitly supplied regularization strengths, "
+                "propagated through the normalized 3-D EVDF and its first/second velocity moments. "
+                "This is model/regularization-selection sensitivity, not measurement uncertainty, "
+                "a confidence interval, or a posterior covariance."
+            ),
+        },
         "candidate_distributions_m3_s3": np.asarray(candidates),
         "noise_model": noise_model,
         "selection_policy": "no automatic lambda selection; inspect the L-curve and external physical constraints",
