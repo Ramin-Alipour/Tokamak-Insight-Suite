@@ -579,3 +579,31 @@ def test_psf_profile_covariance_sandwich_reduces_to_unregularized_gls_covariance
     )
     expected = np.linalg.inv(mixing.T @ np.linalg.solve(covariance, mixing))
     np.testing.assert_allclose(result["profile_covariance"], expected, rtol=2e-8, atol=1e-10)
+
+
+def test_relativistic_projected_evdf_covariance_uses_frequentist_tikhonov_sandwich():
+    from tokamak_analysis.thomson_gap_closure import (
+        _regularized_active_set_measurement_covariance,
+    )
+
+    design = np.array([
+        [1.0, 0.2, 0.0],
+        [0.1, 1.0, 0.3],
+        [0.0, 0.4, 1.0],
+        [0.5, 0.2, 0.7],
+        [0.3, 0.8, 0.1],
+    ])
+    penalty = np.array([
+        [1.0, -2.0, 1.0],
+    ])
+    regularization = 0.35
+    residual_variance = 1.7
+    information = design.T @ design
+    hessian = information + regularization * (penalty.T @ penalty)
+    inverse = np.linalg.pinv(hessian, hermitian=True)
+    expected = inverse @ information @ inverse * residual_variance
+    actual = _regularized_active_set_measurement_covariance(
+        design, penalty, regularization, residual_variance
+    )
+    np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-14)
+    assert not np.allclose(actual, inverse * residual_variance, rtol=1e-3, atol=1e-8)
