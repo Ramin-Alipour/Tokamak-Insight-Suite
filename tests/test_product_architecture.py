@@ -21,6 +21,7 @@ def test_product_catalog_reconciles_all_families_and_registered_workflows():
         "analysis_ids_unique": True,
         "every_analysis_has_one_product_owner": True,
         "product_slugs_unique": True,
+        "product_api_modules_unique": True,
         "instrumentation_support_is_cross_cutting": True,
     }
     assert len(list_products()) == 20
@@ -109,3 +110,43 @@ def test_dependency_inventory_separates_solver_closures_from_shared_platform_imp
         for module in row["transitive_domain_modules"]
     }
     assert all("tokamak_analysis." in module for module in inventory["shared_domain_modules"])
+
+
+
+def test_all_twenty_products_have_importable_public_package_boundaries():
+    from tis.products import load_product_api
+
+    for product in list_products():
+        api = load_product_api(product["product_id"])
+        assert api.PRODUCT_ID == product["product_id"]
+        assert callable(getattr(api, "run_analysis", None)) or callable(
+            getattr(api, "run_probe_analysis", None)
+        ) or product["id"] == 1
+        assert product["api_module"].startswith("tis.products.")
+        for entry in product["entry_points"]:
+            if product["id"] >= 3:
+                assert callable(getattr(api, entry["function"]))
+
+
+def test_product_packages_do_not_import_another_products_private_modules():
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "tis" / "products"
+    for path in root.glob("*/**/*.py"):
+        if path.parent == root:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            for name in names:
+                assert not (
+                    name.startswith("tis.products.")
+                    and name.split(".")[2] not in {"api", "catalog", "dependencies"}
+                    and name.split(".")[2] != path.parent.name
+                ), f"{path} imports another product's private module: {name}"
