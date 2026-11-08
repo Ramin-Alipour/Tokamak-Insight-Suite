@@ -369,6 +369,18 @@ def reconstruct_multiview_3d_evdf(
     candidate_velocity_covariance = 0.5 * (
         candidate_velocity_covariance + candidate_velocity_covariance.T
     )
+    # The kinetic electron-temperature tensor is the central second velocity
+    # moment converted from m^2/s^2 to eV: T_ij[eV] = (m_e/e) C_ij.
+    # It is a directional kinetic moment, not an assumption of isotropy or
+    # local thermodynamic equilibrium.
+    electron_mass_kg = 9.1093837139e-31
+    elementary_charge_C = 1.602176634e-19
+    temperature_tensor_candidate_eV = (
+        electron_mass_kg / elementary_charge_C
+    ) * candidate_velocity_covariance
+    temperature_tensor_eigenvalues_candidate_eV = np.linalg.eigvalsh(
+        temperature_tensor_candidate_eV
+    )
     mean_velocity_covariance = None
     velocity_covariance_tensor_covariance = None
     if identifiable:
@@ -418,6 +430,20 @@ def reconstruct_multiview_3d_evdf(
         "velocity_covariance_tensor_covariance_m4_s4": velocity_covariance_tensor_covariance,
         "candidate_mean_velocity_vector_m_s": candidate_mean_velocity.copy(),
         "candidate_velocity_covariance_tensor_m2_s2": candidate_velocity_covariance.copy(),
+        "temperature_tensor_eV": (
+            temperature_tensor_candidate_eV.copy() if identifiable else None
+        ),
+        "temperature_tensor_eigenvalues_eV": (
+            temperature_tensor_eigenvalues_candidate_eV.copy() if identifiable else None
+        ),
+        "candidate_temperature_tensor_eV": temperature_tensor_candidate_eV.copy(),
+        "candidate_temperature_tensor_eigenvalues_eV": (
+            temperature_tensor_eigenvalues_candidate_eV.copy()
+        ),
+        "temperature_tensor_definition": (
+            "T_ij[eV]=(m_e/e)*integral(f*(v_i-u_i)*(v_j-u_j)*d3v); "
+            "eigenvalues are principal directional kinetic temperatures"
+        ),
         "velocity_moment_definition": (
             "mean_v=integral(f*v*d3v); covariance_v=integral(f*(v-mean_v)*(v-mean_v)^T*d3v); "
             "normalization and moments use the supplied voxel-volume quadrature"
