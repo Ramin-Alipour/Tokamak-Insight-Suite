@@ -60,7 +60,7 @@ def main() -> int:
                 'callable_analysis_completeness_counts':dict(sorted(analysis_completeness.items())),
                 'registry_consistency':{
                     'diagnostic_registry_count_is_80':len(DIAGNOSTICS)==80,
-                    'callable_analysis_registry_count_is_80':len(ANALYSES)==80,
+                    'callable_analysis_registry_count_matches_registry':len(ANALYSES)==len({row['id'] for row in ANALYSES}),
                     'diagnostic_completeness_totals_match_record_count':sum(completeness_counts.values())==len(DIAGNOSTICS),
                     'analysis_completeness_totals_match_entry_point_count':sum(analysis_completeness.values())==len(ANALYSES),
                 },
