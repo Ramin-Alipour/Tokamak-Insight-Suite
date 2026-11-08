@@ -18,8 +18,8 @@ from tis.physics.shared.cts_fdt import (
 )
 from tis.physics.shared.cts_landau_em import landau_full_em_current_response, landau_full_em_electric_field_fluctuation_spectrum
 from tis.physics.shared.cts_full_wave import (solve_stratified_mode_conversion, solve_stratified_full_wave_oblique, solve_3d_periodic_full_wave)
-from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
-from .ece_kinetic import (
+from tis.physics.shared.ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
+from tis.physics.shared.ece_kinetic import (
     relativistic_kinetic_ece_absorption_coefficient,
     solve_relativistic_kinetic_ece_profile,
 )
@@ -32,7 +32,7 @@ from tis.physics.shared.cts_em_background import (
     brightness_temperature_from_radiance,
 )
 from tis.physics.shared.cts_kappa import kappa_electron_susceptibility, kappa_bgk_electron_susceptibility, bi_kappa_electron_susceptibility
-from .cts_kappa import maxwellian_electron_susceptibility
+from tis.physics.shared.cts_kappa import maxwellian_electron_susceptibility
 from tis.physics.shared.cts_kappa_dispersion import kappa_dispersion_function
 from tis.physics.shared.thomson_generalized_dispersion import (
     collective_tabulated_electron_spectral_density,
@@ -46,10 +46,10 @@ from tis.physics.shared.cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
 )
-from .thomson_evdf import reconstruct_thomson_evdf
+from tis.physics.shared.thomson_evdf import reconstruct_thomson_evdf
 from .thomson_scattering import infer_thomson_path_averaged_density
-from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
-from .formula_library import (
+from tis.physics.shared.thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+from tis.physics.shared.formula_library import (
     thomson_electron_temperature_from_spectral_width,
     thomson_velocity_projection_relativistic_exact,
 )
@@ -59,17 +59,17 @@ from .advanced_inference import (
     reconstruct_relativistic_optical_thomson_3d_evdf,
     assess_multiview_evdf_regularization_sensitivity,
 )
-from .thomson_anisotropic_inference import (
+from tis.physics.shared.thomson_anisotropic_inference import (
     fit_gyrotropic_bi_maxwellian_thomson,
     fit_gyrotropic_bi_kappa_thomson,
 )
-from .thomson_gap_closure import (
+from tis.physics.shared.thomson_gap_closure import (
     reconstruct_relativistic_projected_thomson_evdf,
     reconstruct_psf_aware_thomson_profile,
     map_thomson_channels_to_normalized_poloidal_flux,
     relativistic_projected_compton_kinematics,
 )
-from .thomson_kinetic_models import (
+from tis.physics.shared.thomson_kinetic_models import (
     infer_gyrotropic_bi_maxwellian_temperatures,
     infer_three_dimensional_flow_from_thomson_projections,
     project_gyrotropic_bi_kappa_electron_vdf,
@@ -971,10 +971,10 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
     elif model == "thomson_relativistic_3d_evdf":
         solver = reconstruct_relativistic_optical_thomson_3d_evdf
     elif model == "thomson_kinetic_background_fit":
-        from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
+        from tis.physics.shared.thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         solver = fit_noncollective_kinetic_thomson_with_background
     elif model == "thomson_n_population_relativistic_fit":
-        from .thomson_n_population import fit_n_population_relativistic_thomson_spectrum
+        from tis.physics.shared.thomson_n_population import fit_n_population_relativistic_thomson_spectrum
         solver = fit_n_population_relativistic_thomson_spectrum
     elif model == "relativistic_kinetic_ece_profile":
         solver = solve_relativistic_kinetic_ece_profile
