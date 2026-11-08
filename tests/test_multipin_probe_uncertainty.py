@@ -62,6 +62,7 @@ def test_multipin_accepts_time_resolved_voltage_covariance():
         (np.array([[1.0, 0.2, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "must be symmetric"),
         (np.array([[1.0, 2.0, 0.0], [2.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "positive semidefinite"),
         (np.eye(4), "must have shape"),
+        (np.eye(3, dtype=bool), "real numeric values"),
     ],
 )
 def test_multipin_rejects_invalid_voltage_covariance(covariance, message):
