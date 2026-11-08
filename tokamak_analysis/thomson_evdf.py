@@ -1203,6 +1203,111 @@ def reconstruct_thomson_evdf(
             model_selection_uncertainty[
                 "model_averaged_projected_evdf_standard_uncertainty_s_per_m"
             ] = np.sqrt(np.maximum(np.diag(total_model_averaged_covariance), 0.0))
+
+            # Propagate candidate-family uncertainty from the model-averaged
+            # projected EVDF into its actual physical moments.  This is a
+            # distinct covariance from the selected non-parametric inverse.
+            quadrature = np.empty_like(velocity)
+            quadrature[0] = 0.5 * (velocity[1] - velocity[0])
+            quadrature[-1] = 0.5 * (velocity[-1] - velocity[-2])
+            quadrature[1:-1] = 0.5 * (velocity[2:] - velocity[:-2])
+            model_mean = float(integral(velocity * model_averaged_pdf))
+            model_raw2 = float(integral(velocity**2 * model_averaged_pdf))
+            model_raw3 = float(integral(velocity**3 * model_averaged_pdf))
+            model_raw4 = float(integral(velocity**4 * model_averaged_pdf))
+            model_variance = model_raw2 - model_mean**2
+            if np.isfinite(model_variance) and model_variance > 0.0:
+                model_sigma = float(np.sqrt(model_variance))
+                model_central3 = (
+                    model_raw3 - 3.0*model_mean*model_raw2 + 2.0*model_mean**3
+                )
+                model_central4 = (
+                    model_raw4 - 4.0*model_mean*model_raw3
+                    + 6.0*model_mean**2*model_raw2 - 3.0*model_mean**4
+                )
+                raw1_gradient = quadrature * velocity
+                raw2_gradient = quadrature * velocity**2
+                raw3_gradient = quadrature * velocity**3
+                raw4_gradient = quadrature * velocity**4
+                variance_gradient = raw2_gradient - 2.0*model_mean*raw1_gradient
+                central3_gradient = (
+                    raw3_gradient
+                    + (-3.0*model_raw2 + 6.0*model_mean**2)*raw1_gradient
+                    - 3.0*model_mean*raw2_gradient
+                )
+                central4_gradient = (
+                    raw4_gradient
+                    + (-4.0*model_raw3 + 12.0*model_mean*model_raw2
+                       - 12.0*model_mean**3)*raw1_gradient
+                    - 4.0*model_mean*raw3_gradient
+                    + 6.0*model_mean**2*raw2_gradient
+                )
+                model_moment_jacobian = np.vstack((
+                    raw1_gradient,
+                    variance_gradient,
+                    variance_gradient/(2.0*model_sigma),
+                    (9.1093837139e-31/1.602176634e-19)*variance_gradient,
+                    central3_gradient/model_variance**1.5
+                    - 1.5*model_central3*variance_gradient/model_variance**2.5,
+                    central4_gradient/model_variance**2
+                    - 2.0*model_central4*variance_gradient/model_variance**3,
+                ))
+                moment_order = [
+                    "mean_velocity_parallel_m_s",
+                    "velocity_parallel_variance_m2_s2",
+                    "velocity_parallel_standard_deviation_m_s",
+                    "directional_equivalent_temperature_eV",
+                    "skewness",
+                    "excess_kurtosis",
+                ]
+                model_moments = np.array([
+                    model_mean, model_variance, model_sigma,
+                    9.1093837139e-31*model_variance/1.602176634e-19,
+                    model_central3/model_sigma**3,
+                    model_central4/model_variance**2-3.0,
+                ])
+                between_moment_covariance = (
+                    model_moment_jacobian @ between_model_covariance
+                    @ model_moment_jacobian.T
+                )
+                between_moment_covariance = 0.5*(
+                    between_moment_covariance+between_moment_covariance.T
+                )
+                model_selection_uncertainty.update({
+                    "model_averaged_physical_moment_order": moment_order,
+                    "model_averaged_physical_moment_values": {
+                        name: float(value)
+                        for name, value in zip(moment_order, model_moments)
+                    },
+                    "between_model_physical_moment_covariance": between_moment_covariance,
+                    "between_model_physical_moment_standard_uncertainty": np.sqrt(
+                        np.maximum(np.diag(between_moment_covariance), 0.0)
+                    ),
+                    "physical_moment_model_selection_status": (
+                        "between_candidate_family_covariance_propagated_by_moment_jacobian"
+                    ),
+                })
+                if within_pdf_covariance_complete and all(
+                    name in candidate_pdf_covariances for name in active_pdf_names
+                ):
+                    total_moment_covariance = (
+                        model_moment_jacobian @ total_model_averaged_covariance
+                        @ model_moment_jacobian.T
+                    )
+                    total_moment_covariance = 0.5*(
+                        total_moment_covariance+total_moment_covariance.T
+                    )
+                    model_selection_uncertainty[
+                        "model_averaged_physical_moment_covariance"
+                    ] = total_moment_covariance
+                    model_selection_uncertainty[
+                        "model_averaged_physical_moment_standard_uncertainty"
+                    ] = np.sqrt(np.maximum(np.diag(total_moment_covariance), 0.0))
+                    model_selection_uncertainty[
+                        "physical_moment_model_selection_status"
+                    ] = (
+                        "within_and_between_candidate_family_covariance_propagated_by_moment_jacobian"
+                    )
             model_selection_uncertainty[
                 "projected_evdf_uncertainty_interpretation"
             ] += (
