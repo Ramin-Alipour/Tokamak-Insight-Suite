@@ -1929,3 +1929,6 @@ def test_projected_evdf_moment_closure_uses_nonuniform_velocity_finite_volume_me
     closure = result["projected_evdf_spectral_moment_closure"]
     assert closure["evdf_mean_velocity_parallel_m_s"] == pytest.approx(expected_mean)
     assert closure["evdf_variance_velocity_parallel_m2_s2"] == pytest.approx(expected_variance)
+    from scipy.integrate import trapezoid
+    trapz_mean = trapezoid(velocity * pdf, velocity) / trapezoid(pdf, velocity)
+    assert abs(expected_mean - trapz_mean) > 1.0e3
