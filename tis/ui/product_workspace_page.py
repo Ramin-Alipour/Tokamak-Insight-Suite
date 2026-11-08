@@ -78,7 +78,7 @@ def render_product_workspace_page(st: Any) -> None:
         options=product["entry_ids"],
         format_func=lambda analysis_id: (
             f"{analysis_id} · "
-            next(item["name"] for item in product["entry_points"]
+            + next(item["name"] for item in product["entry_points"]
                  if item["id"] == analysis_id)
         ),
         key=f"tis_product_workflow_{selected_id}",
