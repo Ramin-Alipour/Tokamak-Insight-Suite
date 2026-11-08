@@ -4026,7 +4026,92 @@ elif page=='Advanced Analysis':
         from tis.ui.general_temperature_tensor_page import render_general_temperature_tensor_page
         render_general_temperature_tensor_page(st)
     elif workflow=='Analysis 1 / Spectral-distribution subanalysis':
-        st.caption('Analysis 1 subanalysis: spectral-shape diagnostics are available only together with the physical parameters inferred by the canonical Thomson forward fit of the same calibrated measured spectrum.')
+        st.caption('Analysis 1 subanalysis: spectral-shape diagnostics are available together with physical parameters inferred from the same calibrated measured spectrum.')
+        with st.expander('Execute registered Thomson spectral-distribution analysis (ID 81) directly from measured data'):
+            if df is None or len(numeric)<2:
+                st.info('Load a table containing measured wavelength and spectral-intensity columns.')
+            else:
+                api_left,api_right=st.columns(2)
+                with api_left:
+                    wavelength_col=st.selectbox('Measured wavelength column (nm)',numeric,key='ts81_wavelength_column')
+                    signal_choices=[name for name in numeric if name!=wavelength_col]
+                    signal_col=st.selectbox('Measured spectral-intensity column',signal_choices,key='ts81_signal_column')
+                    response_upload_81=st.file_uploader('Measured instrument-response matrix CSV',type=['csv','txt'],key='ts81_response_matrix')
+                    background_choices=[name for name in numeric if name not in {wavelength_col,signal_col}]
+                    background_mode_81=st.selectbox(
+                        'Background representation',
+                        ['Researcher-selected spectral-edge fraction']+(['Explicit fitted-background column'] if background_choices else []),
+                        key='ts81_background_mode',
+                    )
+                    background_col_81=None
+                    background_fraction_81=None
+                    if background_mode_81=='Explicit fitted-background column':
+                        background_col_81=st.selectbox('Fitted-background column',background_choices,key='ts81_background_column')
+                    else:
+                        background_fraction_81=st.number_input(
+                            'Explicit edge fraction at each wavelength end',
+                            min_value=0.001,max_value=0.49,value=0.10,step=0.01,
+                            key='ts81_background_fraction',
+                        )
+                    uncertainty_choices=['<none>']+[name for name in numeric if name not in {wavelength_col,signal_col,background_col_81}]
+                    uncertainty_col_81=st.selectbox('Optional pointwise signal 1σ column',uncertainty_choices,key='ts81_uncertainty_column')
+                with api_right:
+                    laser_81=st.text_input('Incident laser wavelength (nm)',value='532.0',key='ts81_laser_wavelength')
+                    angle_81=st.text_input('Scattering angle (rad)',value='1.5707963267948966',key='ts81_scattering_angle')
+                    kinematics_81=st.selectbox(
+                        'Projected-EVDF kinematics',
+                        ['nonrelativistic','relativistic_thomson','compton'],
+                        key='ts81_kinematics',
+                    )
+                    velocity_limit_81=st.text_input('Projected velocity support limit (m/s)',value='80000',key='ts81_velocity_limit')
+                    velocity_points_81=st.number_input('Projected velocity grid points',min_value=41,max_value=2001,value=121,step=10,key='ts81_velocity_points')
+                    regularization_81=st.text_input('Tikhonov strength (blank = GCV selection)',value='',key='ts81_regularization')
+                    polarization_81=st.text_input('Incident polarization x,y,z (required for Compton)',value='1,0,0',key='ts81_polarization')
+                if st.button('Run spectral-distribution API 81',type='primary',key='run_ts_spectral_distribution_api_81'):
+                    try:
+                        if response_upload_81 is None:
+                            raise ValueError('Upload the measured instrument-response matrix.')
+                        wavelength_values=df[wavelength_col].to_numpy(dtype=float)
+                        signal_values=df[signal_col].to_numpy(dtype=float)
+                        if wavelength_values.ndim!=1 or signal_values.shape!=wavelength_values.shape or np.any(np.diff(wavelength_values)<=0):
+                            raise ValueError('Wavelength samples must be finite, aligned with the signal and already strictly increasing.')
+                        response_values=pd.read_csv(response_upload_81,header=None).to_numpy(dtype=float)
+                        if response_values.shape!=(wavelength_values.size,wavelength_values.size):
+                            raise ValueError('The measured response matrix must be square and match the wavelength sample count.')
+                        api_kwargs={
+                            'instrument_response_matrix':response_values,
+                            'laser_wavelength_nm':_parse_ts_scalar(laser_81,'Laser wavelength',minimum=1e-12),
+                            'scattering_angle_rad':_parse_ts_scalar(angle_81,'Scattering angle',minimum=1e-12,maximum=np.pi-1e-12),
+                            'projected_evdf_options':{
+                                'kinematics':kinematics_81,
+                                'velocity_limit_m_s':_parse_ts_scalar(velocity_limit_81,'Velocity support limit',minimum=1.0),
+                                'velocity_points':int(velocity_points_81),
+                            },
+                        }
+                        if background_mode_81=='Explicit fitted-background column':
+                            api_kwargs['background_signal']=df[background_col_81].to_numpy(dtype=float)
+                        else:
+                            api_kwargs['background_fraction']=float(background_fraction_81)
+                        if uncertainty_col_81!='<none>':
+                            api_kwargs['signal_uncertainty']=df[uncertainty_col_81].to_numpy(dtype=float)
+                        if regularization_81.strip():
+                            api_kwargs['projected_evdf_options']['regularization_strength']=_parse_ts_scalar(regularization_81,'Tikhonov strength',minimum=1e-15)
+                        if kinematics_81=='compton':
+                            polarization_values=np.asarray([float(value.strip()) for value in polarization_81.split(',')],dtype=float)
+                            if polarization_values.shape!=(3,) or not np.all(np.isfinite(polarization_values)):
+                                raise ValueError('Incident polarization must contain exactly three finite components.')
+                            api_kwargs['incident_polarization']=polarization_values
+                        product_api_81=load_product_api('thomson-scattering')
+                        api_result_81=product_api_81.run_analysis(81,wavelength_values,signal_values,**api_kwargs)
+                        st.session_state['tis_thomson_spectral_distribution_api_result']=api_result_81
+                        st.success('Analysis 81 completed through the Thomson product API and canonical executable registry.')
+                    except Exception as exc:
+                        st.error(f'Spectral-distribution API 81 failed: {type(exc).__name__}: {exc}')
+                api_result_81=st.session_state.get('tis_thomson_spectral_distribution_api_result')
+                if api_result_81:
+                    st.markdown('**Registered Analysis 81 result**')
+                    st.json(api_result_81)
+                    json_download('Export registered Thomson spectral-distribution result',api_result_81,'tis_thomson_spectral_distribution_analysis_81.json')
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
         if df is None:
             st.info('Load the calibrated measurement table and run the canonical Thomson spectral-to-physics inference first.')
