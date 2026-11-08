@@ -78,6 +78,8 @@ def analyze_thomson_spectra(*args, **kwargs):
         else:
             wavelength, spectra = positional[:2]
             positional = positional[2:]
+            if positional and "radius_m" in kwargs:
+                raise ValueError("Supply radius_m positionally or by keyword, not both.")
             radius = positional.pop(0) if positional else kwargs.pop("radius_m", None)
         if positional:
             raise TypeError("Too many positional arguments for anisotropic/tensor Analysis-1 inference.")
