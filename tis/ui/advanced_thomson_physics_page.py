@@ -1282,6 +1282,9 @@ def render_advanced_thomson_physics_page(st) -> None:
                     r"T_{e,q}^{(2)}=\frac{m_e}{e}"
                     r"\left[\langle v_q^2\rangle-\langle v_q\rangle^2\right]"
                 )
+                st.caption(
+                    result.get("directional_temperature_interpretation", "")
+                )
                 st.write({
                     "mean_velocity_parallel_m_s": result.get("mean_velocity_parallel_m_s"),
                     "velocity_parallel_standard_deviation_m_s": result.get("velocity_parallel_standard_deviation_m_s"),
