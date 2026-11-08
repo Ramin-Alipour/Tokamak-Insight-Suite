@@ -119,9 +119,7 @@ def test_all_twenty_products_have_importable_public_package_boundaries():
     for product in list_products():
         api = load_product_api(product["product_id"])
         assert api.PRODUCT_ID == product["product_id"]
-        assert callable(getattr(api, "run_analysis", None)) or callable(
-            getattr(api, "run_probe_analysis", None)
-        ) or product["id"] == 1
+        assert callable(getattr(api, "run_analysis", None))
         assert product["api_module"].startswith("tis.products.")
         for entry in product["entry_points"]:
             if product["id"] >= 3:
