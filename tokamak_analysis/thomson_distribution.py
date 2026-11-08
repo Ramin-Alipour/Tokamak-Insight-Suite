@@ -678,6 +678,20 @@ def analyze_thomson_spectral_distribution(
     # was selected; the EVDF-only path consumes them below.
     if physical_model is None and projected_evdf_options is None and any(
         value is not None for value in (
+            laser_wavelength_uncertainty_nm, scattering_angle_uncertainty_rad,
+        )
+    ):
+        raise ValueError(
+            "laser_wavelength_uncertainty_nm and scattering_angle_uncertainty_rad "
+            "require an explicitly selected physical_model or projected_evdf_options"
+        )
+    if physical_model is None and projected_evdf_options is None and laser_angle_covariance_nm_rad != 0.0:
+        raise ValueError(
+            "laser_angle_covariance_nm_rad requires an explicitly selected physical_model "
+            "or projected_evdf_options"
+        )
+    if physical_model is None and projected_evdf_options is None and any(
+        value is not None for value in (
             model_discrepancy_covariance, systematic_covariance,
         )
     ):
