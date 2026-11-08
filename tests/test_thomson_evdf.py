@@ -61,7 +61,14 @@ def test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection():
     assert np.trapz(f, v) == pytest.approx(1.0, rel=2e-5)
     assert out["scattering_vector_projection_only"] is True
     assert out["absolute_density_identified"] is False
-    assert out["directional_equivalent_temperature_eV"] > 0
+    expected_directional_temperature = (
+        9.1093837139e-31
+        * out["velocity_parallel_standard_deviation_m_s"]**2
+        / 1.602176634e-19
+    )
+    assert out["directional_equivalent_temperature_eV"] == pytest.approx(
+        expected_directional_temperature, rel=2e-12
+    )
     assert out["fitted_spectrum"].shape == signal.shape
     assert set(out["parametric_model_comparison"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
     assert set(out["parametric_models"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
@@ -302,8 +309,19 @@ def test_evdf_reports_regularization_selection_spread_separately_from_measuremen
     moment_spread = np.asarray(
         selection["physical_moment_standard_spread_from_regularization_choice"]
     )
-    assert moment_covariance.shape == (5, 5)
-    assert moment_spread.shape == (5,)
+    assert moment_covariance.shape == (6, 6)
+    assert moment_spread.shape == (6,)
+    moment_order = selection["physical_moment_order"]
+    temperature_index = moment_order.index("directional_equivalent_temperature_eV")
+    candidate_moments = np.asarray(selection["physical_moment_candidate_values"])
+    expected_temperatures = (
+        9.1093837139e-31 * candidate_moments[:, 1]
+        / 1.602176634e-19
+    )
+    np.testing.assert_allclose(
+        candidate_moments[:, temperature_index], expected_temperatures,
+        rtol=2e-12, atol=0.0,
+    )
     np.testing.assert_allclose(moment_covariance, moment_covariance.T, atol=1e-12)
     assert np.linalg.eigvalsh(moment_covariance).min() >= -1e-10
     assert selection["physical_moment_candidate_values"].shape[1] == 5
