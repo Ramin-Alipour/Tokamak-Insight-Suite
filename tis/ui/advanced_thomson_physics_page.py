@@ -221,6 +221,15 @@ MODEL_PHYSICS_NOTES = {
         "it does not infer absolute density, unknown view gains, Compton recoil or relativistic tails. "
         "The stacked data-only rank gate withholds a unique 3-D EVDF when angular information is insufficient."
     ),
+    "thomson_multiview_3d_evdf_physical": (
+        "Physical optical Thomson 3-D EVDF inversion. For each view j and velocity voxel a, "
+        "lambda_ja=lambda_L[1-2 sin(theta_j/2)(qhat_j dot v_a)/c]. The unpolarized differential "
+        "cross-section contributes (1+cos²(theta_j))/2 and each view requires a calibrated relative gain. "
+        "Monochromatic probability is conservatively deposited into finite wavelength bins and the measured "
+        "response acts on bin-integrated power. This is non-relativistic elastic Thomson shape inference; "
+        "it does not infer absolute density, Compton recoil or relativistic tails. The data-only rank gate "
+        "withholds a unique 3-D EVDF when angular information is insufficient."
+    ),
     "bi_kappa_electrostatic_susceptibility": (
         "Gyrotropic 3-D bi-Kappa distribution projected exactly onto the supplied scattering vector, including electron bulk drift through v_phi,rest = v_phi,lab - u_e dot q_hat. "
         "The directional second-moment temperature is T_q = T_perp + (T_parallel-T_perp)*(b_hat dot q_hat)^2; "
@@ -634,7 +643,8 @@ EXAMPLES = {
         "scattering_vector_unit": [[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0]],
         "velocity_grid_m_s": [[vx,vy,vz] for vx in [-2.0e4,0.0,2.0e4] for vy in [-2.0e4,0.0,2.0e4] for vz in [-2.0e4,0.0,2.0e4]],
         "laser_wavelength_nm": 500.0,
-        "scattering_angle_rad": 1.5707963267948966,
+        "scattering_angle_rad": [1.5707963267948966]*3,
+        "view_gain": [1.0, 1.0, 1.0],
         "instrument_response_matrix": np.eye(61).tolist(),
         "background_spectra": [[1.0]*61, [1.0]*61, [1.0]*61],
         "voxel_volume_m3_s3": [8.0e12]*27,
@@ -1095,7 +1105,7 @@ def render_advanced_thomson_physics_page(st) -> None:
                 st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
             if model == "thomson_multiview_3d_evdf_physical" and isinstance(result, Mapping):
                 st.subheader("Physical multi-view optical Thomson forward model")
-                st.latex(r"\lambda_{j,a}=\lambda_L\left[1-2\sin(\theta/2)\,\hat{\mathbf q}_j\cdot\mathbf v_a/c\right],\qquad S_j(\lambda_i)=\sum_a f_a K_{j i a}\,\Delta V_a")
+                st.latex(r"\lambda_{j,a}=\lambda_L\left[1-2\sin(\theta_j/2)\,\hat{\mathbf q}_j\cdot\mathbf v_a/c\right],\quad \frac{d\sigma}{d\Omega}=\frac{r_e^2}{2}(1+\cos^2\theta_j),\quad S_j=g_j\frac{1+\cos^2\theta_j}{2}\sum_a f_aK_{jia}\Delta V_a")
                 st.write({
                     "forward_model": result.get("physical_forward_model"),
                     "maximum_velocity_beta": result.get("maximum_velocity_beta"),

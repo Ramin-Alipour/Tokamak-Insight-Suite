@@ -303,6 +303,7 @@ def test_physical_optical_thomson_3d_kernel_conserves_bin_power_and_applies_dopp
     result = reconstruct_optical_thomson_3d_evdf(
         wavelength, np.ones((3, wavelength.size)), directions, velocity,
         laser_wavelength_nm=500.0, scattering_angle_rad=np.pi / 2,
+        view_gain=np.ones(3),
         instrument_response_matrix=np.eye(wavelength.size),
         background_spectra=np.zeros((3, wavelength.size)),
         voxel_volume_m3_s3=np.ones(2), regularization_matrix=np.eye(2),
@@ -313,7 +314,7 @@ def test_physical_optical_thomson_3d_kernel_conserves_bin_power_and_applies_dopp
     np.testing.assert_allclose(result["mapped_line_centres_nm"], expected, rtol=0, atol=1e-12)
     integrated = np.sum(result["physical_spectral_kernels"]
         * result["wavelength_bin_widths_nm"][None, :, None], axis=1)
-    np.testing.assert_allclose(integrated, np.ones_like(integrated), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(integrated, 0.5*np.ones_like(integrated), rtol=1e-12, atol=1e-12)
     assert result["physical_forward_model"] == "elastic_single_particle_unpolarized_nonrelativistic_optical_thomson"
     assert result["validity_domain"]["relativistic_corrections_included"] is False
 
@@ -324,7 +325,8 @@ def test_physical_optical_thomson_3d_kernel_uses_per_view_response_normalization
         reconstruct_optical_thomson_3d_evdf(
             wavelength, np.ones((2,101)), [[1.,0.,0.],[0.,1.,0.]],
             [[1.0e4,0.,0.],[-1.0e4,0.,0.]],
-            laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+            laser_wavelength_nm=500.0, scattering_angle_rad=[np.pi/2,np.pi/2],
+            view_gain=[1.0,1.0],
             instrument_response_matrix=np.stack([np.eye(101),0.5*np.eye(101)]),
             background_spectra=np.zeros((2,101)), voxel_volume_m3_s3=np.ones(2),
             regularization_matrix=np.eye(2), regularization_strength=1e-3,
@@ -338,6 +340,7 @@ def test_physical_optical_thomson_3d_route_rejects_relativistic_velocity_grid():
             wavelength, np.ones((1,101)), [[1.,0.,0.]],
             [[0.11*299792458.0,0.,0.]],
             laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+            view_gain=[1.0],
             instrument_response_matrix=np.eye(101),
             background_spectra=np.zeros((1,101)), voxel_volume_m3_s3=np.ones(1),
             regularization_matrix=np.eye(1), regularization_strength=1e-3,
@@ -373,3 +376,25 @@ def test_primary_analysis_registry_exposes_physical_multiview_evdf_workflow():
     assert entry["model_selector"] == "thomson_multiview_3d_evdf_physical"
     assert "scattering_vector_unit (view × 3 unit vectors)" in entry["inputs"]
     assert "physical_spectral_kernels (view × wavelength × voxel)" in entry["outputs"]
+
+
+def test_physical_optical_thomson_3d_uses_per_view_scattering_angles_and_angular_factor():
+    wavelength = np.linspace(499.8, 500.2, 201)
+    directions = np.array([[1.,0.,0.],[0.,1.,0.]])
+    velocity = np.array([[1.0e4,0.,0.],[-1.0e4,0.,0.]])
+    angles = np.array([np.pi/3.0, np.pi/2.0])
+    result = reconstruct_optical_thomson_3d_evdf(
+        wavelength, np.ones((2,wavelength.size)), directions, velocity,
+        laser_wavelength_nm=500.0, scattering_angle_rad=angles,
+        view_gain=np.array([2.0,0.5]),
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=np.zeros((2,wavelength.size)),
+        voxel_volume_m3_s3=np.ones(2), regularization_matrix=np.eye(2),
+        regularization_strength=1e-4,
+    )
+    qfactor = 2.0*np.sin(angles/2.0)
+    expected_centres = 500.0*(1.0-qfactor[:,None]*(directions@velocity.T)/299792458.0)
+    np.testing.assert_allclose(result["mapped_line_centres_nm"], expected_centres, atol=1e-12)
+    expected_scale = np.array([2.0,0.5])*0.5*(1.0+np.cos(angles)**2)
+    integrated = np.sum(result["physical_spectral_kernels"]*result["wavelength_bin_widths_nm"][None,:,None],axis=1)
+    np.testing.assert_allclose(integrated, expected_scale[:,None]*np.ones((2,2)), rtol=1e-12, atol=1e-12)

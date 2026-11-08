@@ -438,6 +438,7 @@ def reconstruct_optical_thomson_3d_evdf(
     *,
     laser_wavelength_nm,
     scattering_angle_rad,
+    view_gain,
     instrument_response_matrix,
     background_spectra,
     voxel_volume_m3_s3,
@@ -480,10 +481,18 @@ def reconstruct_optical_thomson_3d_evdf(
     if np.any(direction_norm <= 0.0):
         raise ValueError("every scattering_vector_unit must be non-zero")
     directions = directions / direction_norm[:, None]
-    if (not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0.0
-            or not np.isfinite(scattering_angle_rad)
-            or not 0.0 < scattering_angle_rad < np.pi):
-        raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie in (0, pi)")
+    if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0.0:
+        raise ValueError("laser_wavelength_nm must be finite and positive")
+    angles = np.asarray(scattering_angle_rad, dtype=float)
+    if angles.ndim == 0:
+        angles = np.full(n_view, float(angles))
+    if (angles.shape != (n_view,) or not np.all(np.isfinite(angles))
+            or np.any(angles <= 0.0) or np.any(angles >= np.pi)):
+        raise ValueError("scattering_angle_rad must be one finite angle in (0, pi), or one angle per measured view")
+    gains = _real_array(view_gain, "view_gain", 1)
+    if gains.shape != (n_view,) or np.any(gains <= 0.0):
+        raise ValueError("view_gain must contain one finite positive calibrated relative gain per view")
+    angular_factor = 0.5 * (1.0 + np.cos(angles)**2)
     speed = np.linalg.norm(velocity, axis=1)
     beta_max = float(np.max(speed) / 299792458.0)
     if beta_max >= 0.1:
@@ -506,13 +515,13 @@ def reconstruct_optical_thomson_3d_evdf(
     widths = np.diff(edges)
     if np.any(widths <= 0.0):
         raise ValueError("calibrated wavelength centres must define positive finite-volume bins")
-    q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
+    q_over_ki = 2.0 * np.sin(angles / 2.0)
     kernels = np.zeros((n_view, n_wave, velocity.shape[0]), dtype=float)
     line_centres = np.empty((n_view, velocity.shape[0]), dtype=float)
     for view, qhat in enumerate(directions):
         projected_velocity = velocity @ qhat
         centres = float(laser_wavelength_nm) * (
-            1.0 - q_over_ki * projected_velocity / 299792458.0
+            1.0 - q_over_ki[view] * projected_velocity / 299792458.0
         )
         line_centres[view] = centres
         if np.any(centres < edges[0]) or np.any(centres > edges[-1]):
@@ -533,7 +542,7 @@ def reconstruct_optical_thomson_3d_evdf(
                 latent_mass[right, voxel] = fraction
         # R acts on bin-integrated power; divide by bin widths only afterwards.
         measured_mass = response[view] @ latent_mass
-        kernels[view] = measured_mass / widths[:, None]
+        kernels[view] = measured_mass / widths[:, None] * angular_factor[view] * gains[view]
     background_subtracted = spectra - background
     if np.any(background_subtracted < 0.0):
         raise ValueError(
@@ -556,8 +565,10 @@ def reconstruct_optical_thomson_3d_evdf(
         "spectral_forward_equation": "S_j(lambda_i)=sum_a f_a K_ji,a DeltaV_a; lambda_ja=lambda_L*(1-2*sin(theta/2)*(qhat_j dot v_a)/c)",
         "scattering_vector_unit": directions.copy(),
         "laser_wavelength_nm": float(laser_wavelength_nm),
-        "scattering_angle_rad": float(scattering_angle_rad),
-        "q_over_k_incident": float(q_over_ki),
+        "scattering_angle_rad": angles.copy(),
+        "view_gain": gains.copy(),
+        "unpolarized_thomson_angular_factor": angular_factor.copy(),
+        "q_over_k_incident_per_view": q_over_ki.copy(),
         "mapped_line_centres_nm": line_centres,
         "wavelength_bin_widths_nm": widths,
         "background_subtracted_spectra": background_subtracted,
