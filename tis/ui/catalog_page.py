@@ -39,13 +39,8 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
     ):
         st.error("The callable analysis registry must contain unique, ordered integer IDs.")
     diagnostic_positions = {id(row): position for position, row in enumerate(diagnostics, start=1)}
-    expected_completeness = {"complete": 7, "complete_with_declared_scope": 4, "incomplete": 69}
-    expected_levels = {"analysis_pipeline": 11, "limited_calculation": 17, "reference_only": 52}
-    if dict(diagnostic_status) != expected_completeness or dict(diagnostic_levels) != expected_levels:
-        st.warning(
-            "Loaded registry metadata differs from the reconciled main-branch baseline "
-            "(completeness 7/4/69; execution levels 11/17/52). Verify the deployed commit and registry SHA-256."
-        )
+    if sum(diagnostic_levels.values()) != len(diagnostics):
+        st.error("Diagnostic execution-level counts do not reconcile with the loaded registry.")
     st.caption(
         f"Canonical registry: {len(diagnostics)} diagnostic records · {len(analyses)} callable analysis entry points. "
         "Completeness describes declared software scope, not independent experimental validation."
