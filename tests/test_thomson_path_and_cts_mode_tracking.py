@@ -168,3 +168,52 @@ def test_path_density_rejects_non_psd_optical_profile_covariance():
             1.0, s, np.ones(4), np.ones(4), np.ones(4), np.full(4, 0.5),
             optical_profile_covariance=covariance,
         )
+
+
+def test_path_density_propagates_scattered_power_profile_cross_covariance():
+    s = np.linspace(0.0, 0.4, 21)
+    incident = np.linspace(1.0, 0.8, s.size)
+    cross = np.full(s.size, 6.0e-29)
+    solid = np.linspace(0.02, 0.03, s.size)
+    efficiency = np.linspace(0.4, 0.5, s.size)
+    integrate = getattr(np, "trapezoid", None) or np.trapz
+    sensitivity = integrate(incident * cross * solid * efficiency, s)
+    density = 2.5e19
+    power = density * sensitivity
+    sigma_power = 0.02 * power
+
+    # A shared calibration mode drives both scattered power and the incident
+    # power profile. The complete block covariance is rank-one PSD.
+    n = s.size
+    profile_mode = np.zeros(4*n)
+    profile_mode[:n] = 0.05 * incident
+    profile_covariance = np.outer(profile_mode, profile_mode)
+    cross_covariance = sigma_power * profile_mode
+    result = infer_thomson_path_averaged_density(
+        power, s, incident, cross, solid, efficiency,
+        scattered_power_uncertainty_W=sigma_power,
+        optical_profile_covariance=profile_covariance,
+        scattered_power_optical_profile_cross_covariance=cross_covariance,
+    )
+    # The density gradient has opposite signs for scattered power and
+    # incident-power calibration, so their positive covariance cancels part
+    # of the otherwise independent uncertainty.
+    assert result["electron_density_path_averaged_uncertainty_m3"] == pytest.approx(
+        0.03*density, rel=1e-10
+    )
+    assert result["scattered_power_optical_profile_cross_covariance_supplied"] is True
+
+
+def test_path_density_rejects_non_psd_power_profile_joint_covariance():
+    s = np.linspace(0.0, 1.0, 5)
+    n = s.size
+    profile_covariance = np.eye(4*n)
+    cross_covariance = np.full(4*n, 10.0)
+    with pytest.raises(ValueError, match="joint scattered-power/optical-profile covariance"):
+        infer_thomson_path_averaged_density(
+            2.0, s, np.ones(n), np.full(n, 1e-28), np.full(n, 0.02),
+            np.full(n, 0.5),
+            scattered_power_uncertainty_W=0.01,
+            optical_profile_covariance=profile_covariance,
+            scattered_power_optical_profile_cross_covariance=cross_covariance,
+        )
