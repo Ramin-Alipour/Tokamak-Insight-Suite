@@ -556,8 +556,10 @@ def reconstruct_thomson_evdf(
     if variance <= 0 or not np.isfinite(variance):
         raise ValueError("Reconstructed EVDF has non-positive variance")
     sigma_v = float(np.sqrt(variance))
-    skewness = integral(centred**3 * distribution) / sigma_v**3
-    excess_kurtosis = integral(centred**4 * distribution) / variance**2 - 3.0
+    central_third_moment = integral(centred**3 * distribution)
+    central_fourth_moment = integral(centred**4 * distribution)
+    skewness = central_third_moment / sigma_v**3
+    excess_kurtosis = central_fourth_moment / variance**2 - 3.0
 
     # Quantify how the inferred velocity marginal changes across the same
     # regularization candidates used by GCV. This is a numerical sensitivity
@@ -588,14 +590,10 @@ def reconstruct_thomson_evdf(
         if not np.isfinite(candidate_variance) or candidate_variance <= 0.0:
             continue
         candidate_sigma = float(np.sqrt(candidate_variance))
-        candidate_skewness = (
-            integral(candidate_centred**3 * candidate_distribution)
-            / candidate_sigma**3
-        )
-        candidate_excess_kurtosis = (
-            integral(candidate_centred**4 * candidate_distribution)
-            / candidate_variance**2 - 3.0
-        )
+        candidate_central_third = integral(candidate_centred**3 * candidate_distribution)
+        candidate_central_fourth = integral(candidate_centred**4 * candidate_distribution)
+        candidate_skewness = candidate_central_third / candidate_sigma**3
+        candidate_excess_kurtosis = candidate_central_fourth / candidate_variance**2 - 3.0
         candidate_temperature_eV = (
             9.1093837139e-31 * candidate_variance / 1.602176634e-19
         )
@@ -604,6 +602,8 @@ def reconstruct_thomson_evdf(
             float(candidate_variance),
             float(candidate_sigma),
             float(candidate_temperature_eV),
+            float(candidate_central_third),
+            float(candidate_central_fourth),
             float(candidate_skewness),
             float(candidate_excess_kurtosis),
         ])
@@ -614,6 +614,8 @@ def reconstruct_thomson_evdf(
             ),
             "mean_velocity_parallel_m_s": float(candidate_mean),
             "velocity_parallel_standard_deviation_m_s": candidate_sigma,
+            "central_third_velocity_moment_m3_s3": float(candidate_central_third),
+            "central_fourth_velocity_moment_m4_s4": float(candidate_central_fourth),
             "skewness": float(candidate_skewness),
             "excess_kurtosis": float(candidate_excess_kurtosis),
             "total_variation_distance_from_selected": float(
@@ -674,6 +676,8 @@ def reconstruct_thomson_evdf(
             "velocity_parallel_variance_m2_s2",
             "velocity_parallel_standard_deviation_m_s",
             "directional_equivalent_temperature_eV",
+            "central_third_velocity_moment_m3_s3",
+            "central_fourth_velocity_moment_m4_s4",
             "skewness",
             "excess_kurtosis",
         ],
@@ -713,7 +717,7 @@ def reconstruct_thomson_evdf(
                 regularization_candidate_physical_moments, dtype=float
             )
             if (moment_stack.ndim == 2 and moment_stack.shape[0] > 1
-                    and moment_stack.shape[1] == 6
+                    and moment_stack.shape[1] == 8
                     and np.all(np.isfinite(moment_stack))):
                 moment_covariance_from_choice = np.cov(
                     moment_stack, rowvar=False, ddof=1
@@ -754,6 +758,8 @@ def reconstruct_thomson_evdf(
         "velocity_parallel_variance_m2_s2",
         "velocity_parallel_standard_deviation_m_s",
         "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
         "skewness",
         "excess_kurtosis",
     ]
@@ -770,8 +776,8 @@ def reconstruct_thomson_evdf(
         m2 = integral(velocity**2 * distribution)
         m3 = integral(velocity**3 * distribution)
         m4 = integral(velocity**4 * distribution)
-        central_m3 = m3 - 3.0*m1*m2 + 2.0*m1**3
-        central_m4 = m4 - 4.0*m1*m3 + 6.0*m1**2*m2 - 3.0*m1**4
+        central_m3 = central_third_moment
+        central_m4 = central_fourth_moment
         variance_gradient = raw_m2 - 2.0*m1*raw_m1
         sigma_gradient = variance_gradient / (2.0*sigma_v)
         temperature_gradient = (
@@ -797,6 +803,8 @@ def reconstruct_thomson_evdf(
             variance_gradient,
             sigma_gradient,
             temperature_gradient,
+            central_m3_gradient,
+            central_m4_gradient,
             skewness_gradient,
             kurtosis_gradient,
         ))
@@ -1471,10 +1479,23 @@ def reconstruct_thomson_evdf(
             "unavailable_evdf_covariance_not_finite_or_not_identifiable"
         ),
         "velocity_moment_covariance_interpretation": (
-            "First-order Jacobian propagation of the conditional normalized-EVDF covariance through the same trapezoidal first-to-fourth velocity moments; correlations among flow, directional variance, equivalent temperature, skewness and kurtosis are retained."
+            "First-order Jacobian propagation of the conditional normalized-EVDF covariance through the same trapezoidal first-to-fourth velocity moments; correlations among flow, directional variance, equivalent temperature, central third/fourth moments, skewness and kurtosis are retained."
             if moment_covariance is not None else
             "No physical-moment uncertainty is reported because a finite normalized-EVDF covariance is unavailable."
         ),
+        "central_third_velocity_moment_m3_s3": float(central_third_moment),
+        "central_fourth_velocity_moment_m4_s4": float(central_fourth_moment),
+        "central_velocity_moment_equations": {
+            "third": "mu_3 = integral((v_parallel-u_parallel)^3 f_q(v_parallel) dv_parallel)",
+            "fourth": "mu_4 = integral((v_parallel-u_parallel)^4 f_q(v_parallel) dv_parallel)",
+            "skewness": "gamma_1 = mu_3 / sigma_parallel^3",
+            "excess_kurtosis": "gamma_2 = mu_4 / sigma_parallel^4 - 3",
+        },
+        "heat_flux_identifiability": {
+            "status": "not_identified_from_single_projected_marginal",
+            "reason": "The full parallel heat flux requires the conditional perpendicular kinetic-energy contribution in the 3-D EVDF; the projected third central moment alone is not the complete heat-flux moment.",
+            "available_projected_moment": "central_third_velocity_moment_m3_s3",
+        },
         "skewness": float(skewness),
         "excess_kurtosis": float(excess_kurtosis),
         "fitted_spectrum": fitted,
@@ -1560,6 +1581,7 @@ def reconstruct_thomson_evdf(
             "No posterior intervals are reported by this deterministic solver; provide a measurement covariance and use a future/bootstrap or Bayesian uncertainty workflow for calibrated intervals.",
             "The directional equivalent temperature is m_e Var(v_parallel)/k_B in eV; it is not a scalar electron temperature unless isotropy is independently justified.",
             "The routine does not infer absolute density or correct/calibrate measured spectra.",
+            "The projected third central velocity moment is reported, but it is not the full parallel heat flux; perpendicular-energy correlations require a 3-D EVDF or an explicit closure.",
         ],
     }
 
