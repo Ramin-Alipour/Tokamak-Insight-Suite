@@ -581,7 +581,6 @@ def reconstruct_thomson_evdf(
             )
         except ValueError:
             continue
-        regularization_candidate_distributions.append(candidate_distribution.copy())
         candidate_mean = integral(velocity * candidate_distribution)
         candidate_centred = velocity - candidate_mean
         candidate_variance = integral(
@@ -589,6 +588,7 @@ def reconstruct_thomson_evdf(
         )
         if not np.isfinite(candidate_variance) or candidate_variance <= 0.0:
             continue
+        regularization_candidate_distributions.append(candidate_distribution.copy())
         candidate_sigma = float(np.sqrt(candidate_variance))
         candidate_central_third = integral(candidate_centred**3 * candidate_distribution)
         candidate_central_fourth = integral(candidate_centred**4 * candidate_distribution)
@@ -627,6 +627,8 @@ def reconstruct_thomson_evdf(
     sensitivity_metrics = (
         "mean_velocity_parallel_m_s",
         "velocity_parallel_standard_deviation_m_s",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
         "skewness",
         "excess_kurtosis",
         "total_variation_distance_from_selected",
