@@ -138,6 +138,15 @@ def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_rende
     )
 
 
+
+def test_registered_spectral_distribution_dashboard_renders_fit_and_both_evdf_contracts():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "Measured versus fitted Thomson spectrum" in source
+    assert "Measured-space fit residual" in source
+    assert "{'velocity_grid_m_s', 'projected_evdf_s_m'}" in source
+    assert "selected physical model did not pass the primary-result identifiability gate" in source
+
+
 def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     wavelength = np.linspace(531.0, 533.0, 9)
     frame = pd.DataFrame({

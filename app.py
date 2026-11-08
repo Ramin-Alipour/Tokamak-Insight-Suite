@@ -5049,19 +5049,64 @@ elif page=='Advanced Analysis':
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.json(result)
-                if selected_id == 81 and isinstance(result, dict) and isinstance(result.get('projected_evdf_inference'), dict):
-                    evdf_result = result['projected_evdf_inference']
-                    if {'velocity_parallel_m_s', 'evdf_parallel_s_per_m'} <= set(evdf_result):
-                        evdf_frame = pd.DataFrame({
-                            'Parallel velocity (m/s)': evdf_result['velocity_parallel_m_s'],
-                            'Projected EVDF (s/m)': evdf_result['evdf_parallel_s_per_m'],
+                if selected_id == 81 and isinstance(result, dict):
+                    # Render the actual measured-space forward fit, not only its JSON
+                    # payload.  The response-aware model is evaluated on the same
+                    # wavelength bins as the calibrated measurement.
+                    if {'wavelength_nm', 'signal', 'fitted_spectrum', 'residual'} <= set(result):
+                        wavelength_values = np.asarray(result['wavelength_nm'], dtype=float)
+                        measured_values = np.asarray(result['signal'], dtype=float)
+                        fitted_values = np.asarray(result['fitted_spectrum'], dtype=float)
+                        residual_values = np.asarray(result['residual'], dtype=float)
+                        if (wavelength_values.ndim == 1 and measured_values.shape == wavelength_values.shape
+                                and fitted_values.shape == wavelength_values.shape
+                                and residual_values.shape == wavelength_values.shape):
+                            spectrum_frame = pd.DataFrame({
+                                'Measured spectrum': measured_values,
+                                'Forward-model fit': fitted_values,
+                            }, index=wavelength_values)
+                            spectrum_frame.index.name = 'Wavelength (nm)'
+                            st.markdown('**Measured versus fitted Thomson spectrum**')
+                            st.line_chart(spectrum_frame)
+                            st.markdown('**Measured-space fit residual**')
+                            st.line_chart(pd.Series(
+                                residual_values, index=wavelength_values,
+                                name='Measured − fitted',
+                            ))
+                    physical_result = result.get('physical_inference')
+                    if isinstance(physical_result, dict) and physical_result.get('selected_model') is not None:
+                        if physical_result.get('reportable_as_primary_inference') is True:
+                            st.success('The selected physical forward fit passed its primary-result identifiability gate.')
+                        else:
+                            st.warning('The selected physical model did not pass the primary-result identifiability gate; retain its conditional/non-identifiable status.')
+                        st.markdown('**Physical inference status**')
+                        st.json({
+                            'selected_model': physical_result.get('selected_model'),
+                            'status': physical_result.get('status'),
+                            'reportable_as_primary_inference': physical_result.get('reportable_as_primary_inference'),
+                            'gaussian_width_used_as_temperature': physical_result.get('gaussian_width_used_as_temperature'),
                         })
-                        st.markdown('**Response-aware projected electron velocity distribution**')
-                        st.line_chart(evdf_frame.set_index('Parallel velocity (m/s)')['Projected EVDF (s/m)'])
-                        st.caption(
-                            'One-dimensional marginal along the scattering vector only. '
-                            'This is not an unrestricted 3-D EVDF and does not identify absolute density.'
-                        )
+                    evdf_result = result.get('projected_evdf_inference')
+                    if isinstance(evdf_result, dict):
+                        if {'velocity_parallel_m_s', 'evdf_parallel_s_per_m'} <= set(evdf_result):
+                            velocity_values = evdf_result['velocity_parallel_m_s']
+                            distribution_values = evdf_result['evdf_parallel_s_per_m']
+                        elif {'velocity_grid_m_s', 'projected_evdf_s_m'} <= set(evdf_result):
+                            velocity_values = evdf_result['velocity_grid_m_s']
+                            distribution_values = evdf_result['projected_evdf_s_m']
+                        else:
+                            velocity_values = distribution_values = None
+                        if velocity_values is not None:
+                            evdf_frame = pd.DataFrame({
+                                'Projected EVDF (s/m)': distribution_values,
+                            }, index=velocity_values)
+                            evdf_frame.index.name = 'Parallel velocity (m/s)'
+                            st.markdown('**Response-aware projected electron velocity distribution**')
+                            st.line_chart(evdf_frame)
+                            st.caption(
+                                'One-dimensional marginal along the scattering vector only. '
+                                'This is not an unrestricted 3-D EVDF and does not identify absolute density.'
+                            )
                 if selected_id == 1 and isinstance(result, dict) and {'radius_m', 'density_m3', 'temperature_eV'} <= set(result):
                     profile_frame = pd.DataFrame({'Radius (m)': result['radius_m'], 'Electron density (m^-3)': result['density_m3'], 'Electron temperature (eV)': result['temperature_eV']})
                     st.markdown('**Electron-density profile**')
