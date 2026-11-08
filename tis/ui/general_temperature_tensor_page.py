@@ -126,9 +126,14 @@ def render_general_temperature_tensor_page(st) -> None:
                                ("scattering_vector_covariance",geometry_covariance),
                                ("spectral_geometry_cross_covariance",geometry_cross)):
                 if value is not None: kwargs[name]=value
-            from tokamak_analysis.thomson_workflow import fit_general_temperature_tensor_thomson_spectra
-            result=fit_general_temperature_tensor_thomson_spectra(
-                wavelength,measured,laser_wavelength_nm=float(laser),
+            from tokamak_analysis.thomson_workflow import analyze_thomson_spectra
+            api_model = (
+                "general_temperature_tensor_maxwellian"
+                if distribution_model == "maxwellian"
+                else "general_temperature_tensor_kappa"
+            )
+            result=analyze_thomson_spectra(
+                wavelength,measured,model=api_model,laser_wavelength_nm=float(laser),
                 scattering_angle_rad=float(np.deg2rad(angle)),
                 scattering_vector_unit=q,instrument_response_matrix=response,
                 initial_temperature_tensor_eV=np.eye(3)*500.0,
