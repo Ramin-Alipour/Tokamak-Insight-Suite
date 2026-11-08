@@ -313,10 +313,16 @@ def infer_full_temperature_tensor_from_thomson_projections(
                     tensor_components, tensor_components
                 )
                 pressure_covariance_status = (
-                    "independent_temperature_gls_and_density_uncertainty_delta_method"
+                    "independent_temperature_geometry_and_density_uncertainty_delta_method"
+                    if geometry_parameter_covariance is not None
+                    else "independent_temperature_gls_and_density_uncertainty_delta_method"
                 )
             else:
-                pressure_covariance_status = "temperature_gls_only_density_treated_as_exact"
+                pressure_covariance_status = (
+                    "temperature_and_geometry_covariance_density_treated_as_exact"
+                    if geometry_parameter_covariance is not None
+                    else "temperature_gls_only_density_treated_as_exact"
+                )
     elif electron_density_uncertainty_m3 is not None:
         raise ValueError("electron_density_uncertainty_m3 requires electron_density_m3")
 
