@@ -541,10 +541,9 @@ def test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated()
     assert standard is not None
     assert all(np.isfinite(value) and value >= 0.0 for value in standard.values())
     electron_mass = 9.1093837139e-31
-    boltzmann = 1.380649e-23
     elementary_charge = 1.602176634e-19
     expected_temperature_variance = (
-        electron_mass / (boltzmann * elementary_charge)
+        electron_mass / elementary_charge
     ) ** 2 * covariance[1, 1]
     assert covariance[3, 3] == pytest.approx(
         expected_temperature_variance, rel=2e-8, abs=1e-18
