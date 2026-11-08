@@ -169,6 +169,7 @@ def test_dashboard_exposes_all_json_callable_advanced_physics_routes():
         "cold_plasma_mode_group_velocity",
         "thomson_projected_evdf",
         "thomson_relativistic_projected_evdf",
+        "thomson_relativistic_3d_evdf",
         "thomson_psf_profile_inverse",
         "gyrotropic_bi_maxwellian_anisotropy",
         "gyrotropic_bi_maxwellian_spectral_fit",

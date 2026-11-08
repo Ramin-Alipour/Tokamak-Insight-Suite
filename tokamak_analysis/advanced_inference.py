@@ -433,6 +433,293 @@ def reconstruct_multiview_3d_evdf(
 
 
 
+
+def build_relativistic_3d_thomson_kernels(
+    wavelength_nm,
+    velocity_grid_m_s,
+    *,
+    laser_wavelength_nm,
+    incident_direction,
+    scattered_direction,
+    view_gain,
+    instrument_response_matrix,
+    include_compton_recoil=False,
+):
+    r"""Build exact per-view 3-D relativistic single-electron Thomson/Compton kernels.
+
+    For each velocity voxel, transform both photon four-vectors into the
+    electron rest frame. The rest-frame scattered photon obeys
+    E_s'/E_i' = [1 + (E_i'/m_e c^2)(1-cos(chi'))]^-1 when recoil is enabled.
+    The outgoing photon is Lorentz transformed back to the laboratory frame.
+    The unpolarized Klein-Nishina differential cross-section is transformed
+    with the incident-flux and outgoing-solid-angle Jacobians. In the
+    zero-recoil limit the wavelength map reduces exactly to
+    lambda_s/lambda_i=(1-beta.n_i)/(1-beta.n_s).
+
+    Returned kernels are relative spectral-power kernels (cross-section
+    normalized by r_e^2, multiplied by E_s/E_i), before the caller-supplied
+    velocity-space voxel volumes. They are suitable for the rank-gated
+    non-negative 3-D inverse; they do not infer absolute density or unknown
+    view gains. Polarization-resolved scattering is not included.
+    """
+    wavelength = _real_array(wavelength_nm, "wavelength_nm", 1)
+    velocity = _real_array(velocity_grid_m_s, "velocity_grid_m_s", 2)
+    incident = _real_array(incident_direction, "incident_direction", 2)
+    scattered = _real_array(scattered_direction, "scattered_direction", 2)
+    gains = _real_array(view_gain, "view_gain", 1)
+    if wavelength.size < 3 or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least three strictly increasing bin centres")
+    if velocity.shape[1:] != (3,):
+        raise ValueError("velocity_grid_m_s must have shape (n_voxel,3)")
+    if incident.shape != scattered.shape or incident.ndim != 2 or incident.shape[1] != 3:
+        raise ValueError("incident_direction and scattered_direction must both have shape (n_view,3)")
+    n_view = incident.shape[0]
+    if gains.shape != (n_view,) or np.any(gains <= 0.0):
+        raise ValueError("view_gain must contain one finite positive relative gain per view")
+    for name, directions in (("incident_direction", incident), ("scattered_direction", scattered)):
+        norms = np.linalg.norm(directions, axis=1)
+        if np.any(norms <= 0.0) or not np.allclose(norms, 1.0, rtol=1e-8, atol=1e-10):
+            raise ValueError(f"{name} vectors must already be unit length; geometry is not silently renormalized")
+    if isinstance(include_compton_recoil, (bool, np.bool_)):
+        recoil = bool(include_compton_recoil)
+    else:
+        raise ValueError("include_compton_recoil must be an explicit boolean")
+    raw_laser = np.asarray(laser_wavelength_nm)
+    if raw_laser.dtype.kind not in "iuf":
+        raise ValueError("laser_wavelength_nm must contain real numeric values")
+    laser = raw_laser.astype(float, copy=False)
+    if laser.ndim == 0:
+        laser = np.full(n_view, float(laser))
+    if laser.shape != (n_view,) or not np.all(np.isfinite(laser)) or np.any(laser <= 0.0):
+        raise ValueError("laser_wavelength_nm must be one positive scalar or one positive value per view")
+    speed2 = np.einsum("ij,ij->i", velocity, velocity)
+    beta = velocity / 299792458.0
+    beta2 = speed2 / 299792458.0**2
+    if np.any(beta2 >= 1.0):
+        raise ValueError("every relativistic 3-D EVDF velocity voxel must be strictly subluminal (|v| < c)")
+    gamma = 1.0 / np.sqrt(1.0 - beta2)
+    safe_beta2 = np.where(beta2 > 0.0, beta2, 1.0)
+
+    def aberrate_to_rest(direction, projection):
+        coefficient = ((gamma - 1.0) * projection / safe_beta2) - gamma
+        transformed = (
+            direction[None, :] + coefficient[:, None] * beta
+        ) / (gamma * (1.0 - projection))[:, None]
+        return transformed
+
+    response = np.asarray(instrument_response_matrix)
+    if response.dtype.kind not in "iuf":
+        raise ValueError("instrument_response_matrix must contain real numeric values")
+    response = response.astype(float, copy=False)
+    if response.ndim == 2:
+        response = np.broadcast_to(response, (n_view, wavelength.size, wavelength.size))
+    if (response.shape != (n_view, wavelength.size, wavelength.size)
+            or not np.all(np.isfinite(response)) or np.any(response < 0.0)):
+        raise ValueError("instrument_response_matrix must be a finite non-negative (n_wave,n_wave) or (n_view,n_wave,n_wave) array")
+    response_column_sums = response.sum(axis=1)
+    if (np.any(response_column_sums <= 0.0)
+            or not np.allclose(response_column_sums, 1.0, rtol=1e-8, atol=1e-10)):
+        raise ValueError("each measured response matrix must have unit-sum columns to conserve integrated spectral power")
+
+    edges = np.empty(wavelength.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("wavelength_nm must define positive finite-volume bins")
+
+    kernels = np.zeros((n_view, wavelength.size, velocity.shape[0]), dtype=float)
+    line_centres = np.empty((n_view, velocity.shape[0]), dtype=float)
+    cross_section_relative = np.empty_like(line_centres)
+    photon_energy_ratio = np.empty_like(line_centres)
+    rest_frame_scattering_cosine = np.empty_like(line_centres)
+    recoil_fraction = np.zeros_like(line_centres)
+    compton_wavelength_shift_nm = np.zeros(n_view, dtype=float)
+    h_planck = 6.62607015e-34
+    electron_mass = 9.1093837015e-31
+    light_speed = 299792458.0
+    electron_rest_energy = electron_mass * light_speed**2
+    classical_electron_radius = 2.8179403262e-15
+
+    for view in range(n_view):
+        ni = incident[view]
+        ns = scattered[view]
+        dot_i = beta @ ni
+        dot_s = beta @ ns
+        denominator_i = 1.0 - dot_i
+        denominator_s = 1.0 - dot_s
+        ni_rest = aberrate_to_rest(ni, dot_i)
+        ns_rest = aberrate_to_rest(ns, dot_s)
+        cos_chi = np.clip(np.einsum("ij,ij->i", ni_rest, ns_rest), -1.0, 1.0)
+        incident_energy = h_planck * light_speed / (laser[view] * 1.0e-9)
+        incident_energy_rest = gamma * denominator_i * incident_energy
+        epsilon_rest = incident_energy_rest / electron_rest_energy
+        if recoil:
+            rest_energy_ratio = 1.0 / (1.0 + epsilon_rest * (1.0 - cos_chi))
+        else:
+            rest_energy_ratio = np.ones_like(cos_chi)
+        scattered_energy_ratio = (
+            gamma**2 * denominator_i * rest_energy_ratio
+            * (1.0 + np.einsum("ij,ij->i", beta, ns_rest))
+        )
+        if np.any(scattered_energy_ratio <= 0.0) or not np.all(np.isfinite(scattered_energy_ratio)):
+            raise ValueError("relativistic photon energy transformation produced a non-positive or non-finite result")
+        centres = laser[view] / scattered_energy_ratio
+        if np.any(centres < edges[0]) or np.any(centres > edges[-1]):
+            raise ValueError(
+                f"relativistic velocity grid maps outside the measured wavelength window for view {view}; expand wavelength_nm or narrow velocity_grid_m_s"
+            )
+        solid_angle_jacobian = denominator_i / (
+            gamma**2 * denominator_s**2
+        )
+        sine2_chi = np.maximum(0.0, 1.0 - cos_chi**2)
+        differential_kn_relative = 0.5 * rest_energy_ratio**2 * (
+            rest_energy_ratio + 1.0 / rest_energy_ratio - sine2_chi
+        )
+        differential_lab_relative = (
+            solid_angle_jacobian * differential_kn_relative
+        )
+        # Spectral power, rather than photon number, carries the outgoing
+        # photon energy. This factor is essential for recoil-consistent power.
+        power_weight = differential_lab_relative * scattered_energy_ratio
+        if (np.any(power_weight < 0.0) or not np.all(np.isfinite(power_weight))):
+            raise ValueError("relativistic Thomson/Compton kernel weights must be finite and non-negative")
+
+        latent_mass = np.zeros((wavelength.size, velocity.shape[0]), dtype=float)
+        for voxel, centre in enumerate(centres):
+            if centre <= wavelength[0]:
+                latent_mass[0, voxel] = 1.0
+            elif centre >= wavelength[-1]:
+                latent_mass[-1, voxel] = 1.0
+            else:
+                right = int(np.searchsorted(wavelength, centre, side="right"))
+                left = right - 1
+                fraction = (centre - wavelength[left]) / (wavelength[right] - wavelength[left])
+                latent_mass[left, voxel] = 1.0 - fraction
+                latent_mass[right, voxel] = fraction
+        measured_mass = response[view] @ (
+            latent_mass * (power_weight * gains[view])[None, :]
+        )
+        kernels[view] = measured_mass / widths[:, None]
+        line_centres[view] = centres
+        cross_section_relative[view] = differential_lab_relative
+        photon_energy_ratio[view] = scattered_energy_ratio
+        rest_frame_scattering_cosine[view] = cos_chi
+        recoil_fraction[view] = 1.0 - rest_energy_ratio
+        compton_wavelength_shift_nm[view] = (
+            h_planck / (electron_mass * light_speed) * (1.0 - np.dot(ni, ns)) * 1.0e9
+        )
+
+    return {
+        "spectral_kernels": kernels,
+        "line_centres_nm": line_centres,
+        "relative_lab_differential_cross_section": cross_section_relative,
+        "scattered_photon_energy_over_incident": photon_energy_ratio,
+        "rest_frame_scattering_cosine": rest_frame_scattering_cosine,
+        "rest_frame_compton_recoil_fraction": recoil_fraction,
+        "compton_wavelength_shift_at_rest_nm": compton_wavelength_shift_nm,
+        "scattering_angle_rad": np.arccos(np.clip(np.einsum("ij,ij->i", incident, scattered), -1.0, 1.0)),
+        "wavelength_bin_widths_nm": widths,
+        "instrument_response_per_view": response.copy(),
+        "maximum_velocity_beta": float(np.max(np.sqrt(beta2))),
+        "include_compton_recoil": recoil,
+        "cross_section_model": "unpolarized_Klein_Nishina" if recoil else "unpolarized_relativistic_Thomson",
+        "spectral_weight_semantics": "relative_differential_cross_section_times_outgoing_to_incident_photon_energy_ratio",
+    }
+
+
+def reconstruct_relativistic_optical_thomson_3d_evdf(
+    wavelength_nm,
+    measured_spectra,
+    incident_direction,
+    scattered_direction,
+    velocity_grid_m_s,
+    *,
+    laser_wavelength_nm,
+    view_gain,
+    instrument_response_matrix,
+    background_spectra,
+    voxel_volume_m3_s3,
+    regularization_matrix,
+    regularization_strength,
+    include_compton_recoil=False,
+    measurement_uncertainty=None,
+    measurement_covariance=None,
+    model_discrepancy_covariance=None,
+    systematic_covariance=None,
+    max_iter=3000,
+):
+    r"""Reconstruct a non-negative general 3-D EVDF with relativistic optical kernels.
+
+    Unlike a gyrotropic closure or a q-parallel one-dimensional projection, the
+    input velocity grid spans all three Cartesian components. Each view has its
+    own incident and scattered photon directions. The forward kernel uses exact
+    Lorentz aberration and relativistic Doppler kinematics; optional recoil uses
+    the Compton four-momentum relation and unpolarized Klein-Nishina weighting.
+    A 3-D distribution is returned only if the stacked, whitened data-only
+    Jacobian identifies every velocity voxel. Regularization cannot identify
+    missing angular modes. Absolute density and polarization-resolved response
+    are not inferred.
+    """
+    wavelength = _real_array(wavelength_nm, "wavelength_nm", 1)
+    spectra = _real_array(measured_spectra, "measured_spectra", 2)
+    background = _real_array(background_spectra, "background_spectra", 2)
+    if spectra.shape != background.shape or spectra.shape[1] != wavelength.size:
+        raise ValueError("measured_spectra and background_spectra must match (n_view,n_wavelength)")
+    if wavelength.size < 3 or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least three strictly increasing calibrated bin centres")
+    kernel_data = build_relativistic_3d_thomson_kernels(
+        wavelength, velocity_grid_m_s,
+        laser_wavelength_nm=laser_wavelength_nm,
+        incident_direction=incident_direction,
+        scattered_direction=scattered_direction,
+        view_gain=view_gain,
+        instrument_response_matrix=instrument_response_matrix,
+        include_compton_recoil=include_compton_recoil,
+    )
+    if spectra.shape[0] != kernel_data["spectral_kernels"].shape[0]:
+        raise ValueError("measured_spectra view count must match the supplied incident/scattered geometry")
+    result = reconstruct_multiview_3d_evdf(
+        kernel_data["spectral_kernels"],
+        spectra - background,
+        velocity_grid_m_s,
+        voxel_volume_m3_s3=voxel_volume_m3_s3,
+        regularization_matrix=regularization_matrix,
+        measurement_uncertainty=measurement_uncertainty,
+        measurement_covariance=measurement_covariance,
+        model_discrepancy_covariance=model_discrepancy_covariance,
+        systematic_covariance=systematic_covariance,
+        regularization_strength=regularization_strength,
+        max_iter=max_iter,
+    )
+    result = dict(result)
+    result.update({
+        "physical_forward_model": "general_3d_relativistic_unpolarized_thomson_with_optional_compton_recoil",
+        "spectral_forward_equation": "S_j(lambda_i)=sum_a f(v_a) K_j(lambda_i|v_a) DeltaV_a; lambda_s=lambda_L/[gamma^2(1-beta.n_i) r (1+beta.n_s')]; r=[1+epsilon_i'*(1-cos(chi'))]^-1",
+        "incident_direction": np.asarray(incident_direction, dtype=float),
+        "scattered_direction": np.asarray(scattered_direction, dtype=float),
+        "laser_wavelength_nm": np.asarray(laser_wavelength_nm, dtype=float),
+        "view_gain": np.asarray(view_gain, dtype=float),
+        "background_subtracted_spectra": spectra - background,
+        "physical_spectral_kernels": kernel_data["spectral_kernels"],
+        "relativistic_kinematics": kernel_data,
+        "validity_domain": {
+            "velocity_grid_subluminal": True,
+            "maximum_velocity_beta": kernel_data["maximum_velocity_beta"],
+            "relativistic_doppler_kinematics_included": True,
+            "compton_recoil_included": bool(include_compton_recoil),
+            "cross_section": kernel_data["cross_section_model"],
+            "polarization_resolved": False,
+            "absolute_density_inferred": False,
+        },
+        "identifiability_scope": (
+            "general_3D_velocity_space_only_if_stacked_data_only_kernel_has_full_column_rank"
+        ),
+        "experimental_validation": "synthetic_physics_recovery_required_before_experimental_claim",
+    })
+    return result
+
 def reconstruct_optical_thomson_3d_evdf(
     wavelength_nm,
     measured_spectra,

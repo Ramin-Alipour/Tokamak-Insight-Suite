@@ -4,15 +4,15 @@ from pathlib import Path
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_81_unique_ordered_analysis_ids_after_retiring_id_7():
+def test_registry_contains_84_unique_ordered_analysis_ids_after_retiring_id_7():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 81
-    assert ids == [entry_id for entry_id in range(1, 83) if entry_id != 7]
+    assert len(ANALYSES) == 84
+    assert ids == [entry_id for entry_id in range(1, 86) if entry_id != 7]
 
 
-def test_registry_uses_distinct_entry_points_for_all_81_registered_analyses():
+def test_registry_uses_distinct_entry_points_for_all_84_registered_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 81
+    assert len(set(pairs)) == 84
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -624,3 +624,16 @@ def test_spectral_distribution_physical_initial_contract_matches_collective_solv
     assert "collective_initial_temperature_eV" in spec["description"]
     assert "collective_kappa_initial" in spec["description"]
     assert "duplicate keys" in spec["description"]
+
+
+
+def test_general_relativistic_3d_evdf_is_registered_and_resolvable():
+    entry = get_analysis(85)
+    assert entry["name"] == "General relativistic 3-D optical Thomson EVDF reconstruction"
+    assert entry["module"] == "advanced_inference"
+    assert entry["function"] == "reconstruct_relativistic_optical_thomson_3d_evdf"
+    assert callable(resolve_analysis(85))
+    inputs = {item["name"]: item for item in entry["execution_contract"]["input_specs"]}
+    assert {"incident_direction", "scattered_direction", "velocity_grid_m_s",
+            "include_compton_recoil", "measurement_covariance"} <= set(inputs)
+    assert inputs["include_compton_recoil"]["default"] is False

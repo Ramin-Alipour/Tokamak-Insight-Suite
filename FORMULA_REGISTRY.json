@@ -11140,5 +11140,137 @@
         "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_psf_cross_covariance_and_checks_joint_block"
       ]
     }
+  },
+  {
+    "name": "General relativistic 3-D optical Thomson/Compton EVDF forward kernel",
+    "equation": "n_i'=Λ(−β)n_i; n_s'=Λ(−β)n_s; ε_i'=γ ε_i(1−β·n_i); r=[1+ε_i'(1−cosχ')]^−1; E_s/E_i=γ²(1−β·n_i)r(1+β·n_s'); λ_s=λ_L/(E_s/E_i); (1/r_e²)dσ_lab/dΩ_s=[(1−β·n_i)/(γ²(1−β·n_s)²)]·(r²/2)(r+r^−1−sin²χ'); K_j(λ|v)∝R_j[δ(λ−λ_s)(dσ_lab/dΩ_s)(E_s/E_i)]",
+    "inputs": "Per-view laboratory incident/scattered unit directions, laser wavelength, calibrated relative view gain, measured wavelength-response matrix, 3-D subluminal velocity grid, calibrated spectra/background, velocity-space voxel volumes, and optional Compton recoil selection",
+    "output": "Per-view exact relativistic detector-space spectral kernels and a rank-gated non-negative 3-D electron velocity distribution with velocity moments and fixed-active-set covariance",
+    "assumptions": "Single scattering from unpolarized photons and prescribed electron velocities. Lorentz aberration is exact. With recoil disabled, scattering is elastic in the electron rest frame; with recoil enabled, electron-rest-frame Compton kinematics and unpolarized Klein-Nishina differential cross-section are used. The spectral kernel represents scattered spectral power and therefore includes E_s/E_i.",
+    "status": "D",
+    "category": "Optical Thomson scattering — relativistic EVDF",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+      "function_links": [
+        "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
+        "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+        "tokamak_analysis.advanced_inference.reconstruct_multiview_3d_evdf"
+      ],
+      "formula_key": "thomson_general_relativistic_3d_evdf_kernel",
+      "input_specs": [
+        {
+          "name": "incident_direction",
+          "unit": "unit vector per view in laboratory frame",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "unit vector per view in laboratory frame",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "n_voxel x 3 Cartesian velocities with |v|<c",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; scalar or per view",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured unit-column-sum wavelength response",
+          "required": true
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean; optional, default false",
+          "required": false
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full view-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "additive view-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "additive view-major spectral covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "physical_spectral_kernels",
+          "unit": "view x wavelength x velocity-voxel"
+        },
+        {
+          "name": "evdf_m3_s3",
+          "unit": "normalized 3-D EVDF; only when the data-only operator has full column rank"
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "per-view line centres, Compton recoil, cross-section and photon-energy ratio"
+        },
+        {
+          "name": "data_only_jacobian_rank",
+          "unit": "rank of whitened stacked data-only spectral operator"
+        },
+        {
+          "name": "velocity_covariance_tensor_m2_s2",
+          "unit": "3-D central second velocity moment"
+        }
+      ],
+      "prerequisites": [
+        "All electron velocity voxels must be strictly subluminal.",
+        "Each incident/scattered direction must be supplied as an explicit unit vector; geometry is not inferred or silently normalized.",
+        "Measured response matrices must conserve integrated spectral power.",
+        "A primary 3-D EVDF requires a full-column-rank stacked multi-view data operator; regularization cannot supply missing angular information."
+      ],
+      "uncertainty_model": "View-major measurement covariance plus additive model-discrepancy and systematic covariance are propagated through the fixed-active-set frequentist sandwich covariance. The normalized EVDF and velocity-moment covariance are withheld unless the unregularized stacked operator identifies every velocity voxel.",
+      "limitations": [
+        "Unpolarized scattering only; polarization-resolved Thomson/Klein-Nishina weighting is not implemented.",
+        "Absolute electron density and unknown view gains are not inferred.",
+        "No experimental validation is claimed; model and detector calibration must be independently validated."
+      ],
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_zero_velocity_thomson_limit_recovers_unpolarized_angular_cross_section",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_rest_electron_compton_kernel_recovers_exact_compton_wavelength_shift",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_exact_relativistic_thomson_doppler_map_has_correct_first_order_q_projection_limit",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_relativistic_3d_evdf_inverse_uses_generated_per_view_physical_kernels"
+      ],
+      "note": "Every view's kernel is internally generated from full laboratory geometry; the inverse never assumes gyrotropy or collapses the 3-D velocity grid to a q-parallel projection.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "input_data_level": "measured_calibrated_multi_view_optical_thomson_spectra",
+      "execution_scope": "multi_view_spectra_to_general_relativistic_3d_evdf",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "General relativistic 3-D EVDF reconstruction"
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_multi_view_optical_thomson_spectra",
+    "execution_scope": "multi_view_spectra_to_general_relativistic_3d_evdf",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+      "function_links": [
+        "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
+        "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"
+      ],
+      "formula_key": "thomson_general_relativistic_3d_evdf_kernel",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_zero_velocity_thomson_limit_recovers_unpolarized_angular_cross_section",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_rest_electron_compton_kernel_recovers_exact_compton_wavelength_shift"
+      ]
+    }
   }
 ]

@@ -12,6 +12,7 @@ import numpy as np
 from scipy.special import ndtr, stdtr
 
 from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+from tokamak_analysis.advanced_inference import build_relativistic_3d_thomson_kernels
 
 
 def _example_wavelength_edges(wavelength_nm):
@@ -63,6 +64,7 @@ MODEL_LABELS = {
     "thomson_n_population_relativistic_fit": "Optical Thomson — joint inference of 2–8 relativistic Maxwell-Juttner populations, number fractions and shared or component flows",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from caller-supplied kernels",
     "thomson_multiview_3d_evdf_physical": "Optical Thomson — physical multi-view 3-D EVDF inversion from geometry, Doppler kinematics and measured response",
+    "thomson_relativistic_3d_evdf": "Optical Thomson — general Cartesian 3-D relativistic EVDF inversion with exact Lorentz kinematics and optional Compton recoil",
     "kappa_electrostatic_susceptibility": "CTS — dimensional isotropic-Kappa susceptibility from the shared full-tail Landau kernel, with exact thermal scaling and analytic phase derivative",
     "kappa_dispersion_function": "Optical/CTS kinetic kernel — full-tail generalized Kappa plasma dispersion integral with exact Landau boundary value",
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
@@ -356,6 +358,15 @@ MODEL_PHYSICS_NOTES = {
         "iterative tangent-plane errors-in-variables GLS. This is a shared-flow multi-view model, not a local flow map."
     ),
 }
+
+MODEL_PHYSICS_NOTES["thomson_relativistic_3d_evdf"] = (
+    "Builds a separate physical spectral kernel for every measured incident/scattered direction and every 3-D velocity voxel. "
+    "Photon four-vectors are Lorentz transformed to the electron rest frame, optional Compton recoil uses the exact energy-momentum relation, "
+    "and the unpolarized Klein-Nishina differential cross-section is transformed with the incident-flux and solid-angle Jacobians. "
+    "The outgoing photon energy is included because the forward model represents spectral power. The inverse returns a primary 3-D EVDF only "
+    "when the stacked data-only multi-view operator has full column rank; regularization cannot identify missing angular modes. "
+    "This route is not polarization-resolved and does not infer absolute density or view gains."
+)
 
 MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
     "Isothermal multispecies momentum-conserving BGK longitudinal response, "
@@ -952,6 +963,87 @@ EXAMPLES = {
     },
 }
  
+# A deterministic multi-view relativistic 3-D EVDF example. The spectra are
+# generated from the same exact Lorentz/Compton kernel used by the inverse.
+_example_q_directions = np.array([
+    [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+    [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+], dtype=float)
+_example_q_directions /= np.linalg.norm(_example_q_directions, axis=1)[:, None]
+_example_incident_directions = []
+_example_scattered_directions = []
+for _qhat in _example_q_directions:
+    _reference = np.array([0.0, 0.0, 1.0]) if abs(_qhat[2]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    _transverse = np.cross(_qhat, _reference)
+    _transverse /= np.linalg.norm(_transverse)
+    _example_incident_directions.append((-_qhat + _transverse) / np.sqrt(2.0))
+    _example_scattered_directions.append((_qhat + _transverse) / np.sqrt(2.0))
+_example_incident_directions = np.asarray(_example_incident_directions)
+_example_scattered_directions = np.asarray(_example_scattered_directions)
+_example_velocity_axis = np.array([-2.0e4, 0.0, 2.0e4])
+_example_velocity_grid = np.array([
+    [vx, vy, vz]
+    for vx in _example_velocity_axis
+    for vy in _example_velocity_axis
+    for vz in _example_velocity_axis
+], dtype=float)
+_example_velocity_weights = np.array([1.0e4, 2.0e4, 1.0e4])
+_example_voxel_volumes = np.array([
+    wx * wy * wz
+    for wx in _example_velocity_weights
+    for wy in _example_velocity_weights
+    for wz in _example_velocity_weights
+], dtype=float)
+_example_wavelength = np.linspace(499.65, 500.35, 71)
+_example_response = np.eye(_example_wavelength.size)
+_example_background = np.full((6, _example_wavelength.size), 0.01)
+_example_kernel = build_relativistic_3d_thomson_kernels(
+    _example_wavelength, _example_velocity_grid,
+    laser_wavelength_nm=500.0,
+    incident_direction=_example_incident_directions,
+    scattered_direction=_example_scattered_directions,
+    view_gain=np.ones(6),
+    instrument_response_matrix=_example_response,
+    include_compton_recoil=False,
+)
+_example_pdf_seed = np.exp(
+    -0.5 * np.sum(_example_velocity_grid**2, axis=1) / (1.5e4**2)
+)
+_example_pdf_seed /= float(_example_voxel_volumes @ _example_pdf_seed)
+_example_measured = (
+    _example_kernel["spectral_kernels"] @ (_example_pdf_seed * _example_voxel_volumes)
+    + _example_background
+)
+_example_index = {
+    (i, j, k): (i * 3 + j) * 3 + k
+    for i in range(3) for j in range(3) for k in range(3)
+}
+_example_laplacian = np.zeros((27, 27), dtype=float)
+for (_i, _j, _k), _row in _example_index.items():
+    for _di, _dj, _dk in ((1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)):
+        _neighbor = (_i+_di, _j+_dj, _k+_dk)
+        if _neighbor in _example_index:
+            _example_laplacian[_row, _row] += 1.0
+            _example_laplacian[_row, _example_index[_neighbor]] = -1.0
+EXAMPLES["thomson_relativistic_3d_evdf"] = {
+    "wavelength_nm": _example_wavelength.tolist(),
+    "measured_spectra": _example_measured.tolist(),
+    "incident_direction": _example_incident_directions.tolist(),
+    "scattered_direction": _example_scattered_directions.tolist(),
+    "velocity_grid_m_s": _example_velocity_grid.tolist(),
+    "laser_wavelength_nm": 500.0,
+    "view_gain": np.ones(6).tolist(),
+    "instrument_response_matrix": _example_response.tolist(),
+    "background_spectra": _example_background.tolist(),
+    "voxel_volume_m3_s3": _example_voxel_volumes.tolist(),
+    "regularization_matrix": _example_laplacian.tolist(),
+    "regularization_strength": 1.0e25,
+    "include_compton_recoil": False,
+    "measurement_uncertainty": np.full_like(_example_measured, 0.02).tolist(),
+    "model_discrepancy_covariance": None,
+    "systematic_covariance": None,
+}
+
 # Reuse the same explicit physical input contract for the public response alias.
 EXAMPLES["landau_fdt_full_em_response"] = dict(EXAMPLES["landau_fdt_full_em_constitutive"])
 

@@ -54,7 +54,10 @@ from .formula_library import (
     thomson_velocity_projection_relativistic_exact,
 )
 
-from .advanced_inference import reconstruct_multiview_3d_evdf, reconstruct_optical_thomson_3d_evdf
+from .advanced_inference import (
+    reconstruct_multiview_3d_evdf, reconstruct_optical_thomson_3d_evdf,
+    reconstruct_relativistic_optical_thomson_3d_evdf,
+)
 from .thomson_anisotropic_inference import (
     fit_gyrotropic_bi_maxwellian_thomson,
     fit_gyrotropic_bi_kappa_thomson,
@@ -808,6 +811,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_n_population_relativistic_fit",
     "thomson_multiview_3d_evdf",
     "thomson_multiview_3d_evdf_physical",
+    "thomson_relativistic_3d_evdf",
     "kappa_electrostatic_susceptibility",
     "kappa_dispersion_function",
     "bi_kappa_electrostatic_susceptibility",
@@ -917,6 +921,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         wave-normal walk-off from the Hellmann-Feynman derivative of the
         anisotropic Maxwell dispersion matrix; collisionless simple modes only.
       - thomson_multiview_3d_evdf: non-negative 3-D velocity-space inversion from multiple measured scattering views; the data-only stacked kernel rank gates whether a 3-D EVDF is reportable.
+      - thomson_relativistic_3d_evdf: general Cartesian 3-D velocity-space inversion with exact Lorentz aberration, relativistic Doppler kinematics and optional Compton/Klein-Nishina recoil; a full-rank multi-view data operator is required to report the 3-D EVDF.
       - thomson_relativistic_exact_flow_projection: exact relativistic Doppler inversion for one fitted q-parallel bulk-flow projection (not a distribution mean or 3-D flow).
       - thomson_n_population_relativistic_fit: measured-spectrum inversion of a finite 2–8 component relativistic Maxwell-Juttner mixture, with ordered temperatures, simplex number fractions, optional component-specific q-flow, measured response, structured background, joint measurement/model-discrepancy covariance and a scaled-Jacobian identifiability gate.
       - thomson_kinetic_background_fit: finite-bin Kappa or bin-averaged relativistic
@@ -954,6 +959,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = reconstruct_multiview_3d_evdf
     elif model == "thomson_multiview_3d_evdf_physical":
         solver = reconstruct_optical_thomson_3d_evdf
+    elif model == "thomson_relativistic_3d_evdf":
+        solver = reconstruct_relativistic_optical_thomson_3d_evdf
     elif model == "thomson_kinetic_background_fit":
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         solver = fit_noncollective_kinetic_thomson_with_background
