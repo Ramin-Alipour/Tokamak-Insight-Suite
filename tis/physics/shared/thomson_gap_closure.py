@@ -56,6 +56,34 @@ def _trapezoid_quadrature_weights(axis, name):
     return weights
 
 
+def _regularized_active_set_measurement_covariance(active_design, active_penalty, regularization_strength, residual_variance=1.0):
+    """Frequentist sandwich covariance for a fixed-active-set Tikhonov fit.
+
+    For whitened data with unit covariance, Cov(x_hat)=H^-1 A.T A H^-1,
+    where H=A.T A+lambda L.T L. H^-1 alone is a Bayesian posterior
+    covariance only under an additional prior interpretation of the penalty.
+    """
+    design = np.asarray(active_design, dtype=float)
+    penalty = np.asarray(active_penalty, dtype=float)
+    strength = float(regularization_strength)
+    scale = float(residual_variance)
+    if (design.ndim != 2 or penalty.ndim != 2
+            or penalty.shape[1] != design.shape[1]
+            or not np.all(np.isfinite(design))
+            or not np.all(np.isfinite(penalty))
+            or not np.isfinite(strength) or strength < 0.0
+            or not np.isfinite(scale) or scale < 0.0):
+        raise ValueError("active design, penalty, regularization and residual variance must be finite and dimensionally consistent")
+    information = design.T @ design
+    hessian = information + strength * (penalty.T @ penalty)
+    inverse = np.linalg.pinv(hessian, hermitian=True)
+    covariance = inverse @ information @ inverse * scale
+    covariance = 0.5 * (covariance + covariance.T)
+    if not np.all(np.isfinite(covariance)):
+        raise ValueError("regularized active-set measurement covariance is not finite")
+    return covariance
+
+
 def _whitener(n, uncertainty=None, covariance=None):
     if uncertainty is not None and covariance is not None:
         raise ValueError("supply pointwise uncertainty or covariance, not both")
@@ -575,10 +603,13 @@ def reconstruct_relativistic_projected_thomson_evdf(
     da = design[:,active]; pa = scale*d2[:,active]
     hess = da.T@da + float(candidates[idx])*(pa.T@pa)
     cov_coeff = np.zeros((v.size,v.size))
-    cov_active = np.linalg.pinv(hess, hermitian=True)
+    covariance_scale = 1.0
     if noise_status == "unweighted_no_measurement_uncertainty_supplied":
         rr = target-design@coeff
-        cov_active *= float(rr@rr/max(1,target.size-np.count_nonzero(active)))
+        covariance_scale = float(rr@rr/max(1,target.size-np.count_nonzero(active)))
+    cov_active = _regularized_active_set_measurement_covariance(
+        da, pa, float(candidates[idx]), residual_variance=covariance_scale
+    )
     cov_coeff[np.ix_(np.flatnonzero(active),np.flatnonzero(active))] = cov_active
     jac_norm = (
         np.eye(v.size) * norm - np.outer(coeff, velocity_weights)
@@ -626,7 +657,12 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "projected_evdf_s_m": evdf if data_identifiable else None,
         "regularized_candidate_evdf_s_m": evdf,
         "projected_evdf_covariance": cov_evdf if data_identifiable else None,
-        "projected_evdf_standard_uncertainty_s_m": np.sqrt(np.maximum(np.diag(cov_evdf),0)),
+        "regularized_candidate_covariance": cov_evdf,
+        "projected_evdf_standard_uncertainty_s_m": (
+            np.sqrt(np.maximum(np.diag(cov_evdf), 0.0)) if data_identifiable else None
+        ),
+        "regularized_candidate_standard_uncertainty_s_m": np.sqrt(np.maximum(np.diag(cov_evdf), 0.0)),
+        "covariance_method": "frequentist_fixed_active_set_tikhonov_sandwich",
         "fitted_scattered_spectrum": forward@coeff,
         "fitted_background_spectrum": b.copy(),
         "fitted_spectrum": b + forward@coeff,
@@ -681,7 +717,7 @@ def reconstruct_relativistic_projected_thomson_evdf(
             "incident polarization is supplied and transverse to the incident ray for the Compton/Klein-Nishina route",
             "transverse velocity reconstruction and unrestricted 3-D EVDF remain non-identifiable in this single-view inverse",
         ],
-        "uncertainty_interpretation": "local regularized linear covariance conditional on the selected regularization, fixed response, fixed background, and stated 1-D kinematic model; not a posterior distribution",
+        "uncertainty_interpretation": "Frequentist fixed-active-set sampling covariance H^-1 A.T A H^-1 for whitened data, propagated through EVDF normalization; conditional on selected regularization, fixed response, fixed background and stated 1-D kinematic model. It is not the inverse penalized Hessian and not a posterior distribution. Candidate covariance is retained separately when the data-only operator is rank deficient.",
         "experimental_validation": "not_performed",
     }
 
