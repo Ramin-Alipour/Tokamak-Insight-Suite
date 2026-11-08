@@ -11154,8 +11154,8 @@
       "implementation_link_status": "mapped",
       "function_link": "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
       "function_links": [
-        "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
         "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+        "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
         "tokamak_analysis.advanced_inference.reconstruct_multiview_3d_evdf"
       ],
       "formula_key": "thomson_general_relativistic_3d_evdf_kernel",
@@ -11262,8 +11262,9 @@
     "implementation_trace": {
       "function_link": "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
       "function_links": [
+        "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
         "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
-        "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"
+        "tokamak_analysis.advanced_inference.reconstruct_multiview_3d_evdf"
       ],
       "formula_key": "thomson_general_relativistic_3d_evdf_kernel",
       "implementation_link_status": "mapped",
