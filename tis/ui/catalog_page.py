@@ -31,10 +31,9 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
         st.error("Diagnostic completeness counts do not reconcile with the loaded registry; do not trust this status summary.")
     if len(diagnostics) != 80:
         st.error(f"Expected exactly 80 diagnostic records but loaded {len(diagnostics)}.")
-    if len(analyses) != 80 or [item.get("id") for item in analyses] != list(range(1, 81)):
-        st.error("The analysis registry must contain IDs 1–80 in canonical order.")
-    if [item.get("name") for item in analyses] != [item.get("diagnostic") for item in diagnostics]:
-        st.error("Analysis titles/order do not match the canonical diagnostic registry.")
+    expected_analysis_ids = [entry_id for entry_id in range(1, 88) if entry_id != 7]
+    if [item.get("id") for item in analyses] != expected_analysis_ids:
+        st.error("The callable analysis registry must contain IDs 1–87 with retired ID 7 omitted.")
     diagnostic_positions = {id(row): position for position, row in enumerate(diagnostics, start=1)}
     expected_completeness = {"complete": 7, "complete_with_declared_scope": 4, "incomplete": 69}
     expected_levels = {"analysis_pipeline": 11, "limited_calculation": 17, "reference_only": 52}
@@ -67,9 +66,14 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
             f"Scoped complete: {analysis_status.get('complete_with_declared_scope', 0)} · "
             f"Incomplete: {analysis_status.get('incomplete', 0)}"
         )
-    if analysis_families and (len(analysis_families) != 20 or sorted(i for family in analysis_families for i in family.get("entry_ids", [])) != list(range(1, 81))):
+    mapped_analysis_ids = [i for family in analysis_families for i in family.get("entry_ids", [])]
+    if analysis_families and (
+        len(analysis_families) != 20
+        or sorted(mapped_analysis_ids) != sorted(expected_analysis_ids)
+        or len(mapped_analysis_ids) != len(set(mapped_analysis_ids))
+    ):
         st.error("Primary-analysis family mapping is invalid; verify ANALYSIS_FAMILIES.json before relying on the grouped catalogue.")
-    st.caption("Primary navigation: 20 analysis families · underlying callable entry points: 80")
+    st.caption(f"Primary navigation: {len(analysis_families)} analysis families · underlying callable entry points: {len(analyses)}")
     view = st.radio("Catalog", ["20 primary analyses", "Diagnostic families", "Analysis entry points", "Formula reference"], horizontal=True)
     query = st.text_input("Search by diagnostic, observable, formula, method or caveat", "").strip().lower()
     if view == "20 primary analyses":
