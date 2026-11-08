@@ -54,3 +54,25 @@ def test_multipin_product_facade_exposes_voltage_covariance_propagation():
     )
     assert result["electric_field_standard_uncertainty_V_m"].shape == (2, 3)
     assert result["uncertainty_scope"] == "shared_pin_covariance"
+
+
+
+def test_probe_registry_labels_and_contracts_match_their_physical_solver_modules():
+    from tis.products.langmuir import run_probe_analysis
+    from tis.products.catalog import list_product_analyses
+
+    entries = {entry["id"]: entry for entry in list_product_analyses(
+        "langmuir-electrostatic-probes"
+    )}
+    assert entries[16]["module"] == "probe_analysis"
+    assert "compatibility" in entries[16]["name"].lower()
+    assert entries[17]["module"] == "ball_pen_probe"
+    assert "ball-pen" in entries[17]["name"].lower()
+    assert entries[18]["module"] == "gundestrup_probe"
+    assert "gundestrup" in entries[18]["name"].lower()
+    assert entries[19]["module"] == "multipin_probe"
+    assert "potential_covariance_V2" in {
+        item["name"] for item in entries[19]["execution_contract"]["input_specs"]
+    }
+    assert entries[20]["module"] == "potential_analysis"
+    assert callable(run_probe_analysis)
