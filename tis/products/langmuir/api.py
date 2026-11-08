@@ -10,12 +10,12 @@ PRODUCT_ID = "langmuir-electrostatic-probes"
 
 def run_analysis(analysis_id: int, *args: Any, **kwargs: Any) -> Any:
     """Execute only a registered workflow owned by the probe product."""
-    return run_analysis(analysis_id, *args, **kwargs)
+    return execute_product_analysis(PRODUCT_ID, analysis_id, *args, **kwargs)
 
 
 def run_probe_analysis(analysis_id: int, *args: Any, **kwargs: Any) -> Any:
     """Execute a registered Langmuir/electrostatic probe workflow (IDs 2, 16–20)."""
-    return execute_product_analysis(PRODUCT_ID, analysis_id, *args, **kwargs)
+    return run_analysis(analysis_id, *args, **kwargs)
 
 
 def analyze_langmuir_iv(voltage_V, current_A, **kwargs: Any) -> Any:
