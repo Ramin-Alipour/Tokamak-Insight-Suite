@@ -19,6 +19,38 @@ TIS is developed as an openly usable research toolkit. **Independent scientific 
 
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
+## Specialist product architecture
+
+TIS presents 20 specialist product families on top of shared platform services. The initial architecture is a modular monolith: product boundaries are explicit in the registry, Python execution API, dependency inventory, and dashboard, while the existing scientific solver implementations remain in their domain modules.
+
+```python
+from tis.products import list_products, execute_product_analysis
+from tis.products.thomson import analyze_spectra
+
+# Discover product ownership and registered workflows.
+products = list_products()
+thomson = next(p for p in products if p["product_id"] == "thomson-scattering")
+
+# Execute a workflow through the generic product API. Calibrated inputs
+# are passed unchanged to the registered physics implementation.
+result = execute_product_analysis(
+    "thomson-scattering",
+    1,
+    wavelength_nm,
+    measured_spectra,
+    radius_m,
+    laser_wavelength_nm=532.0,
+    scattering_angle_rad=1.5707963267948966,
+    instrument_response=measured_response,
+)
+
+# Named Thomson facade for the same canonical workflow:
+# result = analyze_spectra(...)
+```
+
+The product catalog is derived from `ANALYSIS_FAMILIES.json` and the callable analysis registry; it does not duplicate solver metadata. The AST-based dependency inventory is available through `tis.products.build_dependency_inventory()`. See [the product implementation map](docs/architecture/PRODUCT_IMPLEMENTATION_MAP.md) and [the platform architecture](docs/architecture/PRODUCT_PLATFORM_ARCHITECTURE.md).
+
+The current application provides a Python execution API and Streamlit dashboard. This product layer does not imply a separately deployed HTTP/REST service. Diagnostic knowledge-base records and callable workflow entry points are separate catalogue layers and may have different counts.
 ## Run locally
 
 Python 3.10+ is recommended.
