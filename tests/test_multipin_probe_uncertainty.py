@@ -59,8 +59,8 @@ def test_multipin_accepts_time_resolved_voltage_covariance():
 @pytest.mark.parametrize(
     "covariance, message",
     [
-        (np.array([[1.0, 0.2], [0.0, 1.0]]), "must be symmetric"),
-        (np.array([[1.0, 2.0], [2.0, 1.0]]), "positive semidefinite"),
+        (np.array([[1.0, 0.2, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "must be symmetric"),
+        (np.array([[1.0, 2.0, 0.0], [2.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "positive semidefinite"),
         (np.eye(4), "must have shape"),
     ],
 )
