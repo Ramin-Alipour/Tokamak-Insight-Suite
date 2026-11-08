@@ -1372,8 +1372,8 @@ def render_advanced_thomson_physics_page(st) -> None:
             if model == "thomson_full_temperature_tensor" and isinstance(result, Mapping):
                 st.subheader("General 3-D temperature tensor — scattering-geometry uncertainty")
                 st.latex(
-                    r"T_q=\\hat{\\mathbf q}^{T}T_e\\hat{\\mathbf q},"
-                    r"\\qquad C_{T,\\mathrm{geom}}=J_q C_q J_q^{T}"
+                    r"T_q=\hat{\mathbf q}^{T}T_e\hat{\mathbf q},"
+                    r"\qquad C_{T,\mathrm{geom}}=J_q C_q J_q^{T}"
                 )
                 st.caption(
                     "The geometry covariance is propagated through the implicit GLS solution "
