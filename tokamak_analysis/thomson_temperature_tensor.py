@@ -897,3 +897,128 @@ def fit_general_temperature_tensor_thomson_spectra(
         "optimizer":{"success":bool(fit.success),"message":str(fit.message),"nfev":int(fit.nfev),"cost":float(fit.cost)},
     }
 
+
+
+def compare_general_temperature_tensor_thomson_models(
+    wavelength_nm,
+    measured_spectra,
+    *,
+    laser_wavelength_nm,
+    scattering_angle_rad,
+    scattering_vector_unit,
+    instrument_response_matrix,
+    initial_kappa_index=4.0,
+    kappa_bounds=(1.5001, 100.0),
+    **fit_options,
+):
+    r"""Compare Maxwellian and ellipsoidal-Kappa tensor closures with AICc weights.
+
+    Both physical families are fitted to the same calibrated multi-view spectra,
+    response operator and total supplied covariance. The finite-sample corrected
+    Akaike information criterion is AICc = chi2 + 2k + 2k(k+1)/(n-k-1).
+    Normalized Akaike weights define a predictive model ensemble (not Bayesian
+    posterior probabilities). The model-averaged tensor covariance is the sum
+    of within-family GLS covariance and between-family covariance:
+      C_modelavg = sum_m w_m [C_m + (T_m-T_bar)(T_m-T_bar)^T].
+    Absolute measurement uncertainty is required; discrepancy/systematic-only
+    weighting is not accepted as a substitute for measurement noise.
+    """
+    if fit_options.get("measurement_covariance") is None and fit_options.get("signal_uncertainty") is None:
+        raise ValueError(
+            "model-family comparison requires measurement_covariance or signal_uncertainty; "
+            "model discrepancy/systematic covariance alone is not measurement uncertainty"
+        )
+    common = dict(
+        wavelength_nm=wavelength_nm,
+        measured_spectra=measured_spectra,
+        laser_wavelength_nm=laser_wavelength_nm,
+        scattering_angle_rad=scattering_angle_rad,
+        scattering_vector_unit=scattering_vector_unit,
+        instrument_response_matrix=instrument_response_matrix,
+        **fit_options,
+    )
+    gaussian = fit_general_temperature_tensor_thomson_spectra(
+        **common, distribution_model="maxwellian",
+    )
+    kappa = fit_general_temperature_tensor_thomson_spectra(
+        **common, distribution_model="kappa",
+        initial_kappa_index=initial_kappa_index,
+        fit_kappa_index=True,
+        kappa_bounds=kappa_bounds,
+    )
+    candidates = {"maxwellian": gaussian, "ellipsoidal_kappa": kappa}
+    n_observations = int(np.asarray(measured_spectra).size)
+    aicc = {}
+    tensors = {}
+    covariances = {}
+    for name, result in candidates.items():
+        if not result.get("reportable_as_inferred_parameter", False):
+            raise ValueError(
+                f"{name} model is outside its declared physical validity domain; "
+                "model averaging is withheld"
+            )
+        covariance = result.get("temperature_tensor_parameter_covariance_eV2")
+        if covariance is None:
+            raise ValueError(
+                f"{name} model has no absolute tensor covariance; model averaging is withheld"
+            )
+        parameter_count = int(result["jacobian_parameter_count"])
+        if n_observations <= parameter_count + 1:
+            raise ValueError("AICc is undefined: observations must exceed fitted parameters by more than one")
+        aicc[name] = float(
+            result["chi_square"] + 2.0 * parameter_count
+            + 2.0 * parameter_count * (parameter_count + 1)
+            / (n_observations - parameter_count - 1)
+        )
+        tensor = np.asarray(result["electron_temperature_tensor_eV"], dtype=float)
+        tensors[name] = np.array([
+            tensor[0, 0], tensor[1, 1], tensor[2, 2],
+            tensor[0, 1], tensor[0, 2], tensor[1, 2],
+        ])
+        covariances[name] = np.asarray(covariance, dtype=float)
+    minimum = min(aicc.values())
+    unnormalized = {name: np.exp(-0.5 * (value - minimum)) for name, value in aicc.items()}
+    normalization = float(sum(unnormalized.values()))
+    weights = {name: value / normalization for name, value in unnormalized.items()}
+    mean = sum(weights[name] * tensors[name] for name in candidates)
+    within = sum(weights[name] * covariances[name] for name in candidates)
+    between = sum(
+        weights[name] * np.outer(tensors[name] - mean, tensors[name] - mean)
+        for name in candidates
+    )
+    total = 0.5 * (within + between + (within + between).T)
+    mean_tensor = np.array([
+        [mean[0], mean[3], mean[4]],
+        [mean[3], mean[1], mean[5]],
+        [mean[4], mean[5], mean[2]],
+    ])
+    selected = min(weights, key=weights.get)
+    output = dict(candidates[selected])
+    output.update({
+        "model_family_comparison": {
+            "method": "finite_sample_corrected_Akaike_information_criterion",
+            "weights_are_bayesian_posterior_probabilities": False,
+            "aicc": aicc,
+            "akaike_weights": weights,
+            "selected_family": selected,
+            "candidate_families": list(candidates),
+            "n_observations": n_observations,
+            "parameter_counts": {
+                name: int(result["jacobian_parameter_count"])
+                for name, result in candidates.items()
+            },
+        },
+        "model_averaged_temperature_tensor_eV": mean_tensor,
+        "model_averaged_parameter_covariance_eV2": total,
+        "within_model_parameter_covariance_eV2": 0.5 * (within + within.T),
+        "model_selection_parameter_covariance_eV2": 0.5 * (between + between.T),
+        "model_selection_uncertainty_included": True,
+        "model_selection_uncertainty_status": (
+            "Akaike_weighted_between_family_covariance_for_Maxwellian_and_ellipsoidal_Kappa_closures"
+        ),
+        "model_selection_covariance_equation": (
+            "C_total=sum_m w_m[C_m+(T_m-T_bar)(T_m-T_bar)^T]"
+        ),
+        "reportable_as_inferred_parameter": True,
+    })
+    return output
