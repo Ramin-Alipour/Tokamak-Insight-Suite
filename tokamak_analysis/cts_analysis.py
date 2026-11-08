@@ -1050,7 +1050,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if amp < 0.0:
             amp = 0.0
             coefficients = np.linalg.lstsq(whiten(nuisance), whiten(y), rcond=None)[0]
-        background = nuisance @ coefficients
+            background_coefficients = coefficients
+        else:
+            # The first coefficient belongs to the physical CTS amplitude;
+            # only the remaining coefficients multiply detector-space nuisance modes.
+            background_coefficients = coefficients[1:]
+        background = nuisance @ background_coefficients
         return amp, background, coefficients
     def data_residual(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None, species_override=None, temperatures_override=None):
         z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override,species_override,temperatures_override)
