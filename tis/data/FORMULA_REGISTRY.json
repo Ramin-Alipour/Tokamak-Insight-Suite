@@ -11564,5 +11564,61 @@
         "tests/test_advanced_thomson_physics_page.py::test_dashboard_routes_number_conserving_bgk_kappa_physics"
       ]
     }
+  },
+  {
+    "name": "Projected Thomson EVDF parallel kinetic-energy CDF",
+    "equation": "v_E=sqrt(2 e E/m_e); F_q(E)=integral_[u_q-v_E]^[u_q+v_E] f_q(v_q) dv_q, where integral f_q(v_q) dv_q=1",
+    "inputs": "Normalized response-aware q-parallel EVDF f_q(v_q), its mean flow u_q, electron mass m_e and elementary charge e.",
+    "output": "Cumulative probability that the q-parallel random kinetic energy m_e(v_q-u_q)^2/(2e) is no greater than E eV.",
+    "assumptions": "A single optical Thomson view supplies only the normalized q-parallel velocity marginal. The transformation does not recover perpendicular energy, a full 3-D energy distribution or full parallel heat flux.",
+    "status": "D",
+    "category": "Thomson spectral distribution",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution._projected_evdf_physical_moments",
+      "function_links": [
+        "tis.products.thomson.physics.thomson_distribution._projected_evdf_physical_moments"
+      ],
+      "input_specs": [
+        {
+          "name": "velocity_parallel_m_s",
+          "unit": "m s^-1; strictly increasing q-parallel velocity grid",
+          "required": true
+        },
+        {
+          "name": "normalized_projected_evdf_s_per_m",
+          "unit": "s m^-1; non-negative with unit integral",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "energy_grid_eV",
+          "unit": "eV; q-parallel random kinetic energy"
+        },
+        {
+          "name": "cumulative_probability",
+          "unit": "dimensionless; monotonically nondecreasing from 0 to 1"
+        }
+      ],
+      "assumptions": [
+        "The EVDF is a normalized one-dimensional q-parallel marginal.",
+        "Energy is measured relative to the inferred mean q-parallel flow.",
+        "The finite velocity grid defines the represented support."
+      ],
+      "algorithm": "For each E>=0, set v_E=sqrt(2eE/m_e) and integrate the normalized projected EVDF over [u_q-v_E,u_q+v_E], clipped to the represented velocity support. Piecewise-linear interpolation supplies the integration endpoints and trapezoidal quadrature evaluates the CDF. The CDF representation avoids the integrable E^(-1/2) Jacobian singularity of the pointwise transformed density at E=0.",
+      "uncertainty_model": "The returned CDF is a deterministic transform of the inferred EVDF. Uncertainty is represented by the separately returned EVDF/moment covariance; CDF covariance is not yet propagated.",
+      "limitations": [
+        "One-dimensional projected parallel random-energy marginal only.",
+        "No perpendicular kinetic energy or full 3-D energy distribution is inferred.",
+        "Finite velocity support truncates the represented distribution."
+      ],
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
+      ],
+      "note": "The Maxwellian reference test compares the numerical CDF with erf(sqrt(E/T_e)) for a one-dimensional Gaussian velocity marginal."
+    },
+    "description": "CDF of parallel random kinetic energy derived from the normalized projected Thomson EVDF."
   }
 ]
