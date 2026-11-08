@@ -446,3 +446,26 @@ def test_physical_optical_thomson_3d_rejects_nonunit_scattering_directions():
             background_spectra=np.zeros((1,101)), voxel_volume_m3_s3=[1.0],
             regularization_matrix=np.eye(1), regularization_strength=1e-3,
         )
+
+
+def test_physical_optical_thomson_3d_withholds_distribution_for_one_projection_null_space():
+    wavelength = np.linspace(499.85, 500.15, 101)
+    velocity = np.array([
+        [vx,vy,vz]
+        for vx in [-1.0e4,1.0e4]
+        for vy in [-1.0e4,1.0e4]
+        for vz in [-1.0e4,1.0e4]
+    ])
+    result = reconstruct_optical_thomson_3d_evdf(
+        wavelength, np.ones((1,wavelength.size)), [[1.,0.,0.]], velocity,
+        laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+        view_gain=[1.0], instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=np.zeros((1,wavelength.size)),
+        voxel_volume_m3_s3=np.ones(8), regularization_matrix=np.eye(8),
+        regularization_strength=1e-3,
+    )
+    assert result["status"] == "conditional_regularized_3d_candidate"
+    assert result["evdf_m3_s3"] is None
+    assert result["regularized_candidate_evdf_m3_s3"] is not None
+    assert result["null_space_dimension"] > 0
+    assert result["mean_velocity_vector_m_s"] is None
