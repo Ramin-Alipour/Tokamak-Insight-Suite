@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from .catalog import DIAGNOSTICS, FORMULAS, maturity_label
 from tokamak_analysis.analysis_registry import ANALYSES
+from tis.products.catalog import validate_product_catalog
 from .core import load_table, signal_quality, prepare_time_series, fft_spectrum, welch_psd, sha256_bytes
 
 
@@ -60,9 +61,10 @@ def main() -> int:
                 'callable_analysis_completeness_counts':dict(sorted(analysis_completeness.items())),
                 'registry_consistency':{
                     'diagnostic_registry_count_is_80':len(DIAGNOSTICS)==80,
-                    'callable_analysis_registry_count_matches_registry':len(ANALYSES)==len({row['id'] for row in ANALYSES}),
+                    'callable_analysis_registry_ids_are_unique':len(ANALYSES)==len({row['id'] for row in ANALYSES}),
                     'diagnostic_completeness_totals_match_record_count':sum(completeness_counts.values())==len(DIAGNOSTICS),
                     'analysis_completeness_totals_match_entry_point_count':sum(analysis_completeness.values())==len(ANALYSES),
+                    'product_catalog':validate_product_catalog(),
                 },
                 'first_ten_diagnostics':[{
                     'catalog_position':i+1,
