@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from inspect import signature
+from importlib import import_module
 from typing import Any
 
 from tokamak_analysis.analysis_registry import resolve_analysis
@@ -31,3 +32,10 @@ def execute_product_analysis(
     solver = resolve_analysis(analysis_id)
     signature(solver).bind(*args, **kwargs)
     return solver(*args, **kwargs)
+
+
+
+def load_product_api(product_id: int | str):
+    """Import and return the stable public Python module for one product."""
+    product = get_product(product_id)
+    return import_module(product["api_module"])
