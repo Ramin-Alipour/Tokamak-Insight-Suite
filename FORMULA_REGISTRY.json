@@ -11273,5 +11273,60 @@
         "tests/test_thomson_relativistic_3d_evdf.py::test_rest_electron_compton_kernel_recovers_exact_compton_wavelength_shift"
       ]
     }
+  },
+  {
+    "name": "AICc-weighted Maxwellian/Kappa model selection and tensor covariance",
+    "equation": "AICc_m = χ²_m + 2 k_m + 2 k_m(k_m+1)/(n-k_m-1); w_m ∝ exp[-(AICc_m-min AICc)/2]; C_T = Σ_m w_m[C_m+(T_m-T̄)(T_m-T̄)^T]",
+    "inputs": "Calibrated multi-view optical Thomson spectra, measured response, absolute measurement covariance, Maxwellian and ellipsoidal-Kappa tensor fits",
+    "output": "Akaike predictive weights, model-averaged 3-D temperature tensor and 6x6 covariance including between-family model-selection uncertainty",
+    "assumptions": "Both candidate models fit the same observations and covariance; n>k_m+1; each candidate independently passes physical validity and identifiability; Akaike weights are not Bayesian posterior probabilities.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.compare_general_temperature_tensor_thomson_models",
+      "formula_key": "thomson_tensor_model_selection_aicc",
+      "input_specs": [
+        {
+          "name": "measurement_covariance_or_signal_uncertainty",
+          "unit": "absolute spectral covariance or pointwise 1-sigma",
+          "required": true
+        },
+        {
+          "name": "initial_kappa_index",
+          "unit": "dimensionless; >1.5",
+          "required": false
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless; lower bound >1.5",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "model_family_comparison",
+          "unit": "AICc and normalized Akaike weights"
+        },
+        {
+          "name": "model_averaged_temperature_tensor_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "model_averaged_parameter_covariance_eV2",
+          "unit": "6x6"
+        },
+        {
+          "name": "model_selection_parameter_covariance_eV2",
+          "unit": "6x6 between-family covariance"
+        }
+      ],
+      "uncertainty_model": "Within-family GLS covariance plus between-family covariance weighted by AICc predictive weights. Measurement uncertainty is mandatory; discrepancy/systematic contributions are propagated separately within each candidate.",
+      "test_links": [
+        "tests/test_thomson_temperature_tensor_api.py::test_model_selection_comparison_returns_aicc_weights_and_between_family_covariance"
+      ],
+      "note": "Akaike weights are predictive model weights, not Bayesian posterior probabilities. Synthetic recovery and software verification do not replace experimental validation."
+    }
   }
 ]
