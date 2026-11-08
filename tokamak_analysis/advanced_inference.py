@@ -900,7 +900,9 @@ def reconstruct_optical_thomson_3d_evdf(
 def assess_multiview_evdf_regularization_sensitivity(
     spectral_kernels, measured_spectra, velocity_grid_m_s, *,
     voxel_volume_m3_s3, regularization_matrix, regularization_strengths,
-    measurement_uncertainty=None, measurement_covariance=None, max_iter=3000,
+    measurement_uncertainty=None, measurement_covariance=None,
+    model_discrepancy_covariance=None, systematic_covariance=None,
+    max_iter=3000,
 ):
     """Evaluate a non-negative multi-view EVDF inverse over an explicit lambda grid.
 
@@ -923,24 +925,57 @@ def assess_multiview_evdf_regularization_sensitivity(
         raise ValueError("measured spectra and regularization matrix must match the spectral kernel dimensions")
     if measurement_uncertainty is not None and measurement_covariance is not None:
         raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
+    covariance_components = {}
     if measurement_uncertainty is not None:
         sigma = _real_array(measurement_uncertainty, "measurement_uncertainty", 2)
         if sigma.shape != data.shape or np.any(sigma <= 0.0):
             raise ValueError("measurement_uncertainty must be positive and match measured_spectra")
-        whiten = lambda value: np.asarray(value, dtype=float) / sigma
-        noise_model = "supplied_pointwise_uncertainty"
+        covariance_components["measurement"] = np.diag(sigma.ravel() ** 2)
     elif measurement_covariance is not None:
-        covariance = _real_array(measurement_covariance, "measurement_covariance", 2)
-        if covariance.shape != (data.size, data.size) or not np.allclose(
-            covariance, covariance.T, rtol=1e-10, atol=1e-13
+        covariance_components["measurement"] = _real_array(
+            measurement_covariance, "measurement_covariance", 2
+        )
+    for name, value in (
+        ("model_discrepancy", model_discrepancy_covariance),
+        ("systematic", systematic_covariance),
+    ):
+        if value is not None:
+            covariance_components[name] = _real_array(value, name + "_covariance", 2)
+    for name, covariance_component in covariance_components.items():
+        if covariance_component.shape != (data.size, data.size):
+            raise ValueError(
+                f"{name} covariance must match the stacked (view-major) multi-view spectra"
+            )
+        scale = max(float(np.max(np.abs(covariance_component))), np.finfo(float).tiny)
+        if not np.allclose(
+            covariance_component, covariance_component.T,
+            rtol=1e-10, atol=1e-12 * scale,
         ):
-            raise ValueError("measurement_covariance must be symmetric and match the stacked multi-view spectra")
+            raise ValueError(f"{name} covariance must be symmetric")
+        covariance_component = 0.5 * (
+            covariance_component + covariance_component.T
+        )
+        eigenvalues = np.linalg.eigvalsh(covariance_component)
+        if eigenvalues[0] < -1e-10 * max(
+            float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny
+        ):
+            raise ValueError(f"{name} covariance must be positive semidefinite")
+        covariance_components[name] = covariance_component
+    if covariance_components:
+        total_covariance = np.sum(list(covariance_components.values()), axis=0)
         try:
-            cholesky = np.linalg.cholesky(covariance)
+            cholesky = np.linalg.cholesky(total_covariance)
         except np.linalg.LinAlgError as exc:
-            raise ValueError("measurement_covariance must be positive definite") from exc
-        whiten = lambda value: np.linalg.solve(cholesky, np.asarray(value, dtype=float).ravel()).reshape(data.shape)
-        noise_model = "supplied_full_multi_view_covariance"
+            raise ValueError(
+                "combined measurement, model-discrepancy and systematic covariance "
+                "must be positive definite"
+            ) from exc
+        whiten = lambda value: np.linalg.solve(
+            cholesky, np.asarray(value, dtype=float).ravel()
+        ).reshape(data.shape)
+        noise_model = (
+            "measurement_plus_model_discrepancy_plus_systematic_covariance"
+        )
     else:
         whiten = lambda value: np.asarray(value, dtype=float)
         noise_model = "unweighted_no_measurement_uncertainty_supplied"
@@ -954,6 +989,8 @@ def assess_multiview_evdf_regularization_sensitivity(
             regularization_matrix=penalty,
             measurement_uncertainty=measurement_uncertainty,
             measurement_covariance=measurement_covariance,
+            model_discrepancy_covariance=model_discrepancy_covariance,
+            systematic_covariance=systematic_covariance,
             regularization_strength=float(strength),
             max_iter=max_iter,
         )
@@ -1036,6 +1073,15 @@ def assess_multiview_evdf_regularization_sensitivity(
             ),
         },
         "noise_model": noise_model,
+        "covariance_components_included": {
+            "measurement": "measurement" in covariance_components,
+            "model_discrepancy": "model_discrepancy" in covariance_components,
+            "systematic": "systematic" in covariance_components,
+        },
+        "effective_spectral_covariance": (
+            np.sum(list(covariance_components.values()), axis=0)
+            if covariance_components else None
+        ),
         "selection_policy": "no automatic lambda selection; inspect the L-curve and external physical constraints",
         "interpretation": (
             "Sensitivity of the regularized solution to the supplied lambda grid. "
