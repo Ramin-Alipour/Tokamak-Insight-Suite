@@ -116,7 +116,7 @@ def analyze_thomson_spectra(*args, **kwargs):
         result["canonical_entry_point"] = "tokamak_analysis.thomson_workflow.analyze_thomson_spectra"
         return result
 
-    from .thomson_inference import analyze_thomson_spectra as _infer
+    from tis.physics.shared.thomson_inference import analyze_thomson_spectra as _infer
     return _infer(*args, **kwargs)
 
 
@@ -513,7 +513,7 @@ def reconstruct_thomson_profile_from_spectra(
         unsupported = set(kwargs)-allowed_joint
         if unsupported:
             raise ValueError(f"unsupported joint spatial-spectral inputs: {sorted(unsupported)}")
-        from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+        from tis.physics.shared.thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
         fit_kwargs = {
             "laser_wavelength_nm": kwargs["laser_wavelength_nm"],
             "scattering_angle_rad": kwargs["scattering_angle_rad"],
@@ -1038,7 +1038,7 @@ def reconstruct_thomson_profile_from_spectra(
             "No equilibrium mapping, flux-surface mapping or tomographic inversion is inferred from radius alone.",
         ],
     }
-    from .thomson_identifiability import spatial_profile_identifiability
+    from tis.physics.shared.thomson_identifiability import spatial_profile_identifiability
     result["parameter_identifiability"] = spatial_profile_identifiability()
     result["registered_subanalysis"] = "Thomson spatial profile reconstruction from calibrated spectra"
 
@@ -1053,7 +1053,7 @@ def reconstruct_thomson_profile_from_spectra(
                 "profile_grid_radius_m is required when spatial_mixing_matrix is supplied "
                 "for downstream PSF-aware profile reconstruction."
             )
-        from .thomson_spatial_mixing import reconstruct_profile_with_spatial_mixing
+        from tis.physics.shared.thomson_spatial_mixing import reconstruct_profile_with_spatial_mixing
         profile_grid = np.asarray(profile_grid_radius_m, dtype=float)
         mixing = np.asarray(spatial_mixing_matrix, dtype=float)
         if (profile_grid.ndim != 1 or profile_grid.size < 2
@@ -1144,12 +1144,12 @@ def reconstruct_thomson_profile_from_spectra(
 
 def reconstruct_thomson_joint_spatial_spectra(*args, **kwargs):
     """Run joint wavelength-resolved spatial Thomson inversion with fixed mixing."""
-    from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+    from tis.physics.shared.thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
     return reconstruct_joint_thomson_spatial_spectra(*args, **kwargs)
 
 
 # PSF-aware inverse profile reconstruction is distinct from PCHIP/smoothing interpolation.
-from .thomson_gap_closure import reconstruct_psf_aware_thomson_profile
+from tis.physics.shared.thomson_gap_closure import reconstruct_psf_aware_thomson_profile
 
 
 
@@ -1160,7 +1160,7 @@ def fit_thomson_spectrum_with_structured_background(*args, **kwargs):
     or custom kinetic forward models when their native fit API does not yet
     expose the structured background nuisance block.
     """
-    from .thomson_inference_closure import fit_thomson_with_structured_background
+    from tis.physics.shared.thomson_inference_closure import fit_thomson_with_structured_background
     return fit_thomson_with_structured_background(*args, **kwargs)
 
 
@@ -1171,13 +1171,13 @@ def reconstruct_joint_ne_te_ti_profiles(*args, **kwargs):
     model; ion temperature is not reported as identifiable unless that model
     contains an ion-sensitive spectral response.
     """
-    from .thomson_inference_closure import reconstruct_joint_thomson_profiles
+    from tis.physics.shared.thomson_inference_closure import reconstruct_joint_thomson_profiles
     return reconstruct_joint_thomson_profiles(*args, **kwargs)
 
 
 def thomson_compton_recoil_contract(*args, **kwargs):
     """Return the explicit recoil/cross-section validity contract."""
-    from .thomson_inference_closure import compton_recoil_contract
+    from tis.physics.shared.thomson_inference_closure import compton_recoil_contract
     return compton_recoil_contract(*args, **kwargs)
 
 
@@ -1188,7 +1188,7 @@ def propagate_full_em_cts_ray_geometry_uncertainty(*args, **kwargs):
     sampler and is passed through a complete Full-EM spectral refit. This is
     intentionally not approximated by adding a final-parameter covariance.
     """
-    from .cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty as _propagate
+    from tis.physics.shared.cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty as _propagate
     return _propagate(*args, **kwargs)
 
 
@@ -1198,25 +1198,25 @@ def fit_noncollective_kinetic_thomson_with_background(*args, **kwargs):
     The returned joint covariance retains physical, amplitude and background
     coefficient cross terms. This lower-level API does not infer absolute density.
     """
-    from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background as _fit
+    from tis.physics.shared.thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background as _fit
     return _fit(*args, **kwargs)
 
 
 def collective_tabulated_electron_thomson_spectrum(*args, **kwargs):
     """Evaluate electrostatic collective Thomson response for a supplied 1-D EVDF."""
-    from .thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
+    from tis.physics.shared.thomson_generalized_dispersion import collective_tabulated_electron_spectral_density
     return collective_tabulated_electron_spectral_density(*args, **kwargs)
 
 
 def generalized_thomson_landau_integral(*args, **kwargs):
     """Evaluate the piecewise-linear first-order generalized Landau integral."""
-    from .thomson_generalized_dispersion import generalized_landau_integral
+    from tis.physics.shared.thomson_generalized_dispersion import generalized_landau_integral
     return generalized_landau_integral(*args, **kwargs)
 
 
 def fit_n_population_relativistic_thomson_spectrum(*args, **kwargs):
     """Fit a finite N-population relativistic optical Thomson model to measured spectra."""
-    from .thomson_n_population import (
+    from tis.physics.shared.thomson_n_population import (
         fit_n_population_relativistic_thomson_spectrum as _fit,
     )
     return _fit(*args, **kwargs)
@@ -1225,7 +1225,7 @@ def fit_n_population_relativistic_thomson_spectrum(*args, **kwargs):
 
 def fit_noncollective_kinetic_thomson_with_background(*args, **kwargs):
     """Fit finite-bin Kappa or relativistic MJ Thomson spectra with a joint background covariance."""
-    from .thomson_kinetic_background import (
+    from tis.physics.shared.thomson_kinetic_background import (
         fit_noncollective_kinetic_thomson_with_background as _fit,
     )
     return _fit(*args, **kwargs)
