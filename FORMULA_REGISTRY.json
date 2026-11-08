@@ -11328,5 +11328,112 @@
       ],
       "note": "Akaike weights are predictive model weights, not Bayesian posterior probabilities. Synthetic recovery and software verification do not replace experimental validation."
     }
+  },
+  {
+    "name": "Thomson measurement-kernel-weighted path-average density with power/optical cross covariance",
+    "equation": "P_s = ∫ n_e(s) K(s) ds; K=P_i(dσ_eff/dΩ)ΔΩη; n̄_e=P_s/D, D=∫K ds; Var(n̄_e)=gᵀ C_joint g, g=[1/D, −(P_s/D²)∇D]",
+    "inputs": "Absolutely calibrated integrated scattered power P_s; path coordinate s; incident-power, effective differential-cross-section, collection-solid-angle and optical-efficiency profiles; optional full 4N×4N optical covariance and 1×4N scattered-power/profile cross covariance",
+    "output": "Measurement-kernel-weighted path-averaged electron density [m⁻³] and first-order uncertainty [m⁻³]",
+    "assumptions": "Optically thin single scattering; fixed characterized path profiles; one integrated power identifies only the weighted path average, not an arbitrary local density profile. The joint covariance of power and optical factors must be positive semidefinite.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "formula_key": "thomson_path_average_density_joint_covariance",
+      "input_specs": [
+        {
+          "name": "scattered_power_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "path_coordinate_m",
+          "unit": "m; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "incident_power_profile_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "differential_cross_section_profile_m2_sr",
+          "unit": "m² sr⁻¹",
+          "required": true
+        },
+        {
+          "name": "collection_solid_angle_profile_sr",
+          "unit": "sr",
+          "required": true
+        },
+        {
+          "name": "optical_efficiency_profile",
+          "unit": "dimensionless; (0,1]",
+          "required": true
+        },
+        {
+          "name": "scattered_power_uncertainty_W",
+          "unit": "W; 1σ",
+          "required": false
+        },
+        {
+          "name": "optical_profile_covariance",
+          "unit": "4N×4N covariance",
+          "required": false
+        },
+        {
+          "name": "scattered_power_optical_profile_cross_covariance",
+          "unit": "length-4N covariance vector",
+          "required": false,
+          "description": "Requires both marginal covariance inputs; the complete joint covariance is PSD-validated."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_density_path_averaged_m3",
+          "unit": "m⁻³"
+        },
+        {
+          "name": "electron_density_path_averaged_uncertainty_m3",
+          "unit": "m⁻³"
+        },
+        {
+          "name": "path_integrated_sensitivity_W_m3",
+          "unit": "W m³"
+        },
+        {
+          "name": "identifiability",
+          "unit": "weighted path-average only"
+        }
+      ],
+      "uncertainty_model": "Full first-order Jacobian propagation of the joint covariance of integrated scattered power and the four path-resolved optical/geometry factors, including cross-position, cross-factor and scattered-power/profile covariance.",
+      "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_correlated_optical_profile_covariance",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
+      ],
+      "note": "Analytic single-scattering path integral and first-order covariance propagation; numerical tests verify limiting and correlated cases. Experimental validation remains required."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "formula_key": "thomson_path_average_density_joint_covariance",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
+      ]
+    }
   }
 ]
