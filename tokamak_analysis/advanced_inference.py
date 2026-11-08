@@ -289,11 +289,22 @@ def reconstruct_multiview_3d_evdf(
     for name, component in covariance_components.items():
         if component.shape != (target.size, target.size):
             raise ValueError(f"{name} must match the stacked (view-major) multi-view spectrum")
-        if not np.allclose(component, component.T, rtol=1e-10, atol=1e-13):
+        component_scale = max(
+            float(np.max(np.abs(component))), np.finfo(float).tiny
+        )
+        if not np.allclose(
+            component, component.T, rtol=1e-10,
+            atol=1e-12 * component_scale,
+        ):
             raise ValueError(f"{name} must be symmetric")
-        eigenvalues = np.linalg.eigvalsh(0.5 * (component + component.T))
-        if eigenvalues[0] < -1e-10 * max(float(np.max(np.abs(eigenvalues))), 1.0):
+        component = 0.5 * (component + component.T)
+        eigenvalues = np.linalg.eigvalsh(component)
+        eigenvalue_scale = max(
+            float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny
+        )
+        if eigenvalues[0] < -1e-10 * eigenvalue_scale:
             raise ValueError(f"{name} must be positive semidefinite")
+        covariance_components[name] = component
     if covariance_components:
         total_covariance = np.sum(list(covariance_components.values()), axis=0)
         try:
