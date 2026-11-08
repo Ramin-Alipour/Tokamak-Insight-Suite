@@ -4122,6 +4122,26 @@ def analyze_thomson_spectra(
                 ],
                 "reason": evdf.get("reason", "The projected inverse is unavailable for this channel/model."),
             })
+        for moment_name, moment_unit in (
+            ("central_third_velocity_moment_m3_s3", "m^3 s^-3"),
+            ("central_fourth_velocity_moment_m4_s4", "m^4 s^-4"),
+        ):
+            moment_value = evdf.get(moment_name)
+            if moment_value is None or not np.isfinite(moment_value):
+                continue
+            item = {
+                "parameter": moment_name,
+                "unit": moment_unit,
+                "status": "derived_from_projected_one_dimensional_evdf",
+            }
+            if evdf.get("analysis_status") == "completed":
+                primary.append(item)
+            else:
+                conditional.append({
+                    **item,
+                    "status": "regularized_candidate_not_independently_identified",
+                    "reason": "The projected EVDF is a conditional regularized candidate; higher moments are especially sensitive to finite velocity support and regularization.",
+                })
         channel_classification.append({
             "channel_index": int(channel_index),
             "primary": primary,
