@@ -18,10 +18,12 @@ from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectr
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analyze_langmuir_probe_series, fit_langmuir_electron_models, fit_langmuir_stretched_exponential, estimate_multispecies_ion_density, estimate_electron_density_from_saturation, estimate_ion_particle_flux, estimate_smoothed_plasma_potential_candidates, langmuir_fit_window_sensitivity)
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
-from tokamak_analysis.thomson_inference import analyze_thomson_spectra
-from tokamak_analysis.thomson_scattering import infer_thomson_path_averaged_density
-from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
-from tokamak_analysis.cts_analysis import analyze_cts_spectrum, analyze_cts_spectrum_model
+from tis.products.thomson.api import (
+    analyze_spectra as analyze_thomson_spectra,
+    analyze_cts as analyze_cts_spectrum_model,
+    reconstruct_profiles as reconstruct_thomson_profile_from_spectra,
+    infer_path_averaged_density as infer_thomson_path_averaged_density,
+)
 from tis.ui.advanced_thomson_physics_page import render_advanced_thomson_physics_page
 from tokamak_analysis.cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
@@ -4439,7 +4441,12 @@ elif page=='Advanced Analysis':
                         if not cts_regularization.strip():
                             raise ValueError('Enter the regularization strength explicitly for regularized inversion.')
                         kwargs_cts['regularization_strength']=float(cts_regularization)
-                    result_cts=analyze_cts_spectrum(frequency,spectrum,**kwargs_cts)
+                    result_cts=analyze_cts_spectrum_model(
+                        model='electrostatic',
+                        frequency_shift_Hz=frequency,
+                        spectrum=spectrum,
+                        **kwargs_cts,
+                    )
                     st.success('CTS spectral inversion completed within the declared model scope.')
                     st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
                     st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
