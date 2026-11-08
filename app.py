@@ -10,7 +10,7 @@ from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, ANALYSIS_FAMILIES, resolve_analysis
-from tis.products import list_products, get_product, list_product_analyses, execute_product_analysis
+from tis.products import list_products, get_product, list_product_analyses, load_product_api
 from tis.ui.product_workspace_page import render_product_workspace_page
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
 from tokamak_analysis.cxrs import analyze_cxrs_line
@@ -5076,7 +5076,8 @@ elif page=='Advanced Analysis':
                     if isinstance(value,list): return [resolve_value(v) for v in value]
                     if isinstance(value,dict): return {k:resolve_value(v) for k,v in value.items()}
                     return value
-                result=execute_product_analysis(selected_family_id, selected_id, **{k:resolve_value(v) for k,v in args.items()})
+                product_api=load_product_api(selected_family_id)
+                result=product_api.run_analysis(selected_id, **{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.json(result)
                 if selected_id == 81 and isinstance(result, dict):
