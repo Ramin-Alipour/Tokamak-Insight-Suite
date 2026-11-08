@@ -184,6 +184,7 @@ def test_joint_spatial_dispatch_forwards_full_psf_and_systematic_covariances(mon
         joint_spatial_spectral=True, spatial_mixing_matrix=np.eye(3),
         laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2.0,
         instrument_response=np.eye(wavelength.size), model="non_collective_maxwellian",
+        signal_uncertainty=np.full((3, wavelength.size), 0.01),
         spatial_psf_matrix=np.eye(3),
         spatial_psf_matrix_covariance=psf_covariance,
         spectral_psf_cross_covariance=spectrum_psf_cross,
