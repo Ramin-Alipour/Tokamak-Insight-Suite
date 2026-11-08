@@ -516,6 +516,32 @@ def test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_clos
     )
 
 
+def test_analysis_one_api_dispatches_raw_spectra_to_gyrotropic_physical_solver():
+    from tokamak_analysis.thomson_workflow import analyze_thomson_spectra
+
+    wavelength, spectra, magnetic, q = _synthetic_spectra()
+    result = analyze_thomson_spectra(
+        wavelength,
+        spectra,
+        model="gyrotropic_bi_maxwellian",
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi / 2.0,
+        magnetic_field_unit=magnetic,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        initial_temperature_parallel_eV=700.0,
+        initial_temperature_perpendicular_eV=350.0,
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+    )
+    assert result["analysis_id"] == 1
+    assert result["analysis_model"] == "gyrotropic_bi_maxwellian"
+    assert result["canonical_entry_point"].endswith("thomson_workflow.analyze_thomson_spectra")
+    assert result["reportable_as_inferred_parameter"] is True
+    assert result["electron_temperature_parallel_eV"] == pytest.approx(900.0, rel=2e-2)
+    assert result["electron_temperature_perpendicular_eV"] == pytest.approx(250.0, rel=2e-2)
+
+
 def test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options():
     from tokamak_analysis.thomson_workflow import fit_gyrotropic_thomson_spectra
 
