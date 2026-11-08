@@ -401,18 +401,6 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert channel["effective_differential_cross_section_uncertainty_m2_sr"] > 0.0
     evdf = channel["electron_velocity_distribution"]
     assert evdf["analysis_status"] in {"completed", "conditional_regularized_candidate"}
-    assert np.isfinite(evdf["central_third_velocity_moment_m3_s3"])
-    assert np.isfinite(evdf["central_fourth_velocity_moment_m4_s4"])
-    assert evdf["central_fourth_velocity_moment_m4_s4"] > 0.0
-    assert evdf["heat_flux_identifiability"]["status"] == "not_identified_from_single_projected_marginal"
-    assert "central_third_velocity_moment_m3_s3" in evdf["velocity_moment_covariance_order"]
-    assert "central_fourth_velocity_moment_m4_s4" in evdf["velocity_moment_covariance_order"]
-    classified = result["result_classification"]["channels"][0]
-    classified_moments = {
-        item["parameter"] for item in classified["primary"] + classified["conditional"]
-    }
-    assert "central_third_velocity_moment_m3_s3" in classified_moments
-    assert "central_fourth_velocity_moment_m4_s4" in classified_moments
     assert evdf["recoil_included"] is False
     assert evdf["scattering_cross_section_model"] == (
         "polarized_single_scattering_Thomson_in_electron_rest_frame"
@@ -1003,6 +991,18 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
     assert evdf["analysis_status"] in {"completed", "unavailable_for_this_channel"}
     assert "electron_velocity_distribution" in out
     if evdf["analysis_status"] == "completed":
+        assert np.isfinite(evdf["central_third_velocity_moment_m3_s3"])
+        assert np.isfinite(evdf["central_fourth_velocity_moment_m4_s4"])
+        assert evdf["central_fourth_velocity_moment_m4_s4"] > 0.0
+        assert evdf["heat_flux_identifiability"]["status"] == "not_identified_from_single_projected_marginal"
+        assert "central_third_velocity_moment_m3_s3" in evdf["velocity_moment_covariance_order"]
+        assert "central_fourth_velocity_moment_m4_s4" in evdf["velocity_moment_covariance_order"]
+        classified = out["result_classification"]["channels"][0]
+        classified_moments = {
+            item["parameter"] for item in classified["primary"] + classified["conditional"]
+        }
+        assert "central_third_velocity_moment_m3_s3" in classified_moments
+        assert "central_fourth_velocity_moment_m4_s4" in classified_moments
         assert evdf["scattering_vector_projection_only"] is True
         assert evdf["absolute_density_identified"] is False
         assert np.trapz(evdf["evdf_parallel_s_per_m"], evdf["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
