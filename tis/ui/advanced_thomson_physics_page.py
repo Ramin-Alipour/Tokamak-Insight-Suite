@@ -67,6 +67,7 @@ MODEL_LABELS = {
     "thomson_multiview_3d_evdf_physical": "Optical Thomson — physical multi-view 3-D EVDF inversion from geometry, Doppler kinematics and measured response",
     "thomson_relativistic_3d_evdf": "Optical Thomson — general Cartesian 3-D relativistic EVDF inversion with exact Lorentz kinematics and optional Compton recoil",
     "kappa_electrostatic_susceptibility": "CTS — dimensional isotropic-Kappa susceptibility from the shared full-tail Landau kernel, with exact thermal scaling and analytic phase derivative",
+    "kappa_bgk_electrostatic_susceptibility": "CTS — number-conserving collisional BGK correction to the full-tail isotropic-Kappa Landau susceptibility",
     "kappa_dispersion_function": "Optical/CTS kinetic kernel — full-tail generalized Kappa plasma dispersion integral with exact Landau boundary value",
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
     "thomson_projected_bi_kappa_evdf": "Optical Thomson — exact projected marginal of a gyrotropic 3-D bi-Kappa EVDF",
@@ -122,6 +123,12 @@ MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
 MODEL_PHYSICS_NOTES = {
+    "kappa_bgk_electrostatic_susceptibility": (
+        "Linearized number-conserving BGK response: chi_BGK=chi_L(omega+i nu)/[1-nu J0/(i k)], "
+        "where J0 is the full-tail Kappa marginal integral of f0(v)/(v-(omega+i nu)/k). "
+        "The density-restoring denominator is required by particle conservation; a bare complex-frequency shift is not equivalent. "
+        "This is a scalar-collision-frequency, non-relativistic, unmagnetized longitudinal susceptibility, not a multispecies Coulomb or Full-EM closure."
+    ),
     "cts_non_gyrotropic_gaussian_tensor_spectrum": (
         "A general symmetric positive-definite 3-D electron temperature tensor is marginalized exactly along "
         "q_hat=(n_scattered-n_incident)/|...|. The solver uses T_q=q_hat.T @ T_e @ q_hat and "
@@ -394,6 +401,17 @@ MODEL_PHYSICS_NOTES["cts_conserving_bgk_fdt"] = (
 )
 
 EXAMPLES = {
+    "kappa_bgk_electrostatic_susceptibility": {
+        "v": np.linspace(-5.0e7, 5.0e7, 2001).tolist(),
+        "phase_velocity_m_s": 1.0e6,
+        "electron_flow_projection_m_s": 1.5e5,
+        "electron_density_m3": 2.0e18,
+        "electron_temperature_eV": 250.0,
+        "kappa": 4.0,
+        "wavenumber_m_inverse": 120.0,
+        "collision_frequency_s": 2.0e6,
+        "minimum_velocity_grid_probability_coverage": 0.999
+    },
     "thomson_n_population_relativistic_fit": {
         "wavelength_nm": np.linspace(350.0, 750.0, 81).tolist(),
         "measured_spectrum": (np.exp(-0.5*((np.linspace(350.0, 750.0, 81)-532.0)/35.0)**2)).tolist(),

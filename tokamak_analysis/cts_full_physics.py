@@ -31,7 +31,7 @@ from .cts_em_background import (
     integrate_receiver_spectral_power,
     brightness_temperature_from_radiance,
 )
-from .cts_kappa import kappa_electron_susceptibility, bi_kappa_electron_susceptibility
+from .cts_kappa import kappa_electron_susceptibility, kappa_bgk_electron_susceptibility, bi_kappa_electron_susceptibility
 from .cts_kappa import maxwellian_electron_susceptibility
 from .cts_kappa_dispersion import kappa_dispersion_function
 from .thomson_generalized_dispersion import (
@@ -815,6 +815,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_multiview_3d_evdf_physical",
     "thomson_relativistic_3d_evdf",
     "kappa_electrostatic_susceptibility",
+    "kappa_bgk_electrostatic_susceptibility",
     "kappa_dispersion_function",
     "bi_kappa_electrostatic_susceptibility",
     "maxwellian_electrostatic_susceptibility",
@@ -885,6 +886,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - kappa_electrostatic_susceptibility: collisionless longitudinal susceptibility
         for the exact 1-D marginal of an isotropic 3-D Kappa distribution; this is
         a kinetic response kernel, not a complete Kappa CTS fluctuation spectrum.
+      - kappa_bgk_electrostatic_susceptibility: number-conserving BGK-collisional
+        Kappa longitudinal response with the density-restoring denominator.
       - bi_kappa_electrostatic_susceptibility: exact gyrotropic bi-Kappa directional
         marginal with full-tail Landau response; one view identifies only T_q.
       - cts_collective_kappa_spectrum: collisionless electrostatic dynamic-structure
@@ -983,6 +986,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = maxwellian_electron_susceptibility
     elif model == "kappa_electrostatic_susceptibility":
         solver = kappa_electron_susceptibility
+    elif model == "kappa_bgk_electrostatic_susceptibility":
+        solver = kappa_bgk_electron_susceptibility
     elif model == "kappa_dispersion_function":
         solver = kappa_dispersion_function
     elif model == "bi_kappa_electrostatic_susceptibility":

@@ -11441,5 +11441,128 @@
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
       ]
     }
+  },
+  {
+    "name": "Number-conserving BGK Kappa electrostatic susceptibility",
+    "equation": "χ_BGK(ω,k)=χ_L(ω+iν,k)/[1−ν J₀(ω+iν,k)/(i k)], J₀=∫fκ(v)/(v−(ω+iν)/k)dv; χ_L=−(ω_pe²/k²)∫f′κ(v)/(v−(ω+iν)/k)dv",
+    "inputs": "n_e [m^-3], T_e [eV], κ>3/2, k [m^-1], ω/k [m s^-1], ν_BGK [s^-1], projected flow [m s^-1]",
+    "output": "Complex dimensionless longitudinal electron susceptibility",
+    "assumptions": "Isotropic finite-variance 3-D Kappa EVDF projected to its exact 1-D marginal; linearized number-conserving BGK collision operator; non-relativistic, unmagnetized electrostatic response; retarded pole.",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_kappa.kappa_bgk_electron_susceptibility",
+      "formula_key": "cts_number_conserving_bgk_kappa_susceptibility",
+      "input_specs": [
+        {
+          "name": "v",
+          "unit": "m s^-1",
+          "description": "Strictly increasing finite velocity grid used for analytic Kappa tail-coverage validation.",
+          "required": true
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s^-1",
+          "description": "Real laboratory phase velocity ω/k.",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "description": "Positive electron density.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive second-moment temperature.",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless",
+          "description": "Finite-variance Kappa index >3/2.",
+          "required": true
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1",
+          "description": "Positive scattering wavenumber.",
+          "required": true
+        },
+        {
+          "name": "collision_frequency_s",
+          "unit": "s^-1",
+          "description": "Non-negative scalar BGK collision frequency; zero recovers collisionless Landau response.",
+          "required": true
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Optional signed q-parallel electron drift.",
+          "required": false,
+          "default": 0
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg",
+          "description": "Particle mass; defaults to electron mass.",
+          "required": false
+        },
+        {
+          "name": "minimum_velocity_grid_probability_coverage",
+          "unit": "dimensionless",
+          "description": "Minimum analytic Kappa probability represented by supplied velocity grid.",
+          "required": false,
+          "default": 0.999
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_susceptibility",
+          "unit": "complex dimensionless",
+          "description": "Number-conserving BGK longitudinal susceptibility."
+        },
+        {
+          "name": "electron_susceptibility_collisionless_shifted",
+          "unit": "complex dimensionless",
+          "description": "Landau susceptibility evaluated at ω+iν before density-restoring correction."
+        },
+        {
+          "name": "particle_conserving_denominator",
+          "unit": "complex dimensionless",
+          "description": "1−νJ0/(ik), the number-conserving BGK correction denominator."
+        },
+        {
+          "name": "kappa_bgk_density_integral_s_m",
+          "unit": "s m^-1",
+          "description": "Full-tail J0 integral."
+        },
+        {
+          "name": "bgk_density_integral_absolute_error_estimate_s_m",
+          "unit": "s m^-1",
+          "description": "Adaptive quadrature error estimate for J0."
+        }
+      ],
+      "assumptions": [
+        "Linearized BGK operator relaxes δf−δn fκ and therefore conserves particle number.",
+        "The equilibrium is an isotropic 3-D Kappa EVDF; its exact 1-D marginal is used.",
+        "Collision frequency is an externally supplied scalar and is not calculated from a Coulomb collision operator."
+      ],
+      "algorithm": "Solve the linearized kinetic equation with C_BGK[δf]=−ν(δf−δn fκ). Integrating over velocity gives δn proportional to J1/[1−νJ0/(ik)], where J1=∫f′κ(v)/(v−(ω+iν)/k)dv and J0=∫fκ(v)/(v−(ω+iν)/k)dv. Evaluate J1 with the shared full-tail Kappa Landau kernel and J0 with adaptive full-real-line quadrature. χ_BGK=−(ω_pe²/k²)J1/[1−νJ0/(ik)].",
+      "uncertainty_model": "Deterministic quadrature only; returned quadrature error estimate applies to J0. No experimental or collision-frequency uncertainty is propagated.",
+      "limitations": [
+        "Not a multispecies Coulomb Landau collision operator.",
+        "No magnetized cyclotron harmonics, relativistic Kappa response, FDT noise closure or Full-EM CTS vertex.",
+        "No experimental validation is claimed."
+      ],
+      "test_links": [
+        "tests/test_cts_kappa.py::test_number_conserving_bgk_kappa_response_has_exact_collisionless_limit",
+        "tests/test_cts_kappa.py::test_number_conserving_bgk_kappa_response_includes_density_restoring_term",
+        "tests/test_advanced_thomson_physics_page.py::test_dashboard_routes_number_conserving_bgk_kappa_physics"
+      ]
+    }
   }
 ]

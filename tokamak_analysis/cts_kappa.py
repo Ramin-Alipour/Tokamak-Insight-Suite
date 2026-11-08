@@ -8,6 +8,7 @@ Kappa closure.
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import quad
 from scipy.special import gammaln, betainc, wofz
 from .cts_kappa_dispersion import kappa_dispersion_function
 
@@ -311,6 +312,107 @@ def maxwellian_electron_susceptibility(
         "limitations": [
             "No collisional, magnetized, relativistic, or Full-EM response.",
             "No ion contribution or fluctuation-dissipation spectrum; this is electron susceptibility only.",
+        ],
+    }
+
+
+def kappa_bgk_electron_susceptibility(
+    v, phase_velocity_m_s, *, electron_density_m3, electron_temperature_eV,
+    kappa, wavenumber_m_inverse, collision_frequency_s, mass_kg=ME,
+    electron_flow_projection_m_s=0.0,
+    minimum_velocity_grid_probability_coverage=0.999,
+):
+    r"""Number-conserving BGK longitudinal susceptibility for an isotropic Kappa EVDF.
+
+    Linearizing C[delta_f] = -nu (delta_f - delta_n f_kappa) gives
+      chi_BGK = chi_L(omega+i nu) / [1 - nu J0/(i k)],
+      J0 = integral f_kappa(v)/(v-(omega+i nu)/k) dv.
+    The density-restoring denominator is essential: a bare complex frequency
+    shift violates particle conservation. This is a scalar-nu, non-relativistic,
+    unmagnetized longitudinal model, not a multispecies Coulomb operator.
+    """
+    raw_nu = np.asarray(collision_frequency_s)
+    if raw_nu.ndim != 0 or raw_nu.dtype.kind not in "iuf":
+        raise ValueError("collision_frequency_s must be a finite non-negative real scalar")
+    nu = float(raw_nu)
+    if not np.isfinite(nu) or nu < 0.0:
+        raise ValueError("collision_frequency_s must be finite and non-negative")
+    if nu == 0.0:
+        result = kappa_electron_susceptibility(
+            v, phase_velocity_m_s, electron_density_m3=electron_density_m3,
+            electron_temperature_eV=electron_temperature_eV, kappa=kappa,
+            wavenumber_m_inverse=wavenumber_m_inverse, mass_kg=mass_kg,
+            electron_flow_projection_m_s=electron_flow_projection_m_s,
+            minimum_velocity_grid_probability_coverage=minimum_velocity_grid_probability_coverage,
+        )
+        return {
+            **result, "collision_frequency_s": 0.0,
+            "collision_model": "collisionless_limit_of_number_conserving_BGK",
+            "particle_conserving_correction": 1.0 + 0.0j,
+            "validity_domain": "isotropic_nonrelativistic_unmagnetized_longitudinal_Kappa",
+        }
+
+    ne = _positive_real_scalar(electron_density_m3, "electron_density_m3")
+    te = _positive_real_scalar(electron_temperature_eV, "electron_temperature_eV")
+    kap = _positive_real_scalar(kappa, "kappa")
+    wave_number = _positive_real_scalar(wavenumber_m_inverse, "wavenumber_m_inverse")
+    mass = _positive_real_scalar(mass_kg, "mass_kg")
+    if kap <= 1.5:
+        raise ValueError("kappa must be greater than 3/2")
+    if isinstance(phase_velocity_m_s, (bool, np.bool_)) or not isinstance(
+        phase_velocity_m_s, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError("phase_velocity_m_s must be a finite real scalar")
+    phase = float(phase_velocity_m_s)
+    flow_raw = np.asarray(electron_flow_projection_m_s)
+    if flow_raw.ndim != 0 or flow_raw.dtype.kind not in "iuf":
+        raise ValueError("electron_flow_projection_m_s must be a finite subluminal real scalar")
+    flow = float(flow_raw)
+    if not np.isfinite(phase) or not np.isfinite(flow) or abs(flow) >= C:
+        raise ValueError("phase velocity must be finite and electron flow must be subluminal")
+    velocity_scale = float(np.sqrt(((2.0*kap-3.0)/kap)*E*te/mass))
+    eta = nu/wave_number
+    zeta = complex((phase-flow)/velocity_scale, eta/velocity_scale)
+    collisionless_shifted = kappa_electron_susceptibility(
+        v, phase, electron_density_m3=ne, electron_temperature_eV=te,
+        kappa=kap, wavenumber_m_inverse=wave_number, mass_kg=mass,
+        pole_imaginary_part_m_s=eta,
+        minimum_velocity_grid_probability_coverage=minimum_velocity_grid_probability_coverage,
+        electron_flow_projection_m_s=flow,
+    )
+
+    # J0 is evaluated over the complete real line. nu>0 places the pole in
+    # the upper half-plane, so this integral needs no principal-value handling.
+    log_norm = gammaln(kap)-gammaln(kap-0.5)-0.5*np.log(np.pi*kap)
+    def marginal(x):
+        return np.exp(log_norm-kap*np.log1p(x*x/kap))
+    def integrand(x):
+        return marginal(x)/(complex(x, 0.0)-zeta)
+    j0_real, err_real = quad(lambda x: float(np.real(integrand(x))),
+                             -np.inf, np.inf, epsabs=1e-10, epsrel=1e-9, limit=500)
+    j0_imag, err_imag = quad(lambda x: float(np.imag(integrand(x))),
+                             -np.inf, np.inf, epsabs=1e-10, epsrel=1e-9, limit=500)
+    j0 = complex(j0_real, j0_imag)/velocity_scale
+    denominator = 1.0 - nu/(1j*wave_number)*j0
+    if (not np.isfinite(denominator.real) or not np.isfinite(denominator.imag)
+            or abs(denominator) <= 1e-12):
+        raise ArithmeticError("number-conserving BGK density-restoring denominator is singular")
+    correction = 1.0/denominator
+    return {
+        **collisionless_shifted,
+        "electron_susceptibility_collisionless_shifted": complex(collisionless_shifted["electron_susceptibility"]),
+        "electron_susceptibility": complex(collisionless_shifted["electron_susceptibility"]*correction),
+        "kappa_bgk_density_integral_s_m": j0,
+        "particle_conserving_denominator": denominator,
+        "particle_conserving_correction": correction,
+        "collision_frequency_s": nu,
+        "collision_model": "linearized_number_conserving_BGK_on_full_tail_Kappa_marginal",
+        "bgk_density_integral_absolute_error_estimate_s_m": float(np.hypot(err_real, err_imag)/velocity_scale),
+        "validity_domain": "isotropic_nonrelativistic_unmagnetized_longitudinal_Kappa",
+        "limitations": [
+            "Single supplied BGK collision frequency; not a multispecies Coulomb Landau collision operator.",
+            "No magnetized cyclotron harmonics, relativistic Kappa response, FDT noise closure or Full-EM CTS vertex.",
+            "Kappa index must exceed 3/2 for finite second-moment temperature.",
         ],
     }
 

@@ -326,3 +326,14 @@ def test_physical_multiview_evdf_model_is_exposed_in_dashboard_contract():
     example = EXAMPLES["thomson_multiview_3d_evdf_physical"]
     assert len(example["scattering_vector_unit"]) == len(example["measured_spectra"])
     assert len(example["background_spectra"]) == len(example["measured_spectra"])
+
+
+def test_dashboard_routes_number_conserving_bgk_kappa_physics():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+    model = "kappa_bgk_electrostatic_susceptibility"
+    assert model in MODEL_LABELS and model in EXAMPLES
+    result = run_advanced_thomson_physics(model, **EXAMPLES[model])
+    assert result["public_physics_entrypoint"] == model
+    assert result["collision_model"] == "linearized_number_conserving_BGK_on_full_tail_Kappa_marginal"
+    assert np.isfinite(result["electron_susceptibility"].real)

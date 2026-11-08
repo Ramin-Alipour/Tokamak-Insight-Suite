@@ -677,3 +677,27 @@ def test_cts_kappa_susceptibility_and_shared_kernel_agree_on_exact_landau_bounda
     )
     assert result["landau_contour_method"] == "exact_eta_to_zero_plus"
 
+
+
+def test_number_conserving_bgk_kappa_response_has_exact_collisionless_limit():
+    from tokamak_analysis.cts_kappa import (
+        kappa_bgk_electron_susceptibility, kappa_electron_susceptibility,
+    )
+    a = args()
+    expected = kappa_electron_susceptibility(**a)
+    actual = kappa_bgk_electron_susceptibility(**a, collision_frequency_s=0.0)
+    assert actual["electron_susceptibility"] == pytest.approx(
+        expected["electron_susceptibility"], rel=1e-13, abs=1e-14
+    )
+    assert actual["collision_model"] == "collisionless_limit_of_number_conserving_BGK"
+
+
+def test_number_conserving_bgk_kappa_response_includes_density_restoring_term():
+    from tokamak_analysis.cts_kappa import kappa_bgk_electron_susceptibility
+    result = kappa_bgk_electron_susceptibility(**args(), collision_frequency_s=2.0e6)
+    assert np.isfinite(result["electron_susceptibility"].real)
+    assert np.isfinite(result["electron_susceptibility"].imag)
+    assert result["collision_model"] == "linearized_number_conserving_BGK_on_full_tail_Kappa_marginal"
+    assert result["particle_conserving_denominator"] != 1.0 + 0.0j
+    assert result["bgk_density_integral_absolute_error_estimate_s_m"] >= 0.0
+    assert result["validity_domain"] == "isotropic_nonrelativistic_unmagnetized_longitudinal_Kappa"
