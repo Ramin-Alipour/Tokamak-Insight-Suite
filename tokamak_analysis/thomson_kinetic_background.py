@@ -94,10 +94,54 @@ def _apply_response(response, spectrum, axis):
     return (r @ (y * widths)) / widths
 
 
+def _estimate_kinetic_initial_from_spectrum(wavelength_nm, measured_spectrum, laser_wavelength_nm, scattering_angle_rad, physical_model):
+    """Build deterministic optimizer seeds from the measured line's finite-volume moments.
+
+    A robust linear edge baseline is used only to initialize the optimizer. The
+    returned values are not measurements; the response-convolved physical
+    likelihood and identifiability gate determine the reportable result.
+    """
+    x = _real_vector(wavelength_nm, "wavelength_nm")
+    y = _real_vector(measured_spectrum, "measured_spectrum")
+    if y.shape != x.shape or np.any(np.diff(x) <= 0) or np.any(y < 0):
+        raise ValueError("automatic kinetic initialization requires a non-negative spectrum on an increasing wavelength grid")
+    edges = _wavelength_edges(x)
+    widths = np.diff(edges)
+    edge_count = max(3, int(np.ceil(0.12 * x.size)))
+    edge_indices = np.unique(np.r_[np.arange(edge_count), np.arange(x.size-edge_count, x.size)])
+    x_scale = max(float(np.ptp(x)), np.finfo(float).tiny)
+    design = np.column_stack((np.ones(edge_indices.size), (x[edge_indices]-np.mean(x))/x_scale))
+    baseline_coefficients, *_ = np.linalg.lstsq(design, y[edge_indices], rcond=None)
+    baseline = np.column_stack((np.ones(x.size), (x-np.mean(x))/x_scale)) @ baseline_coefficients
+    weights = np.maximum(y-baseline, 0.0) * widths
+    area = float(np.sum(weights))
+    if not np.isfinite(area) or area <= np.finfo(float).eps * max(float(np.sum(y*widths)), 1.0):
+        raise ValueError("automatic kinetic initialization could not identify a positive spectral feature; supply physical_initial explicitly")
+    center = float(np.sum(weights*x)/area)
+    variance = float(np.sum(weights*(x-center)**2)/area)
+    if not np.isfinite(variance) or variance <= 0.0:
+        raise ValueError("automatic kinetic initialization requires a finite non-zero spectral width; supply physical_initial explicitly")
+    laser, angle = float(laser_wavelength_nm), float(scattering_angle_rad)
+    if not np.isfinite(laser) or laser <= 0.0 or not 0.0 < angle < np.pi:
+        raise ValueError("laser wavelength and scattering angle must be physical for automatic kinetic initialization")
+    q = 2.0*np.sin(angle/2.0)
+    temperature = _E_REST_EV * variance / (laser*q)**2
+    flow = _C * (1.0-center/laser) / q
+    if physical_model == "kappa":
+        return np.array([
+            np.clip(temperature, 1.0e-3, 0.005*_E_REST_EV),
+            np.clip(flow, -0.05*_C, 0.05*_C), 4.0,
+        ], dtype=float)
+    return np.array([
+        np.clip(temperature, 1.0e-3, 1.0e6),
+        np.clip(flow, -0.5*_C, 0.5*_C),
+    ], dtype=float)
+
+
 def fit_noncollective_kinetic_thomson_with_background(
     wavelength_nm, measured_spectrum, *, physical_model,
     laser_wavelength_nm, scattering_angle_rad, instrument_response,
-    physical_initial, background_model="linear", background_degree=2,
+    physical_initial=None, background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     measurement_uncertainty=None, measurement_covariance=None,
     model_discrepancy_covariance=None, systematic_covariance=None,
@@ -152,7 +196,14 @@ def fit_noncollective_kinetic_thomson_with_background(
         raise ValueError("physical_model must be 'kappa' or 'relativistic_maxwell_juttner'")
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
-    p0 = _real_vector(physical_initial, "physical_initial", minimum=2)
+    initial_source = "user_supplied"
+    if physical_initial is None:
+        p0 = _estimate_kinetic_initial_from_spectrum(
+            x, y, laser, angle, physical_model
+        )
+        initial_source = "deterministic_spectral_moment_seed"
+    else:
+        p0 = _real_vector(physical_initial, "physical_initial", minimum=2)
     expected = 3 if physical_model == "kappa" else 2
     if p0.size != expected:
         raise ValueError(f"physical_initial must contain {expected} values for {physical_model}")
@@ -515,6 +566,8 @@ def fit_noncollective_kinetic_thomson_with_background(
         "physical_model": physical_model,
         "physical_parameter_names": ["electron_temperature_eV", "electron_velocity_projection_m_s"] + (["kappa_index"] if physical_model == "kappa" else []),
         "physical_parameters": fit.x.copy(),
+        "physical_initial": p0.copy(),
+        "initialization_source": initial_source,
         "electron_temperature_eV": float(fit.x[0]),
         "electron_velocity_projection_m_s": float(fit.x[1]),
         "kappa_index": float(fit.x[2]) if physical_model == "kappa" else None,
