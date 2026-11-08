@@ -230,3 +230,43 @@ def test_named_product_workflow_wrappers_dispatch_to_their_own_registered_ids(mo
                 result = function("sentinel")
             assert result[0] == product["product_id"]
             assert result[1] == expected_id
+
+
+
+def test_thomson_shared_physics_dependencies_import_from_canonical_shared_package():
+    """Shared kernels must not depend on the product package's __path__ fallback."""
+    from importlib import import_module
+
+    shared_modules = (
+        "formula_library",
+        "thomson_identifiability",
+        "cts_full_em",
+        "cts_landau_fdt",
+        "cts_fdt",
+        "cts_landau_em",
+        "cts_full_wave",
+        "cts_em_background",
+        "cts_kappa",
+        "cts_kappa_dispersion",
+        "thomson_generalized_dispersion",
+        "cts_collisions",
+        "cts_bgk_fdt",
+        "cts_stokes_transfer",
+        "cts_magnetoionic",
+    )
+    for module_name in shared_modules:
+        module = import_module(f"tis.physics.shared.{module_name}")
+        assert module.__name__ == f"tis.physics.shared.{module_name}"
+
+    from tis.products.thomson.api import (
+        analyze_spectra,
+        analyze_cts,
+        analyze_spectral_distribution,
+        analyze_landau_fdt_convergence,
+    )
+    assert all(callable(function) for function in (
+        analyze_spectra,
+        analyze_cts,
+        analyze_spectral_distribution,
+        analyze_landau_fdt_convergence,
+    ))
