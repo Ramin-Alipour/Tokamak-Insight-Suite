@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import curve_fit
 
-from .thomson_identifiability import spectral_distribution_identifiability
+from tis.physics.shared.thomson_identifiability import spectral_distribution_identifiability
 
 
 def _vector(values, name, *, minimum=9):
