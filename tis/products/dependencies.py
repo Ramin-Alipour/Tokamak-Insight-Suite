@@ -10,6 +10,7 @@ import ast
 from pathlib import Path
 
 from .catalog import list_products
+from tis.physics.legacy_map import LEGACY_MODULE_TARGETS
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _ANALYSIS_ROOT = _REPOSITORY_ROOT / "tokamak_analysis"
@@ -18,9 +19,13 @@ _ANALYSIS_ROOT = _REPOSITORY_ROOT / "tokamak_analysis"
 def _module_path(module_name: str) -> Path | None:
     if not module_name.startswith("tokamak_analysis."):
         return None
-    relative = module_name.removeprefix("tokamak_analysis.").replace(".", "/")
-    module_file = _ANALYSIS_ROOT / f"{relative}.py"
-    package_file = _ANALYSIS_ROOT / relative / "__init__.py"
+    relative = module_name.removeprefix("tokamak_analysis.")
+    target = LEGACY_MODULE_TARGETS.get(relative)
+    if target is None:
+        return None
+    target_path = target.replace(".", "/")
+    module_file = _REPOSITORY_ROOT / f"{target_path}.py"
+    package_file = _REPOSITORY_ROOT / target_path / "__init__.py"
     if module_file.is_file():
         return module_file
     if package_file.is_file():
