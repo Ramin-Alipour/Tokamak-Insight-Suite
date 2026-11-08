@@ -399,6 +399,17 @@ def test_multiview_3d_evdf_is_available_through_public_thomson_dispatcher():
     assert result["status"] == "identified_from_multi_view_measurements"
     assert result["evdf_m3_s3"] is not None
     assert result["view_count"] == 3
+    expected_temperature = (9.1093837139e-31 / 1.602176634e-19) * result[
+        "velocity_covariance_tensor_m2_s2"
+    ]
+    np.testing.assert_allclose(
+        result["temperature_tensor_eV"], expected_temperature,
+        rtol=1e-12, atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        result["temperature_tensor_eigenvalues_eV"],
+        np.linalg.eigvalsh(expected_temperature), rtol=1e-12, atol=1e-12,
+    )
 
 
 def test_physical_optical_thomson_3d_kernel_conserves_bin_power_and_applies_doppler_projection():
