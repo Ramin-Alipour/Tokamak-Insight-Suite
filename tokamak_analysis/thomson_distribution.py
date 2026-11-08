@@ -719,10 +719,9 @@ def analyze_thomson_spectral_distribution(
                     "or in physical_fit_options, not both"
                 )
             options[option_name] = option_value
-        if "physical_initial" not in options:
-            raise ValueError(
-                "physical_initial is required as a top-level argument or in physical_fit_options"
-            )
+        # Explicit seeds are optional: the native kinetic solver derives
+        # deterministic moment-based optimizer seeds from this same measured
+        # spectrum when they are omitted. Seeds are never reported as data.
         reserved = {
             "physical_model", "instrument_response", "laser_wavelength_nm",
             "scattering_angle_rad", "wavelength_nm", "measured_spectrum",
@@ -768,6 +767,11 @@ def analyze_thomson_spectral_distribution(
             "status": kinetic_fit.get("status", "completed_with_solver_status"),
             "reportable_as_primary_inference": kinetic_fit.get("primary_result_status") == "identified_from_measurement",
             "fit": kinetic_fit,
+            "initialization": {
+                "source": kinetic_fit.get("initialization_source", "user_supplied"),
+                "physical_initial": kinetic_fit.get("physical_initial"),
+                "interpretation": "optimizer seed only; not an inferred plasma measurement",
+            },
             "source_spectrum": "same_calibrated_measured_spectrum_as_spectral_distribution",
             "forward_model": "native_finite_bin_kinetic_thomson_model_with_measured_response_and_joint_detector_background",
             "gaussian_width_used_as_temperature": False,
