@@ -1324,3 +1324,27 @@ def test_moment_uncertainty_method_reports_discrepancy_and_systematic_only_draws
     components = result["moment_uncertainty_covariance_components"]
     assert components["model_discrepancy_covariance_included"] is (covariance_name == "model_discrepancy_covariance")
     assert components["systematic_covariance_included"] is (covariance_name == "systematic_covariance")
+
+
+def test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf():
+    x = np.linspace(499.0, 501.0, 81)
+    y = 1000.0 * np.exp(-0.5 * ((x - 500.0) / 0.06) ** 2) + 12.0
+    result = _run(
+        x, y,
+        signal_uncertainty=np.full(x.size, 1.0),
+        moment_mc_samples=20,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2.0,
+        scattering_angle_uncertainty_rad=2.0e-4,
+        projected_evdf_options={
+            "regularization_strength": 1.0e-3,
+            "velocity_limit_m_s": 8.0e4,
+            "velocity_points": 41,
+        },
+    )
+    inverse = result["projected_evdf_inference"]
+    assert inverse["scattering_angle_uncertainty_rad"] == pytest.approx(2.0e-4)
+    assert inverse["scattering_geometry_covariance_status"] == (
+        "first_order_fixed_active_set_implicit_sensitivity"
+    )
+    assert inverse["evdf_covariance_including_scattering_geometry"] is not None
