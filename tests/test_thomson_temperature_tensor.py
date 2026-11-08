@@ -495,3 +495,46 @@ def test_raw_tensor_fit_separates_measurement_model_discrepancy_and_systematic_p
     )
     assert np.trace(components["model_discrepancy"]) > 0.0
     assert np.trace(components["systematic"]) > 0.0
+
+
+def test_full_temperature_tensor_propagates_multi_view_scattering_geometry_covariance():
+    q, expected, projected = _views()
+    measurement_covariance = 0.04 * np.eye(q.shape[0])
+    geometry_covariance = 1.0e-8 * np.eye(3*q.shape[0])
+    result = infer_full_temperature_tensor_from_thomson_projections(
+        projected, q,
+        projected_temperature_covariance_eV2=measurement_covariance,
+        scattering_vector_covariance=geometry_covariance,
+    )
+    np.testing.assert_allclose(
+        result["electron_temperature_tensor_eV"], expected,
+        rtol=1e-10, atol=1e-10,
+    )
+    geometry = result["scattering_geometry_parameter_covariance_eV2"]
+    assert geometry.shape == (6, 6)
+    assert np.all(np.isfinite(geometry))
+    assert np.min(np.linalg.eigvalsh(geometry)) >= -1e-12
+    assert np.trace(geometry) > 0.0
+    total = result["parameter_covariance_with_geometry_eV2"]
+    np.testing.assert_allclose(
+        total,
+        result["parameter_covariance_eV2"] + geometry,
+        rtol=1e-10, atol=1e-12,
+    )
+    assert result["geometry_covariance_status"] == (
+        "finite_difference_directional_delta_method_added_to_parameter_covariance"
+    )
+
+
+def test_full_temperature_tensor_geometry_covariance_rejects_invalid_contracts():
+    q, _, projected = _views()
+    with pytest.raises(ValueError, match="shape"):
+        infer_full_temperature_tensor_from_thomson_projections(
+            projected, q, scattering_vector_covariance=np.eye(3),
+        )
+    invalid = np.eye(3*q.shape[0])
+    invalid[0, 0] = -1.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        infer_full_temperature_tensor_from_thomson_projections(
+            projected, q, scattering_vector_covariance=invalid,
+        )
