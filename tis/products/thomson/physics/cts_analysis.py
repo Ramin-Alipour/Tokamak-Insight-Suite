@@ -1552,7 +1552,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
 
 
 # Separate magnetized electromagnetic CTS path; the electrostatic API remains unchanged.
-from .cts_full_em import (
+from tis.physics.shared.cts_full_em import (
     full_em_cts_spectral_density, analyze_full_em_cts_spectrum,
     fit_full_em_gyrotropic_population_shape,
 )
