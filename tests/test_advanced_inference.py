@@ -371,6 +371,16 @@ def test_multiview_evdf_regularization_spread_propagates_to_3d_physical_moments(
     assert spread["physical_moment_candidate_values"].shape == (3, 12)
     covariance = spread["physical_moment_covariance_moment_units_squared"]
     assert covariance.shape == (12, 12)
+    assert spread["temperature_tensor_candidate_values_eV"].shape == (3, 9)
+    assert spread["temperature_tensor_covariance_from_regularization_eV2"].shape == (9, 9)
+    expected_temperature_candidates = (
+        spread["physical_moment_candidate_values"][:, 3:]
+        * 9.1093837139e-31 / 1.602176634e-19
+    )
+    np.testing.assert_allclose(
+        spread["temperature_tensor_candidate_values_eV"],
+        expected_temperature_candidates, rtol=1e-12, atol=1e-12,
+    )
     assert np.allclose(covariance, covariance.T, atol=1e-12)
     assert np.linalg.eigvalsh(covariance).min() >= -1e-10
     assert "not measurement uncertainty" in spread["interpretation"]
