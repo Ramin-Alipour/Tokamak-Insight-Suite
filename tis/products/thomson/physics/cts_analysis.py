@@ -1544,7 +1544,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["ion_temperature_species_uncertainties_eV"] = total_sigma[2:2+n_species].copy()
         out["electron_velocity_projection_uncertainty_m_s"] = float(total_sigma[2+n_species])
         out["ion_velocity_projection_uncertainty_m_s"] = float(total_sigma[3+n_species])
-    from .thomson_identifiability import cts_electrostatic_identifiability
+    from tis.physics.shared.thomson_identifiability import cts_electrostatic_identifiability
     out["parameter_identifiability"] = cts_electrostatic_identifiability(
         fast_ion_model=fast.get("kind") if fast else None
     )
@@ -1570,7 +1570,7 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
     if model == "electrostatic_kappa":
-        from .thomson_kinetic_models import fit_collective_kappa
+        from tis.physics.shared.thomson_kinetic_models import fit_collective_kappa
         args = dict(kwargs)
         # Convert canonical frequency-domain CTS inputs to increasing wavelength
         # bins by a coordinate permutation; no spectral deconvolution is applied.
@@ -1651,7 +1651,7 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
             raise ValueError("Supply the calibrated CTS spectrum once, as 'spectrum' or 'measured_spectrum', not both.")
         if "spectrum" in kwargs:
             kwargs["measured_spectrum"] = kwargs.pop("spectrum")
-        from .cts_spatial_inference import analyze_full_em_cts_spatial_profiles
+        from tis.physics.shared.cts_spatial_inference import analyze_full_em_cts_spatial_profiles
         return analyze_full_em_cts_spatial_profiles(**kwargs)
     if model == "full_electromagnetic":
         if "spectrum" in kwargs and "measured_spectrum" in kwargs:
