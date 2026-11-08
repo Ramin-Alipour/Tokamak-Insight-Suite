@@ -61,7 +61,20 @@ def test_execution_api_forwards_arguments_without_changing_measurements(monkeypa
         captured["calibration_tag"] = calibration_tag
         return sentinel
 
-    monkeypatch.setattr(api, "resolve_analysis", lambda analysis_id: solver)
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        api, "get_analysis",
+        lambda analysis_id: {
+            "id": analysis_id,
+            "module": "test_thomson_solver",
+            "function": "solver",
+        },
+    )
+    monkeypatch.setattr(
+        api, "import_module",
+        lambda module_path: SimpleNamespace(solver=solver),
+    )
     wavelength = [526.0, 527.0, 528.0]
     spectra = [[1.0, 2.0, 1.0]]
     result = execute_product_analysis(
@@ -82,9 +95,21 @@ def test_execution_api_rejects_cross_product_analysis_ids_before_solver(monkeypa
     def forbidden(_analysis_id):
         raise AssertionError("solver must not be resolved for an ownership violation")
 
-    monkeypatch.setattr(api, "resolve_analysis", forbidden)
+    monkeypatch.setattr(api, "get_analysis", forbidden)
     with pytest.raises(ValueError, match="not owned by product"):
         execute_product_analysis("thomson-scattering", 2)
+
+
+def test_thomson_registered_solver_modules_import_through_product_boundary():
+    from importlib import import_module
+
+    product = get_product("thomson-scattering")
+    for entry in product["entry_points"]:
+        module_path = (
+            product["api_module"] + ".physics." + entry["module"]
+        )
+        module = import_module(module_path)
+        assert callable(getattr(module, entry["function"]))
 
 
 def test_product_lookup_rejects_unknown_and_boolean_identifiers():

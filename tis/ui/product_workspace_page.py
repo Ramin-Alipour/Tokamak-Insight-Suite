@@ -1,19 +1,24 @@
 """Product-oriented dashboard view over the canonical analysis registry."""
 from __future__ import annotations
 
+import json
 from typing import Any
 
-from tis.products import get_product, list_products, build_dependency_inventory, load_product_api
+from tis.products import (
+    get_product,
+    list_products,
+    build_dependency_inventory,
+    load_product_api,
+)
 
 
 def render_product_workspace_page(st: Any) -> None:
-    """Render product ownership, callable workflows, and scientific contracts."""
+    """Render product ownership, contracts, and a real registered execution path."""
     products = list_products()
     st.title("Specialist Product Workspace")
     st.caption(
-        "Twenty specialist products share the TIS platform. Each listed workflow "
-        "is resolved through the canonical executable registry; physics remains "
-        "in its domain solver module."
+        "Twenty specialist products share the TIS platform. Each workflow is "
+        "resolved through its owning product API and canonical executable registry."
     )
     selected_id = st.selectbox(
         "Specialist product",
@@ -45,17 +50,22 @@ def render_product_workspace_page(st: Any) -> None:
             "calibration and measurement services are shared dependencies, not "
             "a substitute for diagnostic-specific physical inference."
         )
+
     rows = []
     for entry in product["entry_points"]:
         contract = entry.get("execution_contract") or {}
         rows.append({
             "ID": entry["id"],
             "Workflow": entry["name"],
-            "Callable": f"tokamak_analysis.{entry['module']}.{entry['function']}",
+            "Callable": (
+                f"{product['api_module']}.physics."
+                f"{entry['module']}.{entry['function']}"
+            ),
             "Execution level": contract.get("execution_level", "reference_only"),
             "Completeness": contract.get("completeness", "incomplete"),
         })
     st.dataframe(rows, width="stretch", hide_index=True)
+
     inventory = build_dependency_inventory()
     dependency_row = next(
         item for item in inventory["products"]
@@ -72,6 +82,7 @@ def render_product_workspace_page(st: Any) -> None:
             "Static AST import closure. Dynamic imports, runtime plugins, "
             "non-Python resources and third-party package constraints are not included."
         )
+
     st.markdown("### Selected workflow contract")
     selected_analysis_id = st.selectbox(
         "Workflow",
@@ -79,7 +90,7 @@ def render_product_workspace_page(st: Any) -> None:
         format_func=lambda analysis_id: (
             f"{analysis_id} · "
             + next(item["name"] for item in product["entry_points"]
-                 if item["id"] == analysis_id)
+                   if item["id"] == analysis_id)
         ),
         key=f"tis_product_workflow_{selected_id}",
     )
@@ -88,7 +99,10 @@ def render_product_workspace_page(st: Any) -> None:
         if item["id"] == selected_analysis_id
     )
     contract = entry.get("execution_contract") or {}
-    st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
+    st.caption(
+        f"Callable: {product['api_module']}.physics."
+        f"{entry['module']}.{entry['function']}"
+    )
     st.markdown(contract.get("algorithm", "No algorithm description declared."))
     left, right = st.columns(2)
     with left:
@@ -99,10 +113,49 @@ def render_product_workspace_page(st: Any) -> None:
         st.json(contract.get("output_specs", []))
     if contract.get("limitations"):
         with st.expander("Scientific limitations and assumptions"):
-            st.write({"assumptions": contract.get("assumptions", []),
-                      "limitations": contract.get("limitations", [])})
-    st.info(
-        "Execution is available in Advanced Analysis → Registered analysis modules. "
-        "This workspace and the registered execution form use the same family IDs "
-        "and callable registry."
+            st.write({
+                "assumptions": contract.get("assumptions", []),
+                "limitations": contract.get("limitations", []),
+            })
+
+    st.markdown("### Execute selected workflow")
+    st.caption(
+        "Provide measured/calibrated inputs as a JSON object. The Dashboard "
+        "passes these values unchanged to the registered product solver; it "
+        "does not invent calibration, geometry, uncertainty, or plasma parameters."
     )
+    required_inputs = [
+        spec["name"] for spec in contract.get("input_specs", [])
+        if spec.get("required", False)
+    ]
+    if required_inputs:
+        st.write({"unconditionally_required_inputs": required_inputs})
+    payload_text = st.text_area(
+        "Solver input payload (JSON object)",
+        value="{}",
+        height=240,
+        key=f"tis_product_payload_{selected_id}_{selected_analysis_id}",
+    )
+    if st.button(
+        "Execute registered workflow",
+        type="primary",
+        key=f"tis_product_execute_{selected_id}_{selected_analysis_id}",
+    ):
+        try:
+            payload = json.loads(payload_text)
+            if not isinstance(payload, dict):
+                raise ValueError("The input payload must be a JSON object keyed by declared input name.")
+            result = product_api.run_analysis(selected_analysis_id, **payload)
+            st.success(
+                f"Workflow {selected_analysis_id} completed through "
+                f"{product['product_id']} public API."
+            )
+            st.write(result)
+        except Exception as exc:
+            st.error(f"Registered workflow execution failed: {type(exc).__name__}: {exc}")
+
+    if contract.get("limitations"):
+        st.caption(
+            "Execution success does not remove the model limitations listed above; "
+            "interpret results only within the declared physical and statistical scope."
+        )
