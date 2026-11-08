@@ -511,7 +511,11 @@ def fit_general_temperature_tensor_thomson_spectra(
             chol = np.linalg.cholesky(covariance)
         except np.linalg.LinAlgError as exc:
             raise ValueError("combined spectral covariance must be positive definite") from exc
-        covariance_source = "measurement_plus_supplied_discrepancy_and_systematic_components"
+        covariance_source = (
+            "measurement_plus_supplied_discrepancy_and_systematic_components"
+            if "measurement" in covariance_components
+            else "supplied_discrepancy_and_systematic_only_measurement_uncertainty_unavailable"
+        )
     else:
         chol = np.eye(n_data)
         covariance_source = "identity_metric_no_absolute_spectral_uncertainty_supplied"
@@ -624,7 +628,11 @@ def fit_general_temperature_tensor_thomson_spectra(
     chi_square=float(fit.fun@fit.fun)
     dof=n_data-p0.size
     parameter_covariance=np.linalg.inv(jac.T@jac)
-    covariance_status="absolute_GLS_covariance_conditional_on_supplied_spectral_covariance"
+    covariance_status=(
+        "absolute_GLS_covariance_conditional_on_measurement_discrepancy_and_systematic_covariance"
+        if "measurement" in covariance_components
+        else "partial_GLS_covariance_discrepancy_and_systematic_only_measurement_uncertainty_unavailable"
+    )
     # Decompose the spectral contribution to parameter uncertainty by its
     # physical source.  For the whitened GLS estimator
     # A=(J_w^T J_w)^-1 J_w^T, each independent covariance component C_k
