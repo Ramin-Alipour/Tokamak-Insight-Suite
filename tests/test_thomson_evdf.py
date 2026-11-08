@@ -524,12 +524,14 @@ def test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated()
     )
     covariance = out["velocity_moment_covariance"]
     order = out["velocity_moment_covariance_order"]
-    assert covariance.shape == (6, 6)
+    assert covariance.shape == (8, 8)
     assert order == [
         "mean_velocity_parallel_m_s",
         "velocity_parallel_variance_m2_s2",
         "velocity_parallel_standard_deviation_m_s",
         "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
         "skewness",
         "excess_kurtosis",
     ]
@@ -897,3 +899,34 @@ def test_evdf_rejects_non_psd_joint_laser_angle_covariance():
             scattering_angle_uncertainty_rad=1.0e-4,
             laser_angle_covariance_nm_rad=2.0e-7,
         )
+
+
+def test_evdf_reports_dimensional_third_and_fourth_central_velocity_moments():
+    wavelength, signal, background = _case()
+    out = _run(wavelength, signal, background)
+    sigma = out["velocity_parallel_standard_deviation_m_s"]
+    mu3 = out["central_third_velocity_moment_m3_s3"]
+    mu4 = out["central_fourth_velocity_moment_m4_s4"]
+    assert np.isfinite(mu3)
+    assert np.isfinite(mu4) and mu4 > 0.0
+    assert out["skewness"] == pytest.approx(mu3 / sigma**3, rel=2e-10, abs=1e-10)
+    assert out["excess_kurtosis"] == pytest.approx(mu4 / sigma**4 - 3.0, rel=2e-10, abs=1e-10)
+    assert out["central_velocity_moment_equations"]["third"].startswith("mu_3 = integral")
+    assert out["heat_flux_identifiability"]["status"] == "not_identified_from_single_projected_marginal"
+
+
+def test_evdf_higher_central_moment_uncertainties_are_in_joint_covariance():
+    wavelength, signal, background = _case()
+    out = _run(
+        wavelength, signal, background,
+        signal_uncertainty=np.full(signal.size, 0.5),
+    )
+    order = out["velocity_moment_covariance_order"]
+    covariance = out["velocity_moment_covariance"]
+    i3 = order.index("central_third_velocity_moment_m3_s3")
+    i4 = order.index("central_fourth_velocity_moment_m4_s4")
+    assert covariance.shape == (8, 8)
+    assert np.isfinite(covariance[i3, i3]) and covariance[i3, i3] >= 0.0
+    assert np.isfinite(covariance[i4, i4]) and covariance[i4, i4] >= 0.0
+    assert "central_third_velocity_moment_m3_s3" in out["velocity_moment_standard_uncertainty"]
+    assert "central_fourth_velocity_moment_m4_s4" in out["velocity_moment_standard_uncertainty"]
