@@ -1348,3 +1348,39 @@ def test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf():
         "first_order_fixed_active_set_implicit_sensitivity"
     )
     assert inverse["evdf_covariance_including_scattering_geometry"] is not None
+
+
+def test_spectral_distribution_propagates_joint_laser_angle_calibration_into_projected_evdf():
+    wavelength = np.linspace(499.8, 500.2, 241)
+    laser = 500.0
+    angle = np.pi / 2.0
+    q = 2.0 * np.sin(angle / 2.0)
+    centre = laser * (1.0 - q * 2.0e4 / 299792458.0)
+    width = laser * q * 2.5e4 / 299792458.0
+    background = np.full_like(wavelength, 3.0)
+    signal = 1000.0 * np.exp(-0.5 * ((wavelength - centre) / width) ** 2) + background
+    sigma_laser = 2.0e-3
+    sigma_angle = 2.0e-4
+    cross = 0.25 * sigma_laser * sigma_angle
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        signal_uncertainty=np.full(wavelength.size, 1.0),
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        laser_wavelength_uncertainty_nm=sigma_laser,
+        scattering_angle_uncertainty_rad=sigma_angle,
+        laser_angle_covariance_nm_rad=cross,
+        projected_evdf_options={
+            "regularization_strength": 1.0e-3,
+            "velocity_limit_m_s": 8.0e4,
+            "velocity_points": 81,
+        },
+    )
+    inverse = result["projected_evdf_inference"]
+    assert inverse["geometry_uncertainty_covariance_included"] is True
+    assert inverse["laser_wavelength_uncertainty_nm"] == pytest.approx(sigma_laser)
+    assert inverse["laser_angle_covariance_nm_rad"] == pytest.approx(cross)
+    assert inverse["evdf_standard_uncertainty_including_geometry_s_per_m"].shape == (81,)
+    assert inverse["velocity_moment_covariance_including_geometry"].shape == (6, 6)

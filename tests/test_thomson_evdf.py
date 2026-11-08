@@ -855,3 +855,45 @@ def test_evdf_rejects_scattering_angle_uncertainty_outside_local_gaussian_domain
     wavelength, signal, background = _case()
     with pytest.raises(ValueError, match="3 sigma to remain inside"):
         _run(wavelength, signal, background, scattering_angle_uncertainty_rad=0.6)
+
+
+def test_evdf_propagates_joint_laser_wavelength_angle_covariance_with_cross_terms():
+    wavelength, signal, background = _case()
+    sigma_laser = 2.0e-3
+    sigma_angle = 2.0e-4
+    cross = 0.25 * sigma_laser * sigma_angle
+    result = _run(
+        wavelength, signal, background,
+        signal_uncertainty=np.full(signal.size, 1.0),
+        laser_wavelength_uncertainty_nm=sigma_laser,
+        scattering_angle_uncertainty_rad=sigma_angle,
+        laser_angle_covariance_nm_rad=cross,
+    )
+    sensitivity = np.asarray(result["joint_geometry_sensitivity_matrix"], dtype=float)
+    calibration_covariance = np.asarray(
+        result["joint_laser_angle_calibration_covariance_nm2_rad"], dtype=float
+    )
+    expected_geometry = sensitivity @ calibration_covariance @ sensitivity.T
+    actual_geometry = np.asarray(
+        result["scattering_geometry_evdf_covariance_s2_per_m2"], dtype=float
+    )
+    np.testing.assert_allclose(actual_geometry, expected_geometry, rtol=2e-9, atol=1e-18)
+    assert result["laser_wavelength_evdf_sensitivity_s_per_m_per_nm"] is not None
+    assert result["evdf_scattering_angle_sensitivity_s_per_m_per_rad"] is not None
+    total = np.asarray(result["evdf_covariance_including_scattering_geometry"])
+    conditional = np.asarray(result["evdf_covariance"])
+    np.testing.assert_allclose(total, conditional + expected_geometry, rtol=2e-8, atol=1e-16)
+    assert result["evdf_standard_uncertainty_including_geometry_s_per_m"].shape == sensitivity.shape[:1]
+    assert result["velocity_moment_covariance_including_geometry"].shape == (6, 6)
+    assert result["velocity_moment_standard_uncertainty_including_geometry"] is not None
+
+
+def test_evdf_rejects_non_psd_joint_laser_angle_covariance():
+    wavelength, signal, background = _case()
+    with pytest.raises(ValueError, match="joint laser-wavelength/scattering-angle calibration covariance"):
+        _run(
+            wavelength, signal, background,
+            laser_wavelength_uncertainty_nm=1.0e-3,
+            scattering_angle_uncertainty_rad=1.0e-4,
+            laser_angle_covariance_nm_rad=2.0e-7,
+        )

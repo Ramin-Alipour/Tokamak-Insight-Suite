@@ -1807,8 +1807,11 @@ elif page=='Spectral Analysis':
                             )
                             st.line_chart(evdf_curve)
                             uncertainty=evdf.get(
-                                'evdf_standard_uncertainty_s_per_m',
-                                evdf.get('projected_evdf_standard_uncertainty_s_m'),
+                                'evdf_standard_uncertainty_including_geometry_s_per_m',
+                                evdf.get(
+                                    'evdf_standard_uncertainty_s_per_m',
+                                    evdf.get('projected_evdf_standard_uncertainty_s_m'),
+                                ),
                             )
                             if uncertainty is not None:
                                 uncertainty=np.asarray(uncertainty,dtype=float)
@@ -1817,12 +1820,21 @@ elif page=='Spectral Analysis':
                                         'lower_local_1sigma':np.maximum(distribution_values-uncertainty,0.0),
                                         'upper_local_1sigma':distribution_values+uncertainty,
                                     },index=pd.Index(velocity,name='velocity_parallel_m_s'))
-                                    st.caption(
-                                        'Frequentist fixed-active-set Tikhonov sandwich 1σ uncertainty '
-                                        '(H⁻¹ Aᵀ A H⁻¹), conditional on the selected velocity grid, '
-                                        'measured response, fitted background and regularization. '
-                                        'It excludes regularization-selection uncertainty and is not a posterior interval.'
-                                    )
+                                    if evdf.get('geometry_uncertainty_covariance_included'):
+                                        st.caption(
+                                            'Frequentist fixed-active-set Tikhonov sandwich 1σ uncertainty '
+                                            'with first-order joint laser-wavelength/scattering-angle calibration '
+                                            'covariance propagated through the inverse. Conditional on the selected '
+                                            'velocity grid, measured response, fitted background and regularization; '
+                                            'regularization-selection spread remains separate and this is not a posterior interval.'
+                                        )
+                                    else:
+                                        st.caption(
+                                            'Frequentist fixed-active-set Tikhonov sandwich 1σ uncertainty '
+                                            '(H⁻¹ Aᵀ A H⁻¹), conditional on the selected velocity grid, '
+                                            'measured response, fitted background and regularization. '
+                                            'It excludes regularization-selection uncertainty and is not a posterior interval.'
+                                        )
                                     st.line_chart(band)
                             if evdf_status=='conditional_regularized_candidate':
                                 st.warning('This is a regularized candidate only: the measured spectrum did not identify the full projected EVDF independently of regularization.')

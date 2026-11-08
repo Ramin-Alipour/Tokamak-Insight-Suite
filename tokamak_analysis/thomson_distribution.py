@@ -1118,10 +1118,23 @@ def analyze_thomson_spectral_distribution(
                 "background_signal": background.copy(),
                 **options,
             }
-        if scattering_angle_uncertainty_rad is not None:
-            if use_relativistic_inverse:
-                raise ValueError("scattering_angle_uncertainty_rad is not yet supported by the relativistic projected-EVDF inverse; use the multi-view geometry uncertainty workflow")
-            evdf_kwargs["scattering_angle_uncertainty_rad"] = float(scattering_angle_uncertainty_rad)
+        if use_relativistic_inverse and (
+            scattering_angle_uncertainty_rad is not None
+            or laser_wavelength_uncertainty_nm is not None
+            or float(laser_angle_covariance_nm_rad) != 0.0
+        ):
+            raise ValueError(
+                "laser/scattering geometry covariance propagation is currently supported "
+                "by the non-relativistic projected-EVDF inverse only; use the dedicated "
+                "relativistic multi-view geometry uncertainty workflow"
+            )
+        if not use_relativistic_inverse:
+            if scattering_angle_uncertainty_rad is not None:
+                evdf_kwargs["scattering_angle_uncertainty_rad"] = float(scattering_angle_uncertainty_rad)
+            if laser_wavelength_uncertainty_nm is not None:
+                evdf_kwargs["laser_wavelength_uncertainty_nm"] = float(laser_wavelength_uncertainty_nm)
+            if laser_angle_covariance_nm_rad != 0.0:
+                evdf_kwargs["laser_angle_covariance_nm_rad"] = float(laser_angle_covariance_nm_rad)
         if uncertainty is not None:
             evdf_kwargs["signal_uncertainty"] = uncertainty.copy()
         elif signal_covariance_matrix is not None:
