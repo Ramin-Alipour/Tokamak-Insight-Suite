@@ -51,6 +51,119 @@ def _wavelength_bin_widths(x):
     return widths
 
 
+def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
+    """Return physical moments of a normalized q-parallel EVDF and their covariance.
+
+    The reported moments are one-dimensional scattering-vector marginal
+    moments. They are not the full 3-D electron heat flux or a 3-D EVDF.
+    Covariance is propagated with the same nonuniform trapezoidal quadrature
+    used to normalize the reconstructed density.
+    """
+    velocity = np.asarray(velocity_m_s, dtype=float)
+    density = np.asarray(probability_density_s_per_m, dtype=float)
+    if (velocity.ndim != 1 or density.shape != velocity.shape or velocity.size < 3
+            or not np.all(np.isfinite(velocity)) or not np.all(np.isfinite(density))
+            or np.any(np.diff(velocity) <= 0.0) or np.any(density < 0.0)):
+        raise ValueError("projected EVDF moments require matching finite non-negative density and increasing velocity vectors")
+    intervals = np.diff(velocity)
+    weights = np.empty_like(velocity)
+    weights[0] = 0.5 * intervals[0]
+    weights[-1] = 0.5 * intervals[-1]
+    weights[1:-1] = 0.5 * (intervals[:-1] + intervals[1:])
+    normalization = float(weights @ density)
+    if not np.isfinite(normalization) or normalization <= np.finfo(float).tiny:
+        raise ValueError("projected EVDF has no positive finite probability integral")
+    pdf = density / normalization
+    m1 = float(weights @ (velocity * pdf))
+    m2 = float(weights @ (velocity**2 * pdf))
+    m3 = float(weights @ (velocity**3 * pdf))
+    m4 = float(weights @ (velocity**4 * pdf))
+    variance = m2 - m1**2
+    if not np.isfinite(variance) or variance <= 0.0:
+        raise ValueError("projected EVDF has non-positive velocity variance")
+    sigma = float(np.sqrt(variance))
+    mu3 = float(m3 - 3.0*m1*m2 + 2.0*m1**3)
+    mu4 = float(m4 - 4.0*m1*m3 + 6.0*m1**2*m2 - 3.0*m1**4)
+    skewness = mu3 / sigma**3
+    excess_kurtosis = mu4 / variance**2 - 3.0
+    electron_mass = 9.1093837139e-31
+    elementary_charge = 1.602176634e-19
+    moment_order = (
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
+        "skewness",
+        "excess_kurtosis",
+    )
+    moment_covariance = None
+    moment_standard_uncertainty = None
+    if covariance is not None:
+        cov = np.asarray(covariance, dtype=float)
+        if cov.shape != (velocity.size, velocity.size) or not np.all(np.isfinite(cov)):
+            raise ValueError("projected EVDF covariance must be finite and square on the velocity grid")
+        if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12*max(float(np.max(np.abs(cov))), 1.0)):
+            raise ValueError("projected EVDF covariance must be symmetric")
+        raw1, raw2, raw3, raw4 = (
+            weights*velocity, weights*velocity**2,
+            weights*velocity**3, weights*velocity**4,
+        )
+        variance_gradient = raw2 - 2.0*m1*raw1
+        sigma_gradient = variance_gradient/(2.0*sigma)
+        temperature_gradient = (electron_mass/elementary_charge)*variance_gradient
+        mu3_gradient = raw3 + (-3.0*m2 + 6.0*m1**2)*raw1 - 3.0*m1*raw2
+        mu4_gradient = (
+            raw4 + (-4.0*m3 + 12.0*m1*m2 - 12.0*m1**3)*raw1
+            - 4.0*m1*raw3 + 6.0*m1**2*raw2
+        )
+        skewness_gradient = mu3_gradient/variance**1.5 - 1.5*mu3*variance_gradient/variance**2.5
+        kurtosis_gradient = mu4_gradient/variance**2 - 2.0*mu4*variance_gradient/variance**3
+        jacobian = np.vstack((
+            raw1, variance_gradient, sigma_gradient, temperature_gradient,
+            mu3_gradient, mu4_gradient, skewness_gradient, kurtosis_gradient,
+        ))
+        moment_covariance = jacobian @ cov @ jacobian.T
+        moment_covariance = 0.5*(moment_covariance + moment_covariance.T)
+        if not np.all(np.isfinite(moment_covariance)):
+            raise ValueError("projected EVDF physical-moment covariance is not finite")
+        moment_standard_uncertainty = {
+            name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
+            for i, name in enumerate(moment_order)
+        }
+    return {
+        "status": "identified_from_measurement" if covariance is not None else "moments_only_covariance_unavailable",
+        "velocity_projection": "q_parallel_one_dimensional_marginal",
+        "normalization": normalization,
+        "mean_velocity_parallel_m_s": m1,
+        "velocity_parallel_variance_m2_s2": variance,
+        "velocity_parallel_standard_deviation_m_s": sigma,
+        "directional_equivalent_temperature_eV": electron_mass*variance/elementary_charge,
+        "central_third_velocity_moment_m3_s3": mu3,
+        "central_fourth_velocity_moment_m4_s4": mu4,
+        "skewness": float(skewness),
+        "excess_kurtosis": float(excess_kurtosis),
+        "equations": {
+            "mean": "u_q = integral(v_q f_q(v_q) dv_q)",
+            "variance": "sigma_q^2 = integral((v_q-u_q)^2 f_q(v_q) dv_q)",
+            "directional_temperature": "T_eq,q[eV] = (m_e/e) sigma_q^2",
+            "third_central": "mu_3,q = integral((v_q-u_q)^3 f_q(v_q) dv_q)",
+            "fourth_central": "mu_4,q = integral((v_q-u_q)^4 f_q(v_q) dv_q)",
+            "skewness": "gamma_1,q = mu_3,q/sigma_q^3",
+            "excess_kurtosis": "gamma_2,q = mu_4,q/sigma_q^4 - 3",
+        },
+        "moment_covariance_order": list(moment_order),
+        "moment_covariance": moment_covariance,
+        "moment_standard_uncertainty": moment_standard_uncertainty,
+        "heat_flux_identifiability": {
+            "status": "not_identified_from_single_projected_marginal",
+            "available_projected_moment": "central_third_velocity_moment_m3_s3",
+            "reason": "The 3-D parallel heat flux requires the perpendicular kinetic-energy contribution conditional on v_parallel; a 1-D projected third central moment alone is insufficient.",
+        },
+    }
+
+
 def _apply_response_matrix(response, spectrum, wavelength_nm):
     """Apply a bin-probability response while conserving integrated spectral power."""
     axis = np.asarray(wavelength_nm, dtype=float)
@@ -1192,19 +1305,49 @@ def analyze_thomson_spectral_distribution(
         # In the non-relativistic Thomson limit: lambda=lambda0*(1-q*v_parallel/c).
         # This is a forward-model consistency diagnostic, never a Gaussian Te estimator.
         inverse = result["projected_evdf_inference"]
-        velocity_grid = np.asarray(inverse["velocity_grid_m_s"] if use_relativistic_inverse else inverse["velocity_parallel_m_s"], dtype=float)
-        projected_pdf = np.asarray(inverse["projected_evdf_s_m"] if use_relativistic_inverse else inverse["evdf_parallel_s_per_m"], dtype=float)
-        from scipy.integrate import trapezoid
+        # Both inverse implementations expose the same q-parallel velocity axis.
+        # The relativistic solver deliberately withholds its primary PDF when the
+        # data-only operator is rank deficient, but still returns a conditional
+        # regularized candidate. Use that candidate only with an explicit
+        # conditional status; never silently discard it or promote it to primary.
+        velocity_grid = np.asarray(inverse["velocity_parallel_m_s"], dtype=float)
+        if use_relativistic_inverse:
+            primary_pdf = inverse.get("projected_evdf_s_m")
+            candidate_pdf = inverse.get("regularized_candidate_evdf_s_m")
+            projected_pdf = primary_pdf if primary_pdf is not None else candidate_pdf
+            evdf_primary_identified = primary_pdf is not None
+            moment_covariance_source = inverse.get("projected_evdf_covariance") if evdf_primary_identified else None
+        else:
+            projected_pdf = inverse.get("evdf_parallel_s_per_m")
+            evdf_primary_identified = inverse.get("primary_result_status", "identified_from_measurement") == "identified_from_measurement"
+            moment_covariance_source = inverse.get("evdf_covariance")
+        if projected_pdf is None:
+            raise ValueError("Projected EVDF solver returned neither an identified distribution nor a declared regularized candidate")
+        projected_pdf = np.asarray(projected_pdf, dtype=float)
         if (velocity_grid.ndim != 1 or projected_pdf.shape != velocity_grid.shape
                 or not np.all(np.isfinite(velocity_grid))
                 or not np.all(np.isfinite(projected_pdf)) or np.any(projected_pdf < 0.0)):
             raise ValueError("Projected EVDF returned an invalid probability density")
+        moment_summary = _projected_evdf_physical_moments(
+            velocity_grid, projected_pdf, moment_covariance_source
+        )
+        moment_summary["status"] = (
+            "identified_from_measurement" if evdf_primary_identified
+            else "conditional_regularized_candidate_not_primary"
+        )
+        moment_summary["primary_result_status"] = (
+            "identified_from_measurement" if evdf_primary_identified
+            else "not_fully_identifiable_from_measured_spectrum"
+        )
+        inverse["projected_evdf_physical_moments"] = moment_summary
+        inverse["moment_candidate_used"] = not evdf_primary_identified
+        from scipy.integrate import trapezoid
         evdf_norm = float(trapezoid(projected_pdf, velocity_grid))
         if not np.isfinite(evdf_norm) or evdf_norm <= 0.0:
             raise ValueError("Projected EVDF has non-positive integrated probability")
         normalized_pdf = projected_pdf / evdf_norm
-        evdf_mean = float(trapezoid(velocity_grid * normalized_pdf, velocity_grid))
-        evdf_variance = float(trapezoid((velocity_grid - evdf_mean)**2 * normalized_pdf, velocity_grid))
+        evdf_mean = moment_summary["mean_velocity_parallel_m_s"]
+        evdf_variance = moment_summary["velocity_parallel_variance_m2_s2"]
         q = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
         c_light = 299792458.0
         if use_relativistic_inverse:
@@ -1215,7 +1358,14 @@ def analyze_thomson_spectral_distribution(
             predicted_centroid = float(forward_moments["center"])
             predicted_variance = float(forward_moments["variance"])
             closure = {
-                "status": "relativistic_response_aware_moment_closure",
+                "status": (
+                    "relativistic_response_aware_moment_closure"
+                    if evdf_primary_identified
+                    else "conditional_relativistic_response_aware_moment_closure"
+                ),
+                "evdf_inference_status": moment_summary["status"],
+                "regularized_candidate_used": not evdf_primary_identified,
+                "projected_evdf_physical_moments": moment_summary,
                 "kinematics": "exact_relativistic_single_electron_thomson_or_compton",
                 "recoil_included": bool(use_compton_recoil),
                 "response_forward_modelled_centroid_nm": predicted_centroid,
