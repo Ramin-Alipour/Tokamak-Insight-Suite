@@ -9,7 +9,7 @@ import inspect
 
 
 def test_analysis_1_optical_profile_and_distribution_routes_are_executable():
-    for analysis_id in (1, 30, 46, 81):
+    for analysis_id in (1, 30, 46, 81, 85):
         entry = get_analysis(analysis_id)
         assert callable(resolve_analysis(analysis_id)), entry
         contract = entry["execution_contract"]
@@ -18,7 +18,7 @@ def test_analysis_1_optical_profile_and_distribution_routes_are_executable():
 
 
 def test_thomson_analysis_1_registry_input_and_output_names_are_unique():
-    for analysis_id in (1, 30, 46, 81, 82):
+    for analysis_id in (1, 30, 46, 81, 82, 83, 84, 85):
         contract = get_analysis(analysis_id)["execution_contract"]
         input_names = [item["name"] for item in contract["input_specs"]]
         output_names = [item["name"] for item in contract["output_specs"]]
@@ -132,15 +132,15 @@ def test_analysis_1_declares_channelwise_background_basis_and_mj_joint_gls():
     } <= set(parameters)
 
 
-def test_thomson_family_maps_all_four_distinct_executable_subanalyses():
+def test_thomson_family_maps_all_registered_distinct_executable_subanalyses():
     import json
     from pathlib import Path
     from tokamak_analysis.analysis_registry import get_analysis_family
 
     family = get_analysis_family(1)
-    assert family["entry_ids"] == [1, 30, 46, 81]
+    assert family["entry_ids"] == [1, 30, 46, 81, 82, 83, 84, 85]
     assert len({(get_analysis(i)["module"], get_analysis(i)["function"])
-                for i in family["entry_ids"]}) == 4
+                for i in family["entry_ids"]}) == 8
 
     diagnostic_registry = json.loads(
         (Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(
@@ -160,6 +160,7 @@ def test_thomson_family_maps_all_four_distinct_executable_subanalyses():
         "Collective Thomson / coherent scattering (CTS)",
         "Thomson spatial profile reconstruction",
         "Thomson spectral distribution",
+        "General relativistic 3-D optical Thomson EVDF reconstruction",
     } <= names
 
     by_name = {item["diagnostic"]: item for item in diagnostic_registry}
@@ -168,6 +169,7 @@ def test_thomson_family_maps_all_four_distinct_executable_subanalyses():
         30: ("Collective Thomson / coherent scattering (CTS)", "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model"),
         46: ("Thomson spatial profile reconstruction", "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"),
         81: ("Thomson spectral distribution", "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"),
+        85: ("General relativistic 3-D optical Thomson EVDF reconstruction", "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"),
     }
     for analysis_id, (diagnostic_name, function_path) in expected_functions.items():
         assert function_path in by_name[diagnostic_name]["implementation_functions"]
@@ -261,6 +263,7 @@ def test_analysis1_runtime_and_packaged_registries_are_byte_and_contract_consist
         30: "Collective Thomson / coherent scattering (CTS)",
         46: "Thomson spatial profile reconstruction",
         81: "Thomson spectral distribution",
+        85: "General relativistic 3-D optical Thomson EVDF reconstruction",
     }
     for analysis_id, diagnostic_name in expected.items():
         runtime_contract = get_analysis(analysis_id)["execution_contract"]
