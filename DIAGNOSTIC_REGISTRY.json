@@ -8953,7 +8953,10 @@
     "method": "Analyze the calibrated measured wavelength-intensity spectrum using exactly one explicitly selected background representation, signed spectral moments and a Gaussian spectral-shape forward fit convolved with the supplied measured instrument-response matrix. This subanalysis provides descriptive wavelength-space diagnostics only; physical plasma parameters are extracted by the parent Thomson Analysis 1 forward fit.",
     "caveat": "This subanalysis characterizes measured spectral shape only. It accepts no pre-extracted plasma parameters, does not infer a unique electron velocity distribution from wavelength moments, does not deconvolve the measured spectrum, and does not calculate instrument-corrected widths. The measured response matrix is used only as a forward operator in the Gaussian shape fit. An explicitly supplied fitted background may carry a separate pointwise uncertainty or full covariance, propagated as independent of signal uncertainty unless a joint covariance is available. Possible signal contamination is not independently inferred.",
     "implementation_functions": [
-      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+      "tis.products.thomson.api.analyze_spectral_distribution",
+      "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+      "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
+      "tis.physics.shared.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf"
     ],
     "implementation_status": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics are implemented. Optional non-negative projected-EVDF inversion now supports non-relativistic Doppler, exact relativistic Thomson and Compton/Klein-Nishina kinematics; rank-deficient relativistic inversions retain a clearly labelled regularized candidate and expose q-parallel physical moments without promoting them to identified results.",
     "execution_contract": {
@@ -9413,9 +9416,10 @@
         "A single q-parallel marginal does not identify the perpendicular kinetic-energy conditional distribution and therefore does not identify the full 3-D parallel electron heat flux."
       ],
       "function_links": [
-        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
-        "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
-        "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
+        "tis.products.thomson.api.analyze_spectral_distribution",
+        "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+        "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
+        "tis.physics.shared.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf"
       ],
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
@@ -9431,7 +9435,8 @@
         "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
         "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
         "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
-        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments"
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments",
+        "tests/test_thomson_evdf.py::test_projected_velocity_moments_and_covariance_are_consistent"
       ],
       "input_data_level": "measured_calibrated_spectrum"
     },
