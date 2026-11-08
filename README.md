@@ -65,7 +65,7 @@ field_result = analyze_multipin(
 # cross-pin voltage covariance through its nonuniform-grid derivative.
 ```
 
-The product catalog is derived from `ANALYSIS_FAMILIES.json` and the callable analysis registry; it does not duplicate solver metadata. The AST-based dependency inventory is available through `tis.products.build_dependency_inventory()`. See [the product implementation map](docs/architecture/PRODUCT_IMPLEMENTATION_MAP.md) and [the platform architecture](docs/architecture/PRODUCT_PLATFORM_ARCHITECTURE.md).
+All 20 specialist families now expose dedicated importable API packages under `tis/products/`; resolve a package with `tis.products.load_product_api(product_id)`. Each package routes its named workflow wrappers through the ownership-checked platform dispatcher. The product catalog is derived from `ANALYSIS_FAMILIES.json` and the callable analysis registry; it does not duplicate solver metadata. The AST-based dependency inventory is available through `tis.products.build_dependency_inventory()`. See [the product implementation map](docs/architecture/PRODUCT_IMPLEMENTATION_MAP.md) and [the platform architecture](docs/architecture/PRODUCT_PLATFORM_ARCHITECTURE.md).
 
 The current application provides a Python execution API and Streamlit dashboard. This product layer does not imply a separately deployed HTTP/REST service. Diagnostic knowledge-base records and callable workflow entry points are separate catalogue layers and may have different counts.
 ## Run locally
