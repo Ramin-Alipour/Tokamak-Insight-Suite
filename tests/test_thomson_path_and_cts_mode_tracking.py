@@ -217,3 +217,16 @@ def test_path_density_rejects_non_psd_power_profile_joint_covariance():
             optical_profile_covariance=profile_covariance,
             scattered_power_optical_profile_cross_covariance=cross_covariance,
         )
+
+
+def test_correlated_path_density_is_a_registered_thomson_subanalysis():
+    from tokamak_analysis.analysis_registry import get_analysis, get_analysis_family
+
+    entry = get_analysis(87)
+    assert entry["function"] == "infer_thomson_path_averaged_density"
+    assert entry["module"] == "thomson_scattering"
+    assert any(
+        item["name"] == "scattered_power_optical_profile_cross_covariance"
+        for item in entry["execution_contract"]["input_specs"]
+    )
+    assert 87 in get_analysis_family(1)["entry_ids"]
