@@ -271,6 +271,37 @@ def test_multiview_evdf_regularization_sensitivity_reports_l_curve_without_auto_
     assert all(level["null_space_dimension"] == 0 for level in result["levels"])
 
 
+def test_multiview_evdf_regularization_ensemble_propagates_all_spectral_covariance_components():
+    kernels = np.zeros((3, 2, 6))
+    for view in range(3):
+        kernels[view, :, 2*view:2*view+2] = np.eye(2)
+    truth = np.array([1., 2., 3., 4., 5., 6.])
+    volume = np.full(6, 0.1)
+    data = (kernels.reshape(6, 6) @ (truth * volume)).reshape(3, 2)
+    measurement = np.eye(6) * 1.0e-4
+    discrepancy = np.eye(6) * 2.0e-5
+    discrepancy[0, 1] = discrepancy[1, 0] = 2.0e-6
+    systematic = np.eye(6) * 3.0e-5
+    result = assess_multiview_evdf_regularization_sensitivity(
+        kernels, data, np.arange(18, dtype=float).reshape(6, 3),
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=np.diff(np.eye(6), axis=0),
+        regularization_strengths=np.array([1e-8, 1e-5, 1e-2]),
+        measurement_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+    )
+    assert result["covariance_components_included"] == {
+        "measurement": True, "model_discrepancy": True, "systematic": True,
+    }
+    assert result["noise_model"] == "measurement_plus_model_discrepancy_plus_systematic_covariance"
+    assert np.allclose(
+        result["effective_spectral_covariance"],
+        measurement + discrepancy + systematic,
+    )
+    assert result["regularization_selection_uncertainty"]["physical_moment_covariance_moment_units_squared"].shape == (12, 12)
+
+
 def test_multiview_evdf_regularization_spread_propagates_to_3d_physical_moments():
     kernels = np.zeros((3, 2, 6))
     for view in range(3):
