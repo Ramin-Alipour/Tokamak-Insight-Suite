@@ -1070,6 +1070,8 @@ EXAMPLES["thomson_multiview_3d_evdf_regularization_sensitivity"] = {
     "regularization_matrix": np.diff(np.eye(6), axis=0).tolist(),
     "regularization_strengths": [1.0e-8, 1.0e-5, 1.0e-2],
     "measurement_uncertainty": np.full((3, 2), 0.01).tolist(),
+    "model_discrepancy_covariance": None,
+    "systematic_covariance": None,
 }
 
 # Reuse the same explicit physical input contract for the public response alias.
