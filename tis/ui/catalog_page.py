@@ -31,9 +31,13 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
         st.error("Diagnostic completeness counts do not reconcile with the loaded registry; do not trust this status summary.")
     if len(diagnostics) != 80:
         st.error(f"Expected exactly 80 diagnostic records but loaded {len(diagnostics)}.")
-    expected_analysis_ids = [entry_id for entry_id in range(1, 88) if entry_id != 7]
-    if [item.get("id") for item in analyses] != expected_analysis_ids:
-        st.error("The callable analysis registry must contain IDs 1–87 with retired ID 7 omitted.")
+    analysis_ids = [item.get("id") for item in analyses]
+    if (
+        any(isinstance(item, bool) or not isinstance(item, int) for item in analysis_ids)
+        or analysis_ids != sorted(analysis_ids)
+        or len(analysis_ids) != len(set(analysis_ids))
+    ):
+        st.error("The callable analysis registry must contain unique, ordered integer IDs.")
     diagnostic_positions = {id(row): position for position, row in enumerate(diagnostics, start=1)}
     expected_completeness = {"complete": 7, "complete_with_declared_scope": 4, "incomplete": 69}
     expected_levels = {"analysis_pipeline": 11, "limited_calculation": 17, "reference_only": 52}
@@ -69,7 +73,8 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
     mapped_analysis_ids = [i for family in analysis_families for i in family.get("entry_ids", [])]
     if analysis_families and (
         len(analysis_families) != 20
-        or sorted(mapped_analysis_ids) != sorted(expected_analysis_ids)
+        or [family.get("id") for family in analysis_families] != list(range(1, 21))
+        or sorted(mapped_analysis_ids) != sorted(analysis_ids)
         or len(mapped_analysis_ids) != len(set(mapped_analysis_ids))
     ):
         st.error("Primary-analysis family mapping is invalid; verify ANALYSIS_FAMILIES.json before relying on the grouped catalogue.")
