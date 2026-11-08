@@ -4088,6 +4088,30 @@ elif page=='Advanced Analysis':
                         st.warning('The Gaussian-Maxwellian physical interpretation was withheld because the fitted parameters fall outside the declared non-relativistic validity domain.')
                         st.json(conditional_physics)
                     st.json(distribution)
+                    # Show the physical q-parallel marginal from the same
+                    # calibrated channel spectrum when the parent Analysis 1
+                    # forward workflow has produced it. Wavelength moments are
+                    # never relabelled as velocity moments.
+                    projected_evdf=channel_result.get('electron_velocity_distribution') or {}
+                    evdf_status=projected_evdf.get('analysis_status','unavailable')
+                    if evdf_status in {'completed','conditional_regularized_candidate'}:
+                        st.markdown('**Physical projected-EVDF moments from the same measured channel**')
+                        evdf_moments={
+                            'inference_status':evdf_status,
+                            'mean_velocity_parallel_m_s':projected_evdf.get('mean_velocity_parallel_m_s'),
+                            'directional_equivalent_temperature_eV':projected_evdf.get('directional_equivalent_temperature_eV'),
+                            'central_third_velocity_moment_m3_s3':projected_evdf.get('central_third_velocity_moment_m3_s3'),
+                            'central_fourth_velocity_moment_m4_s4':projected_evdf.get('central_fourth_velocity_moment_m4_s4'),
+                            'skewness':projected_evdf.get('skewness'),
+                            'excess_kurtosis':projected_evdf.get('excess_kurtosis'),
+                            'moment_standard_uncertainty':projected_evdf.get('velocity_moment_standard_uncertainty_including_geometry') or projected_evdf.get('velocity_moment_standard_uncertainty'),
+                            'heat_flux_identifiability':projected_evdf.get('heat_flux_identifiability'),
+                        }
+                        st.json(evdf_moments)
+                        if evdf_status=='conditional_regularized_candidate':
+                            st.warning('The displayed moments belong to a regularized candidate; they are not independently identified by the measured spectrum.')
+                    else:
+                        st.info('No projected-EVDF inverse is available for this channel/model. Wavelength-space moments above remain descriptive and are not converted into velocity moments.')
                     json_download('Export Analysis 1 spectral-distribution diagnostics',distribution,'tis_thomson_spectral_distribution.json')
                     add_report_section('Analysis 1 spectral-distribution subanalysis',distribution)
 
