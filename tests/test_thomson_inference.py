@@ -407,6 +407,12 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert evdf["heat_flux_identifiability"]["status"] == "not_identified_from_single_projected_marginal"
     assert "central_third_velocity_moment_m3_s3" in evdf["velocity_moment_covariance_order"]
     assert "central_fourth_velocity_moment_m4_s4" in evdf["velocity_moment_covariance_order"]
+    classified = result["result_classification"]["channels"][0]
+    classified_moments = {
+        item["parameter"] for item in classified["primary"] + classified["conditional"]
+    }
+    assert "central_third_velocity_moment_m3_s3" in classified_moments
+    assert "central_fourth_velocity_moment_m4_s4" in classified_moments
     assert evdf["recoil_included"] is False
     assert evdf["scattering_cross_section_model"] == (
         "polarized_single_scattering_Thomson_in_electron_rest_frame"
