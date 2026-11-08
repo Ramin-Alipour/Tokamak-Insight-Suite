@@ -271,6 +271,33 @@ def test_multiview_evdf_regularization_sensitivity_reports_l_curve_without_auto_
     assert all(level["null_space_dimension"] == 0 for level in result["levels"])
 
 
+def test_3d_evdf_covariance_ensemble_is_executable_through_public_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    kernels = np.zeros((3, 2, 6))
+    for view in range(3):
+        kernels[view, :, 2*view:2*view+2] = np.eye(2)
+    truth = np.arange(1.0, 7.0)
+    volume = np.full(6, 0.1)
+    data = (kernels.reshape(6, 6) @ (truth * volume)).reshape(3, 2)
+    result = run_advanced_thomson_physics(
+        "thomson_multiview_3d_evdf_regularization_sensitivity",
+        kernels, data, np.arange(18, dtype=float).reshape(6, 3),
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=np.diff(np.eye(6), axis=0),
+        regularization_strengths=[1e-8, 1e-5, 1e-2],
+        measurement_uncertainty=np.full((3, 2), 0.01),
+        model_discrepancy_covariance=np.eye(6) * 2e-5,
+        systematic_covariance=np.eye(6) * 3e-5,
+    )
+    assert result["covariance_components_included"] == {
+        "measurement": True, "model_discrepancy": True, "systematic": True,
+    }
+    assert result["regularization_selection_uncertainty"][
+        "physical_moment_covariance_moment_units_squared"
+    ].shape == (12, 12)
+
+
 def test_multiview_3d_evdf_rejects_tiny_scale_indefinite_covariance():
     kernels = np.zeros((3, 2, 6))
     for view in range(3):
