@@ -20,7 +20,7 @@ def render_product_workspace_page(st: Any) -> None:
         options=[item["id"] for item in products],
         format_func=lambda product_id: (
             f"{product_id:02d} · "
-            next(item["name"] for item in products if item["id"] == product_id)
+            + next(item["name"] for item in products if item["id"] == product_id)
         ),
         key="tis_specialist_product",
     )
