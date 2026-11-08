@@ -1,0 +1,269 @@
+name: Continuous software tests
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keep only the newest validation run for a branch; stale commits must not
+  # accumulate behind a long-running or delayed hosted-runner allocation.
+  group: tis-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests-and-dashboard:
+    runs-on: ubuntu-latest
+    env:
+      TIS_RUN_LIVE_BROWSER_E2E: "1"
+      # Prevent Git's init.defaultBranch advisory from polluting Actions logs
+      # when actions/checkout initializes its temporary worktree.
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: "init.defaultBranch"
+      GIT_CONFIG_VALUE_0: "main"
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install '.[test]' pytest-cov ruff
+      - name: Install Chromium for real-browser tests
+        run: python -m playwright install --with-deps chromium
+      - name: Compile Python sources
+        run: python -m compileall -q app.py tis tokamak_analysis tests
+      - name: Run static checks for syntax and undefined names
+        run: ruff check --select E9,F63,F7,F82 app.py tis tokamak_analysis tests
+      - name: Smoke-test CLI and exported registries after clean install
+        shell: bash
+        run: |
+          set -euo pipefail
+          tis --help
+          output_dir="$RUNNER_TEMP/tis-registry-smoke"
+          tis catalog --kind both --output-dir "$output_dir"
+          python - "$RUNNER_TEMP" "$output_dir" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          temp = pathlib.Path(sys.argv[1])
+          root = pathlib.Path(sys.argv[2])
+          diagnostics = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text())
+          formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text())
+          canonical_diagnostics = json.loads(pathlib.Path("DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+          assert diagnostics == canonical_diagnostics, "Exported diagnostics differ from the canonical diagnostic registry"
+          expected_formulas = json.loads(pathlib.Path("FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+          assert formulas == expected_formulas, "Exported formulas differ from the canonical formula registry"
+          assert all(item.get("execution_contract") for item in formulas), "Formula contract missing"
+          (temp / "tis-cli-smoke.csv").write_text(
+              "t,b1\n" + "".join(f"{i * 0.001},{(i % 4) - 1.5}\n" for i in range(64)),
+              encoding="utf-8",
+          )
+          PY
+          tis qc "$RUNNER_TEMP/tis-cli-smoke.csv" --output "$RUNNER_TEMP/tis-qc-smoke.json"
+          tis fft "$RUNNER_TEMP/tis-cli-smoke.csv" --signal b1 --time t --output "$RUNNER_TEMP/tis-fft-smoke.csv"
+          test -s "$RUNNER_TEMP/tis-qc-smoke.json"
+          test -s "$RUNNER_TEMP/tis-fft-smoke.csv"
+          test -s "$RUNNER_TEMP/tis-fft-smoke_welch_psd.csv"
+      - name: Verify all registered analysis entry points and diagnostic catalog mappings
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+
+          diagnostics = json.loads(Path("DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+          analysis_ids = [item["id"] for item in ANALYSES]
+          assert analysis_ids == sorted(set(analysis_ids)), "Analysis IDs must be unique and ordered"
+
+          analysis_by_name = {item["name"]: item for item in ANALYSES}
+          diagnostic_names = [item["diagnostic"] for item in diagnostics]
+          assert len(diagnostic_names) == len(set(diagnostic_names)), "Diagnostic catalog names must be unique"
+          missing = [name for name in diagnostic_names if name not in analysis_by_name]
+          assert not missing, f"Diagnostic catalog entries lack analysis entry points: {missing}"
+
+          for item in ANALYSES:
+              assert callable(resolve_analysis(item["id"])), item["id"]
+          for name in diagnostic_names:
+              assert callable(resolve_analysis(analysis_by_name[name]["id"])), name
+
+          print(
+              f"Verified {len(ANALYSES)} analysis entry points and "
+              f"{len(diagnostics)} diagnostic catalog mappings."
+          )
+          PY
+      - name: Exercise every workspace page with Streamlit AppTest
+        run: |
+          python - <<'PY'
+          from streamlit.testing.v1 import AppTest
+
+          pages = [
+              "Home",
+              "Public Data Access",
+              "Data Import & QC",
+              "Time Series & MHD",
+              "Events & Transients",
+              "Spectral Analysis",
+              "Probe Analysis",
+              "Plasma Parameters",
+              "Confinement & Scalings",
+              "Equilibrium & Reconstruction",
+              "Tomography & Bolometry",
+              "Advanced Analysis",
+              "Diagnostic Catalog",
+              "Project Manager",
+              "Reports & Export",
+          ]
+          app = AppTest.from_file("app.py", default_timeout=45)
+          app.run()
+          assert not app.exception, f"Home page raised: {app.exception}"
+          assert len(app.radio) > 0, "Workspace page selector was not rendered."
+          observed = list(app.radio[0].options)
+          assert observed == pages, f"Workspace page list changed unexpectedly: {observed}"
+          for page in pages[1:]:
+              app.session_state["workspace_page"] = page
+              app.run()
+              assert not app.exception, f"{page} raised: {app.exception}"
+          PY
+      - name: Start Streamlit dashboard and check HTTP health
+        shell: bash
+        run: |
+          streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8501 > /tmp/tis-streamlit.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health; then
+              echo
+              echo "PASS: Streamlit health endpoint responded."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/tis-streamlit.log
+          echo "FAIL: Streamlit health endpoint did not respond."
+          exit 1
+
+
+  optional-data-and-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install and validate the optional data extra in a clean environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install '.[data]'
+          python -m pip check
+          python - <<'PY'
+          import aiohttp
+          import fsspec
+          import numcodecs
+          import xarray
+          import zarr
+          print("PASS: optional data dependencies import successfully.")
+          print(f"xarray={xarray.__version__}; zarr={zarr.__version__}; fsspec={fsspec.__version__}")
+          PY
+      - name: Build Docker image
+        run: docker build --tag tis-ci:smoke .
+      - name: Run container and verify dashboard health and data imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name tis-ci-smoke --publish 8501:8501 tis-ci:smoke
+          cleanup() {
+            docker logs tis-ci-smoke || true
+            docker rm --force tis-ci-smoke >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              echo "PASS: Dockerized Streamlit health endpoint responded."
+              docker exec tis-ci-smoke python -c "import xarray, zarr, fsspec, aiohttp, numcodecs; print('PASS: data dependencies import inside Docker.')"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs tis-ci-smoke
+          echo "FAIL: Dockerized Streamlit health endpoint did not respond."
+          exit 1
+
+
+  dependency-resolution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Resolve dependencies and install runtime, test, and data extras
+        run: |
+          python -m pip install --upgrade pip uv
+          # The repository's uv.lock is empty. Resolve from pyproject.toml in CI
+          # rather than claiming to validate a committed lock that does not exist.
+          uv lock
+          uv sync --locked --extra test --extra data
+      - name: Compile sources in the resolved environment
+        run: uv run --locked python -m compileall -q app.py tis tokamak_analysis tests
+
+
+  package-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Build and inspect the installable wheel
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m pip install --no-deps --target "$RUNNER_TEMP/tis-installed" dist/*.whl
+          cd "$RUNNER_TEMP"
+          PYTHONPATH="$RUNNER_TEMP/tis-installed" python - <<'PY'
+          import json
+          from pathlib import Path
+          import tis
+          from tis.catalog import DIAGNOSTICS, FORMULAS
+          from tis.contracts import get_diagnostic_contracts
+          from tis import __version__
+          package_data = Path(tis.__file__).resolve().parent / 'data'
+          assert DIAGNOSTICS == json.loads((package_data / 'DIAGNOSTIC_REGISTRY.json').read_text(encoding='utf-8'))
+          assert FORMULAS == json.loads((package_data / 'FORMULA_REGISTRY.json').read_text(encoding='utf-8'))
+          assert len(get_diagnostic_contracts()) == len(DIAGNOSTICS)
+          assert __version__
+          print(f"Wheel import and registry checks passed for TIS {__version__}.")
+          PY

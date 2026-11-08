@@ -1,0 +1,24 @@
+"""Computational analysis modules for tokamak diagnostics and plasma parameters.
+
+Each module exposes explicit numerical functions. Instrument calibration,
+diagnostic geometry and model-dependent assumptions must be supplied by users.
+"""
+__all__ = [
+    "analysis_registry", "average_density", "ball_pen_probe", "beta", "bolometry", "channel_synchronization",
+    "confinement", "cxrs", "denoising", "density_waves", "divertor_analysis", "doppler_flow",
+    "doppler_spectroscopy", "doppler_temperature", "ece_analysis", "ece_kinetic", "ece_kinetic_modes", "ecrh_icrh",
+    "edge_field", "electron_temperature", "energetic_particles", "equilibrium_reconstruction",
+    "fft_analysis", "fueling_rate", "fusion_rate", "gas_puffing", "gundestrup_probe",
+    "hard_xray", "heat_flux", "heating_analysis", "impurity_concentration",
+    "interferometry", "ion_temperature", "lh_transition", "line_radiation",
+    "magnetic_axis", "magnetic_field", "magnetic_mode_frequency", "measurement_uncertainty", "molecular_spectroscopy",
+    "mhd_modes", "mirnov_analysis", "multipin_probe", "neutral_gas", "neutron_flux",
+    "neutron_spectrum", "nuclear_gamma", "plasma_current", "plasma_geometry",
+    "plasma_wave_spectrum", "poloidal_field_probes", "potential_analysis", "probe_analysis", "radiation_tomography",
+    "reflectometry", "rf_interaction", "runaway_electrons", "runaway_energy",
+    "safety_factor", "shafranov_shift", "shape_reconstruction", "signal_calibration",
+    "soft_xray", "spectral_broadening", "spectral_line_identification", "spectral_line_ratio",
+    "svd_analysis", "thomson_advanced_closure", "thomson_anisotropic_inference", "thomson_background", "thomson_kinetic_background", "thomson_generalized_dispersion", "thomson_kinetic_models", "cts_geometry_uncertainty", "cts_fdt", "cts_landau_fdt", "cts_landau_em", "cts_magnetoionic", "cts_full_wave", "cts_full_physics", "cts_nonparaxial", "full_vector_maxwell", "thomson_inference_closure", "thomson_evdf", "thomson_gap_closure", "thomson_external_uncertainty", "thomson_joint_spatial_spectral", "thomson_model_comparison", "thomson_n_population", "thomson_scattering", "thomson_spatial_mixing", "thomson_workflow", "cts_analysis", "cts_full_em", "cts_collisions", "cts_spatial_inference", "thomson_joint_uncertainty", "transport", "turbulence",
+    "vacuum_pressure", "visible_imaging", "wall_recycling", "wavelet_analysis", "x_point",
+    "xray_spectrum",
+]

@@ -1,0 +1,74 @@
+name: Thomson and CTS physics contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tokamak_analysis/**"
+      - "tis/contracts.py"
+      - "tis/data/ANALYSIS_FAMILIES.json"
+      - "tis/data/DIAGNOSTIC_REGISTRY.json"
+      - "tis/data/FORMULA_REGISTRY.json"
+      - "tis/ui/**"
+      - "ANALYSIS_FAMILIES.json"
+      - "DIAGNOSTIC_REGISTRY.json"
+      - "FORMULA_REGISTRY.json"
+      - "tests/test_analysis_registry.py"
+      - "tests/test_formula_*.py"
+      - "tests/test_advanced_thomson_physics_page.py"
+      - "tests/test_cts_*.py"
+      - "tests/test_ece_*.py"
+      - "tests/test_thomson_*.py"
+      - ".github/workflows/cts-analysis.yml"
+  pull_request:
+    paths:
+      - "tokamak_analysis/**"
+      - "tis/contracts.py"
+      - "tis/data/ANALYSIS_FAMILIES.json"
+      - "tis/data/DIAGNOSTIC_REGISTRY.json"
+      - "tis/data/FORMULA_REGISTRY.json"
+      - "tis/ui/**"
+      - "ANALYSIS_FAMILIES.json"
+      - "DIAGNOSTIC_REGISTRY.json"
+      - "FORMULA_REGISTRY.json"
+      - "tests/test_analysis_registry.py"
+      - "tests/test_formula_*.py"
+      - "tests/test_advanced_thomson_physics_page.py"
+      - "tests/test_cts_*.py"
+      - "tests/test_ece_*.py"
+      - "tests/test_thomson_*.py"
+      - ".github/workflows/cts-analysis.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Run physics-contract tests only for the newest relevant commit per ref.
+  group: cts-analysis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cts-physics-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install project and numerical test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
+      - name: Run Thomson and CTS contract regression tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: >-
+          python -m pytest -q
+          tests/test_cts_*.py
+          tests/test_ece_*.py
+          tests/test_thomson_*.py
+          tests/test_analysis_registry.py
+          tests/test_formula_*.py
+          tests/test_advanced_thomson_physics_page.py

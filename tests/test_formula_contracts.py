@@ -1,0 +1,125 @@
+"""Independent analytic tests for the mapped formula-library contracts."""
+import math
+import numpy as np
+import pytest
+E_CHARGE = 1.602176634e-19  # CODATA 2019 exact elementary charge
+EPS0 = 8.8541878128e-12  # CODATA 2018 vacuum permittivity
+M_E = 9.1093837139e-31  # CODATA 2022 electron mass
+from tokamak_analysis.formula_library import (
+    electron_plasma_frequency, debye_length, electron_cyclotron_frequency,
+    ion_sound_speed, electron_thermal_pressure, ion_thermal_pressure,
+    total_thermal_pressure, thermal_stored_energy, line_integrated_density,
+)
+
+def test_electron_plasma_frequency_independent_reference():
+    n=1.0e19; expected=math.sqrt(n*E_CHARGE**2/(EPS0*M_E))
+    r=electron_plasma_frequency(n,sigma_n_e_m3=1.0e17)
+    assert r["omega_pe_rad_s"] == pytest.approx(expected,rel=1e-12)
+    assert r["frequency_pe_Hz"] == pytest.approx(expected/(2*math.pi),rel=1e-12)
+    assert r["uncertainty_omega_pe_rad_s"] == pytest.approx(expected*0.005,rel=1e-12)
+
+def test_debye_length_independent_reference():
+    T,n=100.0,1e19
+    expected=math.sqrt(EPS0*E_CHARGE*T/(n*E_CHARGE**2))
+    r=debye_length(T,n,sigma_temperature_eV=2.0,sigma_density_m3=1e17)
+    assert r["debye_length_m"] == pytest.approx(expected,rel=1e-12)
+    assert r["uncertainty_debye_length_m"] == pytest.approx(0.5*expected*math.sqrt((2/T)**2+(1e17/n)**2),rel=1e-12)
+
+def test_electron_cyclotron_frequency_independent_reference():
+    B=2.0; expected=E_CHARGE*B/M_E
+    r=electron_cyclotron_frequency(B,sigma_magnetic_field_T=0.01)
+    assert r["omega_ce_rad_s"] == pytest.approx(expected,rel=1e-12)
+    assert r["frequency_ce_Hz"] == pytest.approx(expected/(2*math.pi),rel=1e-12)
+    assert r["uncertainty_omega_ce_rad_s"] == pytest.approx(E_CHARGE*0.01/M_E, rel=1e-12)
+    assert r["uncertainty_frequency_ce_Hz"] == pytest.approx(E_CHARGE*0.01/(2*math.pi*M_E), rel=1e-12)
+
+def test_ion_sound_speed_independent_reference():
+    Te,Ti,mi,gamma=20.0,10.0,2*1.66053906660e-27,1.0
+    r = ion_sound_speed(Te,Ti,mi,gamma, sigma_electron_temperature_eV=0.2,
+                        sigma_ion_temperature_eV=0.3, sigma_ion_mass_kg=1e-29, sigma_gamma_i=0.02)
+    assert r["ion_sound_speed_m_s"] == pytest.approx(math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi),rel=1e-12)
+    expected_sigma = math.sqrt((math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*0.2/(2*(Te+gamma*Ti)))**2 + (math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*gamma*0.3/(2*(Te+gamma*Ti)))**2 + (math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*1e-29/(2*mi))**2 + (math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*Ti*0.02/(2*(Te+gamma*Ti)))**2)
+    assert r["uncertainty_ion_sound_speed_m_s"] == pytest.approx(expected_sigma, rel=1e-12)
+
+def test_electron_pressure_independent_reference():
+    n,T=2e19,100.0; expected=n*E_CHARGE*T
+    r=electron_thermal_pressure(n,T,sigma_density_m3=1e17,sigma_temperature_eV=1.0)
+    assert r["electron_pressure_Pa"] == pytest.approx(expected,rel=1e-12)
+    assert r["uncertainty_electron_pressure_Pa"] == pytest.approx(E_CHARGE*math.sqrt((T*1e17)**2+(n*1.0)**2),rel=1e-12)
+
+def test_ion_pressure_multispecies_reference():
+    r=ion_thermal_pressure([1e19,2e19],[10,20],sigma_species_density_m3=[1e17,2e17],sigma_species_temperature_eV=[1,2])
+    assert r["ion_pressure_Pa"] == pytest.approx(E_CHARGE*(1e19*10+2e19*20),rel=1e-12)
+    expected_sigma = E_CHARGE * math.sqrt((10*1e17)**2 + (1e19*1)**2 + (20*2e17)**2 + (2e19*2)**2)
+    assert r["uncertainty_ion_pressure_Pa"] == pytest.approx(expected_sigma, rel=1e-12)
+
+def test_total_pressure_reference():
+    r=total_thermal_pressure(10.0,20.0,sigma_electron_pressure_Pa=1.0,sigma_ion_pressure_Pa=2.0)
+    assert r["total_thermal_pressure_Pa"] == 30.0
+    assert r["uncertainty_total_thermal_pressure_Pa"] == pytest.approx(math.sqrt(5))
+
+def test_thermal_stored_energy_integral_reference():
+    r=thermal_stored_energy([10,10,10],[0,1,2],sigma_pressure_Pa=[1,1,1])
+    assert r["thermal_stored_energy_J"] == pytest.approx(30.0)
+    assert r["uncertainty_thermal_stored_energy_J"] == pytest.approx(1.5*math.sqrt(0.25+1+0.25))
+
+def test_line_integrated_density_reference():
+    r=line_integrated_density([1e19,1e19,1e19],[0,0.5,1.0],sigma_density_m3=[1e17]*3)
+    assert r["line_integrated_density_m-2"] == pytest.approx(1e19)
+    assert r["uncertainty_line_integrated_density_m-2"] == pytest.approx(1e17*math.sqrt(0.375))
+
+@pytest.mark.parametrize("call", [
+    lambda: electron_plasma_frequency(0), lambda: debye_length(-1,1e19),
+    lambda: electron_cyclotron_frequency(float("nan")), lambda: ion_sound_speed(1,-1,1),
+    lambda: electron_thermal_pressure(1,-1), lambda: ion_thermal_pressure([1],[1,2]),
+    lambda: total_thermal_pressure(-1,1), lambda: thermal_stored_energy([1,2],[1,0]),
+    lambda: line_integrated_density([1,2],[0,0]),
+])
+def test_invalid_formula_inputs_raise_value_error(call):
+    with pytest.raises(ValueError): call()
+
+
+from tokamak_analysis.formula_library import thomson_velocity_projection_relativistic_exact
+
+
+def test_thomson_velocity_projection_relativistic_exact_round_trip_and_uncertainty():
+    c = 299792458.0
+    laser = 532.0
+    angle = 1.2
+    beta = 0.12
+    sine = math.sin(angle / 2.0)
+    ratio = (1.0 - beta * sine) / (1.0 + beta * sine)
+    result = thomson_velocity_projection_relativistic_exact(
+        laser * ratio, laser, angle,
+        sigma_fitted_center_nm=1e-5,
+        sigma_laser_wavelength_nm=2e-6,
+        sigma_scattering_angle_rad=1e-5,
+    )
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(beta * c, rel=1e-13)
+    assert result["beta_parallel"] == pytest.approx(beta, rel=1e-13)
+    assert result["uncertainty_electron_velocity_projection_m_s"] > 0.0
+    assert result["identifiability"] == "one_projected_velocity_only"
+
+
+@pytest.mark.parametrize("center, angle", [
+    (0.0, 1.0), (500.0, 0.0), (500.0, math.pi),
+    (2000.0, 1.0),
+])
+def test_thomson_velocity_projection_relativistic_exact_rejects_invalid_inputs(center, angle):
+    with pytest.raises(ValueError):
+        thomson_velocity_projection_relativistic_exact(center, 500.0, angle)
+
+
+def test_thomson_width_temperature_is_explicitly_conditional_and_screened():
+    from tokamak_analysis.formula_library import thomson_electron_temperature_from_spectral_width
+
+    cold = thomson_electron_temperature_from_spectral_width(
+        0.001, 532.0, math.pi / 2.0
+    )
+    hot = thomson_electron_temperature_from_spectral_width(
+        100.0, 532.0, math.pi / 2.0
+    )
+    assert cold["temperature_identifiability"].startswith("conditional_on_")
+    assert cold["nonrelativistic_screen_status"] == "within_conservative_theta_e_screen"
+    assert hot["nonrelativistic_screen_status"] == "outside_conservative_theta_e_screen_use_relativistic_model"
+    assert hot["relativistic_temperature_parameter_theta_e"] > 0.01

@@ -1,0 +1,176 @@
+# Tokamak Insight Suite (TIS)
+
+**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source version: **v0.5.1**. See `docs/architecture/` for execution contracts, the canonical measurement model and reproducible project persistence.
+
+## Governing scientific-analysis input contract
+
+All physical-analysis workflows consume **measured diagnostic data that have already been prepared and calibrated by the instrument/operator**. The software uses the supplied measurements, declared physical models, and explicitly supplied fixed geometry/diagnostic metadata to infer identifiable physical quantities. It does not calibrate instruments, correct detector outputs, estimate missing calibration, or silently repair or preprocess measurements. Data-import and quality-inspection utilities are separate support functions and do not change this input contract for physical inference.
+
+Every physical workflow must distinguish:
+- **Primary outputs:** parameters identifiable from the calibrated measured data and the explicitly selected model.
+- **Conditional outputs:** parameters that become identifiable only when named auxiliary measurements or fixed metadata are supplied; the required inputs and resulting outputs must be stated.
+- **Non-identifiable quantities:** parameters not uniquely determined by the supplied measurement and model; these must be reported as unavailable with a physical reason, never fabricated.
+
+Uncertainty estimates are conditional on the supplied measurement-noise and auxiliary-input uncertainty models. Missing uncertainty or covariance is not inferred. Automated tests establish software behavior only. **No independent experimental validation is claimed or required as part of the current development scope.**
+
+## Open research beta policy
+
+TIS is developed as an openly usable research toolkit. **Independent scientific validation is not a prerequisite for publishing, installing, running, or contributing analysis modules.** Development prioritizes implementation coverage, reproducibility, software correctness, explicit assumptions, and community feedback. Automated software tests remain in place; they check software behavior, not scientific truth. Researchers must judge whether a method, calibration, units, geometry, and uncertainty model are appropriate for their experiment. See [`docs/OPEN_RESEARCH_BETA.md`](docs/OPEN_RESEARCH_BETA.md).
+
+![Dashboard design reference](docs/design_reference_dashboard.png)
+
+## Specialist product architecture
+
+TIS presents 20 specialist product families on top of shared platform services. The initial architecture is a modular monolith: product boundaries are explicit in the registry, Python execution API, dependency inventory, and dashboard, while the existing scientific solver implementations remain in their domain modules.
+
+```python
+from tis.products import list_products, execute_product_analysis
+from tis.products.thomson import analyze_spectra
+
+# Discover product ownership and registered workflows.
+products = list_products()
+thomson = next(p for p in products if p["product_id"] == "thomson-scattering")
+
+# Execute a workflow through the generic product API. Calibrated inputs
+# are passed unchanged to the registered physics implementation.
+result = execute_product_analysis(
+    "thomson-scattering",
+    1,
+    wavelength_nm,
+    measured_spectra,
+    radius_m,
+    laser_wavelength_nm=532.0,
+    scattering_angle_rad=1.5707963267948966,
+    instrument_response=measured_response,
+)
+
+# Named Thomson facade for the same canonical workflow:
+# result = analyze_spectra(...)
+
+# The second specialist product has named probe-specific facades.
+from tis.products.langmuir import analyze_langmuir_iv, analyze_multipin
+
+iv_result = analyze_langmuir_iv(
+    probe_voltage_V,
+    probe_current_A,
+    electron_fit_range=(-3.0, 4.0),
+)
+field_result = analyze_multipin(
+    probe_time_s,
+    synchronized_pin_potentials_V,
+    pin_positions_m,
+    potential_covariance_V2=pin_voltage_covariance_V2,
+)
+# The multi-pin solver reports E=-dV/dx and propagates the supplied
+# cross-pin voltage covariance through its nonuniform-grid derivative.
+```
+
+All 20 specialist families now expose dedicated importable API packages under `tis/products/`; resolve a package with `tis.products.load_product_api(product_id)`. Each package routes its named workflow wrappers through the ownership-checked platform dispatcher. The product catalog is derived from `ANALYSIS_FAMILIES.json` and the callable analysis registry; it does not duplicate solver metadata. The AST-based dependency inventory is available through `tis.products.build_dependency_inventory()`. See [the product implementation map](docs/architecture/PRODUCT_IMPLEMENTATION_MAP.md) and [the platform architecture](docs/architecture/PRODUCT_PLATFORM_ARCHITECTURE.md).
+
+The current application provides a Python execution API and Streamlit dashboard. This product layer does not imply a separately deployed HTTP/REST service. Diagnostic knowledge-base records and callable workflow entry points are separate catalogue layers and may have different counts.
+## Run locally
+
+Python 3.10+ is recommended.
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+# Optional extras: pip install '.[test,data]'
+streamlit run app.py
+```
+
+On Windows, `run_windows.bat` is also provided. On Linux/macOS, use `bash run_unix.sh`.
+
+## Command line
+
+```bash
+tis qc data.csv                     # column audit + SHA-256
+tis fft data.csv --signal b1 --time t
+tis events data.csv --kind elm --time t --signal d_alpha
+tis events data.csv --kind quench --time t --signal ip
+tis scalings --ip-A 1e6 --bt-T 1 --r-m 0.9 --a-m 0.55 --kappa 1.8 --ne-line-avg-m3 4e19 --p-loss-W 2e6
+```
+
+## Run with Docker
+
+```bash
+docker build -t tokamak-insight-suite .
+docker run --rm -p 8501:8501 tokamak-insight-suite
+```
+
+Then open `http://localhost:8501`.
+
+## Real experimental data integration test
+
+TIS includes a reproducible fetcher for **public raw MAST data** from the UKAEA FAIR-MAST archive. The reference case is shot **29790**, Mirnov-coil source group `xmo`, signal `omaha_1lz`. The public catalog documents the signal as raw and shows 1,400,000 time samples. The script exports a downsampled CSV plus a JSON provenance/quality manifest; it does not claim absolute magnetic calibration.
+
+Source documentation: https://mastapp.site/level1-data.html  
+Archive overview and access: https://www.ukaea.org/service/fair-mast/
+
+Run locally (requires network access):
+```bash
+python -m pip install -r requirements-data.txt
+python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
+```
+
+A GitHub Actions integration workflow now exercises multiple real diagnostics, not just one trace: shot 29790 `xmo/omaha_1lz` (Mirnov pickup signal), plus shot 30421 `amc/plasma_current` (plasma/coil-current source) and `ane/density` (CO₂ interferometer). It also exports a selected `efm/plasma_current_rz` grid from the archive’s existing EFIT reconstruction at a requested time. In the dashboard, the Public Data Access page can inventory variables available in a shot/group, mark which numeric one-dimensional traces the current importer supports, fetch time-series data, and retrieve/plot an existing EFIT grid. It checks finite samples, strictly increasing time, anti-alias-filtered downsampling, CSV export, FFT, Welch PSD, and digital filtering for the Mirnov case; FFT/Welch plus signal-quality metrics for the current and interferometer traces; and the dimensions, coordinates, finite fraction, and metadata of the EFIT grid. Successful runs publish CSV files, JSON provenance manifests, and a summary in the downloadable artifact `mast-real-data-multidiagnostic-validation`. Run it manually from **Actions → Real MAST data integration test → Run workflow**. Network access to the public archive is required, so raw data are not bundled in Git.
+
+This validates a real diagnostic time-series path only. Anti-aliasing is applied before downsampling; the exported sample-rate and filter method are recorded in the provenance manifest. It does not validate all TIS algorithms, diagnostic calibration, or absolute physical units. The source catalog labels data quality as “Not Checked”; inspect the source metadata and limitations before using the data for scientific conclusions.
+
+Public real-data archives and access notes: [Public Tokamak Data Sources](docs/public_tokamak_data_sources.md).
+
+**Optional community research:** existing public-data examples and benchmark notes are exploratory resources, not release gates. Researchers may share reproducible cases whether or not an independent reference result is available.
+
+**Formula and physics notes:** [equations, units, assumptions, uncertainty limitations, and edge-case handling](docs/formula_physics_audit.md).  
+**Thomson inference closure:** [joint physical/background fitting, ne/Te/Ti profile inversion, identifiability and recoil semantics](docs/THOMSON_INFERENCE_CLOSURE.md).
+
+**Analysis structure:** TIS presents **20 primary analysis families** (19 physical/diagnostic families plus one shared instrumentation-support family), grouping all **80 registered underlying analysis entry points** without deleting their distinct computational workflows. See [the primary-analysis structure](docs/ANALYSIS_STRUCTURE.md) and [implementation coverage audit: 80 diagnostic records, 80 ordered entry points, and 39 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
+
+## Workspace
+
+- **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
+- **Time Series & MHD:** filtering, FFT, configurable Welch PSD, cross-correlation/coherence, channel-derived coherence-weighted mode-number estimates, calibrated time-series integration with optional baseline subtraction, time-frequency spectrograms, and autocorrelation/correlation-time estimates.
+- **Spectral Analysis:** line fitting, spectral calibration, Doppler temperature/velocity estimates, spectral moments and line-ratio utilities.
+- **Probe Analysis:** calibrated Langmuir I–V analysis, electron/ion density and particle-flux model estimates, advanced electron-branch fits, plasma-potential derivative candidates, multi-channel and time-series batch workflows.
+- **Plasma Parameters:** parameter estimates from explicitly selected measurements and assumptions.
+- **Equilibrium & Reconstruction:** derivatives of an input flux grid and profile analysis; Public Data Access can fetch and plot an existing FAIR-MAST EFIT `plasma_current_rz` grid without claiming to reconstruct equilibrium.
+- **Equilibrium reconstruction (analysis 13):** [prescribed-boundary Grad–Shafranov solve, weighted inverse magnetic fit, inputs, outputs, acceptance tests, and EFIT limitations](docs/analyses/equilibrium_reconstruction.md).
+- **Tomography & Bolometry:** uncertainty-weighted regularized tomography with optional L-curve λ selection, Abel reconstruction, axisymmetric radiated-power integration, and Eich-like or simple-exponential target heat-flux fitting.
+- **Advanced Analysis:** X-ray spectrum summaries, neutron-rate estimates, heat-flux fits and related routines.
+- **Events & Transients:** ELM detection and repetition statistics, sawtooth crash detection (period, amplitude), plasma-current-quench analysis (ITER 80 %→20 % convention). Statistical detectors; always confirm against the raw trace.
+- **Confinement & Scalings:** Greenwald fraction, q95 (ITER formula), β_t/β_p/β_N, ν*ₑ, Spitzer resistivity, IPB98(y,2) τ_E and H98, Martin-08 L–H threshold. Empirical comparison tools, not device-validated predictions. Safety-factor profile coordinate conventions are documented in [the q95 coordinate contract](docs/analyses/safety_factor_profile_coordinates.md).
+- **Signal conditioning and detection limits:** explicit gap policies, Hampel despiking, drift-corrected integration, and background-only robust noise-floor/per-sample detection-threshold estimates. Every repair is reported; detection thresholds require bandwidth/temporal-correlation interpretation. See [Noise floor and detection limit](docs/analyses/noise_floor_detection_limit.md).
+- **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
+- **Molecular Spectroscopy (analysis 6/81):** [feature extraction, user-defined molecular-model fitting, input contract, and physical limitations](docs/analyses/molecular_spectroscopy.md).
+- **Thomson scattering (analysis 1/80):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md); [comprehensive main-branch audit and remaining-scope register](docs/audits/thomson_analysis_1_comprehensive_audit.md).
+- **CXRS (analysis 4/81):** [calibrated line fitting, ion-temperature and line-of-sight velocity estimates, assumptions, tests, and scientific limitations](docs/analyses/charge_exchange_recombination_spectroscopy.md).
+- **Poloidal-field probes:** [calibrated single-/multi-channel field analysis, uncertainty propagation, dashboard acceptance, and physical limitations](docs/analyses/poloidal_field_probes.md).
+- **Polarimetry / Faraday rotation (analysis 14):** [Faraday line-integral calculation, optional chord-averaged parallel field, uncertainty propagation, dashboard workflow, and limitations](docs/analyses/polarimetry_faraday_rotation.md).
+- **Electron Cyclotron Emission (analysis 3/81):** [resonance mapping, calibrated brightness temperature, fluctuation PSD, tests, and scientific limitations](docs/analyses/electron_cyclotron_emission.md).
+- **Reports & Export:** data and analysis exports with provenance metadata.
+
+## Tests and CI
+
+Install test tools with `pip install -e '.[test]'`; data archive support is optional via `pip install -e '.[data]'`. Excel support (`.xlsx` and legacy `.xls`) is included in the base dependencies.
+
+For a **reproducible dependency environment**, the committed `uv.lock` pins the resolved runtime, test, and optional data dependencies (including hashes) without narrowing the version ranges used by ordinary `pip install` workflows. Install [uv](https://docs.astral.sh/uv/) and run:
+
+```bash
+uv sync --locked --extra test
+# Include public-data archive support when needed:
+uv sync --locked --extra test --extra data
+uv run --locked python -m pytest -q
+```
+
+When intentionally changing dependencies, regenerate `uv.lock` with `uv lock`, review the lockfile diff, and run the full CI suite before committing. CI checks that the lockfile matches `pyproject.toml` and tests the locked environment.
+
+The `Continuous software tests` workflow tests Python 3.10–3.12 from a clean package install, compiles the source, runs critical Ruff checks, executes numerical tests with coverage, smoke-tests the `tis` CLI (QC, FFT/Welch PSD, and registry export), and uses Streamlit AppTest to exercise every workspace page. An HTTP health check supplements these runtime tests; it is not treated as proof of scientific validity. Results are recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
+
+## Scientific scope and limitations
+
+This is a research analysis framework, **not** a tokamak control, interlock, or safety system. Calculations are only meaningful when the user supplies appropriate units, calibration, geometry, instrument response, uncertainty assumptions, and valid measurement conditions. Mode-number fits sort sensors by angle and report the spatial alias limit; phase-only data cannot identify a mode above that limit without a physical prior. Timestamp gaps, invalid Langmuir temperature estimates, and negative background-subtracted spectral bins are retained; when their signed moments are physically undefined, the software reports an explicit invalid-status rather than fabricating a centroid or width. Some modules provide generic estimates or analysis building blocks rather than complete device-specific diagnostic inversions. In particular, flux-grid derivatives are not an EFIT/Grad–Shafranov equilibrium solver. Do not treat a formula catalog entry as proof of a validated end-to-end implementation.
+
+The bundled reference notes are in `docs/reference/tokamak_reference_extracted.txt`. The original third-party PDF is intentionally not redistributed; users should consult the original source and its applicable license. Read [Scientific Scope](docs/scientific_scope.md), [Diagnostic Coverage](docs/diagnostic_coverage.md), and [Release Notes](RELEASE_NOTES.md) before interpreting research results.

@@ -1,0 +1,2 @@
+# Optional real-data archive support; versions are defined in pyproject.toml.
+-e .[data]

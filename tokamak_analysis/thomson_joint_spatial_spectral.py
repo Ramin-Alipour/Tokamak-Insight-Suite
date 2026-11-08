@@ -1,0 +1,1520 @@
+"""Joint wavelength-resolved spatial Thomson inverse with fixed operators.
+
+This module fits calibrated channel-by-wavelength spectra directly. The
+researcher-supplied spatial mixing operator, optional PSF, and spectral response
+are fixed forward operators; this code does not calibrate instruments or infer
+an arbitrary PSF. Select an isotropic Maxwellian, finite-variance isotropic
+Kappa, or relativistic Maxwell-Juttner single-particle Thomson model. The
+inferred flow is the component projected along the supplied scattering vector.
+"""
+from __future__ import annotations
+
+import numpy as np
+from scipy.optimize import least_squares
+from scipy.special import gammaln, ndtr, stdtr
+
+
+_C_M_S = 299792458.0
+_MEC2_EV = 510998.95069
+
+
+def _bin_widths(axis):
+    edges = np.empty(axis.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (axis[:-1] + axis[1:])
+    edges[0] = axis[0] - 0.5 * (axis[1] - axis[0])
+    edges[-1] = axis[-1] + 0.5 * (axis[-1] - axis[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0):
+        raise ValueError("wavelength_nm must define positive bin widths")
+    return widths
+
+
+def _wavelength_edges(axis):
+    """Finite-volume wavelength-bin edges for increasing bin centres."""
+    x = np.asarray(axis, dtype=float)
+    if x.ndim != 1 or x.size < 2 or np.any(~np.isfinite(x)) or np.any(np.diff(x) <= 0.0):
+        raise ValueError("wavelength axis must be finite, increasing and contain at least two centres")
+    edges = np.empty(x.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (x[:-1] + x[1:])
+    edges[0] = x[0] - 0.5 * (x[1] - x[0])
+    edges[-1] = x[-1] + 0.5 * (x[-1] - x[-2])
+    return edges
+
+
+def gaussian_spatial_psf_matrix(radius_m, sigma_m):
+    """Finite-volume Gaussian PSF mapping true radial nodes to observed nodes.
+
+    Matrix columns correspond to a point source at each true radius; rows are
+    observed radial bins. Probability outside the finite reconstruction domain
+    is deliberately lost (sub-stochastic edge columns) and is never renormalized.
+    """
+    radius = _real_array(radius_m, "radius_m")
+    sigma = _finite_real_scalar(sigma_m, "spatial_psf_sigma_m")
+    if radius.ndim != 1 or radius.size < 3 or np.any(np.diff(radius) <= 0.0):
+        raise ValueError("radius_m must be a finite, strictly increasing vector with at least three nodes")
+    if sigma < 0.0:
+        raise ValueError("spatial_psf_sigma_m must be finite and non-negative")
+    if sigma == 0.0:
+        return np.eye(radius.size, dtype=float)
+    edges = np.empty(radius.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (radius[:-1] + radius[1:])
+    edges[0] = radius[0] - 0.5 * (radius[1] - radius[0])
+    edges[-1] = radius[-1] + 0.5 * (radius[-1] - radius[-2])
+    upper = (edges[1:, None] - radius[None, :]) / sigma
+    lower = (edges[:-1, None] - radius[None, :]) / sigma
+    probability = ndtr(upper) - ndtr(lower)
+    probability = np.maximum(probability, 0.0)
+    column_mass = np.sum(probability, axis=0)
+    if np.any(~np.isfinite(probability)) or np.any(column_mass <= 0.0) or np.any(column_mass > 1.0 + 1e-10):
+        raise ValueError("Gaussian spatial PSF produced invalid finite-domain probability columns")
+    return probability
+
+
+def _bin_averaged_maxwellian_spectrum(wavelength_nm, center_nm, sigma_nm, peak_amplitude):
+    """Exact finite-bin average of a Gaussian spectral density."""
+    x = np.asarray(wavelength_nm, dtype=float)
+    center, sigma, amplitude = float(center_nm), float(sigma_nm), float(peak_amplitude)
+    if not np.isfinite(center) or not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("Gaussian centre must be finite and sigma strictly positive")
+    if not np.isfinite(amplitude) or amplitude < 0.0:
+        raise ValueError("Gaussian peak amplitude must be finite and non-negative")
+    edges = _wavelength_edges(x)
+    z = (edges - center) / sigma
+    probability = ndtr(z[1:]) - ndtr(z[:-1])
+    positive_tail = z[:-1] > 0.0
+    probability[positive_tail] = ndtr(-z[:-1][positive_tail]) - ndtr(-z[1:][positive_tail])
+    return amplitude * np.sqrt(2.0 * np.pi) * sigma * probability / np.diff(edges)
+
+
+def _bin_averaged_callable_spectrum(wavelength_nm, spectral_density, *, quadrature_order=8):
+    """Gauss-Legendre finite-bin average for a general wavelength spectral density.
+
+    The callable is evaluated at interior quadrature nodes, never at detector
+    bin centres alone. This is used for relativistic Maxwell-Juttner and
+    Compton kernels whose line shapes do not have a closed-form bin CDF.
+    """
+    x = np.asarray(wavelength_nm, dtype=float)
+    edges = _wavelength_edges(x)
+    if (isinstance(quadrature_order, (bool, np.bool_))
+            or not isinstance(quadrature_order, (int, np.integer))
+            or quadrature_order < 2):
+        raise ValueError("quadrature_order must be an integer >= 2")
+    nodes, weights = np.polynomial.legendre.leggauss(int(quadrature_order))
+    midpoint = 0.5 * (edges[:-1] + edges[1:])
+    half_width = 0.5 * np.diff(edges)
+    sample_wavelengths = midpoint[:, None] + half_width[:, None] * nodes[None, :]
+    values = np.asarray(spectral_density(sample_wavelengths.reshape(-1)), dtype=float)
+    if values.shape != (x.size * int(quadrature_order),) or np.any(~np.isfinite(values)):
+        raise ValueError("spectral_density must return one finite value per quadrature wavelength")
+    values = values.reshape(x.size, int(quadrature_order))
+    averaged = 0.5 * (values @ weights)
+    if np.any(averaged < 0.0):
+        raise ValueError("spectral_density must be non-negative")
+    return averaged
+
+
+def _bin_averaged_kappa_spectrum(wavelength_nm, center_nm, sigma_nm, kappa, integrated_amplitude):
+    """Exact finite-bin average of the projected finite-variance 3-D Kappa marginal."""
+    x = np.asarray(wavelength_nm, dtype=float)
+    center, sigma, kap = float(center_nm), float(sigma_nm), float(kappa)
+    amplitude = float(integrated_amplitude)
+    if not np.isfinite(center) or not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("Kappa centre must be finite and sigma strictly positive")
+    if not np.isfinite(kap) or kap <= 1.5:
+        raise ValueError("Kappa index must be finite and greater than 3/2 for finite variance")
+    if not np.isfinite(amplitude) or amplitude < 0.0:
+        raise ValueError("Kappa integrated amplitude must be finite and non-negative")
+    edges = _wavelength_edges(x)
+    degrees = 2.0 * kap - 1.0
+    scale = sigma * np.sqrt((degrees - 2.0) / degrees)
+    z = (edges - center) / scale
+    probability = stdtr(degrees, z[1:]) - stdtr(degrees, z[:-1])
+    positive_tail = z[:-1] > 0.0
+    probability[positive_tail] = stdtr(degrees, -z[:-1][positive_tail]) - stdtr(degrees, -z[1:][positive_tail])
+    probability = np.clip(probability, 0.0, 1.0)
+    return amplitude * probability / np.diff(edges)
+
+
+def _real_array(values, name):
+    raw = np.asarray(values)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans, strings or complex values")
+    result = raw.astype(float, copy=False)
+    if not np.all(np.isfinite(result)):
+        raise ValueError(f"{name} must contain only finite values")
+    return result
+
+
+def _finite_real_scalar(value, name):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a finite real scalar")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be a finite real scalar")
+    return result
+
+
+def _response_stack(response, n_channels, n_wavelengths):
+    if response is None:
+        raise ValueError(
+            "A measured instrument_response is required. Supply the calibrated response operator, "
+            "or explicitly supply an identity matrix only when the input spectra are already "
+            "corrected for the instrument response."
+        )
+    value = _real_array(response, "instrument_response")
+    if value.ndim == 2:
+        value = np.repeat(value[None, :, :], n_channels, axis=0)
+    if value.shape != (n_channels, n_wavelengths, n_wavelengths):
+        raise ValueError("instrument_response must be (n_lambda,n_lambda) or (n_channels,n_lambda,n_lambda)")
+    if not np.all(np.isfinite(value)) or np.any(value < 0):
+        raise ValueError("instrument_response must be finite and non-negative")
+    # Each channel stores a wavelength-output x wavelength-input operator.
+    # Sum over output rows (axis=1) so every input-wavelength column is
+    # checked independently for every channel. Summing axis=0 would instead
+    # mix channels and response rows, rejecting valid shared/channel matrices.
+    column_sums = value.sum(axis=1)
+    if np.any(column_sums <= 0) or not np.allclose(
+        column_sums, 1.0, rtol=1e-6, atol=1e-9
+    ):
+        raise ValueError("instrument_response columns must sum to one for every channel")
+    return value
+
+
+def _bound_aware_jacobian(function, parameters, lower, upper):
+    """Finite-difference Jacobian that never evaluates outside fit bounds.
+
+    Central differences are used in the interior and second-order accuracy is
+    retained where both directions are available. At an active bound, a
+    one-sided difference is used; a parameter fixed at identical lower/upper
+    bounds has a zero derivative column.
+    """
+    point = np.asarray(parameters, dtype=float)
+    lo = np.asarray(lower, dtype=float)
+    hi = np.asarray(upper, dtype=float)
+    if point.ndim != 1 or lo.shape != point.shape or hi.shape != point.shape:
+        raise ValueError("parameters and finite-difference bounds must be matching vectors")
+    if (not np.all(np.isfinite(point)) or np.any(np.isnan(lo)) or np.any(np.isnan(hi))
+            or np.any(lo > hi) or np.any(point < lo) or np.any(point > hi)):
+        raise ValueError("finite-difference point must be finite and lie within ordered bounds")
+    base = np.asarray(function(point), dtype=float).reshape(-1)
+    if not np.all(np.isfinite(base)):
+        raise ValueError("finite-difference function must return finite values")
+    jacobian = np.zeros((base.size, point.size), dtype=float)
+    relative_step = np.cbrt(np.finfo(float).eps)
+    for column, value in enumerate(point):
+        step = relative_step * max(1.0, abs(float(value)))
+        plus_room = float(hi[column] - value)
+        minus_room = float(value - lo[column])
+        if plus_room >= step and minus_room >= step:
+            plus = point.copy()
+            minus = point.copy()
+            plus[column] += step
+            minus[column] -= step
+            jacobian[:, column] = (
+                np.asarray(function(plus), dtype=float).reshape(-1)
+                - np.asarray(function(minus), dtype=float).reshape(-1)
+            ) / (2.0 * step)
+        elif plus_room > 0.0:
+            h = min(step, plus_room)
+            plus = point.copy()
+            plus[column] += h
+            jacobian[:, column] = (
+                np.asarray(function(plus), dtype=float).reshape(-1) - base
+            ) / h
+        elif minus_room > 0.0:
+            h = min(step, minus_room)
+            minus = point.copy()
+            minus[column] -= h
+            jacobian[:, column] = (
+                base - np.asarray(function(minus), dtype=float).reshape(-1)
+            ) / h
+    if not np.all(np.isfinite(jacobian)):
+        raise ValueError("finite-difference Jacobian contains non-finite values")
+    return jacobian
+
+
+def _curvature(axis):
+    matrix = np.zeros((axis.size - 2, axis.size), dtype=float)
+    for i in range(axis.size - 2):
+        left = axis[i + 1] - axis[i]
+        right = axis[i + 2] - axis[i + 1]
+        matrix[i, i] = 2.0 / (left * (left + right))
+        matrix[i, i + 1] = -2.0 / (left * right)
+        matrix[i, i + 2] = 2.0 / (right * (left + right))
+    return matrix
+
+
+def _huber_total_variation_residual(profile, axis, huber_scale):
+    """Normalized-radius Huber-TV residual for an edge-preserving radial prior.
+
+    Squared residuals approximate integral rho_delta(d profile / ds) ds, where
+    rho_delta(g)=2*delta^2*(sqrt(1+(g/delta)^2)-1) and s is normalized radius.
+    The penalty is quadratic for small gradients and linear for large ones,
+    avoiding the strong edge suppression of quadratic curvature smoothing.
+    """
+    values = _real_array(profile, "profile")
+    radial = _real_array(axis, "axis")
+    delta = _finite_real_scalar(huber_scale, "huber_scale")
+    if values.ndim != 1 or radial.ndim != 1 or values.shape != radial.shape:
+        raise ValueError("profile and axis must be matching one-dimensional arrays")
+    spacing = np.diff(radial)
+    if np.any(spacing <= 0.0):
+        raise ValueError("axis must be strictly increasing")
+    if delta <= 0.0:
+        raise ValueError("huber_scale must be strictly positive")
+    gradient = np.diff(values) / spacing
+    rho = 2.0 * delta**2 * (np.sqrt(1.0 + (gradient / delta)**2) - 1.0)
+    return np.sqrt(np.maximum(rho * spacing, 0.0))
+
+
+def reconstruct_joint_thomson_spatial_spectra(
+    wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix, *,
+    laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
+    spatial_psf_matrix=None, spatial_psf_sigma_m=None,
+    spatial_psf_sigma_uncertainty_m=None,
+    spatial_psf_matrix_covariance=None,
+    spectral_psf_cross_covariance=None,
+    spatial_mixing_matrix_covariance=None,
+    spectral_mixing_cross_covariance=None,
+    laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
+    signal_uncertainty=None, joint_spectral_covariance=None,
+    model_discrepancy_covariance=None, systematic_covariance=None,
+    regularization_sensitivity_strengths=None,
+    regularization_strength=0.0, regularization_kind="curvature",
+    tv_huber_scale=0.05, positive_amplitude=True, max_nfev=3000,
+    maximum_data_condition_number=1.0e8,
+    background_model="linear", background_degree=2,
+    background_interior_knots=3, background_templates=None,
+    physical_model="maxwellian", kappa_index=None, fit_kappa_index=False,
+    incident_polarization=None, radial_order=24, angular_order=12,
+    maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
+):
+    """Jointly infer Te(r), projected flow(r), and relative amplitude(r).
+
+    Data layout is channel x wavelength; covariance is flattened in
+    channel-major order. The supplied mixing matrix maps radial nodes to
+    detector channels and is composed with the optional PSF. Detector-space
+    backgrounds are fitted jointly as nuisance basis coefficients; they are
+    not mixed as plasma emission. Select constant, linear, polynomial,
+    cubic-spline, or researcher-supplied background-template bases. The
+    physical forward model is selected explicitly by physical_model.
+    Measurement, model-discrepancy and systematic covariance matrices are
+    accepted as separate channel-major components and summed only under an
+    explicit mutual-independence assumption. The source-resolved parameter
+    covariance contributions are returned separately; correlated error sources
+    require their cross-covariance blocks to be included by the caller.
+    """
+    if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
+        raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
+    if not isinstance(include_compton_recoil, (bool, np.bool_)):
+        raise ValueError("include_compton_recoil must be boolean")
+    if include_compton_recoil and physical_model != "relativistic_maxwell_juttner":
+        raise ValueError("Compton recoil is available only for relativistic_maxwell_juttner")
+    if not isinstance(fit_kappa_index, (bool, np.bool_)):
+        raise ValueError("fit_kappa_index must be boolean")
+    if physical_model == "kappa":
+        if (kappa_index is None or isinstance(kappa_index, (bool, np.bool_))
+                or not isinstance(kappa_index, (int, float, np.integer, np.floating))
+                or not np.isfinite(kappa_index) or float(kappa_index) <= 1.5):
+            raise ValueError("kappa_index must be a finite real value > 1.5 and acts as the optimizer seed or fixed model value")
+        kappa_index = float(kappa_index)
+    elif kappa_index is not None or fit_kappa_index:
+        raise ValueError("kappa_index and fit_kappa_index are used only when physical_model='kappa'")
+    if fit_kappa_index and physical_model != "kappa":
+        raise ValueError("fit_kappa_index=True requires physical_model='kappa'")
+    if physical_model == "relativistic_maxwell_juttner":
+        if incident_polarization is None:
+            raise ValueError("relativistic Maxwell-Juttner joint inference requires incident_polarization")
+        polarization = _real_array(incident_polarization, "incident_polarization")
+        if polarization.shape != (3,) or np.linalg.norm(polarization) == 0:
+            raise ValueError("incident_polarization must be a finite non-zero 3-vector")
+        incident_polarization = polarization / np.linalg.norm(polarization)
+        if isinstance(radial_order, (bool, np.bool_)) or not isinstance(radial_order, (int, np.integer)) or radial_order < 12:
+            raise ValueError("radial_order must be an integer >= 12")
+        if isinstance(angular_order, (bool, np.bool_)) or not isinstance(angular_order, (int, np.integer)) or angular_order < 8:
+            raise ValueError("angular_order must be an integer >= 8")
+    elif incident_polarization is not None:
+        raise ValueError("incident_polarization is used only for relativistic_maxwell_juttner")
+    x = _real_array(wavelength_nm, "wavelength_nm")
+    y = _real_array(measured_spectra, "measured_spectra")
+    r = _real_array(radius_m, "radius_m")
+    h = _real_array(spatial_mixing_matrix, "spatial_mixing_matrix")
+    if x.ndim != 1 or x.size < 9 or not np.all(np.isfinite(x)) or np.any(np.diff(x) <= 0):
+        raise ValueError("wavelength_nm must be finite, strictly increasing, and contain >=9 samples")
+    if y.ndim != 2 or y.shape[1] != x.size or not np.all(np.isfinite(y)):
+        raise ValueError("measured_spectra must be a finite channel-by-wavelength array")
+    if r.ndim != 1 or r.size < 3 or not np.all(np.isfinite(r)) or np.any(np.diff(r) <= 0):
+        raise ValueError("radius_m must be finite, strictly increasing, and contain >=3 spatial nodes")
+    m, nlam = y.shape
+    if h.shape != (m, r.size) or not np.all(np.isfinite(h)) or np.any(h < 0):
+        raise ValueError("spatial_mixing_matrix must be finite, non-negative, and shaped (n_channels,n_nodes)")
+    mixing_covariance = None
+    if spatial_mixing_matrix_covariance is not None:
+        mixing_covariance = _real_array(
+            spatial_mixing_matrix_covariance, "spatial_mixing_matrix_covariance"
+        )
+        expected_mixing_covariance_shape = (m*r.size, m*r.size)
+        if (mixing_covariance.shape != expected_mixing_covariance_shape
+                or not np.allclose(mixing_covariance, mixing_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "spatial_mixing_matrix_covariance must be a finite symmetric "
+                "(n_channels*n_nodes)-square covariance in row-major operator order"
+            )
+        mixing_covariance = 0.5 * (mixing_covariance + mixing_covariance.T)
+        mixing_eigenvalues = np.linalg.eigvalsh(mixing_covariance)
+        mixing_scale = max(float(np.max(np.abs(mixing_eigenvalues))), np.finfo(float).tiny)
+        if mixing_eigenvalues[0] < -1e-10 * mixing_scale:
+            raise ValueError("spatial_mixing_matrix_covariance must be positive semidefinite")
+    if spatial_psf_matrix is not None and spatial_psf_sigma_m is not None:
+        raise ValueError("supply spatial_psf_matrix or spatial_psf_sigma_m, not both")
+    psf_sigma = None
+    if spatial_psf_sigma_m is not None:
+        psf_sigma = _finite_real_scalar(spatial_psf_sigma_m, "spatial_psf_sigma_m")
+        if psf_sigma < 0.0:
+            raise ValueError("spatial_psf_sigma_m must be finite and non-negative")
+        psf = gaussian_spatial_psf_matrix(r, psf_sigma)
+        psf_source = "finite_volume_gaussian_psf_from_sigma"
+    elif spatial_psf_matrix is not None:
+        psf = _real_array(spatial_psf_matrix, "spatial_psf_matrix")
+        if psf.shape != (r.size, r.size) or np.any(psf < 0.0):
+            raise ValueError("spatial_psf_matrix must be finite, non-negative and shaped (n_nodes,n_nodes)")
+        psf_mass = np.sum(psf, axis=0)
+        if np.any(psf_mass <= 0.0) or np.any(psf_mass > 1.0 + 1e-10):
+            raise ValueError("spatial_psf_matrix columns must have positive mass no greater than one; finite-domain losses are not renormalized")
+        psf_source = "researcher_supplied_measured_psf_matrix"
+    else:
+        psf = np.eye(r.size, dtype=float)
+        psf_source = "identity_no_additional_psf_operator"
+    psf_sigma_uncertainty = None
+    if spatial_psf_matrix_covariance is not None and spatial_psf_sigma_uncertainty_m is not None:
+        raise ValueError("supply spatial_psf_matrix_covariance or spatial_psf_sigma_uncertainty_m, not both")
+    if spatial_psf_matrix_covariance is not None and spatial_psf_matrix is None:
+        raise ValueError("spatial_psf_matrix_covariance requires an explicit measured spatial_psf_matrix")
+    if spatial_psf_sigma_uncertainty_m is not None:
+        if psf_sigma is None:
+            raise ValueError(
+                "spatial_psf_sigma_uncertainty_m requires spatial_psf_sigma_m; "
+                "matrix-PSF covariance is not represented by a scalar width uncertainty"
+            )
+        psf_sigma_uncertainty = _finite_real_scalar(
+            spatial_psf_sigma_uncertainty_m, "spatial_psf_sigma_uncertainty_m"
+        )
+        if psf_sigma_uncertainty < 0.0:
+            raise ValueError("spatial_psf_sigma_uncertainty_m must be non-negative")
+    nominal_mixing = h.copy()
+    h = nominal_mixing @ psf
+    if not np.all(np.isfinite(h)) or np.linalg.matrix_rank(h) < min(h.shape):
+        raise ValueError("effective spatial operator (mixing matrix composed with PSF) is rank deficient")
+    laser = _finite_real_scalar(laser_wavelength_nm, "laser_wavelength_nm")
+    angle = _finite_real_scalar(scattering_angle_rad, "scattering_angle_rad")
+    lam_reg = _finite_real_scalar(regularization_strength, "regularization_strength")
+    if not np.isfinite(laser) or laser <= 0 or not np.isfinite(angle) or not 0 < angle < np.pi:
+        raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie strictly between 0 and pi")
+    if not np.isfinite(lam_reg) or lam_reg < 0:
+        raise ValueError("regularization_strength must be finite and non-negative")
+    if regularization_kind not in {"curvature", "huber_total_variation"}:
+        raise ValueError("regularization_kind must be curvature or huber_total_variation")
+    huber_scale = _finite_real_scalar(tv_huber_scale, "tv_huber_scale")
+    if huber_scale <= 0.0:
+        raise ValueError("tv_huber_scale must be strictly positive")
+    sensitivity_strengths = None
+    if regularization_sensitivity_strengths is not None:
+        sensitivity_strengths = _real_array(
+            regularization_sensitivity_strengths, "regularization_sensitivity_strengths"
+        )
+        if (sensitivity_strengths.ndim != 1 or sensitivity_strengths.size < 2
+                or np.any(sensitivity_strengths <= 0.0)
+                or np.any(np.diff(sensitivity_strengths) <= 0.0)):
+            raise ValueError(
+                "regularization_sensitivity_strengths must contain at least two strictly increasing positive finite values"
+            )
+    if signal_uncertainty is not None and joint_spectral_covariance is not None:
+        raise ValueError("supply signal_uncertainty or joint_spectral_covariance, not both")
+
+    measurement_covariance = None
+    measurement_covariance_source = "not_supplied"
+    if joint_spectral_covariance is not None:
+        measurement_covariance = _real_array(
+            joint_spectral_covariance, "joint_spectral_covariance"
+        )
+        if (measurement_covariance.shape != (m*nlam, m*nlam)
+                or not np.all(np.isfinite(measurement_covariance))
+                or not np.allclose(measurement_covariance, measurement_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "joint_spectral_covariance must be finite, symmetric, and channel-major"
+            )
+        measurement_covariance = 0.5 * (
+            measurement_covariance + measurement_covariance.T
+        )
+        try:
+            np.linalg.cholesky(measurement_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "joint_spectral_covariance must be positive definite"
+            ) from exc
+        measurement_covariance_source = "full_channel_major_joint_spectral_covariance"
+    elif signal_uncertainty is not None:
+        sigma = _real_array(signal_uncertainty, "signal_uncertainty")
+        if sigma.shape != y.shape or not np.all(np.isfinite(sigma)) or np.any(sigma <= 0):
+            raise ValueError("signal_uncertainty must be positive, finite, and match measured_spectra")
+        measurement_covariance = np.diag(np.square(sigma.reshape(-1)))
+        measurement_covariance_source = "independent_pointwise_spectral_uncertainty"
+
+    mixing_cross_covariance = None
+    if spectral_mixing_cross_covariance is not None:
+        if mixing_covariance is None:
+            raise ValueError(
+                "spectral_mixing_cross_covariance requires spatial_mixing_matrix_covariance"
+            )
+        if measurement_covariance is None:
+            raise ValueError(
+                "spectral_mixing_cross_covariance requires measured signal_uncertainty "
+                "or joint_spectral_covariance; discrepancy/systematic covariance is not a substitute"
+            )
+        mixing_cross_covariance = _real_array(
+            spectral_mixing_cross_covariance, "spectral_mixing_cross_covariance"
+        )
+        if mixing_cross_covariance.shape != (m*nlam, m*r.size):
+            raise ValueError(
+                "spectral_mixing_cross_covariance must have shape "
+                "(n_channels*n_wavelengths, n_channels*n_nodes) in channel-major/row-major order"
+            )
+        joint_measurement_mixing_covariance = np.block([
+            [measurement_covariance, mixing_cross_covariance],
+            [mixing_cross_covariance.T, mixing_covariance],
+        ])
+        joint_measurement_mixing_covariance = 0.5 * (
+            joint_measurement_mixing_covariance + joint_measurement_mixing_covariance.T
+        )
+        joint_eigenvalues = np.linalg.eigvalsh(joint_measurement_mixing_covariance)
+        joint_scale = max(float(np.max(np.abs(joint_eigenvalues))), np.finfo(float).tiny)
+        if joint_eigenvalues[0] < -1e-10 * joint_scale:
+            raise ValueError(
+                "joint measured-spectrum/spatial-mixing covariance block must be positive semidefinite"
+            )
+
+    psf_matrix_covariance = None
+    if spatial_psf_matrix_covariance is not None:
+        psf_matrix_covariance = _real_array(
+            spatial_psf_matrix_covariance, "spatial_psf_matrix_covariance"
+        )
+        expected_psf_covariance_shape = (r.size*r.size, r.size*r.size)
+        if (psf_matrix_covariance.shape != expected_psf_covariance_shape
+                or not np.allclose(psf_matrix_covariance, psf_matrix_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "spatial_psf_matrix_covariance must be a finite symmetric "
+                "(n_nodes*n_nodes)-square covariance in row-major PSF-element order"
+            )
+        psf_matrix_covariance = 0.5 * (
+            psf_matrix_covariance + psf_matrix_covariance.T
+        )
+        psf_eigenvalues = np.linalg.eigvalsh(psf_matrix_covariance)
+        psf_scale = max(float(np.max(np.abs(psf_eigenvalues))), np.finfo(float).tiny)
+        if psf_eigenvalues[0] < -1e-10 * psf_scale:
+            raise ValueError("spatial_psf_matrix_covariance must be positive semidefinite")
+
+    psf_cross_covariance = None
+    if spectral_psf_cross_covariance is not None:
+        if psf_matrix_covariance is None:
+            raise ValueError(
+                "spectral_psf_cross_covariance requires spatial_psf_matrix_covariance"
+            )
+        if measurement_covariance is None:
+            raise ValueError(
+                "spectral_psf_cross_covariance requires measured signal_uncertainty "
+                "or joint_spectral_covariance; model-discrepancy/systematic covariance is not a substitute"
+            )
+        psf_cross_covariance = _real_array(
+            spectral_psf_cross_covariance, "spectral_psf_cross_covariance"
+        )
+        if psf_cross_covariance.shape != (m*nlam, r.size*r.size):
+            raise ValueError(
+                "spectral_psf_cross_covariance must have shape "
+                "(n_channels*n_wavelengths, n_nodes*n_nodes) in channel-major/row-major order"
+            )
+        joint_measurement_psf_covariance = np.block([
+            [measurement_covariance, psf_cross_covariance],
+            [psf_cross_covariance.T, psf_matrix_covariance],
+        ])
+        joint_measurement_psf_covariance = 0.5 * (
+            joint_measurement_psf_covariance + joint_measurement_psf_covariance.T
+        )
+        joint_psf_eigenvalues = np.linalg.eigvalsh(joint_measurement_psf_covariance)
+        joint_psf_scale = max(
+            float(np.max(np.abs(joint_psf_eigenvalues))), np.finfo(float).tiny
+        )
+        if joint_psf_eigenvalues[0] < -1e-10 * joint_psf_scale:
+            raise ValueError(
+                "joint measured-spectrum/PSF covariance block must be positive semidefinite"
+            )
+
+    discrepancy = None
+    if model_discrepancy_covariance is not None:
+        discrepancy = _real_array(
+            model_discrepancy_covariance, "model_discrepancy_covariance"
+        )
+        if (discrepancy.shape != (m*nlam, m*nlam)
+                or not np.all(np.isfinite(discrepancy))
+                or not np.allclose(discrepancy, discrepancy.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "model_discrepancy_covariance must be finite, symmetric, and channel-major"
+            )
+        discrepancy = 0.5 * (discrepancy + discrepancy.T)
+        discrepancy_eigenvalues = np.linalg.eigvalsh(discrepancy)
+        discrepancy_scale = max(
+            float(np.max(np.abs(discrepancy_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if discrepancy_eigenvalues[0] < -1e-10 * discrepancy_scale:
+            raise ValueError(
+                "model_discrepancy_covariance must be positive semidefinite"
+            )
+
+    systematic = None
+    if systematic_covariance is not None:
+        systematic = _real_array(systematic_covariance, "systematic_covariance")
+        if (systematic.shape != (m*nlam, m*nlam)
+                or not np.all(np.isfinite(systematic))
+                or not np.allclose(systematic, systematic.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "systematic_covariance must be finite, symmetric, and channel-major"
+            )
+        systematic = 0.5 * (systematic + systematic.T)
+        systematic_eigenvalues = np.linalg.eigvalsh(systematic)
+        systematic_scale = max(
+            float(np.max(np.abs(systematic_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if systematic_eigenvalues[0] < -1e-10 * systematic_scale:
+            raise ValueError("systematic_covariance must be positive semidefinite")
+
+    covariance_components = [
+        component for component in (measurement_covariance, discrepancy, systematic)
+        if component is not None
+    ]
+    total_spectral_covariance = None
+    spectral_covariance_cholesky = None
+    if covariance_components:
+        total_spectral_covariance = np.sum(covariance_components, axis=0)
+        supplied_labels = [
+            label for label, component in (
+                ("measurement", measurement_covariance),
+                ("model_discrepancy", discrepancy),
+                ("systematic", systematic),
+            ) if component is not None
+        ]
+        if supplied_labels == ["measurement"]:
+            noise_model = measurement_covariance_source
+        elif supplied_labels == ["model_discrepancy"]:
+            noise_model = "model_discrepancy_only_channel_major_covariance"
+        elif supplied_labels == ["systematic"]:
+            noise_model = "systematic_covariance_only_channel_major_covariance"
+        else:
+            noise_model = "_plus_".join(supplied_labels) + "_channel_major_covariance"
+        try:
+            chol = np.linalg.cholesky(total_spectral_covariance)
+            spectral_covariance_cholesky = chol
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "combined spectral covariance must be positive definite; no silent jitter is applied"
+            ) from exc
+        whiten = lambda v: np.linalg.solve(chol, np.asarray(v).reshape(-1))
+    else:
+        scale = max(float(np.std(y)), float(np.max(np.abs(y))) * 1e-12, np.finfo(float).tiny)
+        whiten = lambda v: np.asarray(v).reshape(-1) / scale
+        noise_model = "unweighted_residual_scaled"
+
+    from .thomson_background import _background_design
+    background_basis = _background_design(
+        x, background_model, degree=background_degree,
+        interior_knots=background_interior_knots,
+        templates=background_templates,
+    )
+    n_background = int(background_basis.shape[1])
+    widths = _bin_widths(x)
+    response = _response_stack(instrument_response, m, nlam)
+    if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
+        raise ValueError("Supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither.")
+    laser_source_metadata = None
+    laser_source_quadrature = None
+    if laser_spectrum_wavelength_nm is not None:
+        from .thomson_inference import _laser_source_response
+        # Validate the measured source profile with the same photon-conserving
+        # contract used by the elastic-Thomson path. For Compton scattering,
+        # source broadening is NOT an output-wavelength shift operator: each
+        # incident wavelength changes the photon energy in the Klein-Nishina
+        # kinematics and must be evaluated by the physical kernel.
+        _, source_metadata = _laser_source_response(
+            x, laser, laser_spectrum_wavelength_nm,
+            laser_spectrum_density_per_nm,
+        )
+        if include_compton_recoil:
+            source_x = _real_array(
+                laser_spectrum_wavelength_nm, "laser_spectrum_wavelength_nm"
+            )
+            source_y = _real_array(
+                laser_spectrum_density_per_nm, "laser_spectrum_density_per_nm"
+            )
+            dx = np.diff(source_x)
+            quadrature = np.empty(source_x.size, dtype=float)
+            quadrature[0] = 0.5 * dx[0]
+            quadrature[-1] = 0.5 * dx[-1]
+            if source_x.size > 2:
+                quadrature[1:-1] = 0.5 * (dx[:-1] + dx[1:])
+            area = float(np.sum(source_y * quadrature))
+            source_weights = source_y * quadrature / area
+            source_weights /= np.sum(source_weights)
+            laser_source_quadrature = (source_x.copy(), source_weights)
+            source_metadata = {
+                **source_metadata,
+                "convolution_approximation": (
+                    "direct_incident_wavelength_quadrature_through_exact_"
+                    "single_scattering_Compton_and_polarized_Klein_Nishina_kernel"
+                ),
+                "incident_wavelength_quadrature_weights_sum": float(
+                    np.sum(source_weights)
+                ),
+                "instrument_response_applied_after_physical_source_integration": True,
+            }
+            laser_source_metadata = {
+                "model": "measured_incident_laser_profile_integrated_inside_Compton_forward_model",
+                "channels": [dict(source_metadata) for _ in range(m)],
+            }
+        else:
+            broadened_responses = []
+            source_metadata_by_channel = []
+            for channel in range(m):
+                source_operator, channel_metadata = _laser_source_response(
+                    x, laser, laser_spectrum_wavelength_nm,
+                    laser_spectrum_density_per_nm,
+                )
+                broadened_responses.append(response[channel] @ source_operator)
+                source_metadata_by_channel.append(channel_metadata)
+            response = np.asarray(broadened_responses, dtype=float)
+            laser_source_metadata = {
+                "model": "measured_incident_laser_profile_convolved_before_instrument_response",
+                "channels": source_metadata_by_channel,
+            }
+    q = 2.0 * np.sin(angle / 2.0)
+    d2 = _curvature(r)
+    span = float(x[-1] - x[0])
+    spectral_spacing = float(np.min(np.diff(x)))
+    peak_scale = max(float(np.max(y) - np.median(y)), np.finfo(float).tiny)
+    initial_sigma = max(span / 3.0, spectral_spacing)
+    # Data-informed numerical seed only.  Do not clip this estimate to an
+    # assumed scientific temperature interval; the selected Maxwellian model's
+    # declared asymptotic-domain screen is applied to the fitted result below.
+    initial_te = _MEC2_EV * (initial_sigma / (2.0 * laser * np.sin(angle/2.0)))**2
+    initial_te = float(max(initial_te, np.finfo(float).tiny))
+    initial_amp = peak_scale / max(float(np.max(h.sum(axis=1))), 1.0)
+
+    # Parameter vector: log amplitude[n], log Te[n], flow[1e6 m/s,n],
+    # optional log(kappa-1.5), then detector-space background coefficients.
+    background_seed = np.zeros((m, n_background), dtype=float)
+    background_seed[:, 0] = np.median(y[:, :max(2, nlam//10)], axis=1)
+    kappa_parameter_count = int(physical_model == "kappa" and fit_kappa_index)
+    p0 = np.r_[np.full(r.size, np.log(initial_amp)),
+               np.full(r.size, np.log(initial_te)),
+               np.zeros(r.size),
+               np.array([np.log(kappa_index-1.5)]) if kappa_parameter_count else np.empty(0),
+               background_seed.ravel()]
+    # Only numerical overflow guards are imposed on logarithmic positive
+    # parameters.  Temperature and flow have no invented physical fit bounds;
+    # the Maxwellian model-domain screen below classifies out-of-regime fits.
+    # Background nuisance parameters and projected flow are unbounded.
+    lower = np.r_[np.full(r.size, -700.0), np.full(r.size, -700.0),
+                  np.full(r.size, -np.inf),
+                  np.array([-10.0]) if kappa_parameter_count else np.empty(0),
+                  np.full(m*n_background, -np.inf)]
+    upper = np.r_[np.full(r.size, 700.0), np.full(r.size, 700.0),
+                  np.full(r.size, np.inf),
+                  np.array([8.0]) if kappa_parameter_count else np.empty(0),
+                  np.full(m*n_background, np.inf)]
+    if physical_model == "relativistic_maxwell_juttner":
+        # Subluminal flow is a physical domain constraint of the relativistic kernel.
+        lower[2*r.size:3*r.size] = -0.99*_C_M_S/1e6
+        upper[2*r.size:3*r.size] = 0.99*_C_M_S/1e6
+    if not isinstance(positive_amplitude, (bool, np.bool_)):
+        raise ValueError("positive_amplitude must be boolean")
+    if not positive_amplitude:
+        raise ValueError("signed plasma amplitudes are unsupported; use positive_amplitude=True")
+    if isinstance(max_nfev, (bool, np.bool_)) or not isinstance(max_nfev, (int, np.integer)) or max_nfev < 1:
+        raise ValueError("max_nfev must be a positive integer")
+    maximum_data_condition_number = _finite_real_scalar(
+        maximum_data_condition_number, "maximum_data_condition_number"
+    )
+    if maximum_data_condition_number < 1.0:
+        raise ValueError("maximum_data_condition_number must be >= 1")
+
+    def predict(p, psf_sigma_override=None, mixing_matrix_override=None, return_node_spectra=False):
+        amp = np.exp(p[:r.size])
+        te = np.exp(p[r.size:2*r.size])
+        flow = p[2*r.size:3*r.size] * 1e6
+        fitted_kappa = (1.5+float(np.exp(p[3*r.size]))
+                        if kappa_parameter_count else kappa_index)
+        background_start = 3*r.size+kappa_parameter_count
+        background_coefficients = p[background_start:].reshape(m, n_background)
+        detector_background = background_coefficients @ background_basis.T
+        sigma = 2.0 * laser * np.sqrt(te / _MEC2_EV) * np.sin(angle/2.0)
+        center = laser * (1.0 - q * flow / _C_M_S)
+        if physical_model == "maxwellian":
+            # Integrate the physical Gaussian over each measured wavelength
+            # bin before applying the bin-probability instrument operator.
+            node_spectra = np.vstack([
+                _bin_averaged_maxwellian_spectrum(x, center[node], sigma[node], amp[node])
+                for node in range(r.size)
+            ])
+        elif physical_model == "kappa":
+            # The exact q-projected marginal of an isotropic 3-D finite-variance
+            # Kappa is Student-t(nu=2*kappa-1). Integrate its CDF over each
+            # finite wavelength bin; retain genuine finite-window tail loss.
+            node_spectra = np.vstack([
+                _bin_averaged_kappa_spectrum(x, center[node], sigma[node], fitted_kappa, amp[node])
+                for node in range(r.size)
+            ])
+        else:
+            from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+            node_spectra = np.empty((r.size,x.size),dtype=float)
+            for node in range(r.size):
+                if laser_source_quadrature is None:
+                    node_spectrum = _bin_averaged_callable_spectrum(
+                        x,
+                        lambda wavelength: relativistic_maxwell_juttner_spectrum(
+                            wavelength, laser, angle, float(te[node]),
+                            flow_projection_m_s=float(flow[node]),
+                            incident_polarization=incident_polarization,
+                            radial_order=int(radial_order), angular_order=int(angular_order),
+                            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                            include_compton_recoil=include_compton_recoil,
+                        )["spectral_density_per_nm"],
+                        quadrature_order=8,
+                    )
+                else:
+                    # Integrate incident laser spectral density before detector
+                    # response. Recoil depends nonlinearly on incident photon
+                    # energy, so an elastic wavelength-shift operator is not a
+                    # valid substitute for evaluating each incident wavelength.
+                    source_wavelengths, source_weights = laser_source_quadrature
+                    node_spectrum = np.zeros(x.size, dtype=float)
+                    for source_wavelength, source_weight in zip(
+                        source_wavelengths, source_weights
+                    ):
+                        source_bin_average = _bin_averaged_callable_spectrum(
+                            x,
+                            lambda wavelength: relativistic_maxwell_juttner_spectrum(
+                                wavelength, float(source_wavelength), angle, float(te[node]),
+                                flow_projection_m_s=float(flow[node]),
+                                incident_polarization=incident_polarization,
+                                radial_order=int(radial_order), angular_order=int(angular_order),
+                                maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                                include_compton_recoil=True,
+                            )["spectral_density_per_nm"],
+                            quadrature_order=8,
+                        )
+                        node_spectrum += float(source_weight) * source_bin_average
+                node_spectra[node] = amp[node] * node_spectrum
+        selected_mixing = nominal_mixing if mixing_matrix_override is None else mixing_matrix_override
+        selected_psf = psf if psf_sigma_override is None else gaussian_spatial_psf_matrix(r, psf_sigma_override)
+        effective_mixing = selected_mixing @ selected_psf
+        mixed = effective_mixing @ node_spectra
+        predicted = np.empty_like(y)
+        for channel in range(m):
+            # Response acts on spectral density through bin-integrated power.
+            convolved = (response[channel] @ (mixed[channel] * widths)) / widths
+            predicted[channel] = convolved + detector_background[channel]
+        if return_node_spectra:
+            return predicted, te, flow, amp, fitted_kappa, node_spectra
+        return predicted, te, flow, amp, fitted_kappa
+
+    def residual(p):
+        predicted, te, flow, amp, _ = predict(p)
+        data = whiten(y - predicted)
+        if lam_reg > 0:
+            if regularization_kind == "curvature":
+                penalties = np.r_[np.sqrt(lam_reg) * (d2 @ np.log(te)),
+                                  np.sqrt(lam_reg) * (d2 @ flow / 1e6),
+                                  np.sqrt(lam_reg) * (d2 @ np.log(amp))]
+            else:
+                normalized_radius = (r - r[0]) / (r[-1] - r[0])
+                penalties = np.sqrt(lam_reg) * np.r_[
+                    _huber_total_variation_residual(np.log(te), normalized_radius, huber_scale),
+                    _huber_total_variation_residual(flow / 1e6, normalized_radius, huber_scale),
+                    _huber_total_variation_residual(np.log(amp), normalized_radius, huber_scale),
+                ]
+            return np.r_[data, penalties]
+        return data
+
+    fit = least_squares(residual, p0, bounds=(lower, upper), method="trf",
+                        x_scale="jac", max_nfev=int(max_nfev))
+    predicted, te, flow, amp, fitted_kappa = predict(fit.x)
+    data_residual = whiten(y - predicted)
+    # Assess identifiability from measured spectral data alone.  The optimizer
+    # Jacobian also contains optional regularization rows; counting those rows
+    # as independent measurements would let smoothing manufacture rank.
+    def data_residual_only(parameters, psf_sigma_override=None, mixing_matrix_override=None):
+        return whiten(y - predict(
+            parameters, psf_sigma_override, mixing_matrix_override
+        )[0])
+
+    parameter_count = int(fit.x.size)
+    background_start = 3*r.size + kappa_parameter_count
+    fitted_background_coefficients = fit.x[background_start:].reshape(m, n_background).copy()
+    data_jacobian = _bound_aware_jacobian(
+        data_residual_only, fit.x, lower, upper
+    )
+    column_norms = np.linalg.norm(data_jacobian, axis=0)
+    scaled_data_jacobian = data_jacobian / np.maximum(
+        column_norms, np.finfo(float).tiny
+    )[None, :]
+    singular_values = np.linalg.svd(scaled_data_jacobian, compute_uv=False)
+    rank_tolerance = (
+        np.finfo(float).eps * max(scaled_data_jacobian.shape)
+        * (singular_values[0] if singular_values.size else 0.0)
+    )
+    data_rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    data_condition = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values.size and singular_values[-1] > rank_tolerance
+        else float("inf")
+    )
+    optimizer_jacobian = np.asarray(fit.jac, dtype=float)
+    optimizer_rank = int(np.linalg.matrix_rank(optimizer_jacobian))
+    optimizer_condition = float(np.linalg.cond(optimizer_jacobian))
+    # Apply the same conservative non-relativistic asymptotic screens as the
+    # channel-wise Maxwellian inference. These are numerical error-budget
+    # screens, not universal physical validity boundaries.
+    from .thomson_inference import (
+        ELECTRON_REST_ENERGY_EV, NONRELATIVE_THETA_E_SCREEN,
+        NONRELATIVE_FLOW_BETA_SCREEN,
+    )
+    theta_e = te / ELECTRON_REST_ENERGY_EV
+    flow_beta = np.abs(flow) / _C_M_S
+    if physical_model in {"maxwellian", "kappa"}:
+        model_domain_valid = bool(
+            np.all(theta_e < NONRELATIVE_THETA_E_SCREEN)
+            and np.all(flow_beta < NONRELATIVE_FLOW_BETA_SCREEN)
+        )
+    else:
+        model_domain_valid = bool(np.all(flow_beta < 1.0))
+    condition_identifiable = bool(
+        np.isfinite(data_condition)
+        and data_condition <= maximum_data_condition_number
+    )
+    data_identifiable = bool(
+        fit.success and data_rank == parameter_count
+        and condition_identifiable and model_domain_valid
+    )
+    if fit.success and not model_domain_valid:
+        primary_status = "model_domain_rejected"
+    elif fit.success and data_rank == parameter_count and not condition_identifiable:
+        primary_status = "ill_conditioned_from_measured_data"
+    elif data_identifiable:
+        primary_status = "identified_from_measured_data"
+    else:
+        primary_status = "not_identifiable_from_measured_data"
+    dof = max(1, data_residual.size - parameter_count)
+
+    # Keep two covariance products distinct.  The optimizer covariance is
+    # conditional on the selected regularizer; it is useful for describing
+    # the stabilized numerical candidate, but its penalty rows are not data.
+    regularized_covariance_p = np.linalg.pinv(
+        optimizer_jacobian.T @ optimizer_jacobian
+    )
+    if joint_spectral_covariance is None and signal_uncertainty is None:
+        residual_scale = float(data_residual @ data_residual / dof)
+        regularized_covariance_p *= residual_scale
+    else:
+        residual_scale = None
+
+    # The reported measurement covariance is derived from the data-only
+    # Jacobian, never from the augmented optimizer Jacobian.  A full-rank
+    # result is required; otherwise no finite data-identified covariance is
+    # published, even if regularization made the optimizer Hessian invertible.
+    data_covariance_p = None
+    measurement_data_covariance_p = None
+    spectral_covariance_parameter_components_p = {}
+    psf_calibration_covariance_p = None
+    psf_sigma_parameter_sensitivity = None
+    psf_matrix_calibration_covariance_p = None
+    psf_matrix_parameter_sensitivity = None
+    psf_matrix_cross_covariance_parameter_p = None
+    mixing_calibration_covariance_p = None
+    mixing_cross_covariance_parameter_p = None
+    mixing_parameter_sensitivity = None
+    if data_identifiable:
+        data_information = data_jacobian.T @ data_jacobian
+        data_covariance_p = np.linalg.pinv(data_information)
+        if residual_scale is not None:
+            data_covariance_p *= residual_scale
+        measurement_data_covariance_p = data_covariance_p.copy()
+        if spectral_covariance_cholesky is not None:
+            # Decompose the data-only GLS covariance by source.  In whitened
+            # coordinates Cw=L^-1 C_source L^-T and the parameter contribution
+            # is H^-1 J^T Cw J H^-1.  These components sum to H^-1 when the
+            # supplied covariance components sum to the effective covariance.
+            whitening_matrix = np.linalg.solve(
+                spectral_covariance_cholesky, np.eye(m*nlam)
+            )
+            for label, component in (
+                ("measurement", measurement_covariance),
+                ("model_discrepancy", discrepancy),
+                ("systematic", systematic),
+            ):
+                if component is None:
+                    continue
+                whitened_component = (
+                    whitening_matrix @ component @ whitening_matrix.T
+                )
+                contribution = (
+                    data_covariance_p @ data_jacobian.T
+                    @ whitened_component @ data_jacobian @ data_covariance_p
+                )
+                spectral_covariance_parameter_components_p[label] = (
+                    0.5 * (contribution + contribution.T)
+                )
+        if mixing_covariance is not None:
+            # Propagate calibration covariance of the measured spatial mixing
+            # operator through the same physical spectral forward model. The
+            # derivative is analytic in each operator element: d(H P S)/dH_cj
+            # is the PSF-blurred spectrum from true node j in detector channel c.
+            _, _, _, _, _, fitted_node_spectra = predict(
+                fit.x, return_node_spectra=True
+            )
+            mixing_residual_jacobian = np.zeros(
+                (m*nlam, m*r.size), dtype=float
+            )
+            for channel in range(m):
+                for node in range(r.size):
+                    blurred_node_spectrum = psf[node] @ fitted_node_spectra
+                    detector_derivative = (
+                        response[channel] @ (blurred_node_spectrum * widths)
+                    ) / widths
+                    derivative = np.zeros((m, nlam), dtype=float)
+                    derivative[channel] = -detector_derivative
+                    mixing_residual_jacobian[:, channel*r.size+node] = whiten(
+                        derivative.reshape(-1)
+                    )
+            mixing_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                data_jacobian.T @ mixing_residual_jacobian
+            )
+            mixing_calibration_covariance_p = (
+                mixing_parameter_sensitivity @ mixing_covariance
+                @ mixing_parameter_sensitivity.T
+            )
+            mixing_calibration_covariance_p = 0.5 * (
+                mixing_calibration_covariance_p + mixing_calibration_covariance_p.T
+            )
+            data_covariance_p = data_covariance_p + mixing_calibration_covariance_p
+            if mixing_cross_covariance is not None:
+                whitening_matrix = np.linalg.solve(
+                    spectral_covariance_cholesky, np.eye(m*nlam)
+                )
+                measurement_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                    data_jacobian.T @ whitening_matrix
+                )
+                mixing_cross_covariance_parameter_p = (
+                    measurement_parameter_sensitivity @ mixing_cross_covariance
+                    @ mixing_parameter_sensitivity.T
+                )
+                mixing_cross_covariance_parameter_p += mixing_cross_covariance_parameter_p.T
+                data_covariance_p = data_covariance_p + mixing_cross_covariance_parameter_p
+            data_covariance_p = 0.5 * (data_covariance_p + data_covariance_p.T)
+
+        if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0:
+            # Differentiate the complete measured-spectrum residual with respect
+            # to the calibrated PSF width, then use implicit GLS sensitivity
+            # dp/dsigma = -(J_data.T J_data)^-1 J_data.T (dr/dsigma).
+            # This propagates calibration uncertainty through the physical
+            # forward model and refitted plasma/background parameters; it does
+            # not treat the PSF width as an inferred plasma parameter.
+            derivative_step = max(
+                abs(float(psf_sigma)) * 1.0e-4,
+                psf_sigma_uncertainty * 1.0e-3,
+                np.sqrt(np.finfo(float).eps) * max(abs(float(psf_sigma)), 1.0e-8),
+            )
+            sigma_low = max(0.0, float(psf_sigma) - derivative_step)
+            sigma_high = float(psf_sigma) + derivative_step
+            if sigma_high <= sigma_low:
+                raise RuntimeError("PSF-width sensitivity step is numerically degenerate")
+            residual_sigma_low = data_residual_only(fit.x, sigma_low)
+            residual_sigma_high = data_residual_only(fit.x, sigma_high)
+            residual_sigma_derivative = (
+                residual_sigma_high - residual_sigma_low
+            ) / (sigma_high - sigma_low)
+            psf_sigma_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                data_jacobian.T @ residual_sigma_derivative
+            )
+            psf_calibration_covariance_p = (
+                np.outer(psf_sigma_parameter_sensitivity,
+                         psf_sigma_parameter_sensitivity)
+                * psf_sigma_uncertainty**2
+            )
+            data_covariance_p = data_covariance_p + psf_calibration_covariance_p
+
+        if psf_matrix_covariance is not None:
+            # For F = H P S, dF_c/dP_ab = H_ca S_b. Differentiate the
+            # response-convolved detector spectrum and propagate the measured
+            # PSF-element covariance through data-only GLS implicit sensitivity.
+            _, _, _, _, _, fitted_node_spectra = predict(
+                fit.x, return_node_spectra=True
+            )
+            psf_residual_jacobian = np.zeros(
+                (m*nlam, r.size*r.size), dtype=float
+            )
+            for observed_node in range(r.size):
+                for true_node in range(r.size):
+                    derivative = np.zeros((m, nlam), dtype=float)
+                    for channel in range(m):
+                        mixed_component = (
+                            nominal_mixing[channel, observed_node]
+                            * fitted_node_spectra[true_node]
+                        )
+                        detector_derivative = (
+                            response[channel] @ (mixed_component * widths)
+                        ) / widths
+                        derivative[channel] = -detector_derivative
+                    psf_residual_jacobian[:, observed_node*r.size+true_node] = (
+                        whiten(derivative.reshape(-1))
+                    )
+            psf_matrix_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                data_jacobian.T @ psf_residual_jacobian
+            )
+            psf_matrix_calibration_covariance_p = (
+                psf_matrix_parameter_sensitivity @ psf_matrix_covariance
+                @ psf_matrix_parameter_sensitivity.T
+            )
+            psf_matrix_calibration_covariance_p = 0.5 * (
+                psf_matrix_calibration_covariance_p
+                + psf_matrix_calibration_covariance_p.T
+            )
+            data_covariance_p = data_covariance_p + psf_matrix_calibration_covariance_p
+            if psf_cross_covariance is not None:
+                whitening_matrix = np.linalg.solve(
+                    spectral_covariance_cholesky, np.eye(m*nlam)
+                )
+                measurement_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                    data_jacobian.T @ whitening_matrix
+                )
+                psf_matrix_cross_covariance_parameter_p = (
+                    measurement_parameter_sensitivity @ psf_cross_covariance
+                    @ psf_matrix_parameter_sensitivity.T
+                )
+                psf_matrix_cross_covariance_parameter_p += (
+                    psf_matrix_cross_covariance_parameter_p.T
+                )
+                data_covariance_p = data_covariance_p + psf_matrix_cross_covariance_parameter_p
+            data_covariance_p = 0.5 * (data_covariance_p + data_covariance_p.T)
+
+    transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
+                              np.array([fitted_kappa-1.5]) if kappa_parameter_count else np.empty(0),
+                              np.ones(m*n_background)])
+    regularized_parameter_covariance = (
+        transform @ regularized_covariance_p @ transform.T
+    )
+    physical_covariance = (
+        transform @ data_covariance_p @ transform.T
+        if data_covariance_p is not None and data_identifiable else None
+    )
+    regularized_diagonal = np.maximum(
+        np.diag(regularized_parameter_covariance), 0.0
+    )
+    regularized_uncertainties = np.sqrt(regularized_diagonal)
+    if physical_covariance is not None:
+        diagonal = np.maximum(np.diag(physical_covariance), 0.0)
+        uncertainties = np.sqrt(diagonal)
+    else:
+        uncertainties = np.full(parameter_count, np.nan, dtype=float)
+    n = r.size
+    profile_parameter_count = 3 * r.size
+    profile_parameter_covariance = (
+        physical_covariance[:profile_parameter_count, :profile_parameter_count].copy()
+        if physical_covariance is not None else None
+    )
+    n = r.size
+    result = {
+        "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
+        "analysis_status": ("model_domain_rejected" if fit.success and not model_domain_valid else "completed" if fit.success else "optimizer_not_converged"),
+        "primary_result_status": primary_status,
+        "primary_outputs_reportable_as_identified": data_identifiable,
+        "model": {
+            "maxwellian": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
+            "kappa": "isotropic_finite_variance_kappa_projected_single_particle_thomson",
+            "relativistic_maxwell_juttner": "isotropic_relativistic_maxwell_juttner_single_particle_thomson",
+        }[physical_model],
+        "physical_model_selection": {
+            "model": physical_model,
+            "kappa_index": fitted_kappa if physical_model == "kappa" else None,
+            "kappa_index_initial_seed": kappa_index if physical_model == "kappa" else None,
+            "kappa_index_role": ("inferred_from_measured_spectra_with_profiled_uncertainty" if kappa_parameter_count else "fixed_external_model_parameter_not_inferred") if physical_model == "kappa" else None,
+            "incident_polarization": incident_polarization,
+            "include_compton_recoil": bool(include_compton_recoil),
+            "maximum_recoil_correction_fraction": float(maximum_recoil_correction_fraction),
+            "relativistic_quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order)} if physical_model == "relativistic_maxwell_juttner" else None,
+            "amplitude_semantics": "Gaussian peak amplitude" if physical_model == "maxwellian" else "relative integrated spectral amplitude",
+        },
+        "validity_screening": {
+            "theta_e_profile": theta_e,
+            "theta_e_limit": NONRELATIVE_THETA_E_SCREEN,
+            "bulk_flow_beta_profile": flow_beta,
+            "bulk_flow_beta_limit": NONRELATIVE_FLOW_BETA_SCREEN,
+            "model_domain_valid": model_domain_valid,
+            "rationale": ("Conservative asymptotic screens apply to the non-relativistic Maxwellian/Kappa kernels; the Maxwell-Juttner kernel uses relativistic kinematics and instead requires subluminal flow. These are declared model-domain checks, not universal validity boundaries."),
+        },
+        "radius_m": r.copy(),
+        "kappa_index_uncertainty": (float(uncertainties[3*n]) if data_identifiable and kappa_parameter_count else None),
+        "kappa_index_status": ("primary" if data_identifiable and kappa_parameter_count else "conditional_fixed_external_model_parameter" if physical_model == "kappa" else "not_applicable"),
+        "electron_temperature_uncertainty_profile_eV": uncertainties[n:2*n] if data_identifiable else None,
+        "electron_density_profile_m3": np.full(n, np.nan, dtype=float),
+        "electron_density_uncertainty_profile_m3": np.full(n, np.nan, dtype=float),
+        "electron_velocity_projection_uncertainty_profile_m_s": uncertainties[2*n:3*n] if data_identifiable else None,
+        "electron_temperature_profile_eV": te if data_identifiable else None,
+        "electron_temperature_uncertainty_eV": uncertainties[n:2*n] if data_identifiable else None,
+        "electron_velocity_projection_profile_m_s": flow if data_identifiable else None,
+        "electron_velocity_projection_uncertainty_m_s": uncertainties[2*n:3*n] if data_identifiable else None,
+        "relative_spectral_amplitude_profile": amp if data_identifiable else None,
+        "relative_spectral_amplitude_uncertainty": uncertainties[:n] if data_identifiable else None,
+        "optimizer_candidate": {
+            "role": "numerical_candidate_not_a_measured_result",
+            "kappa_index": fitted_kappa if physical_model == "kappa" else None,
+            "electron_temperature_profile_eV": te,
+            "electron_velocity_projection_profile_m_s": flow,
+            "relative_spectral_amplitude_profile": amp,
+            "regularized_local_parameter_covariance": regularized_parameter_covariance,
+        },
+        "fitted_spectra": predicted,
+        "residuals": y-predicted,
+        "parameter_covariance": physical_covariance,
+        "profile_parameter_covariance": profile_parameter_covariance,
+        "regularized_parameter_covariance": regularized_parameter_covariance,
+        "measurement_data_parameter_covariance": (
+            transform @ measurement_data_covariance_p @ transform.T
+            if measurement_data_covariance_p is not None else None
+        ),
+        "spectral_covariance_parameter_components": {
+            label: transform @ contribution @ transform.T
+            for label, contribution in spectral_covariance_parameter_components_p.items()
+        },
+        "psf_calibration_parameter_covariance": (
+            transform @ psf_calibration_covariance_p @ transform.T
+            if psf_calibration_covariance_p is not None else None
+        ),
+        "psf_matrix_calibration_parameter_covariance": (
+            transform @ psf_matrix_calibration_covariance_p @ transform.T
+            if psf_matrix_calibration_covariance_p is not None else None
+        ),
+        "psf_matrix_cross_covariance_parameter_contribution": (
+            transform @ psf_matrix_cross_covariance_parameter_p @ transform.T
+            if psf_matrix_cross_covariance_parameter_p is not None else None
+        ),
+        "psf_matrix_parameter_sensitivity": (
+            transform @ psf_matrix_parameter_sensitivity
+            if psf_matrix_parameter_sensitivity is not None else None
+        ),
+        "spatial_mixing_calibration_parameter_covariance": (
+            transform @ mixing_calibration_covariance_p @ transform.T
+            if mixing_calibration_covariance_p is not None else None
+        ),
+        "spatial_mixing_cross_covariance_parameter_contribution": (
+            transform @ mixing_cross_covariance_parameter_p @ transform.T
+            if mixing_cross_covariance_parameter_p is not None else None
+        ),
+        "spatial_mixing_parameter_sensitivity": (
+            transform @ mixing_parameter_sensitivity
+            if mixing_parameter_sensitivity is not None else None
+        ),
+        "psf_sigma_parameter_sensitivity": (
+            transform @ psf_sigma_parameter_sensitivity
+            if psf_sigma_parameter_sensitivity is not None else None
+        ),
+        "covariance_decomposition": {
+            "reported_parameter_covariance": (
+                "data_only_GLS_plus_linearized_external_PSF_calibration_covariance_excluding_regularization_penalty"
+                if psf_calibration_covariance_p is not None or psf_matrix_calibration_covariance_p is not None else
+                "data_only_GLS_covariance_excluding_regularization_penalty"
+            ),
+            "measurement_data_covariance_available": measurement_data_covariance_p is not None and data_identifiable,
+            "psf_calibration_covariance": (
+                "scalar_Gaussian_PSF_width_covariance" if psf_calibration_covariance_p is not None
+                else "full_measured_PSF_matrix_element_covariance" if psf_matrix_calibration_covariance_p is not None
+                else "not_supplied"
+            ),
+            "psf_matrix_calibration_covariance_available": psf_matrix_calibration_covariance_p is not None,
+            "psf_matrix_spectrum_cross_covariance_available": psf_matrix_cross_covariance_parameter_p is not None,
+            "regularized_parameter_covariance": "optimizer_local_covariance_including_selected_regularization_penalty",
+            "profile_parameter_order": ([f"amplitude_{i}" for i in range(n)] +
+                                       [f"Te_{i}_eV" for i in range(n)] +
+                                       [f"flow_projection_{i}_m_s" for i in range(n)]),
+            "cross_covariance_retained_between_amplitude_temperature_flow_and_spatial_nodes": physical_covariance is not None,
+            "data_and_external_operator_covariance_available": data_covariance_p is not None and data_identifiable,
+            "spatial_mixing_calibration_covariance_available": mixing_calibration_covariance_p is not None,
+            "spatial_mixing_measurement_cross_covariance_available": mixing_cross_covariance_parameter_p is not None,
+            "unweighted_residual_scale": residual_scale,
+        },
+        "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
+                            [f"Te_{i}_eV" for i in range(n)] +
+                            [f"flow_projection_{i}_m_s" for i in range(n)] +
+                            (["kappa_index"] if kappa_parameter_count else []) +
+                            [f"background_channel_{channel}_coefficient_{coefficient}"
+                             for channel in range(m)
+                             for coefficient in range(n_background)]),
+        "detector_background_model": background_model,
+        "detector_background_basis": background_basis.copy(),
+        "detector_background_coefficients": fitted_background_coefficients,
+        "detector_background_offset": (
+            fitted_background_coefficients[:, 0].copy()
+            if background_model in {"linear", "polynomial"} else None
+        ),
+        "detector_background_slope_per_nm": (
+            fitted_background_coefficients[:, 1].copy()
+            * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
+        ),
+        "spatial_mixing_operator": (
+            "researcher_supplied_operator_with_linearized_calibration_covariance"
+            if mixing_covariance is not None else
+            "researcher_supplied_fixed_forward_operator"
+        ),
+        "spatial_mixing_matrix_nominal": nominal_mixing.copy(),
+        "spatial_mixing_covariance_contract": {
+            "supplied": mixing_covariance is not None,
+            "parameter_order": "row_major_channel_then_true_spatial_node",
+            "covariance_shape": list(mixing_covariance.shape) if mixing_covariance is not None else None,
+            "cross_covariance_with_measured_spectra_supplied": mixing_cross_covariance is not None,
+            "propagation": (
+                "implicit_data_only_GLS_sensitivity_with_full_operator_covariance"
+                if mixing_calibration_covariance_p is not None else
+                "fixed_operator_no_calibration_covariance_supplied"
+            ),
+            "cross_term": (
+                "included_from_joint_measurement_operator_covariance"
+                if mixing_cross_covariance_parameter_p is not None else
+                "zero_or_not_supplied"
+            ),
+        },
+        "effective_spatial_mixing_matrix": h.copy(),
+        "spatial_psf_matrix": psf.copy(),
+        "spatial_psf_contract": {
+            "source": psf_source,
+            "sigma_m": psf_sigma,
+            "mapping": "true_radial_nodes_to_observed_radial_bins",
+            "column_probability_mass": np.sum(psf, axis=0),
+            "finite_domain_edge_loss_preserved": True,
+            "renormalized": False,
+            "sigma_uncertainty_m": psf_sigma_uncertainty,
+            "uncertainty": (
+                "linearized_GLS_parameter_covariance_propagated_from_external_sigma_calibration_uncertainty"
+                if psf_calibration_covariance_p is not None else
+                "not_propagated_data_solution_not_identifiable"
+                if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0 else
+                "fixed_operator_no_PSF_calibration_covariance_supplied"
+            ),
+            "uncertainty_status": (
+                "propagated"
+                if psf_calibration_covariance_p is not None
+                or psf_matrix_calibration_covariance_p is not None else
+                "not_propagated_data_solution_not_identifiable"
+                if (psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0)
+                or psf_matrix_covariance is not None else
+                "not_supplied"
+            ),
+            "matrix_element_covariance_supplied": psf_matrix_covariance is not None,
+            "matrix_element_covariance_shape": (
+                list(psf_matrix_covariance.shape)
+                if psf_matrix_covariance is not None else None
+            ),
+            "spectrum_psf_cross_covariance_supplied": psf_cross_covariance is not None,
+            "matrix_element_uncertainty_method": (
+                "first_order_data_only_GLS_implicit_sensitivity_with_full_row_major_matrix_covariance"
+                if psf_matrix_calibration_covariance_p is not None else "not_propagated"
+            ),
+        },
+        "instrument_response": "researcher_supplied_fixed_forward_operator",
+        "spectral_bin_integration": (
+            "exact_Gaussian_CDF_finite_volume_bin_averages"
+            if physical_model == "maxwellian" else
+            "exact_Student_t_CDF_finite_volume_bin_averages_nu_2kappa_minus_1"
+            if physical_model == "kappa" else
+            "8_point_Gauss_Legendre_finite_volume_bin_averages_of_relativistic_forward_kernel"
+        ),
+        "regularization": {
+            "kind": (
+                "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude"
+                if regularization_kind == "curvature"
+                else "length_weighted_huber_total_variation_on_log_Te_flow_and_log_amplitude"
+            ),
+            "strength": lam_reg,
+            "huber_scale": huber_scale if regularization_kind == "huber_total_variation" else None,
+            "user_selected": True,
+            "edge_preserving": regularization_kind == "huber_total_variation",
+        },
+        "noise_model": noise_model,
+        "spectral_covariance_provenance": {
+            "measurement_covariance_source": measurement_covariance_source,
+            "measurement_covariance_supplied": measurement_covariance is not None,
+            "model_discrepancy_covariance_supplied": discrepancy is not None,
+            "model_discrepancy_covariance_shape": (
+                list(discrepancy.shape) if discrepancy is not None else None
+            ),
+            "model_discrepancy_covariance_trace": (
+                float(np.trace(discrepancy)) if discrepancy is not None else None
+            ),
+            "systematic_covariance_supplied": systematic is not None,
+            "systematic_covariance_shape": (
+                list(systematic.shape) if systematic is not None else None
+            ),
+            "systematic_covariance_trace": (
+                float(np.trace(systematic)) if systematic is not None else None
+            ),
+            "combined_covariance": (
+                "independent_measurement_model_discrepancy_and_systematic_covariances"
+                if measurement_covariance is not None and discrepancy is not None and systematic is not None
+                else "independent_measurement_and_systematic_covariances"
+                if measurement_covariance is not None and systematic is not None and discrepancy is None
+                else "independent_measurement_and_model_discrepancy_covariances"
+                if measurement_covariance is not None and discrepancy is not None and systematic is None
+                else "model_discrepancy_and_systematic_covariances"
+                if measurement_covariance is None and discrepancy is not None and systematic is not None
+                else "systematic_covariance_only"
+                if measurement_covariance is None and discrepancy is None and systematic is not None
+                else "model_discrepancy_covariance_only"
+                if measurement_covariance is None and discrepancy is not None
+                else "measurement_covariance_only"
+                if measurement_covariance is not None
+                else "unweighted_residual_scaled"
+            ),
+            "independence_assumption": (
+                "all supplied covariance components are mutually independent; "
+                "supply their cross-covariance blocks externally if correlated"
+            ),
+            "cross_covariance_assumed_zero": bool(
+                sum(component is not None for component in
+                    (measurement_covariance, discrepancy, systematic)) > 1
+            ),
+            "silent_jitter_or_eigenvalue_clipping": False,
+        },
+        "background_contract": {
+            "model": background_model,
+            "coefficient_count_per_channel": n_background,
+            "role": "detector_space_nuisance_not_plasma_emission",
+            "basis_source": "researcher_selected_model_or_supplied_templates",
+            "fit_is_joint_with_physical_thomson_forward_model": True,
+        },
+        "optimizer": {"success": bool(fit.success), "message": str(fit.message),
+                      "nfev": int(fit.nfev), "cost": float(fit.cost),
+                      "jacobian_rank": optimizer_rank, "parameter_count": parameter_count,
+                      "jacobian_condition_number": optimizer_condition,
+                      "data_only_jacobian_rank": data_rank,
+                      "data_only_scaled_jacobian_condition_number": data_condition,
+                      "maximum_data_condition_number": maximum_data_condition_number,
+                      "data_condition_number_acceptable": condition_identifiable,
+                      "regularization_rows_excluded_from_identifiability": True,
+                      "degrees_of_freedom": dof},
+        "identifiability": {
+            "status": primary_status,
+            "data_only_jacobian_rank": data_rank,
+            "parameter_count": parameter_count,
+            "primary": [f"joint finite-dimensional Te(r), scattering-vector flow projection(r), and relative amplitude(r) under the supplied {physical_model} model and fixed operators"],
+            "conditional": ["absolute density only if independent absolute-power and complete optical-geometry inputs are subsequently supplied; this function does not infer it"],
+            "non_identifiable": ["flow components perpendicular to the scattering vector",
+                                 "spatial structures in the null space of the supplied mixing operator",
+                                 "sub-resolution spatial structure not encoded by the measured mixing operator",
+                                 "unrestricted anisotropic or non-Maxwellian electron distributions"]},
+        "uncertainty_semantics": f"parameter_covariance is the local linearized GLS covariance conditional on the selected {physical_model} model and the sum of all supplied independent measurement, model-discrepancy and systematic covariance components, with optional first-order propagation of external Gaussian PSF-width calibration uncertainty; regularization is excluded. The PSF covariance is conditional on the supplied Gaussian PSF shape and fixed spatial mixing operator. regularized_parameter_covariance is separately exposed for the stabilized numerical candidate. Full cross-covariance among amplitude, Te, flow and spatial nodes is retained.",
+        "parameter_identifiability": {
+            "primary": ["electron_temperature_profile_eV", "electron_velocity_projection_profile_m_s", "relative_spectral_amplitude_profile"] if data_identifiable else [],
+            "conditional": ["absolute electron density requires a separate absolute-power and optical-collection inference with its complete auxiliary inputs"],
+            "non_identifiable": ["perpendicular flow components", "spatial null-space and sub-resolution structures", "unrestricted anisotropic or non-Maxwellian electron distributions"],
+            "status": primary_status,
+            "data_condition_number_limit": maximum_data_condition_number,
+            "data_condition_number_acceptable": condition_identifiable,
+        },
+        "experimental_validation": "not_performed; numerical software inference only",
+    }
+
+    if sensitivity_strengths is not None:
+        sensitivity_profiles = []
+        sensitivity_candidates = []
+        for strength in sensitivity_strengths:
+            candidate = reconstruct_joint_thomson_spatial_spectra(
+                wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix,
+                laser_wavelength_nm=laser_wavelength_nm,
+                scattering_angle_rad=scattering_angle_rad,
+                instrument_response=instrument_response,
+                spatial_psf_matrix=spatial_psf_matrix,
+                spatial_psf_sigma_m=spatial_psf_sigma_m,
+                spatial_psf_sigma_uncertainty_m=spatial_psf_sigma_uncertainty_m,
+                spatial_psf_matrix_covariance=spatial_psf_matrix_covariance,
+                spectral_psf_cross_covariance=spectral_psf_cross_covariance,
+                laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
+                laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
+                signal_uncertainty=signal_uncertainty,
+                joint_spectral_covariance=joint_spectral_covariance,
+                model_discrepancy_covariance=model_discrepancy_covariance,
+                systematic_covariance=systematic_covariance,
+                regularization_sensitivity_strengths=None,
+                regularization_strength=float(strength),
+                regularization_kind=regularization_kind,
+                tv_huber_scale=huber_scale,
+                positive_amplitude=positive_amplitude,
+                max_nfev=max_nfev,
+                background_model=background_model,
+                background_degree=background_degree,
+                background_interior_knots=background_interior_knots,
+                background_templates=background_templates,
+                physical_model=physical_model,
+                kappa_index=kappa_index,
+                fit_kappa_index=fit_kappa_index,
+                incident_polarization=incident_polarization,
+                radial_order=radial_order,
+                angular_order=angular_order,
+                maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
+            )
+            numerical = candidate["optimizer_candidate"]
+            profile = np.concatenate((
+                np.asarray(numerical["electron_temperature_profile_eV"], dtype=float),
+                np.asarray(numerical["electron_velocity_projection_profile_m_s"], dtype=float),
+                np.asarray(numerical["relative_spectral_amplitude_profile"], dtype=float),
+            ))
+            if not np.all(np.isfinite(profile)):
+                raise ValueError(
+                    "regularization sensitivity produced a non-finite numerical profile candidate"
+                )
+            sensitivity_profiles.append(profile)
+            sensitivity_candidates.append({
+                "regularization_strength": float(strength),
+                "optimizer_success": bool(candidate["optimizer"]["success"]),
+                "primary_result_status": candidate["primary_result_status"],
+                "data_only_jacobian_rank": int(candidate["optimizer"]["data_only_jacobian_rank"]),
+                "parameter_count": int(candidate["optimizer"]["parameter_count"]),
+            })
+        profile_matrix = np.asarray(sensitivity_profiles, dtype=float)
+        profile_names = (
+            [f"Te_{i}_eV" for i in range(n)]
+            + [f"flow_projection_{i}_m_s" for i in range(n)]
+            + [f"relative_amplitude_{i}" for i in range(n)]
+        )
+        result["regularization_sensitivity"] = {
+            "strengths": sensitivity_strengths.copy(),
+            "selected_strength": lam_reg,
+            "profile_parameter_order": profile_names,
+            "profile_candidates": profile_matrix,
+            "profile_mean": profile_matrix.mean(axis=0),
+            "profile_standard_deviation": profile_matrix.std(axis=0, ddof=1),
+            "profile_covariance_across_regularization": np.atleast_2d(
+                np.cov(profile_matrix, rowvar=False)
+            ),
+            "candidate_diagnostics": sensitivity_candidates,
+            "interpretation": (
+                "regularization-choice sensitivity of numerical profile candidates; "
+                "not measurement uncertainty and not a substitute for data-only identifiability"
+            ),
+        }
+    return result
