@@ -1474,3 +1474,25 @@ def test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_report
         "conditional_relativistic_response_aware_moment_closure"
     )
     assert inverse["spectral_moment_closure"]["regularized_candidate_used"] is True
+
+
+def test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    mean = 1.0e6
+    sigma = 1.0e4
+    velocity = np.linspace(mean - 8.0*sigma, mean + 8.0*sigma, 1601)
+    pdf = np.exp(-0.5*((velocity-mean)/sigma)**2)
+    pdf /= np.trapz(pdf, velocity)
+    moments = _projected_evdf_physical_moments(velocity, pdf)
+
+    assert moments["mean_velocity_parallel_m_s"] == pytest.approx(mean, rel=1e-10)
+    assert moments["velocity_parallel_variance_m2_s2"] == pytest.approx(sigma**2, rel=2e-4)
+    assert moments["central_third_velocity_moment_m3_s3"] == pytest.approx(0.0, abs=1e7)
+    assert moments["central_fourth_velocity_moment_m4_s4"] == pytest.approx(
+        3.0*sigma**4, rel=3e-4
+    )
+    assert moments["skewness"] == pytest.approx(0.0, abs=1e-8)
+    assert moments["excess_kurtosis"] == pytest.approx(0.0, abs=1e-3)
