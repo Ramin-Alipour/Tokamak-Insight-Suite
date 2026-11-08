@@ -538,3 +538,24 @@ def test_full_temperature_tensor_geometry_covariance_rejects_invalid_contracts()
         infer_full_temperature_tensor_from_thomson_projections(
             projected, q, scattering_vector_covariance=invalid,
         )
+
+def test_full_temperature_tensor_rejects_asymmetric_measurement_covariance():
+    q, _, projected = _views()
+    covariance = np.eye(q.shape[0]) * 0.04
+    covariance[0, 1] = 0.01
+    with pytest.raises(ValueError, match="covariance must be symmetric"):
+        infer_full_temperature_tensor_from_thomson_projections(
+            projected, q, projected_temperature_covariance_eV2=covariance,
+        )
+
+
+def test_full_temperature_tensor_accepts_roundoff_level_covariance_asymmetry():
+    q, expected, projected = _views()
+    covariance = np.eye(q.shape[0]) * 0.04
+    covariance[0, 1] = 1.0e-14
+    result = infer_full_temperature_tensor_from_thomson_projections(
+        projected, q, projected_temperature_covariance_eV2=covariance,
+    )
+    np.testing.assert_allclose(
+        result["electron_temperature_tensor_eV"], expected, rtol=1e-9, atol=1e-9
+    )
