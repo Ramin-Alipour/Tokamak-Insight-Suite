@@ -230,3 +230,17 @@ def test_correlated_path_density_is_a_registered_thomson_subanalysis():
         for item in entry["execution_contract"]["input_specs"]
     )
     assert 87 in get_analysis_family(1)["entry_ids"]
+
+
+def test_path_density_formula_registry_points_to_the_physical_solver():
+    import json
+    from pathlib import Path
+
+    registry = json.loads(
+        (Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json").read_text()
+    )
+    formula = registry["108"]
+    assert formula["execution_contract"]["function_link"] == (
+        "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
+    )
+    assert "Var(n̄_e)=gᵀ C_joint g" in formula["equation"]
