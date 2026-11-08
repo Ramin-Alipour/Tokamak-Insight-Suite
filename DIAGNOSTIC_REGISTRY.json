@@ -9052,12 +9052,15 @@
           "name": "laser_wavelength_nm",
           "unit": "nm; positive laser wavelength used by the selected physical forward model",
           "required": false,
-          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments.",
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments. Also required when projected_evdf_options is supplied for the projected-EVDF inverse.",
           "required_when": {
             "physical_model": [
               "non_collective_maxwellian",
               "kappa",
               "relativistic_maxwell_juttner"
+            ],
+            "projected_evdf_options": [
+              "non-null"
             ]
           }
         },
@@ -9065,12 +9068,15 @@
           "name": "scattering_angle_rad",
           "unit": "rad; scattering angle in (0, pi) used by the selected physical forward model",
           "required": false,
-          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments.",
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments. Also required when projected_evdf_options is supplied for the projected-EVDF inverse.",
           "required_when": {
             "physical_model": [
               "non_collective_maxwellian",
               "kappa",
               "relativistic_maxwell_juttner"
+            ],
+            "projected_evdf_options": [
+              "non-null"
             ]
           }
         },
@@ -9113,28 +9119,6 @@
             ]
           },
           "description": "For the non-relativistic projected-EVDF inverse, propagates angle uncertainty by finite-difference sensitivity of the physical Doppler forward operator and implicit differentiation of the constrained regularized inverse. Requires 3 sigma to remain inside (0, pi). The relativistic projected-EVDF inverse currently rejects this input rather than silently omitting it."
-        },
-        {
-          "name": "laser_wavelength_nm",
-          "unit": "nm; positive incident laser wavelength",
-          "required": false,
-          "required_when": {
-            "projected_evdf_options": [
-              "non-null"
-            ]
-          },
-          "description": "Required for projected-EVDF inversion; used with the explicitly supplied scattering angle in the selected Thomson/Compton kinematic forward operator."
-        },
-        {
-          "name": "scattering_angle_rad",
-          "unit": "rad; scattering angle strictly inside (0, pi)",
-          "required": false,
-          "required_when": {
-            "projected_evdf_options": [
-              "non-null"
-            ]
-          },
-          "description": "Required for projected-EVDF inversion; defines |q|/|k_i|=2 sin(theta/2)."
         },
         {
           "name": "laser_wavelength_uncertainty_nm",
