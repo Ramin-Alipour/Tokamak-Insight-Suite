@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tis.products import get_product, list_products
+from tis.products import get_product, list_products, build_dependency_inventory
 
 
 def render_product_workspace_page(st: Any) -> None:
@@ -49,6 +49,22 @@ def render_product_workspace_page(st: Any) -> None:
             "Completeness": contract.get("completeness", "incomplete"),
         })
     st.dataframe(rows, width="stretch", hide_index=True)
+    inventory = build_dependency_inventory()
+    dependency_row = next(
+        item for item in inventory["products"]
+        if item["product_id"] == product["product_id"]
+    )
+    with st.expander("Code ownership and dependency boundary"):
+        st.write({
+            "registered_solver_modules": dependency_row["entry_point_modules"],
+            "product_local_domain_modules": dependency_row["product_local_domain_modules"],
+            "shared_domain_modules": dependency_row["shared_domain_modules"],
+            "shared_platform_dependencies": dependency_row["shared_platform_dependencies"],
+        })
+        st.caption(
+            "Static AST import closure. Dynamic imports, runtime plugins, "
+            "non-Python resources and third-party package constraints are not included."
+        )
     st.markdown("### Selected workflow contract")
     selected_analysis_id = st.selectbox(
         "Workflow",
