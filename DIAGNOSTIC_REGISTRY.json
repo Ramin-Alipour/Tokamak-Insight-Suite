@@ -9110,7 +9110,7 @@
           "name": "projected_evdf_options",
           "unit": "mapping of non-parametric projected-EVDF inverse controls",
           "required": false,
-          "description": "When supplied, invokes the response-aware non-negative 1-D q-parallel EVDF inverse on the same calibrated spectrum, using the measured instrument response and the same explicit background/covariance inputs. It does not infer a 3-D EVDF or absolute density."
+          "description": "When supplied with explicit top-level laser_wavelength_nm and scattering_angle_rad, runs the response-aware non-negative q-parallel EVDF inverse on the same calibrated spectrum. kinematics accepts nonrelativistic, relativistic_thomson or compton; the latter two use exact relativistic single-electron kinematics, with Compton selecting recoil and Klein-Nishina weighting. Options include velocity_grid_m_s or velocity_limit_m_s/velocity_points and regularization_strength (null selects GCV). The forward integral is discretized as sum_j f(v_j) K(lambda|v_j) w_j using nonuniform trapezoidal velocity weights. Measurement, model-discrepancy and systematic covariance are propagated separately. Rank-deficient relativistic inversions return conditional regularized candidates and conditional moments, never primary identified EVDFs. Dimensional q-parallel moments include mean, variance, directional-equivalent temperature, third/fourth central moments, skewness and excess kurtosis. A single view does not infer absolute density, unrestricted 3-D EVDF or full parallel heat flux."
         },
         {
           "name": "scattering_angle_uncertainty_rad",
