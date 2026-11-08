@@ -54,7 +54,7 @@ from .formula_library import (
     thomson_velocity_projection_relativistic_exact,
 )
 
-from .advanced_inference import reconstruct_multiview_3d_evdf
+from .advanced_inference import reconstruct_multiview_3d_evdf, reconstruct_optical_thomson_3d_evdf
 from .thomson_anisotropic_inference import (
     fit_gyrotropic_bi_maxwellian_thomson,
     fit_gyrotropic_bi_kappa_thomson,
@@ -807,6 +807,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "thomson_kinetic_background_fit",
     "thomson_n_population_relativistic_fit",
     "thomson_multiview_3d_evdf",
+    "thomson_multiview_3d_evdf_physical",
     "kappa_electrostatic_susceptibility",
     "kappa_dispersion_function",
     "bi_kappa_electrostatic_susceptibility",
@@ -951,6 +952,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = infer_thomson_path_averaged_density
     elif model == "thomson_multiview_3d_evdf":
         solver = reconstruct_multiview_3d_evdf
+    elif model == "thomson_multiview_3d_evdf_physical":
+        solver = reconstruct_optical_thomson_3d_evdf
     elif model == "thomson_kinetic_background_fit":
         from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         solver = fit_noncollective_kinetic_thomson_with_background

@@ -61,7 +61,8 @@ MODEL_LABELS = {
     "thomson_temperature_from_spectral_width": "Optical Thomson — conditional Maxwellian temperature from intrinsic thermal width with joint covariance",
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "thomson_n_population_relativistic_fit": "Optical Thomson — joint inference of 2–8 relativistic Maxwell-Juttner populations, number fractions and shared or component flows",
-    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion with vector flow, velocity-covariance tensor and propagated moment uncertainty from independent measured views",
+    "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from caller-supplied kernels",
+    "thomson_multiview_3d_evdf_physical": "Optical Thomson — physical multi-view 3-D EVDF inversion from geometry, Doppler kinematics and measured response",
     "kappa_electrostatic_susceptibility": "CTS — dimensional isotropic-Kappa susceptibility from the shared full-tail Landau kernel, with exact thermal scaling and analytic phase derivative",
     "kappa_dispersion_function": "Optical/CTS kinetic kernel — full-tail generalized Kappa plasma dispersion integral with exact Landau boundary value",
     "bi_kappa_electrostatic_susceptibility": "CTS — gyrotropic bi-Kappa directional Landau susceptibility with exact projected marginal",
@@ -202,7 +203,7 @@ MODEL_PHYSICS_NOTES = {
         "standard deviations, never both. This is not a 3-D flow or a broad-EVDF mean."
     ),
     "thomson_multiview_3d_evdf": (
-        "Non-negative 3-D velocity-space inversion from independently measured scattering views. "
+        "Generic non-negative 3-D velocity-space inversion from caller-supplied kernels. "
         "The stacked spectral kernel is assembled from the supplied view kernels; a data-only "
         "rank/conditioning gate determines whether the 3-D distribution is identifiable. "
         "Regularization can stabilize a conditional candidate but cannot create missing angular "
@@ -618,6 +619,20 @@ EXAMPLES = {
         "model_discrepancy_covariance": None,
         "systematic_covariance": None,
         "regularization_strength": 0.01
+    },
+    "thomson_multiview_3d_evdf_physical": {
+        "wavelength_nm": np.linspace(499.7, 500.3, 61).tolist(),
+        "measured_spectra": [[0.0]*61, [0.0]*61, [0.0]*61],
+        "scattering_vector_unit": [[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0]],
+        "velocity_grid_m_s": [[vx,vy,vz] for vx in [-2.0e4,0.0,2.0e4] for vy in [-2.0e4,0.0,2.0e4] for vz in [-2.0e4,0.0,2.0e4]],
+        "laser_wavelength_nm": 500.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response_matrix": np.eye(61).tolist(),
+        "background_spectra": [[0.0]*61, [0.0]*61, [0.0]*61],
+        "voxel_volume_m3_s3": [8.0e12]*27,
+        "regularization_matrix": np.diff(np.eye(27), n=2, axis=0).tolist(),
+        "regularization_strength": 0.01,
+        "measurement_uncertainty": [[0.01]*61, [0.01]*61, [0.01]*61]
     },
     "thomson_projected_evdf": {
         "wavelength_nm": np.linspace(499.98, 500.02, 41).tolist(),

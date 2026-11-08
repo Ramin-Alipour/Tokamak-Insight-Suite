@@ -429,6 +429,154 @@ def reconstruct_multiview_3d_evdf(
     }
 
 
+
+def reconstruct_optical_thomson_3d_evdf(
+    wavelength_nm,
+    measured_spectra,
+    scattering_vector_unit,
+    velocity_grid_m_s,
+    *,
+    laser_wavelength_nm,
+    scattering_angle_rad,
+    instrument_response_matrix,
+    background_spectra,
+    voxel_volume_m3_s3,
+    regularization_matrix,
+    regularization_strength,
+    measurement_uncertainty=None,
+    measurement_covariance=None,
+    model_discrepancy_covariance=None,
+    systematic_covariance=None,
+    max_iter=3000,
+):
+    r"""Build and invert the physical non-relativistic optical-Thomson 3-D kernel.
+
+    For view j and velocity voxel a, the elastic single-particle Doppler map is
+    lambda_ja = lambda_L [1 - 2 sin(theta/2) (qhat_j . v_a)/c].
+    A unit-integral monochromatic line is deposited conservatively into the
+    finite wavelength bins, then the measured response operator acts on bin
+    *integrated* power. The inverse solves S_j(lambda)=int f(v)K_j(lambda|v)d^3v.
+
+    This route is explicitly restricted to unpolarized, non-relativistic,
+    single-scattering Thomson shape inference. It requires a measured response
+    per view and explicit background; it does not infer absolute density,
+    unknown view gains, polarization, Compton recoil or a relativistic EVDF.
+    The 3-D distribution is reported only when the stacked data-only kernel
+    identifies every velocity voxel; regularization cannot supply angular data.
+    """
+    wavelength = _real_array(wavelength_nm, "wavelength_nm", 1)
+    spectra = _real_array(measured_spectra, "measured_spectra", 2)
+    directions = _real_array(scattering_vector_unit, "scattering_vector_unit", 2)
+    velocity = _real_array(velocity_grid_m_s, "velocity_grid_m_s", 2)
+    background = _real_array(background_spectra, "background_spectra", 2)
+    if wavelength.size < 3 or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least three strictly increasing calibrated bin centres")
+    n_view, n_wave = spectra.shape
+    if n_wave != wavelength.size or background.shape != spectra.shape:
+        raise ValueError("measured_spectra and background_spectra must match (n_view, n_wavelength)")
+    if directions.shape != (n_view, 3) or velocity.ndim != 2 or velocity.shape[1] != 3:
+        raise ValueError("scattering_vector_unit must be (n_view,3) and velocity_grid_m_s must be (n_voxel,3)")
+    direction_norm = np.linalg.norm(directions, axis=1)
+    if np.any(direction_norm <= 0.0):
+        raise ValueError("every scattering_vector_unit must be non-zero")
+    directions = directions / direction_norm[:, None]
+    if (not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0.0
+            or not np.isfinite(scattering_angle_rad)
+            or not 0.0 < scattering_angle_rad < np.pi):
+        raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie in (0, pi)")
+    speed = np.linalg.norm(velocity, axis=1)
+    beta_max = float(np.max(speed) / 299792458.0)
+    if beta_max >= 0.1:
+        raise ValueError(
+            "the physical 3-D optical Thomson kernel is non-relativistic and requires max(|v|)/c < 0.1; use the relativistic 3-D kernel when available"
+        )
+    response = np.asarray(instrument_response_matrix, dtype=float)
+    if response.ndim == 2:
+        response = np.broadcast_to(response, (n_view, n_wave, n_wave))
+    if (response.shape != (n_view, n_wave, n_wave)
+            or not np.all(np.isfinite(response)) or np.any(response < 0.0)):
+        raise ValueError("instrument_response_matrix must be non-negative finite (n_wave,n_wave) or (n_view,n_wave,n_wave)")
+    response_sums = response.sum(axis=1)
+    if np.any(response_sums <= 0.0) or not np.allclose(response_sums, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("each measured response matrix must conserve integrated spectral power: columns sum to one")
+    edges = np.empty(n_wave + 1, dtype=float)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("calibrated wavelength centres must define positive finite-volume bins")
+    q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
+    kernels = np.zeros((n_view, n_wave, velocity.shape[0]), dtype=float)
+    line_centres = np.empty((n_view, velocity.shape[0]), dtype=float)
+    for view, qhat in enumerate(directions):
+        projected_velocity = velocity @ qhat
+        centres = float(laser_wavelength_nm) * (
+            1.0 - q_over_ki * projected_velocity / 299792458.0
+        )
+        line_centres[view] = centres
+        if np.any(centres < edges[0]) or np.any(centres > edges[-1]):
+            raise ValueError(
+                f"velocity grid for view {view} maps outside the measured wavelength window; expand the wavelength range or narrow the velocity grid"
+            )
+        latent_mass = np.zeros((n_wave, velocity.shape[0]), dtype=float)
+        for voxel, centre in enumerate(centres):
+            if centre <= wavelength[0]:
+                latent_mass[0, voxel] = 1.0
+            elif centre >= wavelength[-1]:
+                latent_mass[-1, voxel] = 1.0
+            else:
+                right = int(np.searchsorted(wavelength, centre, side="right"))
+                left = right - 1
+                fraction = (centre - wavelength[left]) / (wavelength[right] - wavelength[left])
+                latent_mass[left, voxel] = 1.0 - fraction
+                latent_mass[right, voxel] = fraction
+        # R acts on bin-integrated power; divide by bin widths only afterwards.
+        measured_mass = response[view] @ latent_mass
+        kernels[view] = measured_mass / widths[:, None]
+    background_subtracted = spectra - background
+    if np.any(background_subtracted < 0.0):
+        raise ValueError(
+            "background-subtracted spectra contain negative bins; supply a physically valid background or use a signed-noise likelihood route"
+        )
+    result = reconstruct_multiview_3d_evdf(
+        kernels, background_subtracted, velocity,
+        voxel_volume_m3_s3=voxel_volume_m3_s3,
+        regularization_matrix=regularization_matrix,
+        measurement_uncertainty=measurement_uncertainty,
+        measurement_covariance=measurement_covariance,
+        model_discrepancy_covariance=model_discrepancy_covariance,
+        systematic_covariance=systematic_covariance,
+        regularization_strength=regularization_strength,
+        max_iter=max_iter,
+    )
+    result = dict(result)
+    result.update({
+        "physical_forward_model": "elastic_single_particle_unpolarized_nonrelativistic_optical_thomson",
+        "spectral_forward_equation": "S_j(lambda_i)=sum_a f_a K_ji,a DeltaV_a; lambda_ja=lambda_L*(1-2*sin(theta/2)*(qhat_j dot v_a)/c)",
+        "scattering_vector_unit": directions.copy(),
+        "laser_wavelength_nm": float(laser_wavelength_nm),
+        "scattering_angle_rad": float(scattering_angle_rad),
+        "q_over_k_incident": float(q_over_ki),
+        "mapped_line_centres_nm": line_centres,
+        "wavelength_bin_widths_nm": widths,
+        "background_subtracted_spectra": background_subtracted,
+        "physical_spectral_kernels": kernels,
+        "instrument_response_per_view": response.copy(),
+        "maximum_velocity_beta": beta_max,
+        "validity_domain": {
+            "maximum_speed_over_c": 0.1,
+            "actual_maximum_speed_over_c": beta_max,
+            "relativistic_corrections_included": False,
+            "compton_recoil_included": False,
+            "polarization_resolved": False,
+            "absolute_density_inferred": False,
+        },
+        "forward_kernel_contract": "internally generated physical Doppler/finite-volume/response kernel; per-view measured response applied to integrated bin power",
+        "experimental_validation": "synthetic_physics_recovery_required_before_experimental_claim",
+    })
+    return result
+
 def assess_multiview_evdf_regularization_sensitivity(
     spectral_kernels, measured_spectra, velocity_grid_m_s, *,
     voxel_volume_m3_s3, regularization_matrix, regularization_strengths,
