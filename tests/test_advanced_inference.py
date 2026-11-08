@@ -354,6 +354,55 @@ def test_physical_optical_thomson_3d_rejects_nonconserving_view_hidden_by_other_
         )
 
 
+def test_multiview_evdf_preserves_signed_background_subtracted_noise_residuals():
+    kernels = np.zeros((1, 5, 2))
+    kernels[0, :, 0] = [1.0, 0.8, 0.5, 0.2, 0.1]
+    kernels[0, :, 1] = [0.1, 0.2, 0.5, 0.8, 1.0]
+    truth = np.array([0.4, 0.6])
+    volume = np.ones(2)
+    signal = (kernels[0] @ truth)[None, :]
+    signal[0, 0] -= 0.2  # a valid negative residual after background subtraction
+    result = reconstruct_multiview_3d_evdf(
+        kernels, signal, np.array([[-1.0e4, 0., 0.], [1.0e4, 0., 0.]]),
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=np.zeros((1, 2)),
+        measurement_uncertainty=np.full((1, 5), 0.1),
+        regularization_strength=1e-8,
+    )
+    assert result["residual_spectra"][0, 0] < 0.0
+    assert np.all(result["regularized_candidate_evdf_m3_s3"] >= 0.0)
+    assert result["noise_model"] == "full_stacked_measurement_plus_model_discrepancy_plus_systematic_covariance"
+
+
+def test_physical_optical_thomson_3d_accepts_negative_background_subtracted_noise_bin():
+    wavelength = np.linspace(499.85, 500.15, 101)
+    velocity = np.array([[-1.0e4, 0., 0.], [1.0e4, 0., 0.]])
+    direction = np.array([[1., 0., 0.]])
+    pilot = reconstruct_optical_thomson_3d_evdf(
+        wavelength, np.ones((1, wavelength.size)), direction, velocity,
+        laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+        view_gain=[1.0], instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=np.zeros((1, wavelength.size)),
+        voxel_volume_m3_s3=np.ones(2), regularization_matrix=np.zeros((1, 2)),
+        regularization_strength=1e-8,
+    )
+    truth = np.array([0.35, 0.65])
+    measured = (pilot["physical_spectral_kernels"][0] @ truth)[None, :]
+    background = np.zeros_like(measured)
+    background[0, 0] = measured[0, 0] + 1e-8
+    result = reconstruct_optical_thomson_3d_evdf(
+        wavelength, measured, direction, velocity,
+        laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+        view_gain=[1.0], instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=background,
+        voxel_volume_m3_s3=np.ones(2), regularization_matrix=np.zeros((1, 2)),
+        measurement_uncertainty=np.full_like(measured, 1e-7),
+        regularization_strength=1e-8,
+    )
+    assert result["background_subtracted_spectra"][0, 0] < 0.0
+    assert np.all(result["regularized_candidate_evdf_m3_s3"] >= 0.0)
+
+
 def test_physical_optical_thomson_3d_route_rejects_relativistic_velocity_grid():
     wavelength = np.linspace(499.0, 501.0, 101)
     with pytest.raises(ValueError, match="non-relativistic"):

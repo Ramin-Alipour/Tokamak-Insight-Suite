@@ -258,8 +258,11 @@ def reconstruct_multiview_3d_evdf(
     speed = np.linalg.norm(velocity, axis=1)
     if np.any(speed >= 299792458.0):
         raise ValueError("every 3-D EVDF velocity voxel must be strictly subluminal (|v| < c)")
-    if np.any(volume <= 0) or np.any(data < 0) or penalty.shape[1] != nvoxel:
-        raise ValueError("voxel volumes must be positive, spectra non-negative and regularization columns must match voxels")
+    # Background-subtracted spectra are allowed to be signed: negative
+    # residual bins are expected for finite-noise measurements. The physical
+    # EVDF remains non-negative through the bounded inverse below.
+    if np.any(volume <= 0) or penalty.shape[1] != nvoxel:
+        raise ValueError("voxel volumes must be positive and regularization columns must match voxels")
     lam = float(regularization_strength)
     if not np.isfinite(lam) or lam <= 0:
         raise ValueError("regularization_strength must be positive and finite")
@@ -559,11 +562,10 @@ def reconstruct_optical_thomson_3d_evdf(
         # R acts on bin-integrated power; divide by bin widths only afterwards.
         measured_mass = response[view] @ latent_mass
         kernels[view] = measured_mass / widths[:, None] * angular_factor[view] * gains[view]
+    # Preserve signed background-subtracted residuals. Gaussian/GLS
+    # measurement models permit negative noise excursions; non-negativity is
+    # imposed on the latent EVDF coefficients, not on each observed bin.
     background_subtracted = spectra - background
-    if np.any(background_subtracted < 0.0):
-        raise ValueError(
-            "background-subtracted spectra contain negative bins; supply a physically valid background or use a signed-noise likelihood route"
-        )
     result = reconstruct_multiview_3d_evdf(
         kernels, background_subtracted, velocity,
         voxel_volume_m3_s3=voxel_volume_m3_s3,
