@@ -285,3 +285,58 @@ def test_full_em_cts_constitutive_name_routes_to_the_same_public_solver(monkeypa
     assert calls == [{"marker": 17}]
     assert result["solver"] == "landau_fdt_full_em_constitutive"
     assert result["public_physics_entrypoint"] == "landau_fdt_full_em_constitutive"
+
+
+
+def test_kinetic_fit_derives_optimizer_seed_when_physical_initial_is_omitted():
+    wavelength = np.linspace(529.0, 535.0, 181)
+    laser, angle = 532.0, np.pi / 2.0
+    truth = np.array([300.0, 8.0e4, 3.5])
+    shape = _kappa_bin_average_spectral_density(
+        wavelength, laser, angle, truth[0], truth[1], truth[2]
+    )
+    measured = 2.3 * shape + 0.04 + 0.006 * (
+        2.0 * (wavelength-wavelength.min())/np.ptp(wavelength)-1.0
+    )
+    result = fit_noncollective_kinetic_thomson_with_background(
+        wavelength, measured, physical_model="kappa",
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        measurement_uncertainty=np.full(wavelength.size, 0.003),
+        max_nfev=5000,
+    )
+    assert result["optimizer_success"]
+    assert result["initialization_source"] == "deterministic_spectral_moment_seed"
+    assert result["physical_initial"].shape == (3,)
+    assert np.all(np.isfinite(result["physical_initial"]))
+    assert result["status"] == "identified_from_measurement"
+    assert np.allclose(result["physical_parameters"], truth, rtol=0.05, atol=1e-3)
+
+
+def test_spectral_distribution_kinetic_fit_accepts_optional_physical_initial(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_background as kinetic
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    captured = {}
+
+    def fake_fit(*args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "status": "identified_from_measurement",
+            "primary_result_status": "identified_from_measurement",
+            "reportable_as_primary_inference": True,
+            "initialization_source": "deterministic_spectral_moment_seed",
+            "physical_initial": np.array([300.0, 0.0, 3.5]),
+        }
+
+    monkeypatch.setattr(kinetic, "fit_noncollective_kinetic_thomson_with_background", fake_fit)
+    wavelength = np.linspace(529.0, 535.0, 81)
+    signal = 0.03 + np.exp(-0.5*((wavelength-532.0)/0.45)**2)
+    output = analyze_thomson_spectral_distribution(
+        wavelength, signal, instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full(wavelength.size, 0.03),
+        physical_model="kappa", laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2.0,
+    )
+    assert "physical_initial" not in captured
+    assert output["physical_inference"]["initialization"]["source"] == "deterministic_spectral_moment_seed"
