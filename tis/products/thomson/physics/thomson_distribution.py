@@ -151,6 +151,7 @@ def analyze_thomson_spectral_distribution(
     laser_angle_covariance_nm_rad: float = 0.0,
     fit_geometry_cross_covariance_nm2_rad: np.ndarray | None = None,
     physical_fit_options: dict | None = None,
+    radius_m: float | None = None,
     projected_evdf_options: dict | None = None,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
@@ -914,12 +915,7 @@ def analyze_thomson_spectral_distribution(
     # forward fitter when the caller supplies the spatial coordinate and fit
     # controls. The Gaussian-width conversion above remains a clearly labelled
     # diagnostic candidate; it is never promoted to the primary measurement.
-    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"} and (
-        physical_fit_options is not None or any(value is not None for value in (
-            incident_polarization, include_compton_recoil, physical_background_model,
-            model_discrepancy_covariance, systematic_covariance, physical_initial,
-        ))
-    ):
+    if physical_model in {"non_collective_maxwellian", "collective_maxwellian", "collective_kappa"}:
         if laser_wavelength_nm is None or scattering_angle_rad is None:
             raise ValueError(
                 "laser_wavelength_nm and scattering_angle_rad are required for canonical Thomson physical inference"
@@ -927,6 +923,13 @@ def analyze_thomson_spectral_distribution(
         if physical_fit_options is not None and not isinstance(physical_fit_options, dict):
             raise ValueError("physical_fit_options must be a mapping for canonical Maxwellian inference")
         options = dict(physical_fit_options or {})
+        if radius_m is not None:
+            if "radius_m" in options:
+                raise ValueError(
+                    "radius_m must be supplied either as a top-level argument "
+                    "or in physical_fit_options, not both"
+                )
+            options["radius_m"] = radius_m
         direct_options = {
             "incident_polarization": incident_polarization,
             "include_compton_recoil": include_compton_recoil,
