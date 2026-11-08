@@ -684,6 +684,7 @@ def test_number_conserving_bgk_kappa_response_has_exact_collisionless_limit():
         kappa_bgk_electron_susceptibility, kappa_electron_susceptibility,
     )
     a = args()
+    a.pop("pole_imaginary_part_m_s")
     expected = kappa_electron_susceptibility(**a)
     actual = kappa_bgk_electron_susceptibility(**a, collision_frequency_s=0.0)
     assert actual["electron_susceptibility"] == pytest.approx(
@@ -694,7 +695,9 @@ def test_number_conserving_bgk_kappa_response_has_exact_collisionless_limit():
 
 def test_number_conserving_bgk_kappa_response_includes_density_restoring_term():
     from tokamak_analysis.cts_kappa import kappa_bgk_electron_susceptibility
-    result = kappa_bgk_electron_susceptibility(**args(), collision_frequency_s=2.0e6)
+    a = args()
+    a.pop("pole_imaginary_part_m_s")
+    result = kappa_bgk_electron_susceptibility(**a, collision_frequency_s=2.0e6)
     assert np.isfinite(result["electron_susceptibility"].real)
     assert np.isfinite(result["electron_susceptibility"].imag)
     assert result["collision_model"] == "linearized_number_conserving_BGK_on_full_tail_Kappa_marginal"
