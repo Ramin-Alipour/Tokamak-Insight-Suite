@@ -9403,7 +9403,8 @@
         "tests/test_thomson_distribution.py::test_distribution_rejects_non_positive_definite_joint_signal_background_covariance",
         "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
         "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
-        "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf"
+        "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
+        "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
       ],
       "input_data_level": "measured_calibrated_spectrum"
     },
@@ -9432,7 +9433,21 @@
     "primary_analysis_id": 1,
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
-    "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction."
+    "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction.",
+    "implementation_trace": {
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
+        "tests/test_thomson_distribution.py::test_distribution_does_not_accept_pre_extracted_physical_parameters_or_width_corrections",
+        "tests/test_thomson_distribution.py::test_moments_use_signed_residuals_and_propagate_pointwise_uncertainty",
+        "tests/test_thomson_inference.py::test_primary_thomson_inference_includes_spectral_distribution_diagnostics",
+        "tests/test_thomson_distribution.py::test_distribution_propagates_joint_signal_background_cross_covariance",
+        "tests/test_thomson_distribution.py::test_distribution_rejects_non_positive_definite_joint_signal_background_covariance",
+        "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
+        "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
+        "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
+        "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
+      ]
+    }
   },
   {
     "family": "Plasma parameters",

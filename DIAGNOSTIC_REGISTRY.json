@@ -9456,7 +9456,8 @@
         "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments",
         "tests/test_thomson_evdf.py::test_evdf_reports_dimensional_third_and_fourth_central_velocity_moments",
         "tests/test_thomson_gap_closure.py::test_relativistic_projected_evdf_covariance_uses_frequentist_tikhonov_sandwich",
-        "tests/test_thomson_distribution.py::test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution"
+        "tests/test_thomson_distribution.py::test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution",
+        "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
       ],
       "input_data_level": "measured_calibrated_spectrum"
     },
@@ -9485,7 +9486,25 @@
     "primary_analysis_id": 1,
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
-    "completion_scope": "Observed wavelength-space diagnostics plus optional calibrated-spectrum-to-one-dimensional q-parallel EVDF inversion with non-relativistic, exact relativistic Thomson or Compton/Klein-Nishina forward kinematics, measured instrument response, explicit background, physical velocity moments and conditional covariance. A single view does not identify an unrestricted 3-D EVDF or full heat flux."
+    "completion_scope": "Observed wavelength-space diagnostics plus optional calibrated-spectrum-to-one-dimensional q-parallel EVDF inversion with non-relativistic, exact relativistic Thomson or Compton/Klein-Nishina forward kinematics, measured instrument response, explicit background, physical velocity moments and conditional covariance. A single view does not identify an unrestricted 3-D EVDF or full heat flux.",
+    "implementation_trace": {
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
+        "tests/test_thomson_distribution.py::test_distribution_does_not_accept_pre_extracted_physical_parameters_or_width_corrections",
+        "tests/test_thomson_distribution.py::test_moments_use_signed_residuals_and_propagate_pointwise_uncertainty",
+        "tests/test_thomson_inference.py::test_primary_thomson_inference_includes_spectral_distribution_diagnostics",
+        "tests/test_thomson_distribution.py::test_distribution_propagates_joint_signal_background_cross_covariance",
+        "tests/test_thomson_distribution.py::test_distribution_rejects_non_positive_definite_joint_signal_background_covariance",
+        "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
+        "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
+        "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments",
+        "tests/test_thomson_evdf.py::test_evdf_reports_dimensional_third_and_fourth_central_velocity_moments",
+        "tests/test_thomson_gap_closure.py::test_relativistic_projected_evdf_covariance_uses_frequentist_tikhonov_sandwich",
+        "tests/test_thomson_distribution.py::test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution",
+        "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
+      ]
+    }
   },
   {
     "family": "Plasma parameters",
