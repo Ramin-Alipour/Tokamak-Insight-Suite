@@ -1422,3 +1422,53 @@ def test_selected_maxwellian_model_executes_canonical_fit_with_top_level_radius(
     assert captured["spectra"].shape == (1, x.size)
     assert captured["model"] == "non_collective_maxwellian"
     assert result["physical_inference"]["reportable_as_primary_inference"] is True
+
+
+def test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments():
+    """A rank-deficient relativistic inverse must return a labelled candidate, not crash."""
+    wavelength = np.linspace(499.7, 500.3, 61)
+    background = np.full_like(wavelength, 3.0)
+    signal = (
+        900.0 * np.exp(-0.5 * ((wavelength - 500.0) / 0.055) ** 2)
+        + background
+    )
+    result = analyze_thomson_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full(wavelength.size, 1.0),
+        background_signal=background,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2.0,
+        projected_evdf_options={
+            "kinematics": "relativistic_thomson",
+            "velocity_limit_m_s": 8.0e4,
+            "velocity_points": 101,
+            "regularization_strength": 1.0e-3,
+        },
+    )
+
+    inverse = result["projected_evdf_inference"]
+    assert inverse["primary_result_status"] == "not_fully_identifiable_from_measured_spectrum"
+    assert inverse["projected_evdf_s_m"] is None
+    assert inverse["regularized_candidate_evdf_s_m"] is not None
+    assert inverse["moment_candidate_used"] is True
+    assert inverse["velocity_parallel_m_s"].shape == (101,)
+
+    moments = inverse["projected_evdf_physical_moments"]
+    assert moments["status"] == "conditional_regularized_candidate_not_primary"
+    assert moments["primary_result_status"] == "not_fully_identifiable_from_measured_spectrum"
+    assert np.isfinite(moments["mean_velocity_parallel_m_s"])
+    assert moments["velocity_parallel_variance_m2_s2"] > 0.0
+    assert np.isfinite(moments["central_third_velocity_moment_m3_s3"])
+    assert moments["central_fourth_velocity_moment_m4_s4"] > 0.0
+    assert np.isfinite(moments["skewness"])
+    assert np.isfinite(moments["excess_kurtosis"])
+    assert moments["moment_covariance"] is None
+    assert moments["heat_flux_identifiability"]["status"] == (
+        "not_identified_from_single_projected_marginal"
+    )
+    assert inverse["spectral_moment_closure"]["status"] == (
+        "conditional_relativistic_response_aware_moment_closure"
+    )
+    assert inverse["spectral_moment_closure"]["regularized_candidate_used"] is True
