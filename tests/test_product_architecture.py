@@ -91,3 +91,21 @@ def test_product_lookup_rejects_unknown_and_boolean_identifiers():
         get_product(True)
     with pytest.raises(KeyError, match="Unknown specialist product"):
         get_product("not-a-product")
+
+def test_dependency_inventory_separates_solver_closures_from_shared_platform_imports():
+    from tis.products.dependencies import build_dependency_inventory
+
+    inventory = build_dependency_inventory()
+    assert inventory["product_count"] == 20
+    products = {row["product_id"]: row for row in inventory["products"]}
+    thomson = products["thomson-scattering"]
+    langmuir = products["langmuir-electrostatic-probes"]
+    assert "tokamak_analysis.thomson_workflow" in thomson["entry_point_modules"]
+    assert "tokamak_analysis.thomson_inference" in thomson["transitive_domain_modules"]
+    assert "tokamak_analysis.langmuir_probe" in langmuir["entry_point_modules"]
+    assert "tokamak_analysis.langmuir_probe" in langmuir["product_local_domain_modules"]
+    assert set(inventory["shared_domain_modules"]) <= {
+        module for row in products.values()
+        for module in row["transitive_domain_modules"]
+    }
+    assert all("tokamak_analysis." in module for module in inventory["shared_domain_modules"])
