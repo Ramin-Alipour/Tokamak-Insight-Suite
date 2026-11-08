@@ -449,6 +449,7 @@ def fit_general_temperature_tensor_thomson_spectra(
 
     n_data = n_view*n_wave
     covariance_parts = []
+    covariance_components = {}
     measured_covariance_for_geometry = None
     if measurement_covariance is not None and signal_uncertainty is not None:
         raise ValueError("supply measurement_covariance or signal_uncertainty, not both")
@@ -461,12 +462,14 @@ def fit_general_temperature_tensor_thomson_spectra(
             raise ValueError("measurement_covariance must be symmetric")
         measured_covariance_for_geometry = 0.5*(measured_covariance+measured_covariance.T)
         covariance_parts.append(measured_covariance_for_geometry)
+        covariance_components["measurement"] = measured_covariance_for_geometry
     if signal_uncertainty is not None:
         uncertainty = _finite_array(signal_uncertainty,"signal_uncertainty")
         if uncertainty.shape not in {(n_view,n_wave),(n_data,)} or np.any(uncertainty <= 0.0):
             raise ValueError("signal_uncertainty must be positive with shape (n_view,n_wave) or flattened channel-major")
         measured_covariance_for_geometry = np.diag(uncertainty.ravel()**2)
         covariance_parts.append(measured_covariance_for_geometry)
+        covariance_components["measurement"] = measured_covariance_for_geometry
     if geometry_cross_covariance is not None:
         if measured_covariance_for_geometry is None or measured_covariance_for_geometry.shape != (n_data,n_data):
             raise ValueError("spectral_geometry_cross_covariance requires a valid absolute (n_view*n_wavelength)^2 measurement covariance")
@@ -498,6 +501,7 @@ def fit_general_temperature_tensor_thomson_spectra(
         if eigenvalues[0] < -1e-10*max(float(np.max(np.abs(eigenvalues))), 1e-300):
             raise ValueError(f"{name} must be positive semidefinite")
         covariance_parts.append(matrix)
+        covariance_components["model_discrepancy" if name == "model_discrepancy_covariance" else "systematic"] = matrix
     if covariance_parts:
         if any(part.shape != (n_data,n_data) for part in covariance_parts):
             raise ValueError("every supplied covariance component must be (n_view*n_wavelength)^2 channel-major")
@@ -621,6 +625,26 @@ def fit_general_temperature_tensor_thomson_spectra(
     dof=n_data-p0.size
     parameter_covariance=np.linalg.inv(jac.T@jac)
     covariance_status="absolute_GLS_covariance_conditional_on_supplied_spectral_covariance"
+    # Decompose the spectral contribution to parameter uncertainty by its
+    # physical source.  For the whitened GLS estimator
+    # A=(J_w^T J_w)^-1 J_w^T, each independent covariance component C_k
+    # contributes A L^-1 C_k L^-T A^T.  The components sum to the
+    # measurement+discrepancy+systematic GLS covariance before geometry terms.
+    parameter_covariance_components = {}
+    if covariance_parts:
+        estimator = np.linalg.solve(jac.T @ jac, jac.T)
+        for component_name, component_covariance in covariance_components.items():
+            whitened_component = np.linalg.solve(chol, component_covariance)
+            whitened_component = np.linalg.solve(chol, whitened_component.T).T
+            contribution = estimator @ whitened_component @ estimator.T
+            contribution = 0.5 * (contribution + contribution.T)
+            eig = np.linalg.eigvalsh(contribution)
+            scale = max(float(np.max(np.abs(eig))), 1e-300)
+            if eig[0] < -1e-9 * scale:
+                raise ArithmeticError(
+                    f"{component_name} parameter-covariance contribution is not positive semidefinite"
+                )
+            parameter_covariance_components[component_name] = contribution
     geometry_parameter_covariance = None
     geometry_cross_parameter_covariance = None
     geometry_jacobian = None
@@ -818,6 +842,17 @@ def fit_general_temperature_tensor_thomson_spectra(
         "view_dyad_rank":geom_rank,
         "view_dyad_condition_number":geom_condition,
         "parameter_covariance":parameter_covariance,
+        "spectral_parameter_covariance_components":parameter_covariance_components,
+        "spectral_parameter_covariance_component_order":list(parameter_covariance_components),
+        "spectral_parameter_covariance_decomposition_status":(
+            "separated_GLS_sandwich_contributions_before_geometry_terms"
+            if parameter_covariance_components else "not_available_without_supplied_spectral_covariance_components"
+        ),
+        "model_discrepancy_parameter_covariance":parameter_covariance_components.get("model_discrepancy"),
+        "systematic_parameter_covariance":parameter_covariance_components.get("systematic"),
+        "measurement_parameter_covariance":parameter_covariance_components.get("measurement"),
+        "model_selection_uncertainty_included":False,
+        "model_selection_uncertainty_status":"not_included; requires evidence-weighted comparison across distinct physical model families",
         "scattering_vector_covariance_used":geometry_covariance is not None,
         "spectral_geometry_cross_covariance_used":geometry_cross_covariance is not None,
         "geometry_parameter_covariance":geometry_parameter_covariance,
