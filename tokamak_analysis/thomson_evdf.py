@@ -578,10 +578,14 @@ def reconstruct_thomson_evdf(
             integral(candidate_centred**4 * candidate_distribution)
             / candidate_variance**2 - 3.0
         )
+        candidate_temperature_eV = (
+            9.1093837139e-31 * candidate_variance / 1.602176634e-19
+        )
         regularization_candidate_physical_moments.append([
             float(candidate_mean),
             float(candidate_variance),
             float(candidate_sigma),
+            float(candidate_temperature_eV),
             float(candidate_skewness),
             float(candidate_excess_kurtosis),
         ])
@@ -651,6 +655,7 @@ def reconstruct_thomson_evdf(
             "mean_velocity_parallel_m_s",
             "velocity_parallel_variance_m2_s2",
             "velocity_parallel_standard_deviation_m_s",
+            "directional_equivalent_temperature_eV",
             "skewness",
             "excess_kurtosis",
         ],
@@ -690,7 +695,7 @@ def reconstruct_thomson_evdf(
                 regularization_candidate_physical_moments, dtype=float
             )
             if (moment_stack.ndim == 2 and moment_stack.shape[0] > 1
-                    and moment_stack.shape[1] == 5
+                    and moment_stack.shape[1] == 6
                     and np.all(np.isfinite(moment_stack))):
                 moment_covariance_from_choice = np.cov(
                     moment_stack, rowvar=False, ddof=1
@@ -714,8 +719,11 @@ def reconstruct_thomson_evdf(
 
 
     electron_mass = 9.1093837139e-31
-    boltzmann = 1.380649e-23
-    directional_temperature_ev = electron_mass * variance / (boltzmann * 1.602176634e-19)
+    elementary_charge = 1.602176634e-19
+    # For a one-dimensional projected marginal, m_e Var(v_q) is the
+    # directional kinetic energy in joules. Divide by e to express eV;
+    # Boltzmann's constant is not part of this eV conversion.
+    directional_temperature_ev = electron_mass * variance / elementary_charge
 
     # Propagate the normalized-EVDF covariance into the actual physical
     # velocity moments.  The covariance above is on the sampled probability
@@ -749,7 +757,7 @@ def reconstruct_thomson_evdf(
         variance_gradient = raw_m2 - 2.0*m1*raw_m1
         sigma_gradient = variance_gradient / (2.0*sigma_v)
         temperature_gradient = (
-            electron_mass / (boltzmann * 1.602176634e-19)
+            electron_mass / elementary_charge
         ) * variance_gradient
         central_m3_gradient = (
             raw_m3 + (-3.0*m2 + 6.0*m1**2)*raw_m1 - 3.0*m1*raw_m2
