@@ -478,9 +478,10 @@ def reconstruct_optical_thomson_3d_evdf(
     if directions.shape != (n_view, 3) or velocity.ndim != 2 or velocity.shape[1] != 3:
         raise ValueError("scattering_vector_unit must be (n_view,3) and velocity_grid_m_s must be (n_voxel,3)")
     direction_norm = np.linalg.norm(directions, axis=1)
-    if np.any(direction_norm <= 0.0):
-        raise ValueError("every scattering_vector_unit must be non-zero")
-    directions = directions / direction_norm[:, None]
+    if np.any(direction_norm <= 0.0) or not np.allclose(
+        direction_norm, 1.0, rtol=1e-8, atol=1e-10
+    ):
+        raise ValueError("every scattering_vector_unit must already be a unit vector; geometry is not silently renormalized")
     if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0.0:
         raise ValueError("laser_wavelength_nm must be finite and positive")
     angles = np.asarray(scattering_angle_rad, dtype=float)
@@ -576,6 +577,9 @@ def reconstruct_optical_thomson_3d_evdf(
         "scattering_angle_rad": angles.copy(),
         "view_gain": gains.copy(),
         "unpolarized_thomson_angular_factor": angular_factor.copy(),
+        "unpolarized_differential_cross_section_m2_sr": (
+            thomson_unpolarized_differential_cross_section(angles)
+        ),
         "q_over_k_incident_per_view": q_over_ki.copy(),
         "mapped_line_centres_nm": line_centres,
         "wavelength_bin_widths_nm": widths,

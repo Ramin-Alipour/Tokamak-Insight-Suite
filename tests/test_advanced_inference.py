@@ -399,3 +399,50 @@ def test_physical_optical_thomson_3d_uses_per_view_scattering_angles_and_angular
     expected_scale = np.array([2.0,0.5])*0.5*(1.0+np.cos(angles)**2)
     integrated = np.sum(result["physical_spectral_kernels"]*result["wavelength_bin_widths_nm"][None,:,None],axis=1)
     np.testing.assert_allclose(integrated, expected_scale[:,None]*np.ones((2,2)), rtol=1e-12, atol=1e-12)
+
+
+def test_physical_optical_thomson_3d_inverse_recovers_known_two_voxel_distribution():
+    wavelength = np.linspace(499.85, 500.15, 151)
+    directions = np.array([[1.,0.,0.]])
+    velocity = np.array([[-1.0e4,0.,0.],[1.0e4,0.,0.]])
+    volumes = np.ones(2)
+    regularizer = np.zeros((1,2))
+    common = dict(
+        scattering_vector_unit=directions,
+        velocity_grid_m_s=velocity,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2,
+        view_gain=[1.0],
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=np.zeros((1,wavelength.size)),
+        voxel_volume_m3_s3=volumes,
+        regularization_matrix=regularizer,
+        regularization_strength=1e-8,
+    )
+    pilot = reconstruct_optical_thomson_3d_evdf(
+        wavelength, np.ones((1,wavelength.size)), **common
+    )
+    truth = np.array([0.25,0.75])
+    synthetic_spectrum = (
+        pilot["physical_spectral_kernels"][0] @ (truth*volumes)
+    )[None,:]
+    recovered = reconstruct_optical_thomson_3d_evdf(
+        wavelength, synthetic_spectrum, **common
+    )
+    assert recovered["status"] == "identified_from_multi_view_measurements"
+    np.testing.assert_allclose(
+        recovered["evdf_m3_s3"]*volumes, truth, rtol=2e-5, atol=2e-7
+    )
+    assert recovered["unpolarized_differential_cross_section_m2_sr"][0] > 0.0
+
+
+def test_physical_optical_thomson_3d_rejects_nonunit_scattering_directions():
+    wavelength = np.linspace(499.85, 500.15, 101)
+    with pytest.raises(ValueError, match="must already be a unit vector"):
+        reconstruct_optical_thomson_3d_evdf(
+            wavelength, np.ones((1,101)), [[2.,0.,0.]], [[0.,0.,0.]],
+            laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+            view_gain=[1.0], instrument_response_matrix=np.eye(101),
+            background_spectra=np.zeros((1,101)), voxel_volume_m3_s3=[1.0],
+            regularization_matrix=np.eye(1), regularization_strength=1e-3,
+        )
