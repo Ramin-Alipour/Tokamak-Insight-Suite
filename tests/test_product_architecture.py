@@ -150,3 +150,57 @@ def test_product_packages_do_not_import_another_products_private_modules():
                     and name.split(".")[2] not in {"api", "catalog", "dependencies"}
                     and name.split(".")[2] != path.parent.name
                 ), f"{path} imports another product's private module: {name}"
+
+
+
+def test_named_product_workflow_wrappers_dispatch_to_their_own_registered_ids(monkeypatch):
+    from tis.products import load_product_api
+
+    for product in list_products():
+        api = load_product_api(product["product_id"])
+        captured = []
+        monkeypatch.setattr(
+            api,
+            "execute_product_analysis",
+            lambda product_id, analysis_id, *args, **kwargs: (
+                product_id, analysis_id, args, kwargs
+            ),
+        )
+        if product["id"] == 1:
+            calls = [
+                ("analyze_spectra", 1),
+                ("analyze_cts", 30),
+                ("reconstruct_profiles", 46),
+                ("analyze_spectral_distribution", 81),
+                ("fit_gyrotropic", 82),
+                ("fit_temperature_tensor", 83),
+                ("analyze_landau_fdt_convergence", 84),
+                ("reconstruct_relativistic_evdf", 85),
+                ("compare_temperature_tensor_models", 86),
+                ("infer_path_averaged_density", 87),
+            ]
+        elif product["id"] == 2:
+            calls = [
+                ("analyze_langmuir_iv", 2),
+                ("analyze_probe_iv_compatibility", 16),
+                ("analyze_ball_pen", 17),
+                ("analyze_gundestrup", 18),
+                ("analyze_multipin", 19),
+                ("analyze_potential_arrays", 20),
+            ]
+        else:
+            calls = [(entry["function"], entry["id"]) for entry in product["entry_points"]]
+        for function_name, expected_id in calls:
+            function = getattr(api, function_name)
+            if product["id"] == 2 and function_name in {"analyze_ball_pen"}:
+                result = function([0.0], [1.0])
+            elif product["id"] == 2 and function_name == "analyze_gundestrup":
+                result = function([0.0, 1.0, 2.0], [1.0, 2.0, 1.0])
+            elif product["id"] == 2 and function_name == "analyze_multipin":
+                result = function([0.0, 1.0], [[0.0, 1.0], [1.0, 2.0]], [0.0, 1.0])
+            elif product["id"] == 2 and function_name == "analyze_potential_arrays":
+                result = function([2.0], [1.0])
+            else:
+                result = function("sentinel")
+            assert result[0] == product["product_id"]
+            assert result[1] == expected_id
