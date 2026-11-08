@@ -8953,9 +8953,12 @@
     "method": "Analyze the calibrated measured wavelength-intensity spectrum using exactly one explicitly selected background representation, signed spectral moments and a Gaussian spectral-shape forward fit convolved with the supplied measured instrument-response matrix. This subanalysis provides descriptive wavelength-space diagnostics only; physical plasma parameters are extracted by the parent Thomson Analysis 1 forward fit.",
     "caveat": "This subanalysis characterizes measured spectral shape only. It accepts no pre-extracted plasma parameters, does not infer a unique electron velocity distribution from wavelength moments, does not deconvolve the measured spectrum, and does not calculate instrument-corrected widths. The measured response matrix is used only as a forward operator in the Gaussian shape fit. An explicitly supplied fitted background may carry a separate pointwise uncertainty or full covariance, propagated as independent of signal uncertainty unless a joint covariance is available. Possible signal contamination is not independently inferred.",
     "implementation_functions": [
-      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+      "tis.products.thomson.api.analyze_spectral_distribution",
+      "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+      "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
+      "tis.physics.shared.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf"
     ],
-    "implementation_status": "Observed spectral moments and response-convolved Gaussian shape diagnostics are implemented; explicit Kappa and relativistic Maxwell-Juttner selections dispatch to their native physical forward fit with shared measured response and supplied detector-background/uncertainty inputs. The projected q-parallel EVDF is additionally transformed into a cumulative random-kinetic-energy marginal.",
+    "implementation_status": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics are implemented. Optional non-negative projected-EVDF inversion now supports non-relativistic Doppler, exact relativistic Thomson and Compton/Klein-Nishina kinematics; rank-deficient relativistic inversions retain a clearly labelled regularized candidate and expose q-parallel physical moments without promoting them to identified results. The projected q-parallel EVDF is additionally transformed into a cumulative random-kinetic-energy marginal.",
     "execution_contract": {
       "schema_version": "1.1",
       "execution_level": "analysis_pipeline",
@@ -9052,12 +9055,15 @@
           "name": "laser_wavelength_nm",
           "unit": "nm; positive laser wavelength used by the selected physical forward model",
           "required": false,
-          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments.",
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments. Also required when projected_evdf_options is supplied for the projected-EVDF inverse.",
           "required_when": {
             "physical_model": [
               "non_collective_maxwellian",
               "kappa",
               "relativistic_maxwell_juttner"
+            ],
+            "projected_evdf_options": [
+              "non-null"
             ]
           }
         },
@@ -9065,12 +9071,15 @@
           "name": "scattering_angle_rad",
           "unit": "rad; scattering angle in (0, pi) used by the selected physical forward model",
           "required": false,
-          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments.",
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments. Also required when projected_evdf_options is supplied for the projected-EVDF inverse.",
           "required_when": {
             "physical_model": [
               "non_collective_maxwellian",
               "kappa",
               "relativistic_maxwell_juttner"
+            ],
+            "projected_evdf_options": [
+              "non-null"
             ]
           }
         },
@@ -9101,7 +9110,7 @@
           "name": "projected_evdf_options",
           "unit": "mapping of non-parametric projected-EVDF inverse controls",
           "required": false,
-          "description": "When supplied, invokes the response-aware non-negative 1-D q-parallel EVDF inverse on the same calibrated spectrum, using the measured instrument response and the same explicit background/covariance inputs. It does not infer a 3-D EVDF or absolute density."
+          "description": "When supplied with explicit top-level laser_wavelength_nm and scattering_angle_rad, runs the response-aware non-negative q-parallel EVDF inverse on the same calibrated spectrum. kinematics accepts nonrelativistic, relativistic_thomson or compton; the latter two use exact relativistic single-electron kinematics, with Compton selecting recoil and Klein-Nishina weighting. Options include velocity_grid_m_s or velocity_limit_m_s/velocity_points and regularization_strength (null selects GCV). The forward integral is discretized as sum_j f(v_j) K(lambda|v_j) w_j using nonuniform trapezoidal velocity weights. Measurement, model-discrepancy and systematic covariance are propagated separately. Rank-deficient relativistic inversions return conditional regularized candidates and conditional moments, never primary identified EVDFs. Dimensional q-parallel moments include mean, variance, directional-equivalent temperature, third/fourth central moments, skewness and excess kurtosis. A single view does not infer absolute density, unrestricted 3-D EVDF or full parallel heat flux."
         },
         {
           "name": "scattering_angle_uncertainty_rad",
@@ -9113,6 +9122,18 @@
             ]
           },
           "description": "For the non-relativistic projected-EVDF inverse, propagates angle uncertainty by finite-difference sensitivity of the physical Doppler forward operator and implicit differentiation of the constrained regularized inverse. Requires 3 sigma to remain inside (0, pi). The relativistic projected-EVDF inverse currently rejects this input rather than silently omitting it."
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma calibration uncertainty",
+          "required": false,
+          "description": "Optional laser-wavelength calibration uncertainty propagated by the non-relativistic projected-EVDF inverse; not silently applied to the relativistic branch."
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm rad; Cov(lambda_0, theta)",
+          "required": false,
+          "description": "Optional covariance between laser-wavelength and scattering-angle calibration inputs for the non-relativistic projected-EVDF inverse."
         }
       ],
       "output_specs": [
@@ -9359,6 +9380,30 @@
           "unit": "structured numerical inference/covariance output; units and covariance order are declared in the nested result"
         },
         {
+          "name": "projected_evdf_physical_moments",
+          "unit": "structured q-parallel marginal moments: mean, variance, directional-equivalent temperature, third/fourth central moments, skewness and excess kurtosis; covariance and identifiability status included"
+        },
+        {
+          "name": "projected_evdf_moment_candidate_status",
+          "unit": "identified_from_measurement or conditional_regularized_candidate_not_primary"
+        },
+        {
+          "name": "projected_evdf_heat_flux_identifiability",
+          "unit": "structured statement that full 3-D heat flux is not identified by a single q-parallel marginal"
+        },
+        {
+          "name": "regularized_candidate_covariance",
+          "unit": "conditional normalized projected-EVDF covariance; withheld as primary when the data-only inverse is rank deficient"
+        },
+        {
+          "name": "regularized_candidate_standard_uncertainty_s_m",
+          "unit": "s m^-1; conditional regularized candidate only"
+        },
+        {
+          "name": "covariance_method",
+          "unit": "frequentist fixed-active-set Tikhonov sandwich covariance method"
+        },
+        {
           "name": "projected_parallel_kinetic_energy_cdf_eV",
           "unit": "dimensionless CDF over parallel random kinetic energy [eV]",
           "description": "Cumulative probability F_q(E)=integral from u_q-sqrt(2eE/m_e) to u_q+sqrt(2eE/m_e) of the normalized q-parallel EVDF. This is a one-dimensional projected energy marginal, not the full 3-D electron energy distribution."
@@ -9374,8 +9419,8 @@
       "preprocessing": [
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
-      "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the parent Thomson Analysis 1 forward model. An additional explicit Kappa/relativistic-Maxwell-Juttner route fits the measured calibrated spectrum directly with a physical kinetic forward model and detector-background basis. The isotropic Kappa q-marginal is integrated exactly by Student-t CDF differences over finite wavelength bins; the relativistic MJ kernel is Gauss-Legendre averaged within each bin. The measured response acts on bin-integrated spectral power. The full joint covariance includes physical/background cross terms and is withheld when the data Jacobian is rank deficient or ill-conditioned. If projected_evdf_options is supplied, solve the non-negative response-aware inverse S(lambda)=R A_q f_q+b with integral f_q dv=1. When scattering_angle_uncertainty_rad is supplied, differentiate A_q(theta) and the active-set regularized normal equations to propagate the independent scalar geometry variance into the normalized EVDF and velocity-moment covariance; the geometry contribution is returned separately from the conditional measurement covariance and GCV regularization-choice spread. The projected EVDF is also mapped to its parallel random-kinetic-energy CDF F_q(E)=integral_[u_q-sqrt(2eE/m_e)]^[u_q+sqrt(2eE/m_e)] f_q(v) dv; the CDF avoids the integrable E^(-1/2) density singularity at zero energy and is explicitly a one-dimensional marginal.",
-      "uncertainty_model": "Spectral-moment uncertainties are propagated by Monte Carlo from supplied pointwise signal uncertainty or full within-channel covariance and supplied background uncertainty. When signal_background_cross_covariance is supplied with both marginal covariance models, the complete positive-definite joint signal/background covariance is sampled jointly; otherwise signal and background errors are treated as independent. Gaussian-fit covariance is conditional on the fixed supplied measured response matrix. The optional non-relativistic projected-EVDF path additionally reports first-order scattering-angle geometry covariance from implicit fixed-active-set sensitivity; the angle contribution is separate from signal/background covariance and regularization-choice spread, and the named combined covariance adds only those explicitly represented terms.",
+      "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the parent Thomson Analysis 1 forward model. An additional explicit Kappa/relativistic-Maxwell-Juttner route fits the measured calibrated spectrum directly with a physical kinetic forward model and detector-background basis. The isotropic Kappa q-marginal is integrated exactly by Student-t CDF differences over finite wavelength bins; the relativistic MJ kernel is Gauss-Legendre averaged within each bin. The measured response acts on bin-integrated spectral power. The full joint covariance includes physical/background cross terms and is withheld when the data Jacobian is rank deficient or ill-conditioned. If projected_evdf_options is supplied, solve the non-negative response-aware inverse S(lambda)=R A_q f_q+b with integral f_q dv=1. When scattering_angle_uncertainty_rad is supplied, differentiate A_q(theta) and the active-set regularized normal equations to propagate the independent scalar geometry variance into the normalized EVDF and velocity-moment covariance; the geometry contribution is returned separately from the conditional measurement covariance and GCV regularization-choice spread. For kinematics=relativistic_thomson or compton, use the exact single-electron relativistic wavelength/cross-section kernel and the measured detector response. If the data-only Jacobian is rank deficient, retain the solver's non-negative regularized candidate for explicitly conditional moment diagnostics; never report it as a primary identified EVDF. Compute u_q=integral(v_q f_q dv_q), sigma_q^2=integral((v_q-u_q)^2 f_q dv_q), mu_3,q=integral((v_q-u_q)^3 f_q dv_q), mu_4,q=integral((v_q-u_q)^4 f_q dv_q), gamma_1=mu_3,q/sigma_q^3 and gamma_2=mu_4,q/sigma_q^4-3 using the same velocity quadrature as EVDF normalization. The relativistic inverse uses the frequentist fixed-active-set Tikhonov sampling covariance Cov(x_hat)=H^-1 A^T A H^-1 (for whitened data), not H^-1; covariance is propagated through the EVDF normalization Jacobian. Candidate covariance is explicitly separate from primary identified covariance. The projected EVDF is also mapped to its parallel random-kinetic-energy CDF F_q(E)=integral_[u_q-sqrt(2eE/m_e)]^[u_q+sqrt(2eE/m_e)] f_q(v) dv; the CDF avoids the integrable E^(-1/2) density singularity at zero energy and is explicitly a one-dimensional marginal.",
+      "uncertainty_model": "Spectral-moment uncertainties are propagated by Monte Carlo from supplied pointwise signal uncertainty or full within-channel covariance and supplied background uncertainty. When signal_background_cross_covariance is supplied with both marginal covariance models, the complete positive-definite joint signal/background covariance is sampled jointly; otherwise signal and background errors are treated as independent. Gaussian-fit covariance is conditional on the fixed supplied measured response matrix. The optional non-relativistic projected-EVDF path additionally reports first-order scattering-angle geometry covariance from implicit fixed-active-set sensitivity; the angle contribution is separate from signal/background covariance and regularization-choice spread, and the named combined covariance adds only those explicitly represented terms. For an identified relativistic projected EVDF, the normalized distribution covariance is propagated to the physical-moment vector by its first-order moment Jacobian. When the relativistic solver withholds a primary distribution because the data-only operator is rank deficient, moments of the regularized candidate are conditional diagnostics only and no measurement covariance is claimed. Relativistic projected-EVDF uncertainty uses the fixed-active-set frequentist sandwich H^-1 A^T A H^-1 for whitened data; the inverse penalized Hessian is not reported as a frequentist covariance. Candidate covariance/standard uncertainty is conditional and remains separate from primary identified outputs.",
       "limitations": [
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
         "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
@@ -9383,12 +9428,16 @@
         "Edge-fraction background estimation is a researcher-selected heuristic, not an independently identified background; background uncertainty and possible signal contamination are not jointly inferred.",
         "The deterministic EVDF solver does not return posterior confidence intervals; uncertainty weighting is not equivalent to uncertainty propagation.",
         "An explicitly supplied fitted background can include pointwise uncertainty or a full positive-definite covariance; in the absence of signal/background cross-covariance the two perturbations are assumed independent. Possible signal contamination in the background remains non-identifiable.",
-        "The projected-EVDF scattering-angle uncertainty propagation is a local first-order scalar-angle approximation conditional on the selected velocity grid, response, background, active set and regularization; use a bounded joint Monte Carlo geometry workflow for large/non-Gaussian or correlated beam-direction uncertainties."
+        "The projected-EVDF scattering-angle uncertainty propagation is a local first-order scalar-angle approximation conditional on the selected velocity grid, response, background, active set and regularization; use a bounded joint Monte Carlo geometry workflow for large/non-Gaussian or correlated beam-direction uncertainties.",
+        "A rank-deficient relativistic inverse returns conditional moments of its regularized candidate; these are not data-identified primary EVDF moments.",
+        "A single q-parallel marginal does not identify the perpendicular kinetic-energy conditional distribution and therefore does not identify the full 3-D parallel electron heat flux."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
-        "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
-        "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
+        "tis.products.thomson.api.analyze_spectral_distribution",
+        "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+        "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
+        "tis.physics.shared.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf"
       ],
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
@@ -9404,6 +9453,10 @@
         "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
         "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
         "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments",
+        "tests/test_thomson_evdf.py::test_evdf_reports_dimensional_third_and_fourth_central_velocity_moments",
+        "tests/test_thomson_gap_closure.py::test_relativistic_projected_evdf_covariance_uses_frequentist_tikhonov_sandwich",
+        "tests/test_thomson_distribution.py::test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution",
         "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
       ],
       "input_data_level": "measured_calibrated_spectrum"
@@ -9429,11 +9482,11 @@
         "scope": "Diagnostic forward/instrument-response modeling context."
       }
     ],
-    "note": "Analysis 1 subanalysis: descriptive observed spectral moments and response-convolved Gaussian diagnostics by default. Its explicitly selected kinetic physical-fit route uses calibrated measured spectra and explicit laser/scattering geometry; it does not infer EVDF from wavelength moments.",
+    "note": "Analysis 1 subanalysis: wavelength-space moments remain descriptive. When projected_evdf_options is supplied with explicit laser wavelength and scattering angle, the same calibrated measured spectrum is inverted through the response-aware projected-EVDF forward operator; dimensional velocity moments are derived from that reconstructed marginal, never substituted by wavelength moments.",
     "primary_analysis_id": 1,
     "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": false,
-    "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction.",
+    "calibrated_measurements_to_physics": true,
+    "completion_scope": "Observed wavelength-space diagnostics plus optional calibrated-spectrum-to-one-dimensional q-parallel EVDF inversion with non-relativistic, exact relativistic Thomson or Compton/Klein-Nishina forward kinematics, measured instrument response, explicit background, physical velocity moments and conditional covariance. A single view does not identify an unrestricted 3-D EVDF or full heat flux.",
     "implementation_trace": {
       "test_links": [
         "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
@@ -9445,6 +9498,10 @@
         "tests/test_thomson_kinetic_background.py::test_kappa_forward_model_integrates_exact_finite_wavelength_bin_probabilities",
         "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
         "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments",
+        "tests/test_thomson_evdf.py::test_evdf_reports_dimensional_third_and_fourth_central_velocity_moments",
+        "tests/test_thomson_gap_closure.py::test_relativistic_projected_evdf_covariance_uses_frequentist_tikhonov_sandwich",
+        "tests/test_thomson_distribution.py::test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution",
         "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian"
       ]
     }

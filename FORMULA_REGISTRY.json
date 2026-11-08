@@ -11654,7 +11654,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_multiview_3d_evdf",
+      "function_link": "tis.products.thomson.physics.advanced_inference.derive_3d_evdf_third_moments",
       "formula_key": "thomson_evdf_third_moment_heat_flux",
       "input_specs": [
         {
@@ -11679,23 +11679,63 @@
       "output_specs": [
         {
           "name": "third_central_velocity_moment_tensor_m3_s3",
-          "unit": "m³ s⁻³; 3x3x3",
-          "description": "M_ijk, the third central Cartesian velocity moment tensor."
+          "unit": "m^3 s^-3; primary only when data-identifiable",
+          "description": "Third central Cartesian velocity moment tensor from normalized 3-D EVDF."
         },
         {
-          "name": "heat_flux_per_density_W_m",
-          "unit": "W m; 3-vector",
-          "description": "Classical q_i/n_e=(m_e/2)Σ_j M_ijj, only inside the declared non-relativistic domain."
+          "name": "candidate_third_central_velocity_moment_tensor_m3_s3",
+          "unit": "m^3 s^-3; conditional candidate",
+          "description": "Third central moment of the regularized candidate."
         },
         {
           "name": "third_central_velocity_moment_covariance_m6_s6",
-          "unit": "(m³ s⁻³)²; 27x27",
+          "unit": "(m^3 s^-3)^2; 27x27",
           "description": "Delta-method covariance from normalized EVDF covariance."
         },
         {
+          "name": "third_central_velocity_moment_covariance_status",
+          "unit": "text",
+          "description": "Availability and propagation method for third-moment covariance."
+        },
+        {
+          "name": "candidate_heat_flux_per_density_W_m",
+          "unit": "W m; conditional candidate",
+          "description": "Classical q/n_e candidate retained only in its declared non-relativistic domain."
+        },
+        {
+          "name": "heat_flux_per_density_W_m",
+          "unit": "W m; primary only when identifiable and max(|v|)/c < 0.01",
+          "description": "Classical electron heat-flux vector per density; absolute q is not inferred."
+        },
+        {
           "name": "heat_flux_per_density_covariance_W2_m2",
-          "unit": "(W m)²; 3x3",
-          "description": "Delta-method covariance of q/n_e."
+          "unit": "(W m)^2; 3x3",
+          "description": "Delta-method covariance of the classical heat-flux-per-density vector."
+        },
+        {
+          "name": "heat_flux_per_density_standard_uncertainty_W_m",
+          "unit": "W m; 3-vector",
+          "description": "One-sigma uncertainties derived from the heat-flux covariance diagonal."
+        },
+        {
+          "name": "heat_flux_status",
+          "unit": "text",
+          "description": "Identifiability and physical-domain status of the classical heat-flux expression."
+        },
+        {
+          "name": "third_central_velocity_moment_definition",
+          "unit": "text",
+          "description": "Definition and quadrature convention for M_ijk."
+        },
+        {
+          "name": "heat_flux_definition",
+          "unit": "text",
+          "description": "Definition of the classical heat-flux-per-density moment."
+        },
+        {
+          "name": "heat_flux_validity_domain",
+          "unit": "structured",
+          "description": "Beta threshold, actual maximum beta, and absolute-density limitation."
         }
       ],
       "prerequisites": [
@@ -11709,7 +11749,8 @@
         "Regularization does not promote data-null-space modes to identified EVDF structure."
       ],
       "test_links": [
-        "tests/test_thomson_relativistic_3d_evdf.py::test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance"
+        "tests/test_thomson_relativistic_3d_evdf.py::test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_higher_moment_helper_matches_discrete_quadrature"
       ],
       "note": "Executable physical moments with analytic covariance propagation; software/physics verification uses synthetic distributions, not experimental validation."
     }

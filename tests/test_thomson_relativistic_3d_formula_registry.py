@@ -43,3 +43,11 @@ def test_3d_evdf_third_moment_heat_flux_formula_is_registered_and_executable():
     assert "third_central_velocity_moment_tensor_m3_s3" in names
     assert "heat_flux_per_density_W_m" in names
     assert "thomson_evdf_third_moment_heat_flux" in entry["execution_contract"]["derived_formula_keys"]
+
+
+def test_3d_evdf_third_moment_formula_resolves_to_dedicated_physics_helper():
+    rows = json.loads((Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    item = next(x for x in rows if x["execution_contract"]["formula_key"] == "thomson_evdf_third_moment_heat_flux")
+    module_name, function_name = item["execution_contract"]["function_link"].rsplit(".", 1)
+    import importlib
+    assert callable(getattr(importlib.import_module(module_name), function_name))

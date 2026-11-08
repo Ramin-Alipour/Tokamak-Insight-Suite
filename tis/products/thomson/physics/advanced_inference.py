@@ -222,6 +222,106 @@ def bootstrap_reference_pca_basis(
     }
 
 
+def derive_3d_evdf_third_moments(
+    normalized_evdf_m3_s3, velocity_grid_m_s, voxel_volume_m3_s3, *,
+    distribution_covariance=None, data_identifiable=True,
+):
+    """Derive the 3-D third central velocity moment and classical q/n_e.
+
+    The EVDF must be normalized with the supplied voxel-volume quadrature.
+    Its covariance, when supplied, is the covariance of normalized EVDF
+    density values. The classical heat-flux expression is withheld when
+    max(|v|)/c >= 0.01; no classical expression is substituted for
+    relativistic energy-momentum flux.
+    """
+    distribution = _real_array(normalized_evdf_m3_s3, "normalized_evdf_m3_s3", 1)
+    velocity = _real_array(velocity_grid_m_s, "velocity_grid_m_s", 2)
+    volume = _real_array(voxel_volume_m3_s3, "voxel_volume_m3_s3", 1)
+    if velocity.shape != (distribution.size, 3) or volume.shape != distribution.shape:
+        raise ValueError("EVDF, Cartesian velocity grid and voxel-volume dimensions are inconsistent")
+    if np.any(distribution < 0.0) or np.any(volume <= 0.0):
+        raise ValueError("EVDF values must be non-negative and voxel volumes strictly positive")
+    normalization = float(volume @ distribution)
+    if not np.isclose(normalization, 1.0, rtol=1e-9, atol=1e-11):
+        raise ValueError("normalized_evdf_m3_s3 must integrate to one using voxel_volume_m3_s3")
+    if not isinstance(data_identifiable, (bool, np.bool_)):
+        raise ValueError("data_identifiable must be boolean")
+    speed = np.linalg.norm(velocity, axis=1)
+    if np.any(speed >= 299792458.0):
+        raise ValueError("every velocity voxel must be strictly subluminal (|v| < c)")
+    probability_mass = distribution * volume
+    mean_velocity = np.einsum("a,ai->i", probability_mass, velocity)
+    centered = velocity - mean_velocity[None, :]
+    covariance_velocity = np.einsum("a,ai,aj->ij", probability_mass, centered, centered)
+    third = np.einsum("a,ai,aj,ak->ijk", probability_mass, centered, centered, centered)
+    third_covariance = None
+    heat_flux_covariance = None
+    third_covariance_status = "not_supplied"
+    heat_flux_standard_uncertainty = None
+    covariance = None
+    third_jacobian = None
+    if distribution_covariance is not None:
+        covariance = _real_array(distribution_covariance, "distribution_covariance", 2)
+        if covariance.shape != (distribution.size, distribution.size):
+            raise ValueError("distribution_covariance must be square with one row per EVDF voxel")
+        scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12 * scale):
+            raise ValueError("distribution_covariance must be symmetric")
+        third_jacobian = np.empty((27, distribution.size), dtype=float)
+        for voxel, vector in enumerate(centered):
+            derivative = volume[voxel] * (
+                np.einsum("i,j,k->ijk", vector, vector, vector)
+                - third
+                - np.einsum("ij,k->ijk", covariance_velocity, vector)
+                - np.einsum("ik,j->ijk", covariance_velocity, vector)
+                - np.einsum("jk,i->ijk", covariance_velocity, vector)
+            )
+            third_jacobian[:, voxel] = derivative.reshape(27)
+        third_covariance = third_jacobian @ covariance @ third_jacobian.T
+        third_covariance = 0.5 * (third_covariance + third_covariance.T)
+        third_covariance_status = "first_order_delta_method_from_normalized_evdf_covariance"
+    maximum_beta = float(np.max(speed) / 299792458.0)
+    candidate_heat_flux = None
+    heat_flux = None
+    heat_flux_status = "conditional_candidate_only_not_data_identifiable"
+    if maximum_beta < 0.01:
+        contraction = np.zeros((3, 27), dtype=float)
+        for component in range(3):
+            for axis in range(3):
+                contraction[component, component * 9 + axis * 3 + axis] = 1.0
+        heat_flux_factor = 9.1093837139e-31 / 2.0
+        candidate_heat_flux = heat_flux_factor * (contraction @ third.reshape(27))
+        if covariance is not None:
+            heat_flux_jacobian = heat_flux_factor * (contraction @ third_jacobian)
+            heat_flux_covariance = heat_flux_jacobian @ covariance @ heat_flux_jacobian.T
+            heat_flux_covariance = 0.5 * (heat_flux_covariance + heat_flux_covariance.T)
+            heat_flux_standard_uncertainty = np.sqrt(np.maximum(np.diag(heat_flux_covariance), 0.0))
+        if data_identifiable:
+            heat_flux = candidate_heat_flux.copy()
+            heat_flux_status = "identified_classical_heat_flux_per_density"
+    else:
+        heat_flux_status = "withheld_relativistic_domain_classical_expression_not_validated"
+    return {
+        "third_central_velocity_moment_tensor_m3_s3": third.copy() if data_identifiable else None,
+        "candidate_third_central_velocity_moment_tensor_m3_s3": third.copy(),
+        "third_central_velocity_moment_covariance_m6_s6": third_covariance if data_identifiable else None,
+        "third_central_velocity_moment_covariance_status": third_covariance_status,
+        "candidate_heat_flux_per_density_W_m": None if candidate_heat_flux is None else candidate_heat_flux.copy(),
+        "heat_flux_per_density_W_m": heat_flux,
+        "heat_flux_per_density_covariance_W2_m2": heat_flux_covariance if data_identifiable else None,
+        "heat_flux_per_density_standard_uncertainty_W_m": heat_flux_standard_uncertainty if data_identifiable else None,
+        "heat_flux_status": heat_flux_status,
+        "third_central_velocity_moment_definition": "M_ijk=integral(f*(v_i-u_i)*(v_j-u_j)*(v_k-u_k)*d3v); normalized EVDF and voxel-volume quadrature",
+        "heat_flux_definition": "q_i/n_e=(m_e/2)*sum_j M_ijj; classical non-relativistic central energy flux per electron density",
+        "heat_flux_validity_domain": {
+            "maximum_speed_over_c_for_classical_heat_flux": 0.01,
+            "actual_maximum_speed_over_c": maximum_beta,
+            "absolute_heat_flux_reported": False,
+            "reason": "Absolute q requires independently inferred electron density; for beta >= 0.01 a comoving relativistic energy-momentum moment is required.",
+        },
+    }
+
+
 def reconstruct_multiview_3d_evdf(
     spectral_kernels, measured_spectra, velocity_grid_m_s, *,
     voxel_volume_m3_s3, regularization_matrix,
@@ -406,80 +506,10 @@ def reconstruct_multiview_3d_evdf(
             velocity_covariance_tensor_covariance
             + velocity_covariance_tensor_covariance.T
         )
-    # Third central velocity moment tensor from the reconstructed 3-D EVDF.
-    # M_ijk = integral f (v_i-u_i)(v_j-u_j)(v_k-u_k) d^3v.
-    # The Jacobian includes normalization and mean-flow derivatives.
-    third_moment_candidate = np.einsum(
-        "a,ai,aj,ak->ijk",
-        probability_mass, centered_velocity, centered_velocity, centered_velocity,
-    )
-    third_moment_covariance = None
-    heat_flux_per_density_candidate = None
-    heat_flux_per_density_covariance = None
-    heat_flux_status = "not_reported_without_data_identifiable_3d_evdf"
-    third_moment_covariance_status = "withheld_without_data_identifiable_3d_evdf"
-    if identifiable:
-        third_moment_jacobian = np.empty((27, nvoxel), dtype=float)
-        for voxel, vector in enumerate(centered_velocity):
-            derivative = volume[voxel] * (
-                np.einsum("i,j,k->ijk", vector, vector, vector)
-                - third_moment_candidate
-                - np.einsum("ij,k->ijk", candidate_velocity_covariance, vector)
-                - np.einsum("ik,j->ijk", candidate_velocity_covariance, vector)
-                - np.einsum("jk,i->ijk", candidate_velocity_covariance, vector)
-            )
-            third_moment_jacobian[:, voxel] = derivative.reshape(27)
-        third_moment_covariance = (
-            third_moment_jacobian @ distribution_covariance
-            @ third_moment_jacobian.T
-        )
-        third_moment_covariance = 0.5 * (
-            third_moment_covariance + third_moment_covariance.T
-        )
-        third_moment_covariance_status = (
-            "first_order_delta_method_from_fixed_active_set_normalized_evdf_covariance"
-        )
-        maximum_beta = float(np.max(speed) / 299792458.0)
-        # q_i/n_e=(m_e/2) sum_j M_ijj is classical. Do not label it
-        # relativistic heat flux when the velocity support leaves this domain.
-        if maximum_beta < 0.01:
-            contraction = np.zeros((3, 27), dtype=float)
-            for component in range(3):
-                for axis in range(3):
-                    contraction[component, component * 9 + axis * 3 + axis] = 1.0
-            heat_flux_factor = electron_mass_kg / 2.0
-            heat_flux_per_density_candidate = heat_flux_factor * (
-                contraction @ third_moment_candidate.reshape(27)
-            )
-            heat_flux_jacobian = heat_flux_factor * (
-                contraction @ third_moment_jacobian
-            )
-            heat_flux_per_density_covariance = (
-                heat_flux_jacobian @ distribution_covariance
-                @ heat_flux_jacobian.T
-            )
-            heat_flux_per_density_covariance = 0.5 * (
-                heat_flux_per_density_covariance
-                + heat_flux_per_density_covariance.T
-            )
-            heat_flux_status = "identified_classical_heat_flux_per_density"
-        else:
-            heat_flux_status = (
-                "withheld_relativistic_domain_classical_expression_not_validated"
-            )
-    elif float(np.max(speed) / 299792458.0) >= 0.01:
-        heat_flux_status = (
-            "withheld_relativistic_domain_classical_expression_not_validated"
-        )
-    third_moment_primary = third_moment_candidate if identifiable else None
-    heat_flux_primary = (
-        heat_flux_per_density_candidate
-        if identifiable and heat_flux_status == "identified_classical_heat_flux_per_density"
-        else None
-    )
-    heat_flux_standard_uncertainty = (
-        np.sqrt(np.maximum(np.diag(heat_flux_per_density_covariance), 0.0))
-        if heat_flux_per_density_covariance is not None else None
+    higher_moments = derive_3d_evdf_third_moments(
+        distribution, velocity, volume,
+        distribution_covariance=distribution_covariance if identifiable else None,
+        data_identifiable=identifiable,
     )
 
     return {
@@ -524,38 +554,8 @@ def reconstruct_multiview_3d_evdf(
             "mean_v=integral(f*v*d3v); covariance_v=integral(f*(v-mean_v)*(v-mean_v)^T*d3v); "
             "normalization and moments use the supplied voxel-volume quadrature"
         ),
-        "third_central_velocity_moment_tensor_m3_s3": (
-            third_moment_primary.copy() if third_moment_primary is not None else None
-        ),
-        "candidate_third_central_velocity_moment_tensor_m3_s3": third_moment_candidate.copy(),
-        "third_central_velocity_moment_covariance_m6_s6": third_moment_covariance,
-        "third_central_velocity_moment_covariance_status": third_moment_covariance_status,
-        "third_central_velocity_moment_definition": (
-            "M_ijk=integral(f*(v_i-u_i)*(v_j-u_j)*(v_k-u_k)*d3v); "
-            "normalized EVDF and voxel-volume quadrature"
-        ),
-        "heat_flux_per_density_W_m": (
-            heat_flux_primary.copy() if heat_flux_primary is not None else None
-        ),
-        "candidate_heat_flux_per_density_W_m": (
-            None if heat_flux_per_density_candidate is None
-            else heat_flux_per_density_candidate.copy()
-        ),
-        "heat_flux_per_density_covariance_W2_m2": heat_flux_per_density_covariance,
-        "heat_flux_per_density_standard_uncertainty_W_m": heat_flux_standard_uncertainty,
-        "heat_flux_status": heat_flux_status,
-        "heat_flux_definition": (
-            "q_i/n_e=(m_e/2)*sum_j M_ijj; classical non-relativistic central energy flux per electron density"
-        ),
-        "heat_flux_validity_domain": {
-            "maximum_speed_over_c_for_classical_heat_flux": 0.01,
-            "actual_maximum_speed_over_c": float(np.max(speed) / 299792458.0),
-            "absolute_heat_flux_reported": False,
-            "reason": (
-                "Absolute q requires independently inferred electron density; "
-                "for beta >= 0.01 a comoving relativistic energy-momentum moment is required."
-            ),
-        },
+        **higher_moments,
+
         "velocity_moment_status": (
             "identified_from_multi_view_measurements" if identifiable
             else "conditional_candidate_only_velocity_moments_not_identified"

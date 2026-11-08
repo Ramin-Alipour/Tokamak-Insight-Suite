@@ -176,7 +176,7 @@ def test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_co
 
 
 def test_3d_evdf_withholds_classical_heat_flux_outside_nonrelativistic_moment_domain():
-    from tokamak_analysis.advanced_inference import reconstruct_multiview_3d_evdf
+    from tis.products.thomson.physics.advanced_inference import reconstruct_multiview_3d_evdf
 
     velocity = np.array([[0.0, 0.0, 0.0], [0.02 * 299792458.0, 0.0, 0.0]])
     kernels = np.array([
@@ -197,3 +197,18 @@ def test_3d_evdf_withholds_classical_heat_flux_outside_nonrelativistic_moment_do
     assert result["heat_flux_status"] == (
         "withheld_relativistic_domain_classical_expression_not_validated"
     )
+
+
+def test_3d_evdf_higher_moment_helper_matches_discrete_quadrature():
+    from tis.products.thomson.physics.advanced_inference import derive_3d_evdf_third_moments
+    velocity = np.array([[-2e3,1e3,0],[1e3,-1e3,2e3],[3e3,2e3,-1e3],[0,1e3,3e3]])
+    volume = np.array([0.5,1.0,1.5,2.0])
+    raw = np.array([0.2,0.3,0.1,0.4])
+    evdf = raw/(volume@raw)
+    result = derive_3d_evdf_third_moments(evdf,velocity,volume)
+    probability=evdf*volume
+    centered=velocity-probability@velocity
+    expected=np.einsum("a,ai,aj,ak->ijk",probability,centered,centered,centered)
+    np.testing.assert_allclose(result["third_central_velocity_moment_tensor_m3_s3"],expected)
+    assert result["heat_flux_per_density_W_m"] is not None
+    assert result["heat_flux_status"]=="identified_classical_heat_flux_per_density"
