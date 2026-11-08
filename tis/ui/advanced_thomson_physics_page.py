@@ -86,6 +86,7 @@ MODEL_LABELS = {
     "thomson_three_dimensional_flow": "Optical Thomson — 3-D electron flow from multiple scattering views",
     "thomson_full_temperature_tensor": "Optical Thomson — unconstrained-gyrotropy 3-D electron temperature tensor from multi-view spectra",
     "thomson_full_temperature_tensor_spectral_fit": "Optical Thomson — general 3-D non-gyrotropic temperature tensor fitted directly to measured multi-view spectra",
+    "thomson_temperature_tensor_model_selection": "Optical Thomson — AICc-weighted Maxwellian/Kappa model comparison with model-selection covariance",
     "gyrotropic_bi_maxwellian_anisotropy": "Optical Thomson — gyrotropic electron temperature anisotropy from multiple pitch angles",
     "gyrotropic_bi_maxwellian_spectral_fit": "Optical Thomson — joint calibrated-spectrum fit for gyrotropic bi-Maxwellian anisotropy",
     "gyrotropic_bi_kappa_spectral_fit": "Optical Thomson — joint multi-view gyrotropic anisotropic Kappa inference with relativistic-tail validity diagnostic",
@@ -1058,6 +1059,43 @@ _joint_ts_spectra = (
     np.exp(-0.5 * ((_joint_ts_wavelength[None, :] - _joint_ts_center[:, None]) / _joint_ts_sigma[:, None]) ** 2)
     + 0.01
 )
+_model_compare_wavelength = np.linspace(432.0, 632.0, 201)
+_model_compare_q = np.array([
+    [1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0],
+    [1.0,1.0,0.0],[1.0,0.0,1.0],[0.0,1.0,1.0],[1.0,-1.0,1.0],
+], dtype=float)
+_model_compare_q /= np.linalg.norm(_model_compare_q, axis=1)[:,None]
+_model_compare_tensor = np.array([
+    [400.0,50.0,20.0],[50.0,600.0,-30.0],[20.0,-30.0,900.0]
+])
+_model_compare_flow = np.array([2.0e5,-1.0e5,0.5e5])
+_model_compare_kappa = 4.2
+_model_compare_qfactor = 2.0*np.sin(np.pi/4.0)
+_model_compare_spectra = []
+for _direction in _model_compare_q:
+    _tq = float(_direction @ _model_compare_tensor @ _direction)
+    _uq = float(_direction @ _model_compare_flow)
+    _model_compare_spectra.append(
+        5.0e4*_example_kappa_bin_density(
+            _model_compare_wavelength,532.0,_model_compare_qfactor,
+            _uq,_tq,_model_compare_kappa
+        ) + 5.0 + 0.2*(_model_compare_wavelength-532.0)/200.0
+    )
+EXAMPLES["thomson_temperature_tensor_model_selection"] = {
+    "wavelength_nm": _model_compare_wavelength.tolist(),
+    "measured_spectra": np.asarray(_model_compare_spectra).tolist(),
+    "laser_wavelength_nm": 532.0,
+    "scattering_angle_rad": float(np.pi/2.0),
+    "scattering_vector_unit": _model_compare_q.tolist(),
+    "instrument_response_matrix": np.eye(_model_compare_wavelength.size).tolist(),
+    "signal_uncertainty": np.full((len(_model_compare_q),_model_compare_wavelength.size),0.05).tolist(),
+    "initial_temperature_tensor_eV": (1.1*_model_compare_tensor).tolist(),
+    "initial_electron_velocity_vector_m_s": _model_compare_flow.tolist(),
+    "initial_kappa_index": 4.0,
+    "kappa_bounds": [2.0,8.0],
+    "max_nfev": 4000,
+}
+
 EXAMPLES["thomson_joint_spatial_spectra"] = {
     "wavelength_nm": _joint_ts_wavelength.tolist(),
     "measured_spectra": _joint_ts_spectra.tolist(),
@@ -1463,6 +1501,17 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "The 3-D thermal covariance tensor is withheld because both "
                         "temperature components are not both identifiable within the declared model-validity domain."
                     )
+            if isinstance(result, Mapping) and "model_family_comparison" in result:
+                st.subheader("Maxwellian / ellipsoidal-Kappa model comparison")
+                st.latex(r"\mathrm{AICc}=\chi^2+2k+\frac{2k(k+1)}{n-k-1}")
+                st.write({
+                    "model_comparison": result.get("model_family_comparison"),
+                    "model_averaged_temperature_tensor_eV": result.get("model_averaged_temperature_tensor_eV"),
+                    "within_model_parameter_covariance_eV2": result.get("within_model_parameter_covariance_eV2"),
+                    "model_selection_parameter_covariance_eV2": result.get("model_selection_parameter_covariance_eV2"),
+                    "total_model_averaged_parameter_covariance_eV2": result.get("model_averaged_parameter_covariance_eV2"),
+                    "model_selection_uncertainty_status": result.get("model_selection_uncertainty_status"),
+                })
             if isinstance(result, Mapping) and "electron_temperature_tensor_eV" in result:
                 st.subheader("General non-gyrotropic 3-D electron temperature tensor")
                 st.latex(r"T_q=\hat{\mathbf q}^{T}\mathbf T_e\hat{\mathbf q},\qquad u_{q,i}=\hat{\mathbf q}_i\cdot\mathbf u_e,\qquad \mathbf T_e=\mathbf L\mathbf L^T")
