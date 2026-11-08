@@ -9438,10 +9438,10 @@
   },
   {
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
-    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}=m_e/(e k_B)[⟨v²⟩−⟨v⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v⟩,Var(v),σ_v,T_{e,q},skewness,excess kurtosis)",
+    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}^{(2)}=(m_e/e)[⟨v_q²⟩−⟨v_q⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v_q⟩,Var(v_q),σ_v,T_{e,q}^{(2)},skewness,excess kurtosis)",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
-    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance.",
-    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization.",
+    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance. Separately, Akaike-weighted Maxwellian/Kappa/super-Gaussian model-family uncertainty is propagated into the model-averaged EVDF's six physical moments, with within- and between-family covariance reported separately from measurement and regularization-choice uncertainty.",
+    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is calculated from the projected kinetic-energy variance m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -9526,7 +9526,7 @@
         },
         {
           "name": "directional_equivalent_temperature_eV",
-          "unit": "eV; m_e Var(v_q)/(e k_B)"
+          "unit": "eV; m_e Var(v_q)/e (second-moment-equivalent temperature)"
         },
         {
           "name": "skewness and excess_kurtosis",
@@ -9539,14 +9539,19 @@
         {
           "name": "velocity_moment_standard_uncertainty",
           "unit": "one-sigma uncertainty for each reported physical moment"
+        },
+        {
+          "name": "parametric_model_selection_uncertainty",
+          "unit": "Akaike-weighted candidate-family covariance for the projected EVDF and six physical velocity moments, including within- and between-family contributions when available"
         }
       ],
       "prerequisites": [
         "A single view identifies only the q-parallel marginal; it cannot identify a general 3-D EVDF or perpendicular velocity components.",
         "A finite normalized-EVDF covariance is required for delta-method physical-moment uncertainty.",
-        "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified."
+        "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified.",
+        "The directional second-moment temperature is T_eq,eV=m_e Var(v_q)/e. k_B is not included when converting kinetic energy in joules to electronvolts."
       ],
-      "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation.",
+      "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation. Separately, Akaike-weighted Maxwellian, projected Student-t Kappa and super-Gaussian candidate marginals propagate between-family and available within-family covariance through the same six physical moment Jacobians; this model-selection covariance is kept distinct from measurement/background and regularization-choice uncertainty.",
       "limitations": [
         "Non-relativistic q·v Doppler approximation; use the separate relativistic projected-EVDF solver outside this domain.",
         "One scattering view cannot recover unrestricted 3-D anisotropy.",
@@ -9558,7 +9563,8 @@
         "tests/test_thomson_evdf.py::test_evdf_selects_regularization_by_gcv_and_reports_conditional_covariance",
         "tests/test_thomson_evdf.py::test_evdf_propagates_signal_background_and_cross_covariance",
         "tests/test_thomson_evdf.py::test_evdf_adds_independent_model_discrepancy_and_systematic_covariance",
-        "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated"
+        "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated",
+        "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty"
       ],
       "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
       "raw_data_to_physics": false,
@@ -11271,6 +11277,168 @@
       "test_links": [
         "tests/test_thomson_relativistic_3d_evdf.py::test_zero_velocity_thomson_limit_recovers_unpolarized_angular_cross_section",
         "tests/test_thomson_relativistic_3d_evdf.py::test_rest_electron_compton_kernel_recovers_exact_compton_wavelength_shift"
+      ]
+    }
+  },
+  {
+    "name": "AICc-weighted Maxwellian/Kappa model selection and tensor covariance",
+    "equation": "AICc_m = χ²_m + 2 k_m + 2 k_m(k_m+1)/(n-k_m-1); w_m ∝ exp[-(AICc_m-min AICc)/2]; C_T = Σ_m w_m[C_m+(T_m-T̄)(T_m-T̄)^T]",
+    "inputs": "Calibrated multi-view optical Thomson spectra, measured response, absolute measurement covariance, Maxwellian and ellipsoidal-Kappa tensor fits",
+    "output": "Akaike predictive weights, model-averaged 3-D temperature tensor and 6x6 covariance including between-family model-selection uncertainty",
+    "assumptions": "Both candidate models fit the same observations and covariance; n>k_m+1; each candidate independently passes physical validity and identifiability; Akaike weights are not Bayesian posterior probabilities.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_temperature_tensor.compare_general_temperature_tensor_thomson_models",
+      "formula_key": "thomson_tensor_model_selection_aicc",
+      "input_specs": [
+        {
+          "name": "measurement_covariance_or_signal_uncertainty",
+          "unit": "absolute spectral covariance or pointwise 1-sigma",
+          "required": true
+        },
+        {
+          "name": "initial_kappa_index",
+          "unit": "dimensionless; >1.5",
+          "required": false
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless; lower bound >1.5",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "model_family_comparison",
+          "unit": "AICc and normalized Akaike weights"
+        },
+        {
+          "name": "model_averaged_temperature_tensor_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "model_averaged_parameter_covariance_eV2",
+          "unit": "6x6"
+        },
+        {
+          "name": "model_selection_parameter_covariance_eV2",
+          "unit": "6x6 between-family covariance"
+        }
+      ],
+      "uncertainty_model": "Within-family GLS covariance plus between-family covariance weighted by AICc predictive weights. Measurement uncertainty is mandatory; discrepancy/systematic contributions are propagated separately within each candidate.",
+      "test_links": [
+        "tests/test_thomson_temperature_tensor_api.py::test_model_selection_comparison_returns_aicc_weights_and_between_family_covariance"
+      ],
+      "note": "Akaike weights are predictive model weights, not Bayesian posterior probabilities. Synthetic recovery and software verification do not replace experimental validation."
+    }
+  },
+  {
+    "name": "Thomson measurement-kernel-weighted path-average density with power/optical cross covariance",
+    "equation": "P_s = ∫ n_e(s) K(s) ds; K=P_i(dσ_eff/dΩ)ΔΩη; n̄_e=P_s/D, D=∫K ds; Var(n̄_e)=gᵀ C_joint g, g=[1/D, −(P_s/D²)∇D]",
+    "inputs": "Absolutely calibrated integrated scattered power P_s; path coordinate s; incident-power, effective differential-cross-section, collection-solid-angle and optical-efficiency profiles; optional full 4N×4N optical covariance and 1×4N scattered-power/profile cross covariance",
+    "output": "Measurement-kernel-weighted path-averaged electron density [m⁻³] and first-order uncertainty [m⁻³]",
+    "assumptions": "Optically thin single scattering; fixed characterized path profiles; one integrated power identifies only the weighted path average, not an arbitrary local density profile. The joint covariance of power and optical factors must be positive semidefinite.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "formula_key": "thomson_path_average_density_joint_covariance",
+      "input_specs": [
+        {
+          "name": "scattered_power_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "path_coordinate_m",
+          "unit": "m; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "incident_power_profile_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "differential_cross_section_profile_m2_sr",
+          "unit": "m² sr⁻¹",
+          "required": true
+        },
+        {
+          "name": "collection_solid_angle_profile_sr",
+          "unit": "sr",
+          "required": true
+        },
+        {
+          "name": "optical_efficiency_profile",
+          "unit": "dimensionless; (0,1]",
+          "required": true
+        },
+        {
+          "name": "scattered_power_uncertainty_W",
+          "unit": "W; 1σ",
+          "required": false
+        },
+        {
+          "name": "optical_profile_covariance",
+          "unit": "4N×4N covariance",
+          "required": false
+        },
+        {
+          "name": "scattered_power_optical_profile_cross_covariance",
+          "unit": "length-4N covariance vector",
+          "required": false,
+          "description": "Requires both marginal covariance inputs; the complete joint covariance is PSD-validated."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_density_path_averaged_m3",
+          "unit": "m⁻³"
+        },
+        {
+          "name": "electron_density_path_averaged_uncertainty_m3",
+          "unit": "m⁻³"
+        },
+        {
+          "name": "path_integrated_sensitivity_W_m3",
+          "unit": "W m³"
+        },
+        {
+          "name": "identifiability",
+          "unit": "weighted path-average only"
+        }
+      ],
+      "uncertainty_model": "Full first-order Jacobian propagation of the joint covariance of integrated scattered power and the four path-resolved optical/geometry factors, including cross-position, cross-factor and scattered-power/profile covariance.",
+      "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_correlated_optical_profile_covariance",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
+      ],
+      "note": "Analytic single-scattering path integral and first-order covariance propagation; numerical tests verify limiting and correlated cases. Experimental validation remains required."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      }
+    ],
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "formula_key": "thomson_path_average_density_joint_covariance",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
       ]
     }
   }
