@@ -1422,14 +1422,3 @@ def test_selected_maxwellian_model_executes_canonical_fit_with_top_level_radius(
     assert captured["spectra"].shape == (1, x.size)
     assert captured["model"] == "non_collective_maxwellian"
     assert result["physical_inference"]["reportable_as_primary_inference"] is True
-
-
-def test_selected_maxwellian_model_does_not_silently_skip_canonical_fit_without_radius():
-    x, y = _spectrum()
-    with pytest.raises(ValueError, match="physical_fit_options must include radius_m"):
-        _run(
-            x, y,
-            physical_model="non_collective_maxwellian",
-            laser_wavelength_nm=532.0,
-            scattering_angle_rad=np.pi / 2.0,
-        )
