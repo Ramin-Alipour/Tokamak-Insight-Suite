@@ -67,8 +67,12 @@ def analyze_thomson_spectra(*args, **kwargs):
         kwargs = dict(kwargs)
         kwargs.pop("model")
         positional = list(args)
-        if len(positional) < 2:
+        if len(positional) == 0:
             wavelength = kwargs.pop("wavelength_nm", None)
+            spectra = kwargs.pop("spectra", None)
+            radius = kwargs.pop("radius_m", None)
+        elif len(positional) == 1:
+            wavelength = positional.pop(0)
             spectra = kwargs.pop("spectra", None)
             radius = kwargs.pop("radius_m", None)
         else:
@@ -86,9 +90,13 @@ def analyze_thomson_spectra(*args, **kwargs):
             radial_coordinates = np.asarray(radius, dtype=float)
             if radial_coordinates.shape != (spectra_shape[0],) or np.any(~np.isfinite(radial_coordinates)):
                 raise ValueError("optional radius_m provenance must contain one finite coordinate per measured view")
-        if "instrument_response" in kwargs and "instrument_response_matrix" not in kwargs:
+        if "instrument_response" in kwargs:
+            if "instrument_response_matrix" in kwargs:
+                raise ValueError("Supply instrument_response or instrument_response_matrix once, not both.")
             kwargs["instrument_response_matrix"] = kwargs.pop("instrument_response")
-        if "joint_spectral_covariance" in kwargs and "measurement_covariance" not in kwargs:
+        if "joint_spectral_covariance" in kwargs:
+            if "measurement_covariance" in kwargs:
+                raise ValueError("Supply joint_spectral_covariance or measurement_covariance once, not both.")
             kwargs["measurement_covariance"] = kwargs.pop("joint_spectral_covariance")
         if model == "general_temperature_tensor_maxwellian":
             kwargs["distribution_model"] = "maxwellian"
