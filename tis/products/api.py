@@ -5,7 +5,7 @@ from inspect import signature
 from importlib import import_module
 from typing import Any
 
-from tokamak_analysis.analysis_registry import resolve_analysis
+from tokamak_analysis.analysis_registry import get_analysis
 from .catalog import get_product
 
 
@@ -29,7 +29,9 @@ def execute_product_analysis(
         raise ValueError(
             f"Analysis ID {analysis_id} is not owned by product {product['product_id']}"
         )
-    solver = resolve_analysis(analysis_id)
+    entry = get_analysis(analysis_id)
+    module = import_module(entry["module"])
+    solver = getattr(module, entry["function"])
     signature(solver).bind(*args, **kwargs)
     return solver(*args, **kwargs)
 
