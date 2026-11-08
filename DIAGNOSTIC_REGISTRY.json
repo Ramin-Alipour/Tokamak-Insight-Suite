@@ -9428,6 +9428,7 @@
         "A single q-parallel marginal does not identify the perpendicular kinetic-energy conditional distribution and therefore does not identify the full 3-D parallel electron heat flux."
       ],
       "function_links": [
+        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
         "tis.products.thomson.api.analyze_spectral_distribution",
         "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
         "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
