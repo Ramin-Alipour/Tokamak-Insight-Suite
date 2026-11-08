@@ -130,8 +130,8 @@ def _load_analysis_families() -> list[dict]:
     if family_ids != list(range(1, 21)):
         raise RuntimeError("Primary-analysis family IDs must be unique and ordered from 1 to 20.")
     entry_ids = [entry_id for family in families for entry_id in family.get("entry_ids", [])]
-    expected_entry_ids = [entry_id for entry_id in range(1, 85) if entry_id != 7]
-    if sorted(entry_ids) != expected_entry_ids or len(set(entry_ids)) != 83:
+    expected_entry_ids = [entry["id"] for entry in ANALYSES]
+    if sorted(entry_ids) != expected_entry_ids or len(set(entry_ids)) != len(expected_entry_ids):
         raise RuntimeError("Primary-analysis families must map every registered underlying analysis ID exactly once (ID 7 is retired).")
     return families
 
