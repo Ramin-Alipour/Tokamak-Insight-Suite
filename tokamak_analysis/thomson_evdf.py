@@ -1328,9 +1328,13 @@ def reconstruct_thomson_evdf(
     # A finite velocity grid can silently truncate a real high-energy tail.
     # Quantify probability in the two boundary cells at each end using the
     # same nonuniform trapezoidal measure as normalization and moments.
+    support_quadrature_weights = np.empty_like(velocity)
+    support_quadrature_weights[0] = 0.5 * (velocity[1] - velocity[0])
+    support_quadrature_weights[-1] = 0.5 * (velocity[-1] - velocity[-2])
+    support_quadrature_weights[1:-1] = 0.5 * (velocity[2:] - velocity[:-2])
     boundary_mass_weights = np.zeros_like(velocity)
-    boundary_mass_weights[:2] = spacing_weights[:2]
-    boundary_mass_weights[-2:] = spacing_weights[-2:]
+    boundary_mass_weights[:2] = support_quadrature_weights[:2]
+    boundary_mass_weights[-2:] = support_quadrature_weights[-2:]
     boundary_mass_fraction = float(boundary_mass_weights @ distribution)
     boundary_mass_variance = None
     boundary_mass_standard_uncertainty = None
