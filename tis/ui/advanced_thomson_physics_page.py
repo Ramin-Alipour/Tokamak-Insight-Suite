@@ -1478,6 +1478,13 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "spectral_jacobian_rank": result.get("jacobian_rank"),
                     "spectral_jacobian_condition_number": result.get("jacobian_condition_number"),
                     "tensor_covariance_eV2": result.get("temperature_tensor_parameter_covariance_eV2"),
+                    "spectral_parameter_covariance_components": result.get("spectral_parameter_covariance_components"),
+                    "measurement_parameter_covariance": result.get("measurement_parameter_covariance"),
+                    "model_discrepancy_parameter_covariance": result.get("model_discrepancy_parameter_covariance"),
+                    "systematic_parameter_covariance": result.get("systematic_parameter_covariance"),
+                    "spectral_parameter_covariance_decomposition_status": result.get("spectral_parameter_covariance_decomposition_status"),
+                    "model_selection_uncertainty_included": result.get("model_selection_uncertainty_included"),
+                    "model_selection_uncertainty_status": result.get("model_selection_uncertainty_status"),
                     "model_validity_status": result.get("model_validity_status"),
                 })
                 if not result.get("reportable_as_inferred_parameter", False):
