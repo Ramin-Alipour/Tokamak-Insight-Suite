@@ -1891,3 +1891,41 @@ def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api(
     assert channel["electron_mixture_moments"]["population_count"] == 2
     assert channel["electron_mixture_moments"]["between_population_drift_temperature_eV"] > 0.0
     assert channel["ion_populations"] == ion_populations
+
+
+def test_projected_evdf_moment_closure_uses_nonuniform_velocity_finite_volume_measure(monkeypatch):
+    import tokamak_analysis.thomson_evdf as evdf_module
+
+    velocity = np.array([-3.0, -1.0, 0.5, 4.0, 9.0]) * 1.0e5
+    pdf = np.array([0.2, 0.8, 1.1, 0.35, 0.05]) / 1.0e6
+    fitted = None
+
+    def fake_inverse(*args, **kwargs):
+        return {
+            "velocity_parallel_m_s": velocity.copy(),
+            "evdf_parallel_s_per_m": pdf.copy(),
+            "fitted_spectrum": fitted.copy(),
+        }
+
+    x = np.linspace(500.0, 564.0, 65)
+    y = 20.0 + 100.0 * np.exp(-0.5 * ((x - 532.0) / 5.0) ** 2)
+    fitted = 100.0 * np.exp(-0.5 * ((x - 532.0) / 5.0) ** 2)
+    monkeypatch.setattr(evdf_module, "reconstruct_thomson_evdf", fake_inverse)
+
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+    result = analyze_thomson_spectral_distribution(
+        x, y, instrument_response_matrix=np.eye(x.size),
+        background_fraction=0.1,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        projected_evdf_options={},
+    )
+    intervals = np.diff(velocity)
+    weights = np.r_[0.5 * intervals[0],
+                    0.5 * (intervals[:-1] + intervals[1:]),
+                    0.5 * intervals[-1]]
+    normalized = pdf / np.sum(pdf * weights)
+    expected_mean = np.sum(velocity * normalized * weights)
+    expected_variance = np.sum((velocity - expected_mean) ** 2 * normalized * weights)
+    closure = result["projected_evdf_spectral_moment_closure"]
+    assert closure["evdf_mean_velocity_parallel_m_s"] == pytest.approx(expected_mean)
+    assert closure["evdf_variance_velocity_parallel_m2_s2"] == pytest.approx(expected_variance)
