@@ -1,5 +1,6 @@
 """Thomson Scattering specialist product public interface."""
 from .api import (
+    PRODUCT_ID,
     run_analysis,
     analyze_spectra,
     analyze_cts,
@@ -14,6 +15,7 @@ from .api import (
 )
 
 __all__ = [
+    "PRODUCT_ID",
     "run_analysis",
     "analyze_spectra", "analyze_cts", "reconstruct_profiles",
     "analyze_spectral_distribution", "fit_gyrotropic",
