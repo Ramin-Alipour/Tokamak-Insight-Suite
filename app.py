@@ -9,7 +9,7 @@ import streamlit as st
 from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
-from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+from tokamak_analysis.analysis_registry import ANALYSES, ANALYSIS_FAMILIES, resolve_analysis
 from tis.products import list_products, get_product, list_product_analyses
 from tis.ui.product_workspace_page import render_product_workspace_page
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
