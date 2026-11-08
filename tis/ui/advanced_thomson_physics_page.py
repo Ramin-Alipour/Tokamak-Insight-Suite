@@ -283,6 +283,7 @@ MODEL_PHYSICS_NOTES = {
     "thomson_full_temperature_tensor": (
         "Inverts T_q = q_hat.T @ T_eV @ q_hat for the six independent components of a general symmetric 3-D electron second-moment temperature tensor. " 
         "At least six independent scattering-view dyads are required; full covariance-weighted GLS and a positive-semidefinite tensor constraint are applied. " 
+        "Optional scattering_vector_covariance is a full (3*n_view,3*n_view) covariance in view-major Cartesian direction components; a finite-difference implicit GLS Jacobian propagates it through q q.T, with each perturbed direction renormalized. The resulting geometry covariance is kept separate and also reported in parameter_covariance_with_geometry_eV2. " 
         "This removes the imposed gyrotropic-axis assumption but does not reconstruct higher EVDF moments. A PSD-boundary solution does not report symmetric local covariance."
     ),
     "gyrotropic_bi_maxwellian_anisotropy": (
@@ -842,6 +843,7 @@ EXAMPLES = {
         "projected_temperature_eV": [800.0, 420.0, 260.0, 700.0, 495.0, 395.0, 373.3333333333],
         "scattering_vector_unit": [[1.0,0.0,0.0],[0.0,1.0,0.0],[0.0,0.0,1.0],[0.7071067812,0.7071067812,0.0],[0.7071067812,0.0,0.7071067812],[0.0,0.7071067812,0.7071067812],[0.5773502692,-0.5773502692,0.5773502692]],
         "projected_temperature_covariance_eV2": (0.04*np.eye(7)).tolist(),
+        "scattering_vector_covariance": (1.0e-8*np.eye(21)).tolist(),
         "maximum_geometry_condition_number": 1000.0,
         "minimum_consistency_p_value": 0.001
     },
