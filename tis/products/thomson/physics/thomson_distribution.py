@@ -768,7 +768,7 @@ def analyze_thomson_spectral_distribution(
                 )
             options["measurement_covariance"] = signal_covariance_matrix.copy()
 
-        from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
+        from tis.physics.shared.thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background
         kinetic_fit = fit_noncollective_kinetic_thomson_with_background(
             x, y, physical_model=kinetic_solver_model,
             laser_wavelength_nm=laser_wavelength_nm,
@@ -1005,7 +1005,7 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("physical_fit_options.radius_m must be finite")
         if uncertainty is not None and signal_covariance_matrix is not None:
             raise ValueError("internal error: signal uncertainty and covariance are mutually exclusive")
-        from .thomson_inference import analyze_thomson_spectra as canonical_fit
+        from tis.physics.shared.thomson_inference import analyze_thomson_spectra as canonical_fit
         canonical_kwargs = dict(
             laser_wavelength_nm=float(laser_wavelength_nm),
             scattering_angle_rad=float(scattering_angle_rad),
@@ -1107,7 +1107,7 @@ def analyze_thomson_spectral_distribution(
         use_relativistic_inverse = kinematics in {"relativistic_thomson", "compton"} or include_compton_recoil is True
         use_compton_recoil = bool(include_compton_recoil) or kinematics == "compton"
         if use_relativistic_inverse:
-            from .thomson_gap_closure import reconstruct_relativistic_projected_thomson_evdf
+            from tis.physics.shared.thomson_gap_closure import reconstruct_relativistic_projected_thomson_evdf
             velocity_grid = options.pop("velocity_grid_m_s", None)
             velocity_limit = options.pop("velocity_limit_m_s", 8.0e6)
             velocity_points = options.pop("velocity_points", 241)
@@ -1130,7 +1130,7 @@ def analyze_thomson_spectral_distribution(
                 **options,
             }
         else:
-            from .thomson_evdf import reconstruct_thomson_evdf
+            from tis.physics.shared.thomson_evdf import reconstruct_thomson_evdf
             evdf_solver = reconstruct_thomson_evdf
             evdf_kwargs = {
                 "wavelength_nm": x, "signal": y,
