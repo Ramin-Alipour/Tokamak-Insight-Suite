@@ -1617,3 +1617,41 @@ def test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian():
         rtol=2.5e-3,
         atol=2.5e-4,
     )
+
+
+
+def test_projected_evdf_energy_cdf_covariance_matches_finite_difference():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-4.0e5, 4.0e5, 41)
+    density = (
+        np.exp(-0.5*((velocity - 2.0e4)/1.15e5)**2)
+        + 0.22*np.exp(-0.5*((velocity + 1.8e5)/7.0e4)**2)
+    )
+    covariance = np.diag((density*2.0e-4)**2)
+    result = _projected_evdf_physical_moments(velocity, density, covariance)
+    energy = result["projected_parallel_kinetic_energy_cdf_eV"]
+    actual = energy["cumulative_probability_covariance"]
+
+    numerical_jacobian = np.empty((velocity.size, velocity.size))
+    for column in range(velocity.size):
+        step = density[column]*1.0e-5
+        plus = density.copy()
+        minus = density.copy()
+        plus[column] += step
+        minus[column] -= step
+        cdf_plus = _projected_evdf_physical_moments(
+            velocity, plus
+        )["projected_parallel_kinetic_energy_cdf_eV"]["cumulative_probability"]
+        cdf_minus = _projected_evdf_physical_moments(
+            velocity, minus
+        )["projected_parallel_kinetic_energy_cdf_eV"]["cumulative_probability"]
+        numerical_jacobian[:, column] = (cdf_plus-cdf_minus)/(2.0*step)
+
+    expected = numerical_jacobian @ covariance @ numerical_jacobian.T
+    np.testing.assert_allclose(actual, expected, rtol=2.0e-4, atol=1.0e-14)
+    np.testing.assert_allclose(actual, actual.T, rtol=1.0e-12, atol=1.0e-14)
+    assert np.linalg.eigvalsh(actual).min() >= -1.0e-12
+    assert energy["cumulative_probability_standard_uncertainty"][-1] == pytest.approx(0.0, abs=1.0e-12)

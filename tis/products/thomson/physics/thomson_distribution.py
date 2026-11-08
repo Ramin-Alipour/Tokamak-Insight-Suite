@@ -161,7 +161,6 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
     # random kinetic-energy distribution. For E in eV,
     # v_E=sqrt(2 e E/m_e) and F_q(E)=integral[u_q-v_E,u_q+v_E] f_q(v) dv.
     # A CDF avoids the integrable E^(-1/2) Jacobian singularity at E=0.
-    from scipy.integrate import trapezoid
     from scipy.constants import elementary_charge as _elementary_charge
     energy_max_eV = (
         0.5 * electron_mass / _elementary_charge
@@ -169,30 +168,83 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
     )
     energy_grid_eV = np.linspace(0.0, energy_max_eV, velocity.size)
 
-    def _energy_cdf(energy_eV):
+    def _interval_quadrature_weights(lower, upper):
+        """Integrate the piecewise-linear EVDF over [lower, upper]."""
+        coefficients = np.zeros(velocity.size, dtype=float)
+        if upper <= lower:
+            return coefficients
+        for index, (left, right) in enumerate(zip(velocity[:-1], velocity[1:])):
+            a = max(float(lower), float(left))
+            b = min(float(upper), float(right))
+            if b <= a:
+                continue
+            width = right - left
+            t0 = (a - left) / width
+            t1 = (b - left) / width
+            quadratic_area = 0.5 * (t1*t1 - t0*t0)
+            coefficients[index] += width * ((t1-t0) - quadratic_area)
+            coefficients[index+1] += width * quadratic_area
+        return coefficients
+
+    energy_cdf_jacobian = np.zeros((energy_grid_eV.size, velocity.size))
+    energy_cdf = np.zeros(energy_grid_eV.size)
+    for index, energy_eV in enumerate(energy_grid_eV):
         speed = np.sqrt(
             2.0 * _elementary_charge * float(energy_eV) / electron_mass
         )
-        lower = max(float(velocity[0]), m1 - speed)
-        upper = min(float(velocity[-1]), m1 + speed)
-        if upper <= lower:
-            return 0.0
-        interior = velocity[(velocity > lower) & (velocity < upper)]
-        nodes = np.concatenate(([lower], interior, [upper]))
-        values = np.interp(nodes, velocity, pdf)
-        return float(trapezoid(values, nodes))
-
-    energy_cdf = np.asarray([_energy_cdf(value) for value in energy_grid_eV])
+        lower_raw = m1 - speed
+        upper_raw = m1 + speed
+        lower = max(float(velocity[0]), lower_raw)
+        upper = min(float(velocity[-1]), upper_raw)
+        interval_weights = _interval_quadrature_weights(lower, upper)
+        raw_integral = float(interval_weights @ density)
+        energy_cdf[index] = raw_integral / normalization
+        if covariance is not None:
+            # F(E)=I(E,u_q)/(w.f). Include normalization and the inferred
+            # centre derivative because the energy interval moves with u_q.
+            gradient = (
+                interval_weights - energy_cdf[index] * weights
+            ) / normalization
+            upper_density = (
+                float(np.interp(upper, velocity, density))
+                if upper_raw < velocity[-1] else 0.0
+            )
+            lower_density = (
+                float(np.interp(lower, velocity, density))
+                if lower_raw > velocity[0] else 0.0
+            )
+            d_integral_d_mean = upper_density - lower_density
+            energy_cdf_jacobian[index] = (
+                gradient
+                + (d_integral_d_mean / normalization) * mean_gradient
+            )
     energy_cdf = np.maximum.accumulate(np.clip(energy_cdf, 0.0, 1.0))
     energy_cdf[-1] = 1.0
+    energy_cdf_covariance = None
+    energy_cdf_standard_uncertainty = None
+    if covariance is not None:
+        energy_cdf_covariance = (
+            energy_cdf_jacobian @ cov @ energy_cdf_jacobian.T
+        )
+        energy_cdf_covariance = 0.5 * (
+            energy_cdf_covariance + energy_cdf_covariance.T
+        )
+        if not np.all(np.isfinite(energy_cdf_covariance)):
+            raise ValueError("projected EVDF energy-CDF covariance is not finite")
+        energy_cdf_standard_uncertainty = np.sqrt(
+            np.maximum(np.diag(energy_cdf_covariance), 0.0)
+        )
 
     return {
-        "status": "identified_from_measurement" if covariance is not None else "moments_only_covariance_unavailable",
+        "status": "moments_with_covariance" if covariance is not None else "moments_only_covariance_unavailable",
         "velocity_projection": "q_parallel_one_dimensional_marginal",
         "normalization": normalization,
         "projected_parallel_kinetic_energy_cdf_eV": {
             "energy_grid_eV": energy_grid_eV,
             "cumulative_probability": energy_cdf,
+            "cumulative_probability_covariance": energy_cdf_covariance,
+            "cumulative_probability_standard_uncertainty": energy_cdf_standard_uncertainty,
+            "covariance_order": "energy_grid_eV",
             "definition": "F_q(E)=integral_[u_q-sqrt(2*e*E/m_e)]^[u_q+sqrt(2*e*E/m_e)] f_q(v) dv",
             "energy_reference": "kinetic energy in the q-parallel random velocity relative to inferred mean flow",
             "distribution_scope": "one_dimensional_projected_parallel_energy_only",
