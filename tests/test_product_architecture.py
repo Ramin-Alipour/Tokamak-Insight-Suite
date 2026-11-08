@@ -253,6 +253,21 @@ def test_thomson_shared_physics_dependencies_import_from_canonical_shared_packag
         "cts_bgk_fdt",
         "cts_stokes_transfer",
         "cts_magnetoionic",
+        "cts_spatial_inference",
+        "thomson_kinetic_models",
+        "ece_kinetic",
+        "ece_kinetic_modes",
+        "thomson_evdf",
+        "thomson_joint_spatial_spectral",
+        "thomson_anisotropic_inference",
+        "thomson_gap_closure",
+        "thomson_kinetic_background",
+        "thomson_n_population",
+        "cts_geometry_uncertainty",
+        "thomson_generalized_dispersion",
+        "thomson_inference",
+        "thomson_inference_closure",
+        "thomson_spatial_mixing",
     )
     for module_name in shared_modules:
         module = import_module(f"tis.physics.shared.{module_name}")
