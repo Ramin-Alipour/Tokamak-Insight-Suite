@@ -78,12 +78,15 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
     m2 = float(weights @ (velocity**2 * pdf))
     m3 = float(weights @ (velocity**3 * pdf))
     m4 = float(weights @ (velocity**4 * pdf))
-    variance = m2 - m1**2
+    centered_velocity = velocity - m1
+    variance = float(weights @ (centered_velocity**2 * pdf))
     if not np.isfinite(variance) or variance <= 0.0:
         raise ValueError("projected EVDF has non-positive velocity variance")
     sigma = float(np.sqrt(variance))
-    mu3 = float(m3 - 3.0*m1*m2 + 2.0*m1**3)
-    mu4 = float(m4 - 4.0*m1*m3 + 6.0*m1**2*m2 - 3.0*m1**4)
+    # Evaluate central moments directly about the inferred mean to avoid
+    # catastrophic cancellation for a narrow distribution with large flow.
+    mu3 = float(weights @ (centered_velocity**3 * pdf))
+    mu4 = float(weights @ (centered_velocity**4 * pdf))
     skewness = mu3 / sigma**3
     excess_kurtosis = mu4 / variance**2 - 3.0
     electron_mass = 9.1093837139e-31
