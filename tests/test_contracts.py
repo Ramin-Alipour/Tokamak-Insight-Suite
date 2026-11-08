@@ -182,3 +182,18 @@ def test_spectral_distribution_registry_matches_public_physical_geometry_argumen
     assert {"laser_wavelength_nm", "scattering_angle_rad"} <= public
     assert {"physical_initial", "incident_polarization", "include_compton_recoil"} <= declared
     assert {"physical_initial", "incident_polarization", "include_compton_recoil"} <= public
+
+
+def test_spectral_distribution_contract_enforces_geometry_for_selected_physical_models():
+    contract = get_diagnostic_contract("Thomson spectral distribution")
+    base = {
+        "wavelength_nm": [500.0, 500.1, 500.2],
+        "signal": [1.0, 2.0, 1.0],
+        "instrument_response_matrix": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        "physical_model": "kappa",
+    }
+    with pytest.raises(ContractError, match="laser_wavelength_nm.*scattering_angle_rad"):
+        contract.validate_inputs(base)
+    base["laser_wavelength_nm"] = 1064.0
+    base["scattering_angle_rad"] = 1.5707963267948966
+    contract.validate_inputs(base)

@@ -26,6 +26,7 @@ class QuantitySpec:
     accepted_units: tuple[str, ...] = ()
     minimum: float | None = None
     maximum: float | None = None
+    required_when: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
 
 @dataclass(frozen=True)
 class ExecutionContract:
@@ -75,6 +76,14 @@ class ExecutionContract:
         if unknown:
             raise ContractError(f"Undeclared input(s): {', '.join(sorted(unknown))}")
         missing = [item.name for item in self.input_specs if item.required and item.name not in values]
+        for item in self.input_specs:
+            if item.name in values or item.name in missing:
+                continue
+            if any(
+                condition_name in values and values[condition_name] in accepted_values
+                for condition_name, accepted_values in item.required_when.items()
+            ):
+                missing.append(item.name)
         if missing:
             raise ContractError(f"Missing required input(s): {', '.join(missing)}")
         for name, value in values.items():
@@ -127,7 +136,8 @@ def contract_from_registry(row: Mapping[str, Any]) -> ExecutionContract:
             name=str(item["name"]), unit=str(item.get("unit", "unspecified")),
             description=str(item.get("description", "")), required=bool(item.get("required", True)),
             accepted_units=tuple(item.get("accepted_units", ())),
-            minimum=item.get("minimum"), maximum=item.get("maximum"))
+            minimum=item.get("minimum"), maximum=item.get("maximum"),
+            required_when={name: tuple(values) for name, values in item.get("required_when", {}).items()})
             for item in raw.get(key, []))
     return ExecutionContract(
         diagnostic_id=str(row.get("id", row.get("diagnostic", "unknown"))),

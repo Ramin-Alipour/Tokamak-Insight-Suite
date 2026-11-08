@@ -9044,13 +9044,27 @@
           "name": "laser_wavelength_nm",
           "unit": "nm; positive laser wavelength used by the selected physical forward model",
           "required": false,
-          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments."
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments.",
+          "required_when": {
+            "physical_model": [
+              "non_collective_maxwellian",
+              "kappa",
+              "relativistic_maxwell_juttner"
+            ]
+          }
         },
         {
           "name": "scattering_angle_rad",
           "unit": "rad; scattering angle in (0, pi) used by the selected physical forward model",
           "required": false,
-          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments."
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments.",
+          "required_when": {
+            "physical_model": [
+              "non_collective_maxwellian",
+              "kappa",
+              "relativistic_maxwell_juttner"
+            ]
+          }
         },
         {
           "name": "physical_fit_options",
