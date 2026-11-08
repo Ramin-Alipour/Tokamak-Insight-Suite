@@ -311,6 +311,13 @@ def test_tensor_spectral_fit_registry_exposes_shared_cartesian_flow_contract():
         "electron_pressure_covariance_equation",
     } <= outputs
     assert "one shared Cartesian bulk-flow vector" in contract["algorithm"]
+    assert {
+        "spectral_parameter_covariance_components",
+        "measurement_parameter_covariance",
+        "model_discrepancy_parameter_covariance",
+        "systematic_parameter_covariance",
+        "model_selection_uncertainty_status",
+    } <= outputs
 
 
 
