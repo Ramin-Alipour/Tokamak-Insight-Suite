@@ -70,19 +70,26 @@ def analyze_thomson_spectra(*args, **kwargs):
         if len(positional) < 2:
             wavelength = kwargs.pop("wavelength_nm", None)
             spectra = kwargs.pop("spectra", None)
+            radius = kwargs.pop("radius_m", None)
         else:
             wavelength, spectra = positional[:2]
             positional = positional[2:]
+            radius = positional.pop(0) if positional else kwargs.pop("radius_m", None)
         if positional:
-            # The third positional argument is the radial coordinate used by
-            # isotropic profile inference. It is not a parameter of a multi-view
-            # anisotropy inverse, so reject rather than silently reinterpret it.
-            raise TypeError(
-                "Anisotropic/tensor Analysis-1 inference accepts wavelength_nm "
-                "and spectra positionally; pass no positional radius_m."
-            )
+            raise TypeError("Too many positional arguments for anisotropic/tensor Analysis-1 inference.")
         if wavelength is None or spectra is None:
             raise ValueError("wavelength_nm and measured spectra are required")
+        spectra_shape = np.asarray(spectra).shape
+        if len(spectra_shape) != 2:
+            raise ValueError("anisotropic/tensor spectra must have shape (n_view, n_wavelength)")
+        if radius is not None:
+            radial_coordinates = np.asarray(radius, dtype=float)
+            if radial_coordinates.shape != (spectra_shape[0],) or np.any(~np.isfinite(radial_coordinates)):
+                raise ValueError("optional radius_m provenance must contain one finite coordinate per measured view")
+        if "instrument_response" in kwargs and "instrument_response_matrix" not in kwargs:
+            kwargs["instrument_response_matrix"] = kwargs.pop("instrument_response")
+        if "joint_spectral_covariance" in kwargs and "measurement_covariance" not in kwargs:
+            kwargs["measurement_covariance"] = kwargs.pop("joint_spectral_covariance")
         if model == "general_temperature_tensor_maxwellian":
             kwargs["distribution_model"] = "maxwellian"
         elif model == "general_temperature_tensor_kappa":
@@ -94,6 +101,8 @@ def analyze_thomson_spectra(*args, **kwargs):
         result = dict(result)
         result["analysis_id"] = 1
         result["analysis_model"] = model
+        if radius is not None:
+            result["view_radius_m"] = np.asarray(radius, dtype=float).copy()
         result["canonical_entry_point"] = "tokamak_analysis.thomson_workflow.analyze_thomson_spectra"
         return result
 
