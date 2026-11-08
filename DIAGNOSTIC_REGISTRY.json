@@ -9436,7 +9436,7 @@
         "tests/test_thomson_kinetic_background.py::test_kinetic_background_model_is_routed_through_public_advanced_dashboard",
         "tests/test_thomson_distribution.py::test_distribution_routes_scattering_angle_uncertainty_into_projected_evdf",
         "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments",
-        "tests/test_thomson_evdf.py::test_projected_velocity_moments_and_covariance_are_consistent"
+        "tests/test_thomson_evdf.py::test_evdf_reports_dimensional_third_and_fourth_central_velocity_moments"
       ],
       "input_data_level": "measured_calibrated_spectrum"
     },
