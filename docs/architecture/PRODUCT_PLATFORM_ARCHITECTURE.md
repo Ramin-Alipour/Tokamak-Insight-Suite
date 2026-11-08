@@ -1,6 +1,6 @@
 # Product Platform Architecture
 
-Status: proposed architecture baseline
+Status: modular-monolith product boundaries implemented; physics migration remains in progress
 Target branch: `main`
 Scope: the 20 user-facing analysis families currently presented by TIS
 
@@ -125,6 +125,12 @@ The pilot should be decomposed into domain subpackages only after a dependency a
 - geometry and full-forward uncertainty propagation.
 
 These are candidate boundaries, not permission to create empty packages or move files without understanding dependencies. Each extracted capability must retain its actual solver and be reachable from the supported workflow/API/dashboard path.
+
+## 6.0 Dedicated package boundary status
+
+The 20 family IDs now resolve to 20 distinct importable product API modules under `tis/products/`. The product catalog carries a stable `api_module` for each family, and `load_product_api(product_id)` resolves it without requiring callers to know the package path. Every package exposes ownership-checked dispatch and named workflow facades for its registered entry points. The dashboard product workspace reports the package path and its exported API surface.
+
+This is the first enforceable package/API boundary, not yet a full physical-code relocation: canonical solver implementations remain in `tokamak_analysis/` while they are migrated product by product. The AST dependency inventory and import-boundary tests are used to identify shared modules and prevent product packages from importing another product's private package. Do not label the products independently distributable until their solver dependencies, resources, packaging metadata, and CI are isolated.
 
 ## 6.1 Current implementation boundary
 
