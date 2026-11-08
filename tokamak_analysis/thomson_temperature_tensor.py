@@ -91,6 +91,17 @@ def infer_full_temperature_tensor_from_thomson_projections(
         )
         if covariance.shape != (n, n):
             raise ValueError("projected_temperature_covariance_eV2 must be (n_view,n_view)")
+        covariance_scale = max(
+            float(np.max(np.abs(covariance))), np.finfo(float).tiny
+        )
+        asymmetry = float(np.max(np.abs(covariance - covariance.T)))
+        if asymmetry > 1.0e-10 * covariance_scale:
+            raise ValueError(
+                "projected-temperature covariance must be symmetric; "
+                "the supplied matrix is not silently symmetrized"
+            )
+        # Remove only round-off-level antisymmetric noise after validating the
+        # covariance contract; materially asymmetric input is a caller error.
         covariance = 0.5 * (covariance + covariance.T)
         try:
             chol = np.linalg.cholesky(covariance)
