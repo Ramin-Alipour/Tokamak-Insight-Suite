@@ -978,6 +978,13 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
     distribution = out["channels"][0]["spectral_distribution"]
     assert distribution["analysis_status"] == "completed"
     assert distribution["background_source"].startswith("background nuisance")
+    physical = distribution["physical_inference"]
+    assert physical["selected_model"] == out["model"]
+    assert physical["fit_reused_without_refitting"] is True
+    assert physical["gaussian_width_used_as_temperature"] is False
+    assert physical["primary_parameters"]["electron_temperature_eV"] == pytest.approx(
+        out["channels"][0]["electron_temperature_eV"]
+    )
     assert "physical_parameter_extraction" not in distribution
     assert "spectral_distribution" in out
     evdf = out["channels"][0]["electron_velocity_distribution"]
