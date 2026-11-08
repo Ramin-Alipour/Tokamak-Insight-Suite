@@ -30,7 +30,8 @@ def execute_product_analysis(
             f"Analysis ID {analysis_id} is not owned by product {product['product_id']}"
         )
     entry = get_analysis(analysis_id)
-    module = import_module(entry["module"])
+    module_path = product["api_module"] + ".physics." + entry["module"]
+    module = import_module(module_path)
     solver = getattr(module, entry["function"])
     signature(solver).bind(*args, **kwargs)
     return solver(*args, **kwargs)
