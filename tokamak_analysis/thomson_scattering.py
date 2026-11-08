@@ -358,6 +358,7 @@ def infer_thomson_path_averaged_density(
     *,
     scattered_power_uncertainty_W=None,
     optical_profile_covariance=None,
+    scattered_power_optical_profile_cross_covariance=None,
 ):
     """Infer the measurement-kernel-weighted electron density along a sightline.
 
@@ -408,6 +409,8 @@ def infer_thomson_path_averaged_density(
             scattered_power_uncertainty_W, "scattered_power_uncertainty_W", allow_zero=True
         )
     profile_sigma = None
+    profile_gradient = None
+    profile_covariance = None
     if optical_profile_covariance is not None:
         n = s.size
         cov = np.asarray(optical_profile_covariance, dtype=float)
@@ -429,14 +432,45 @@ def infer_thomson_path_averaged_density(
         dx = np.diff(s)
         w = np.r_[0.5*dx[0], 0.5*(dx[:-1]+dx[1:]), 0.5*dx[-1]]
         dden = np.concatenate([w*kernel/x for x in (pi, dsigma, omega, eta)])
-        grad = -(density/denominator)*dden
-        variance = float(grad @ cov @ grad)
-        if variance < -1e-10*density**2:
+        profile_gradient = -(density/denominator)*dden
+        profile_covariance = cov
+        profile_variance = float(profile_gradient @ cov @ profile_gradient)
+        if profile_variance < -1e-10*density**2:
             raise ValueError("optical_profile_covariance gives negative variance")
-        profile_sigma = float(np.sqrt(max(variance, 0.0)))
+        profile_sigma = float(np.sqrt(max(profile_variance, 0.0)))
+
+    power_profile_cross = None
+    if scattered_power_optical_profile_cross_covariance is not None:
+        if sigma_ps is None or profile_covariance is None:
+            raise ValueError(
+                "scattered_power_optical_profile_cross_covariance requires both "
+                "scattered_power_uncertainty_W and optical_profile_covariance"
+            )
+        power_profile_cross = np.asarray(
+            scattered_power_optical_profile_cross_covariance, dtype=float
+        )
+        if power_profile_cross.shape != (4*s.size,) or not np.all(np.isfinite(power_profile_cross)):
+            raise ValueError("scattered_power_optical_profile_cross_covariance must be a finite vector of length 4N")
+        joint_covariance = np.block([
+            [np.asarray([[sigma_ps**2]]), power_profile_cross[None, :]],
+            [power_profile_cross[:, None], profile_covariance],
+        ])
+        joint_covariance = 0.5*(joint_covariance+joint_covariance.T)
+        joint_eigenvalues = np.linalg.eigvalsh(joint_covariance)
+        joint_scale = max(float(np.max(np.abs(joint_eigenvalues))), np.finfo(float).tiny)
+        if joint_eigenvalues[0] < -1e-10*joint_scale:
+            raise ValueError(
+                "joint scattered-power/optical-profile covariance must be positive semidefinite"
+            )
+
     variance = 0.0 if profile_sigma is None else profile_sigma**2
     if sigma_ps is not None:
         variance += (sigma_ps/denominator)**2
+    if power_profile_cross is not None:
+        variance += 2.0*(1.0/denominator)*float(profile_gradient @ power_profile_cross)
+    if variance < -1e-10*density**2:
+        raise ValueError("combined scattered-power/optical-profile covariance gives negative density variance")
+    variance = max(variance, 0.0)
     uncertainty = np.sqrt(variance) if (sigma_ps is not None or profile_sigma is not None) else None
     return {
         "electron_density_path_averaged_m3": float(density),
@@ -468,8 +502,9 @@ def infer_thomson_path_averaged_density(
              "collection_solid_angle_profile_sr", "optical_efficiency_profile"]
             if profile_sigma is not None else None
         ),
+        "scattered_power_optical_profile_cross_covariance_supplied": power_profile_cross is not None,
         "uncertainty_model": (
-            "First-order Jacobian propagation of full 4N x 4N optical-profile covariance, including cross-position and cross-factor correlations; scattered power is independent."
+            "First-order Jacobian propagation of full 4N x 4N optical-profile covariance, including cross-position and cross-factor correlations; scattered-power/profile cross-covariance is included when supplied."
             if profile_sigma is not None else
             "First-order propagation of scattered-power uncertainty only; optical-profile covariance is not included."
             if sigma_ps is not None else "No uncertainty supplied."
