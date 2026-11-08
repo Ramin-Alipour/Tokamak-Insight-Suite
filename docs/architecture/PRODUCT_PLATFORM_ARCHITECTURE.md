@@ -126,6 +126,22 @@ The pilot should be decomposed into domain subpackages only after a dependency a
 
 These are candidate boundaries, not permission to create empty packages or move files without understanding dependencies. Each extracted capability must retain its actual solver and be reachable from the supported workflow/API/dashboard path.
 
+## 6.1 Current implementation boundary
+
+The first product-layer implementation is now represented by:
+
+- `tis/products/catalog.py`: derives product descriptors and ownership from the canonical family and analysis registries;
+- `tis/products/api.py`: validates product ownership and Python callable signatures before dispatching unchanged arguments to the registered solver;
+- `tis/products/dependencies.py`: statically traces local Python imports from registered solver modules and separates shared-domain reuse from product-local dependency closures;
+- `tis/products/thomson/`: named facade for the Thomson family workflows;
+- `tis/products/langmuir/`: first second-product facade for registered electrostatic-probe workflows;
+- `tis/ui/product_workspace_page.py`: dashboard view of product ownership and scientific contracts;
+- `app.py`: registered analysis execution now selects products and entry points through the product catalog.
+
+The dependency inventory is an AST-based approximation. Dynamic imports, runtime plugins, non-Python resources, and third-party dependency constraints require additional review before any repository/package extraction.
+
+The canonical callable registry currently contains 86 entry points (IDs 1–87, with retired ID 7 omitted). The diagnostic knowledge-base registry is a separate 80-record catalogue; these counts are not expected to match. See [PRODUCT_IMPLEMENTATION_MAP.md](PRODUCT_IMPLEMENTATION_MAP.md) for the current product-to-code-to-dashboard map.
+
 ## 7. Migration plan
 
 ### Phase 0 — Baseline and inventory
