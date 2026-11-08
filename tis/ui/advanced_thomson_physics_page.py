@@ -63,6 +63,7 @@ MODEL_LABELS = {
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "thomson_n_population_relativistic_fit": "Optical Thomson — joint inference of 2–8 relativistic Maxwell-Juttner populations, number fractions and shared or component flows",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from caller-supplied kernels",
+    "thomson_multiview_3d_evdf_regularization_sensitivity": "Optical Thomson — 3-D EVDF regularization ensemble with propagated distribution and velocity-moment spread",
     "thomson_multiview_3d_evdf_physical": "Optical Thomson — physical multi-view 3-D EVDF inversion from geometry, Doppler kinematics and measured response",
     "thomson_relativistic_3d_evdf": "Optical Thomson — general Cartesian 3-D relativistic EVDF inversion with exact Lorentz kinematics and optional Compton recoil",
     "kappa_electrostatic_susceptibility": "CTS — dimensional isotropic-Kappa susceptibility from the shared full-tail Landau kernel, with exact thermal scaling and analytic phase derivative",
@@ -215,6 +216,13 @@ MODEL_PHYSICS_NOTES = {
         "and systematic_covariance are independent additive components in stacked view-major "
         "spectral space. The fixed-active-set coefficient covariance uses the frequentist "
         "sandwich H^-1 A_w^T A_w H^-1, not H^-1."
+    ),
+    "thomson_multiview_3d_evdf_regularization_sensitivity": (
+        "Runs the same non-negative 3-D EVDF inverse over an explicit increasing grid of regularization strengths. "
+        "For each candidate, computes the normalized distribution and its 3-D mean-velocity vector and covariance tensor. "
+        "The sample covariance across candidates is reported separately as regularization-selection sensitivity; "
+        "it is not measurement noise, a confidence interval, or a posterior. The data-only rank gate is evaluated "
+        "at every strength and regularization never creates angular identifiability."
     ),
     "thomson_multiview_3d_evdf_physical": (
         "Physical optical Thomson 3-D EVDF inversion. For each measured view j and velocity voxel a, "
@@ -1045,6 +1053,25 @@ EXAMPLES["thomson_relativistic_3d_evdf"] = {
     "systematic_covariance": None,
 }
 
+# Regularization ensemble for a small, fully identified synthetic 3-D EVDF.
+_sens_kernels = np.zeros((3, 2, 6), dtype=float)
+for _view in range(3):
+    _sens_kernels[_view, :, 2*_view:2*_view+2] = np.eye(2)
+_sens_truth = np.array([1., 2., 3., 4., 5., 6.])
+_sens_volume = np.full(6, 0.1)
+_sens_data = (
+    _sens_kernels.reshape(6, 6) @ (_sens_truth * _sens_volume)
+).reshape(3, 2)
+EXAMPLES["thomson_multiview_3d_evdf_regularization_sensitivity"] = {
+    "spectral_kernels": _sens_kernels.tolist(),
+    "measured_spectra": _sens_data.tolist(),
+    "velocity_grid_m_s": np.arange(18, dtype=float).reshape(6, 3).tolist(),
+    "voxel_volume_m3_s3": _sens_volume.tolist(),
+    "regularization_matrix": np.diff(np.eye(6), axis=0).tolist(),
+    "regularization_strengths": [1.0e-8, 1.0e-5, 1.0e-2],
+    "measurement_uncertainty": np.full((3, 2), 0.01).tolist(),
+}
+
 # Reuse the same explicit physical input contract for the public response alias.
 EXAMPLES["landau_fdt_full_em_response"] = dict(EXAMPLES["landau_fdt_full_em_constitutive"])
 
@@ -1276,6 +1303,27 @@ def render_advanced_thomson_physics_page(st) -> None:
                         "projected probability to superluminal velocities. Use the "
                         "relativistic projected-EVDF route before interpreting this fit physically."
                     )
+            if model == "thomson_multiview_3d_evdf_regularization_sensitivity" and isinstance(result, Mapping):
+                spread = result.get("regularization_selection_uncertainty", {})
+                st.subheader("3-D EVDF — regularization-selection propagation")
+                st.caption(spread.get("interpretation", "Candidate spread is separate from measurement uncertainty."))
+                st.write({
+                    "candidate_count": spread.get("candidate_count"),
+                    "regularization_strengths": result.get("regularization_strengths"),
+                    "candidate_levels": result.get("levels"),
+                })
+                if spread.get("physical_moment_covariance_moment_units_squared") is not None:
+                    st.write("Physical-moment covariance order:")
+                    st.write(spread.get("physical_moment_order"))
+                    st.dataframe(
+                        np.asarray(spread["physical_moment_covariance_moment_units_squared"], dtype=float),
+                        use_container_width=True,
+                    )
+                st.write({
+                    "distribution_standard_spread_m3_s3": spread.get("distribution_standard_spread_m3_s3"),
+                    "distribution_lower_envelope_m3_s3": spread.get("distribution_lower_envelope_m3_s3"),
+                    "distribution_upper_envelope_m3_s3": spread.get("distribution_upper_envelope_m3_s3"),
+                })
             if isinstance(result, Mapping) and "velocity_moment_covariance_order" in result:
                 st.subheader("Projected EVDF — physical velocity moments")
                 st.latex(
