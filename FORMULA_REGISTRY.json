@@ -11642,5 +11642,76 @@
       "note": "The Maxwellian reference test compares the numerical CDF with erf(sqrt(E/T_e)) for a one-dimensional Gaussian velocity marginal."
     },
     "description": "CDF of parallel random kinetic energy derived from the normalized projected Thomson EVDF."
+  },
+  {
+    "name": "Third central velocity moment and classical heat flux from a 3-D Thomson EVDF",
+    "equation": "M_ijk = ∫ f(v)(v_i-u_i)(v_j-u_j)(v_k-u_k) d³v; q_i/n_e = (m_e/2) Σ_j M_ijj",
+    "inputs": "Normalized 3-D electron EVDF f(v) [s³ m⁻³], mean velocity u [m s⁻¹], velocity-space voxel volumes [m³ s⁻³]",
+    "output": "M_ijk [m³ s⁻³]; classical heat flux per density q_i/n_e [W m]",
+    "assumptions": "The EVDF is normalized and data-identifiable on the supplied 3-D velocity grid. The classical heat-flux expression is used only for max(|v|)/c < 0.01. Absolute heat flux additionally requires independently inferred electron density.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_multiview_3d_evdf",
+      "formula_key": "thomson_evdf_third_moment_heat_flux",
+      "input_specs": [
+        {
+          "name": "normalized_evdf_m3_s3",
+          "unit": "s³ m⁻³",
+          "description": "Normalized reconstructed 3-D EVDF on the supplied velocity-space voxels.",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s⁻¹; n_voxel x 3",
+          "description": "Cartesian velocity vector at each voxel.",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "m³ s⁻³",
+          "description": "Positive velocity-space quadrature volume for each voxel.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "third_central_velocity_moment_tensor_m3_s3",
+          "unit": "m³ s⁻³; 3x3x3",
+          "description": "M_ijk, the third central Cartesian velocity moment tensor."
+        },
+        {
+          "name": "heat_flux_per_density_W_m",
+          "unit": "W m; 3-vector",
+          "description": "Classical q_i/n_e=(m_e/2)Σ_j M_ijj, only inside the declared non-relativistic domain."
+        },
+        {
+          "name": "third_central_velocity_moment_covariance_m6_s6",
+          "unit": "(m³ s⁻³)²; 27x27",
+          "description": "Delta-method covariance from normalized EVDF covariance."
+        },
+        {
+          "name": "heat_flux_per_density_covariance_W2_m2",
+          "unit": "(W m)²; 3x3",
+          "description": "Delta-method covariance of q/n_e."
+        }
+      ],
+      "prerequisites": [
+        "A normalized 3-D EVDF identified by the stacked multi-view measurement operator.",
+        "Velocity-space quadrature volumes consistent with the forward model."
+      ],
+      "uncertainty_model": "First-order delta-method propagation through normalized-EVDF moment Jacobians, conditional on the fixed non-negative active set and supplied spectral covariance.",
+      "limitations": [
+        "Classical heat flux is withheld for max(|v|)/c >= 0.01; no relativistic heat-flux approximation is substituted.",
+        "Absolute heat flux is not returned without independently inferred electron density.",
+        "Regularization does not promote data-null-space modes to identified EVDF structure."
+      ],
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance"
+      ],
+      "note": "Executable physical moments with analytic covariance propagation; software/physics verification uses synthetic distributions, not experimental validation."
+    }
   }
 ]

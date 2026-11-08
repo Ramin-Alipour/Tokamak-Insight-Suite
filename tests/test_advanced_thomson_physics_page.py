@@ -337,3 +337,16 @@ def test_dashboard_routes_number_conserving_bgk_kappa_physics():
     assert result["public_physics_entrypoint"] == model
     assert result["collision_model"] == "linearized_number_conserving_BGK_on_full_tail_Kappa_marginal"
     assert np.isfinite(result["electron_susceptibility"].real)
+
+
+
+def test_relativistic_3d_evdf_dashboard_uses_registered_product_api_entry_85():
+    from tis.products.thomson.api import reconstruct_relativistic_evdf
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES
+
+    result = reconstruct_relativistic_evdf(**EXAMPLES["thomson_relativistic_3d_evdf"])
+    assert result["physical_forward_model"] == (
+        "general_3d_relativistic_unpolarized_thomson_with_optional_compton_recoil"
+    )
+    assert "third_central_velocity_moment_tensor_m3_s3" in result
+    assert "heat_flux_status" in result

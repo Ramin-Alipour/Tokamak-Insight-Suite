@@ -9438,7 +9438,7 @@
   },
   {
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
-    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}^{(2)}=(m_e/e)[⟨v_q²⟩−⟨v_q⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v_q⟩,Var(v_q),σ_v,T_{e,q}^{(2)},skewness,excess kurtosis)",
+    "equation": "p_i=f_i/(Σ_j w_j f_j); u_q=Σ_i w_i v_i p_i; μ_n,q=Σ_i w_i(v_i−u_q)^n p_i (n=2,3,4); T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; ∂u_q/∂f_i=(w_i/N)(v_i−u_q); ∂μ_2,q/∂f_i=(w_i/N)[(v_i−u_q)²−μ_2,q]; ∂μ_3,q/∂f_i=(w_i/N)[(v_i−u_q)³−μ_3,q−3μ_2,q(v_i−u_q)]; ∂μ_4,q/∂f_i=(w_i/N)[(v_i−u_q)^4−μ_4,q−4μ_3,q(v_i−u_q)]; Cov(g)=J_g Cov(f_q) J_gᵀ",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
     "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance. Separately, Akaike-weighted Maxwellian/Kappa/super-Gaussian model-family uncertainty is propagated into the model-averaged EVDF's six physical moments, with within- and between-family covariance reported separately from measurement and regularization-choice uncertainty.",
     "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is calculated from the projected kinetic-energy variance m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
@@ -9447,7 +9447,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
       "formula_key": "optical_thomson_projected_evdf_velocity_moment_covariance",
       "input_specs": [
         {
@@ -9564,7 +9564,10 @@
         "tests/test_thomson_evdf.py::test_evdf_propagates_signal_background_and_cross_covariance",
         "tests/test_thomson_evdf.py::test_evdf_adds_independent_model_discrepancy_and_systematic_covariance",
         "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated",
-        "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty"
+        "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty",
+        "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_matches_normalized_finite_difference",
+        "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_rejects_indefinite_input",
+        "tests/test_thomson_distribution.py::test_thomson_spectral_distribution_executes_through_specialist_product_api"
       ],
       "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
       "raw_data_to_physics": false,
@@ -9576,7 +9579,8 @@
       "input_data_level": "calibrated_measured_spectrum_and_measured_response",
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Optical Thomson / projected EVDF"
-    }
+    },
+    "description": "Physical central moments and their correlated uncertainty are derived from the response-aware reconstructed normalized q-parallel EVDF using the same nonuniform velocity quadrature as the inverse. A single projected marginal does not identify the unrestricted 3-D EVDF or full parallel heat flux."
   },
   {
     "name": "Three-dimensional Bloch-periodic full-vector Maxwell energy closure",
@@ -11638,5 +11642,76 @@
       "note": "The Maxwellian reference test compares the numerical CDF with erf(sqrt(E/T_e)) for a one-dimensional Gaussian velocity marginal."
     },
     "description": "CDF of parallel random kinetic energy derived from the normalized projected Thomson EVDF."
+  },
+  {
+    "name": "Third central velocity moment and classical heat flux from a 3-D Thomson EVDF",
+    "equation": "M_ijk = ∫ f(v)(v_i-u_i)(v_j-u_j)(v_k-u_k) d³v; q_i/n_e = (m_e/2) Σ_j M_ijj",
+    "inputs": "Normalized 3-D electron EVDF f(v) [s³ m⁻³], mean velocity u [m s⁻¹], velocity-space voxel volumes [m³ s⁻³]",
+    "output": "M_ijk [m³ s⁻³]; classical heat flux per density q_i/n_e [W m]",
+    "assumptions": "The EVDF is normalized and data-identifiable on the supplied 3-D velocity grid. The classical heat-flux expression is used only for max(|v|)/c < 0.01. Absolute heat flux additionally requires independently inferred electron density.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_multiview_3d_evdf",
+      "formula_key": "thomson_evdf_third_moment_heat_flux",
+      "input_specs": [
+        {
+          "name": "normalized_evdf_m3_s3",
+          "unit": "s³ m⁻³",
+          "description": "Normalized reconstructed 3-D EVDF on the supplied velocity-space voxels.",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s⁻¹; n_voxel x 3",
+          "description": "Cartesian velocity vector at each voxel.",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "m³ s⁻³",
+          "description": "Positive velocity-space quadrature volume for each voxel.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "third_central_velocity_moment_tensor_m3_s3",
+          "unit": "m³ s⁻³; 3x3x3",
+          "description": "M_ijk, the third central Cartesian velocity moment tensor."
+        },
+        {
+          "name": "heat_flux_per_density_W_m",
+          "unit": "W m; 3-vector",
+          "description": "Classical q_i/n_e=(m_e/2)Σ_j M_ijj, only inside the declared non-relativistic domain."
+        },
+        {
+          "name": "third_central_velocity_moment_covariance_m6_s6",
+          "unit": "(m³ s⁻³)²; 27x27",
+          "description": "Delta-method covariance from normalized EVDF covariance."
+        },
+        {
+          "name": "heat_flux_per_density_covariance_W2_m2",
+          "unit": "(W m)²; 3x3",
+          "description": "Delta-method covariance of q/n_e."
+        }
+      ],
+      "prerequisites": [
+        "A normalized 3-D EVDF identified by the stacked multi-view measurement operator.",
+        "Velocity-space quadrature volumes consistent with the forward model."
+      ],
+      "uncertainty_model": "First-order delta-method propagation through normalized-EVDF moment Jacobians, conditional on the fixed non-negative active set and supplied spectral covariance.",
+      "limitations": [
+        "Classical heat flux is withheld for max(|v|)/c >= 0.01; no relativistic heat-flux approximation is substituted.",
+        "Absolute heat flux is not returned without independently inferred electron density.",
+        "Regularization does not promote data-null-space modes to identified EVDF structure."
+      ],
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance"
+      ],
+      "note": "Executable physical moments with analytic covariance propagation; software/physics verification uses synthetic distributions, not experimental validation."
+    }
   }
 ]

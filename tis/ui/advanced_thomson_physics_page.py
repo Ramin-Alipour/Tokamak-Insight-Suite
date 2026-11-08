@@ -1254,7 +1254,16 @@ def render_advanced_thomson_physics_page(st) -> None:
             if not isinstance(parsed, dict):
                 raise ValueError("The solver configuration must be a JSON object.")
             config = decode_complex_json(parsed)
-            result = run_advanced_thomson_physics(model, **config)
+            if model == "thomson_relativistic_3d_evdf":
+                # Use the registered Thomson product API entry 85, not a parallel dispatcher.
+                from tis.products.thomson.api import reconstruct_relativistic_evdf
+                result = reconstruct_relativistic_evdf(**config)
+                result = dict(result)
+                result["dashboard_execution_path"] = (
+                    "tis.products.thomson.api.reconstruct_relativistic_evdf -> analysis_id_85"
+                )
+            else:
+                result = run_advanced_thomson_physics(model, **config)
             safe = json_safe(result)
             if isinstance(result, Mapping) and "velocity_grid_convergence" in result:
                 convergence = result["velocity_grid_convergence"]
@@ -1288,6 +1297,24 @@ def render_advanced_thomson_physics_page(st) -> None:
                 )
             else:
                 st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
+            if model == "thomson_relativistic_3d_evdf" and isinstance(result, Mapping):
+                st.subheader("3-D EVDF higher velocity moments")
+                st.latex(r"M_{ijk}=\int f(\mathbf v)(v_i-u_i)(v_j-u_j)(v_k-u_k)\,d^3v,\qquad q_i/n_e=(m_e/2)\sum_j M_{ijj}")
+                st.write({
+                    "third_central_velocity_moment_tensor_m3_s3": result.get("third_central_velocity_moment_tensor_m3_s3"),
+                    "third_central_velocity_moment_covariance_m6_s6": result.get("third_central_velocity_moment_covariance_m6_s6"),
+                    "heat_flux_per_density_W_m": result.get("heat_flux_per_density_W_m"),
+                    "heat_flux_per_density_standard_uncertainty_W_m": result.get("heat_flux_per_density_standard_uncertainty_W_m"),
+                    "heat_flux_status": result.get("heat_flux_status"),
+                    "heat_flux_validity_domain": result.get("heat_flux_validity_domain"),
+                    "dashboard_execution_path": result.get("dashboard_execution_path"),
+                })
+                if result.get("heat_flux_status") == "withheld_relativistic_domain_classical_expression_not_validated":
+                    st.warning("Classical heat flux is withheld: this velocity domain requires a relativistic comoving energy-momentum moment.")
+                elif result.get("heat_flux_per_density_W_m") is not None:
+                    st.success("The classical heat-flux-per-density vector and its covariance were derived from the data-identifiable 3-D EVDF.")
+                if result.get("third_central_velocity_moment_tensor_m3_s3") is None:
+                    st.warning("The 3-D EVDF is not data-identifiable; higher moments remain conditional and are not reported as primary measurements.")
             if model == "thomson_multiview_3d_evdf_physical" and isinstance(result, Mapping):
                 st.subheader("Physical multi-view optical Thomson forward model")
                 st.latex(r"\lambda_{j,a}=\lambda_L\left[1-2\sin(\theta_j/2)\,\hat{\mathbf q}_j\cdot\mathbf v_a/c\right],\quad \frac{d\sigma}{d\Omega}=\frac{r_e^2}{2}(1+\cos^2\theta_j),\quad S_j=g_j\frac{1+\cos^2\theta_j}{2}\sum_a f_aK_{jia}\Delta V_a")

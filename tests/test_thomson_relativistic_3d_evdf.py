@@ -119,3 +119,81 @@ def test_relativistic_3d_evdf_public_dispatch_and_dashboard_route():
     assert result["public_physics_entrypoint"] == model
     assert result["validity_domain"]["relativistic_doppler_kinematics_included"] is True
     assert result["validity_domain"]["polarization_resolved"] is False
+
+
+
+def test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance():
+    wavelength = np.linspace(499.85, 500.15, 121)
+    velocity = np.array([[0.0, 0.0, 0.0], [1.0e4, 0.0, 0.0]])
+    q_directions = np.eye(3)
+    geometry = [_view_geometry(q) for q in q_directions]
+    incident = np.asarray([item[0] for item in geometry])
+    scattered = np.asarray([item[1] for item in geometry])
+    background = np.full((3, wavelength.size), 0.05)
+    response = np.eye(wavelength.size)
+    volume = np.ones(2)
+    seed = np.array([0.7, 0.3])
+    kernels = build_relativistic_3d_thomson_kernels(
+        wavelength, velocity, laser_wavelength_nm=500.0,
+        incident_direction=incident, scattered_direction=scattered,
+        view_gain=np.ones(3), instrument_response_matrix=response,
+    )["spectral_kernels"]
+    measured = kernels @ (seed * volume) + background
+    result = reconstruct_relativistic_optical_thomson_3d_evdf(
+        wavelength, measured, incident, scattered, velocity,
+        laser_wavelength_nm=500.0, view_gain=np.ones(3),
+        instrument_response_matrix=response, background_spectra=background,
+        voxel_volume_m3_s3=volume, regularization_matrix=np.array([[-1.0, 1.0]]),
+        regularization_strength=1.0e-10,
+        measurement_uncertainty=np.full_like(measured, 0.01),
+    )
+
+    assert result["status"] == "identified_from_multi_view_measurements"
+    distribution = result["evdf_m3_s3"]
+    probability = distribution * volume
+    mean = probability @ velocity
+    centered = velocity - mean
+    expected_third = np.einsum(
+        "a,ai,aj,ak->ijk", probability, centered, centered, centered
+    )
+    np.testing.assert_allclose(
+        result["third_central_velocity_moment_tensor_m3_s3"],
+        expected_third, rtol=1e-10, atol=1e-8,
+    )
+    electron_mass = 9.1093837139e-31
+    expected_heat_flux = 0.5 * electron_mass * np.einsum(
+        "ijj->i", expected_third
+    )
+    np.testing.assert_allclose(
+        result["heat_flux_per_density_W_m"],
+        expected_heat_flux, rtol=1e-10, atol=1e-35,
+    )
+    assert result["heat_flux_status"] == "identified_classical_heat_flux_per_density"
+    assert result["third_central_velocity_moment_covariance_m6_s6"].shape == (27, 27)
+    assert result["heat_flux_per_density_covariance_W2_m2"].shape == (3, 3)
+    assert np.linalg.eigvalsh(result["heat_flux_per_density_covariance_W2_m2"])[0] >= -1e-35
+    assert result["heat_flux_validity_domain"]["absolute_heat_flux_reported"] is False
+
+
+def test_3d_evdf_withholds_classical_heat_flux_outside_nonrelativistic_moment_domain():
+    from tokamak_analysis.advanced_inference import reconstruct_multiview_3d_evdf
+
+    velocity = np.array([[0.0, 0.0, 0.0], [0.02 * 299792458.0, 0.0, 0.0]])
+    kernels = np.array([
+        [[1.0, 0.0], [0.0, 1.0]],
+        [[1.0, 0.0], [0.0, 1.0]],
+    ])
+    measured = np.einsum("vwi,i->vw", kernels, np.array([0.7, 0.3]))
+    result = reconstruct_multiview_3d_evdf(
+        kernels, measured, velocity,
+        voxel_volume_m3_s3=np.ones(2),
+        regularization_matrix=np.array([[-1.0, 1.0]]),
+        measurement_uncertainty=np.full_like(measured, 0.01),
+        regularization_strength=1.0e-10,
+    )
+    assert result["status"] == "identified_from_multi_view_measurements"
+    assert result["third_central_velocity_moment_tensor_m3_s3"] is not None
+    assert result["heat_flux_per_density_W_m"] is None
+    assert result["heat_flux_status"] == (
+        "withheld_relativistic_domain_classical_expression_not_validated"
+    )
