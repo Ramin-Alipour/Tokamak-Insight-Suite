@@ -1231,6 +1231,8 @@ def analyze_thomson_spectral_distribution(
             predicted_variance = float(forward_moments["variance"])
             closure = {
                 "status": "conditional_response_aware_moment_closure",
+                "velocity_quadrature": "nonuniform_trapezoidal_finite_volume_nodal_density",
+                "velocity_probability_normalization": evdf_norm,
                 "intrinsic_doppler_formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
                 "evdf_mean_velocity_parallel_m_s": evdf_mean,
                 "evdf_variance_velocity_parallel_m2_s2": evdf_variance,
