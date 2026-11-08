@@ -148,11 +148,11 @@ def _synthetic_bi_kappa_spectra():
 
 
 def test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa():
-    from tokamak_analysis.thomson_anisotropic_inference import fit_gyrotropic_bi_kappa_thomson
+    from tokamak_analysis.thomson_workflow import analyze_thomson_spectra
 
     wavelength, spectra, b, q = _synthetic_bi_kappa_spectra()
-    result = fit_gyrotropic_bi_kappa_thomson(
-        wavelength, spectra, laser_wavelength_nm=500.0,
+    result = analyze_thomson_spectra(
+        wavelength, spectra, model="gyrotropic_bi_kappa", laser_wavelength_nm=500.0,
         scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
         scattering_vector_unit=q, instrument_response_matrix=np.eye(wavelength.size),
         initial_temperature_parallel_eV=750.0,
