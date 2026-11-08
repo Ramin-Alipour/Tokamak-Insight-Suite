@@ -9,8 +9,9 @@ import streamlit as st
 from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
-from tokamak_analysis.analysis_registry import ANALYSES, ANALYSIS_FAMILIES, resolve_analysis
+from tokamak_analysis.analysis_registry import ANALYSES, ANALYSIS_FAMILIES
 from tis.products import list_products, get_product, list_product_analyses, load_product_api
+from tis.products.api import resolve_product_analysis
 from tis.ui.product_workspace_page import render_product_workspace_page
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
 from tokamak_analysis.cxrs import analyze_cxrs_line
@@ -5166,9 +5167,10 @@ elif page=='Advanced Analysis':
         )
         entry=next(x for x in family_entries if x['id']==selected_id)
         st.caption(f"Primary analysis: {selected_family['name']} · Subanalysis: {entry['name']}")
-        fn=resolve_analysis(selected_id)
+        product_api=load_product_api(selected_family_id)
+        fn=resolve_product_analysis(selected_family_id, selected_id)
         import inspect
-        st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
+        st.caption(f"Callable: {selected_family['api_module']}.physics.{entry['module']}.{entry['function']}")
         contract = entry.get('execution_contract', {})
         completeness = contract.get('completeness', 'incomplete')
         status = ('Implemented within declared scope'

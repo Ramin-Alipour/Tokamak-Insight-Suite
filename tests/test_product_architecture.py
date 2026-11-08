@@ -285,3 +285,38 @@ def test_thomson_shared_physics_dependencies_import_from_canonical_shared_packag
         analyze_spectral_distribution,
         analyze_landau_fdt_convergence,
     ))
+
+
+
+def test_product_solver_resolution_uses_the_owned_specialist_package(monkeypatch):
+    import tis.products.api as api
+    from types import SimpleNamespace
+
+    sentinel_solver = lambda wavelength_nm: wavelength_nm
+    monkeypatch.setattr(
+        api,
+        "get_analysis",
+        lambda analysis_id: {
+            "id": analysis_id,
+            "module": "thomson_workflow",
+            "function": "analyze_thomson_spectra",
+        },
+    )
+    captured = {}
+
+    def fake_import(module_path):
+        captured["module_path"] = module_path
+        return SimpleNamespace(analyze_thomson_spectra=sentinel_solver)
+
+    monkeypatch.setattr(api, "import_module", fake_import)
+    assert api.resolve_product_analysis("thomson-scattering", 1) is sentinel_solver
+    assert captured["module_path"] == (
+        "tis.products.thomson.physics.thomson_workflow"
+    )
+
+
+def test_product_solver_resolution_rejects_cross_product_analysis():
+    import tis.products.api as api
+
+    with pytest.raises(ValueError, match="not owned by product"):
+        api.resolve_product_analysis("thomson-scattering", 2)
