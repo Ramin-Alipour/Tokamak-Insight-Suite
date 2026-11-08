@@ -2,12 +2,14 @@
 from .api import (
     PRODUCT_ID,
     run_analysis,
-    "analyze_cxrs_line",
-    "analyze_magnetic_field",
-    "estimate_impurity_fraction",
+    analyze_cxrs_line,
+    analyze_magnetic_field,
+    estimate_impurity_fraction,
 )
 
-__all__ = ["PRODUCT_ID", "run_analysis",
+__all__ = [
+    "PRODUCT_ID",
+    "run_analysis",
     "analyze_cxrs_line",
     "analyze_magnetic_field",
     "estimate_impurity_fraction",
