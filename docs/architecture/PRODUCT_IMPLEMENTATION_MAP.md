@@ -47,6 +47,12 @@ Generated against the canonical registry on the current `main` branch. This is a
 | 19 | X-Ray Diagnostics | `x-ray-diagnostics` | 23, 34, 35 | `bolometry`, `doppler_flow`, `xray_spectrum` |
 | 20 | Instrumentation & Measurement Support | `instrumentation-measurement-support` | 26, 27, 77, 78, 79, 80 | `channel_synchronization`, `denoising`, `measurement_uncertainty`, `signal_calibration`, `spectral_line_identification`, `spectral_line_ratio` |
 
+## Dedicated product packages
+
+All 20 families now have a dedicated importable package under `tis/products/`. Products 1 and 2 retain their established concise package names (`thomson`, `langmuir`); products 3–20 use their stable snake-case family names. Each package exposes its own `PRODUCT_ID`, ownership-checked `run_analysis` entry point, and named wrappers for its registered solver functions (the two pilot packages retain their diagnostic-specific facade names). The canonical registry remains the compatibility source of truth; package wrappers do not copy solver code or bypass ownership checks.
+
+The catalog publishes each package's `api_module`, and `tis.products.load_product_api(product_id)` resolves that public module. The Dashboard workspace displays the exact import path and exported capabilities. Product-private modules are prohibited from importing another product's private package; shared execution is mediated by the common platform API.
+
 ## Execution surfaces
 
 - Generic Python API: `tis.products.execute_product_analysis(product_id, analysis_id, *args, **kwargs)`.
