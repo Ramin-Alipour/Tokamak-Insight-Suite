@@ -6,13 +6,13 @@ from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_a
 
 def test_registry_contains_84_unique_ordered_analysis_ids_after_retiring_id_7():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 84
-    assert ids == [entry_id for entry_id in range(1, 86) if entry_id != 7]
+    assert len(ANALYSES) == 86
+    assert ids == [entry_id for entry_id in range(1, 88) if entry_id != 7]
 
 
 def test_registry_uses_distinct_entry_points_for_all_84_registered_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 84
+    assert len(set(pairs)) == 86
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -519,7 +519,7 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
     }
     assert expected_inputs <= set(runtime_inputs)
     assert runtime_inputs["external_input_mc_samples"]["default"] == 100
-    assert runtime_inputs["external_input_mc_seed"]["default"] == 84622
+    assert runtime_inputs["external_input_mc_seed"]["default"] == 86622
     assert "frequency-resolved ray/equilibrium/beam covariance" in (
         runtime_inputs["external_input_covariance"]["description"]
     )
