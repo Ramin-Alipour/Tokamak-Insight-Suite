@@ -294,6 +294,15 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
         "moment_covariance_order": list(moment_order),
         "moment_covariance": moment_covariance,
         "moment_standard_uncertainty": moment_standard_uncertainty,
+        "random_energy_moment_covariance": (
+            None if moment_covariance is None else moment_covariance[-2:, -2:]
+        ),
+        "random_energy_moment_standard_uncertainty": (
+            None if moment_standard_uncertainty is None else {
+                name: moment_standard_uncertainty[name]
+                for name in moment_order[-2:]
+            }
+        ),
         "heat_flux_identifiability": {
             "status": "not_identified_from_single_projected_marginal",
             "available_projected_moment": "central_third_velocity_moment_m3_s3",

@@ -1712,3 +1712,8 @@ def test_projected_evdf_random_energy_moment_covariance_matches_finite_differenc
 
     expected = numerical_jacobian @ covariance @ numerical_jacobian.T
     np.testing.assert_allclose(actual, expected, rtol=3.0e-4, atol=1.0e-18)
+    np.testing.assert_allclose(
+        result["random_energy_moment_covariance"], expected,
+        rtol=3.0e-4, atol=1.0e-18,
+    )
+    assert set(result["random_energy_moment_standard_uncertainty"]) == set(names)

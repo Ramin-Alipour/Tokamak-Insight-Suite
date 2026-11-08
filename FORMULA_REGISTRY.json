@@ -11615,7 +11615,11 @@
         },
         {
           "name": "random_energy_moment_covariance",
-          "unit": "2x2; propagated from full projected-EVDF covariance"
+          "unit": "2x2 covariance of projected random-energy mean and variance"
+        },
+        {
+          "name": "random_energy_moment_standard_uncertainty",
+          "unit": "1-sigma uncertainties of projected random-energy mean and variance"
         }
       ],
       "assumptions": [
