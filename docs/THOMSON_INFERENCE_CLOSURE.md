@@ -289,3 +289,31 @@ reports whitened residual chi-square, reduced chi-square, and a fit-acceptance
 state that requires scientific residual review rather than automatically
 declaring every converged fit acceptable. One-sided nuisance bounds receive a
 feasible initial coefficient vector instead of an infeasible all-zero start.
+
+## Finite velocity-support validity for projected EVDF inversion
+
+The non-negative projected-EVDF inverse now reports an explicit finite-domain
+tail diagnostic. For velocity nodes v_i, normalized nodal density f_i, and the
+same nonuniform trapezoidal quadrature weights w_i used by the inverse, the
+boundary probability is
+
+    P_boundary = sum(i in {0, 1, N-2, N-1}) w_i f_i.
+
+The default warning threshold is boundary_mass_fraction_limit=0.01. If
+P_boundary exceeds the declared threshold, the result is marked
+support_truncation_suspected; callers should expand the velocity domain and
+repeat the inversion before interpreting tail-sensitive moments. This
+diagnostic does not clip, extrapolate, or renormalize the reconstructed EVDF.
+
+When the conditional normalized-EVDF covariance C_f is available, the
+boundary-mass standard uncertainty is propagated as
+
+    sigma(P_boundary) = sqrt(w_boundary.T @ C_f @ w_boundary).
+
+The diagnostic remains separate from regularization-selection spread and
+model-selection uncertainty. It is returned by the direct projected-EVDF
+solver and by the Analysis-1 spectral-distribution path that invokes that
+solver. The advanced Thomson physics Dashboard displays the boundary
+probability and warns when the finite velocity support is suspect. This is a
+numerical support-validity check, not a substitute for independent physical
+validation of the inferred EVDF.
