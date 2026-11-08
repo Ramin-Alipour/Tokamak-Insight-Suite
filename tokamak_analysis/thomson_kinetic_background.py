@@ -101,6 +101,9 @@ def fit_noncollective_kinetic_thomson_with_background(
     background_interior_knots=3, background_templates=None,
     measurement_uncertainty=None, measurement_covariance=None,
     model_discrepancy_covariance=None, systematic_covariance=None,
+    laser_wavelength_uncertainty_nm=0.0,
+    scattering_angle_uncertainty_rad=0.0,
+    laser_angle_covariance_nm_rad=0.0,
     incident_polarization=None, radial_order=36, angular_order=18,
     maximum_recoil_correction_fraction=0.01, include_compton_recoil=False,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
@@ -114,7 +117,9 @@ def fit_noncollective_kinetic_thomson_with_background(
     linearly with the background coefficients. Kappa is the finite-variance
     isotropic Student-t projection; it is not the generalized Skolar plasma
     dispersion-function method. MJ uses the polarized single-particle forward
-    model and its explicit Thomson/Compton recoil contract.
+    model and its explicit Thomson/Compton recoil contract. Laser-wavelength and
+    scattering-angle calibration covariance is propagated by symmetric refits
+    into the full physical/amplitude/background parameter covariance.
     """
     from scipy.optimize import least_squares
     from .thomson_background import _background_design
@@ -128,6 +133,21 @@ def fit_noncollective_kinetic_thomson_with_background(
     angle = float(scattering_angle_rad)
     if not np.isfinite(laser) or laser <= 0 or not np.isfinite(angle) or not 0 < angle < np.pi:
         raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie in (0, pi)")
+    geometry_sigma_laser = float(laser_wavelength_uncertainty_nm)
+    geometry_sigma_angle = float(scattering_angle_uncertainty_rad)
+    geometry_cross = float(laser_angle_covariance_nm_rad)
+    if (not np.isfinite(geometry_sigma_laser) or geometry_sigma_laser < 0.0
+            or not np.isfinite(geometry_sigma_angle) or geometry_sigma_angle < 0.0
+            or not np.isfinite(geometry_cross)):
+        raise ValueError("geometry uncertainties must be finite and non-negative; their covariance must be finite")
+    geometry_covariance = np.array([
+        [geometry_sigma_laser**2, geometry_cross],
+        [geometry_cross, geometry_sigma_angle**2],
+    ], dtype=float)
+    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+    geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
+    if geometry_eigenvalues[0] < -1e-12 * geometry_scale:
+        raise ValueError("laser/angle geometry covariance must be positive semidefinite")
     if physical_model not in {"kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be 'kappa' or 'relativistic_maxwell_juttner'")
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
@@ -283,11 +303,13 @@ def fit_noncollective_kinetic_thomson_with_background(
 
     q = 2.0 * np.sin(angle / 2.0)
 
-    def intrinsic(parameters):
+    def intrinsic(parameters, laser_value=None, angle_value=None):
         te, flow = float(parameters[0]), float(parameters[1])
+        laser_value = laser if laser_value is None else float(laser_value)
+        angle_value = angle if angle_value is None else float(angle_value)
         if physical_model == "kappa":
             return _kappa_bin_average_spectral_density(
-                x, laser, angle, te, flow, float(parameters[2])
+                x, laser_value, angle_value, te, flow, float(parameters[2])
             )
         # Evaluate the relativistic kernel inside each measured finite bin and
         # Gauss-Legendre average before the response acts on bin-integrated power.
@@ -296,12 +318,12 @@ def fit_noncollective_kinetic_thomson_with_background(
         half_width = 0.5 * np.diff(edges)
         midpoint = 0.5 * (edges[1:] + edges[:-1])
         quadrature_wavelength = (midpoint[:, None] + half_width[:, None] * nodes[None, :]).ravel()
-        source_lasers = [(laser, 1.0)] if source_nodes is None else zip(source_nodes, source_weights)
+        source_lasers = [(laser_value, 1.0)] if source_nodes is None else zip(source_nodes, source_weights)
         combined = np.zeros(quadrature_wavelength.size, dtype=float)
         total_scattered_weight = 0.0
         for incident_laser_nm, photon_weight in source_lasers:
             result = relativistic_maxwell_juttner_spectrum(
-                quadrature_wavelength, float(incident_laser_nm), angle, te, flow_projection_m_s=flow,
+                quadrature_wavelength, float(incident_laser_nm), angle_value, te, flow_projection_m_s=flow,
                 incident_polarization=np.asarray(incident_polarization, dtype=float),
                 radial_order=radial_order, angular_order=angular_order,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
@@ -331,8 +353,8 @@ def fit_noncollective_kinetic_thomson_with_background(
         density = (combined/total_scattered_weight).reshape(x.size, nodes.size)
         return 0.5 * (density @ weights)
 
-    def profiled(parameters):
-        shape = _apply_response(response, intrinsic(parameters), x)
+    def profiled(parameters, laser_value=None, angle_value=None):
+        shape = _apply_response(response, intrinsic(parameters, laser_value, angle_value), x)
         design = np.column_stack((shape, basis))
         a = whiten(design)
         b = whiten(y)
@@ -343,8 +365,8 @@ def fit_noncollective_kinetic_thomson_with_background(
         fitted = design @ coefficients
         return coefficients, fitted, shape
 
-    def residual(parameters):
-        _, fitted, _ = profiled(parameters)
+    def residual(parameters, laser_value=None, angle_value=None):
+        _, fitted, _ = profiled(parameters, laser_value, angle_value)
         return whiten(fitted - y)
 
     fit = least_squares(residual, p0, bounds=(lower, upper), method="trf", x_scale="jac", max_nfev=int(max_nfev))
@@ -431,6 +453,50 @@ def fit_noncollective_kinetic_thomson_with_background(
             "local_joint_GLS_covariance_conditional_on_supplied_measurement_"
             "model_discrepancy_and_systematic_covariance_components"
         )
+    # Propagate calibrated laser/angle uncertainty through the refitted physical
+    # model, retaining cross-covariance with fitted amplitude and background.
+    geometry_parameter_covariance = np.zeros_like(joint_covariance)
+    if np.any(geometry_covariance != 0.0):
+        geometry_sensitivity = np.empty((parameter_count, 2), dtype=float)
+        geometry_steps = (
+            max(abs(laser) * 1.0e-5, 1.0e-8),
+            min(max(abs(angle) * 1.0e-5, 1.0e-6), 0.25 * min(angle, np.pi - angle)),
+        )
+        for coordinate, step in enumerate(geometry_steps):
+            if coordinate == 0:
+                plus_geometry, minus_geometry = (laser + step, angle), (laser - step, angle)
+            else:
+                plus_geometry, minus_geometry = (laser, angle + step), (laser, angle - step)
+            plus_fit = least_squares(
+                lambda parameters: residual(parameters, *plus_geometry),
+                fit.x, bounds=(lower, upper), method="trf",
+                x_scale="jac", max_nfev=int(max_nfev),
+            )
+            minus_fit = least_squares(
+                lambda parameters: residual(parameters, *minus_geometry),
+                fit.x, bounds=(lower, upper), method="trf",
+                x_scale="jac", max_nfev=int(max_nfev),
+            )
+            if (not plus_fit.success or not minus_fit.success
+                    or not np.all(np.isfinite(plus_fit.x))
+                    or not np.all(np.isfinite(minus_fit.x))):
+                raise ValueError("geometry-uncertainty sensitivity refit failed; physical covariance is incomplete")
+            plus_coefficients, _, _ = profiled(plus_fit.x, *plus_geometry)
+            minus_coefficients, _, _ = profiled(minus_fit.x, *minus_geometry)
+            geometry_sensitivity[:, coordinate] = (
+                np.r_[plus_fit.x, plus_coefficients]
+                - np.r_[minus_fit.x, minus_coefficients]
+            ) / (2.0 * step)
+        geometry_parameter_covariance = (
+            geometry_sensitivity @ geometry_covariance @ geometry_sensitivity.T
+        )
+        geometry_parameter_covariance = 0.5 * (
+            geometry_parameter_covariance + geometry_parameter_covariance.T
+        )
+        joint_covariance = 0.5 * (
+            joint_covariance + geometry_parameter_covariance
+            + (joint_covariance + geometry_parameter_covariance).T
+        )
     physical_covariance = joint_covariance[:n_physical, :n_physical]
     nuisance_covariance = joint_covariance[n_physical:, n_physical:]
     physical_background_cross_covariance = joint_covariance[
@@ -461,6 +527,10 @@ def fit_noncollective_kinetic_thomson_with_background(
         "residual": y - fitted,
         "physical_parameter_covariance": physical_covariance,
         "physical_parameter_standard_uncertainty": np.sqrt(np.maximum(np.diag(physical_covariance), 0.0)),
+        "geometry_covariance": geometry_covariance.copy(),
+        "geometry_parameter_covariance": geometry_parameter_covariance,
+        "geometry_uncertainty_propagated": bool(np.any(geometry_covariance != 0.0)),
+        "geometry_uncertainty_method": "symmetric_finite_difference_refit_implicit_sensitivity",
         "joint_parameter_names": (
             ["electron_temperature_eV", "electron_velocity_projection_m_s"]
             + (["kappa_index"] if physical_model == "kappa" else [])
@@ -497,7 +567,7 @@ def fit_noncollective_kinetic_thomson_with_background(
         "optimizer_message": str(fit.message),
         "noise_model": noise_model,
         "covariance_status": covariance_status,
-        "uncertainty_semantics": "Joint local covariance for physical parameters, spectral amplitude and detector-background coefficients; physical/background cross-covariance is returned. Conditional on the selected background basis, fixed instrument response and explicitly supplied covariance components. This is a local covariance, not a posterior distribution.",
+        "uncertainty_semantics": "Joint local covariance for physical parameters, spectral amplitude and detector-background coefficients; physical/background cross-covariance is returned. Conditional on the selected background basis and fixed instrument response; supplied measurement, model-discrepancy and systematic covariance components are combined with a separate finite-difference refit propagation of laser/angle calibration covariance. This is a local covariance, not a posterior distribution.",
         "absolute_density_inferred": False,
         "recoil_included": bool(include_compton_recoil) if physical_model == "relativistic_maxwell_juttner" else False,
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if include_compton_recoil else "polarized_elastic_Thomson") if physical_model == "relativistic_maxwell_juttner" else "not_applicable_nonrelativistic_kappa_projection",

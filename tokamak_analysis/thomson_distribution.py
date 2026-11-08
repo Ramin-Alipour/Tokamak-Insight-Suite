@@ -703,6 +703,12 @@ def analyze_thomson_spectral_distribution(
             "background_model": physical_background_model,
             "model_discrepancy_covariance": model_discrepancy_covariance,
             "systematic_covariance": systematic_covariance,
+            "laser_wavelength_uncertainty_nm": laser_wavelength_uncertainty_nm,
+            "scattering_angle_uncertainty_rad": scattering_angle_uncertainty_rad,
+            "laser_angle_covariance_nm_rad": (
+                laser_angle_covariance_nm_rad
+                if laser_angle_covariance_nm_rad != 0.0 else None
+            ),
         }
         for option_name, option_value in direct_options.items():
             if option_value is None:
@@ -977,6 +983,8 @@ def analyze_thomson_spectral_distribution(
         canonical_kwargs = dict(
             laser_wavelength_nm=float(laser_wavelength_nm),
             scattering_angle_rad=float(scattering_angle_rad),
+            laser_wavelength_uncertainty_nm=laser_wavelength_uncertainty_nm,
+            scattering_angle_uncertainty_rad=scattering_angle_uncertainty_rad,
             instrument_response=response,
             model=physical_model,
             **options,

@@ -32,6 +32,9 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
         measurement_uncertainty=np.full(wavelength.size, 0.003),
         model_discrepancy_covariance=np.eye(wavelength.size) * 1.0e-6,
         systematic_covariance=np.eye(wavelength.size) * 4.0e-7,
+        laser_wavelength_uncertainty_nm=0.02,
+        scattering_angle_uncertainty_rad=0.002,
+        laser_angle_covariance_nm_rad=1.0e-5,
         max_nfev=5000,
     )
     assert result["optimizer_success"]
@@ -45,6 +48,10 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
     assert result["absolute_density_inferred"] is False
     assert result["model_discrepancy_covariance_included"] is True
     assert result["systematic_covariance_included"] is True
+    assert result["geometry_uncertainty_propagated"] is True
+    assert result["geometry_covariance"].shape == (2, 2)
+    assert result["geometry_parameter_covariance"].shape == result["joint_parameter_covariance"].shape
+    assert np.all(np.linalg.eigvalsh(result["geometry_parameter_covariance"]) >= -1e-10)
     assert result["covariance_components"] == {
         "measurement_covariance_supplied": True,
         "model_discrepancy_covariance_supplied": True,
@@ -61,6 +68,43 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
     )
     assert np.all(np.linalg.eigvalsh(result["joint_parameter_covariance"]) >= -1e-12)
     assert result["cross_section_model"] == "isotropic_finite_variance_Kappa_projection"
+
+
+
+def test_spectral_distribution_forwards_top_level_geometry_covariance_to_kinetic_fit(monkeypatch):
+    import tokamak_analysis.thomson_kinetic_background as kinetic
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    captured = {}
+
+    def fake_fit(*args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "status": "identified_from_measurement",
+            "primary_result_status": "identified_from_measurement",
+            "reportable_as_primary_inference": True,
+        }
+
+    monkeypatch.setattr(
+        kinetic, "fit_noncollective_kinetic_thomson_with_background", fake_fit
+    )
+    wavelength = np.linspace(529.0, 535.0, 81)
+    signal = 0.03 + np.exp(-0.5 * ((wavelength - 532.0) / 0.45) ** 2)
+    analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full(wavelength.size, 0.03),
+        physical_model="kappa",
+        physical_initial=[300.0, 0.0, 3.5],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        laser_wavelength_uncertainty_nm=0.02,
+        scattering_angle_uncertainty_rad=0.002,
+        laser_angle_covariance_nm_rad=1.0e-5,
+    )
+    assert captured["laser_wavelength_uncertainty_nm"] == 0.02
+    assert captured["scattering_angle_uncertainty_rad"] == 0.002
+    assert captured["laser_angle_covariance_nm_rad"] == 1.0e-5
 
 
 def test_structured_background_fit_rejects_non_psd_model_discrepancy_covariance():
