@@ -1083,6 +1083,18 @@ def assess_multiview_evdf_regularization_sensitivity(
         else np.zeros((12, 12), dtype=float)
     )
     moment_covariance = np.atleast_2d(moment_covariance)
+    electron_mass_kg = 9.1093837139e-31
+    elementary_charge_C = 1.602176634e-19
+    temperature_tensor_candidates_eV = (
+        moment_stack[:, 3:] * electron_mass_kg / elementary_charge_C
+    )
+    temperature_tensor_selection_covariance_eV2 = (
+        np.cov(temperature_tensor_candidates_eV, rowvar=False, ddof=1)
+        if strengths.size > 1 else np.zeros((9, 9), dtype=float)
+    )
+    temperature_tensor_selection_covariance_eV2 = np.atleast_2d(
+        temperature_tensor_selection_covariance_eV2
+    )
     return {
         "levels": levels,
         "regularization_strengths": strengths.copy(),
@@ -1102,6 +1114,15 @@ def assess_multiview_evdf_regularization_sensitivity(
             ],
             "physical_moment_candidate_values": moment_stack,
             "physical_moment_covariance_moment_units_squared": moment_covariance,
+            "temperature_tensor_candidate_values_eV": temperature_tensor_candidates_eV,
+            "temperature_tensor_covariance_from_regularization_eV2": (
+                temperature_tensor_selection_covariance_eV2
+            ),
+            "temperature_tensor_order": [
+                "T_xx_eV", "T_xy_eV", "T_xz_eV",
+                "T_yx_eV", "T_yy_eV", "T_yz_eV",
+                "T_zx_eV", "T_zy_eV", "T_zz_eV",
+            ],
             "interpretation": (
                 "Empirical spread across the explicitly supplied regularization strengths, "
                 "propagated through the normalized 3-D EVDF and its first/second velocity moments. "
