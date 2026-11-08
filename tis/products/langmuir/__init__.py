@@ -1,5 +1,6 @@
 """Langmuir & Electrostatic Probes specialist product public interface."""
 from .api import (
+    run_analysis,
     analyze_ball_pen,
     analyze_gundestrup,
     analyze_langmuir_iv,
@@ -10,6 +11,7 @@ from .api import (
 )
 
 __all__ = [
+    "run_analysis",
     "run_probe_analysis",
     "analyze_langmuir_iv",
     "analyze_probe_iv_compatibility",
