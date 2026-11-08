@@ -12,8 +12,13 @@ from ..api import execute_product_analysis
 PRODUCT_ID = "thomson-scattering"
 
 
-def _run(analysis_id: int, *args: Any, **kwargs: Any) -> Any:
+def run_analysis(analysis_id: int, *args: Any, **kwargs: Any) -> Any:
+    """Execute only a registered Thomson Scattering workflow."""
     return execute_product_analysis(PRODUCT_ID, analysis_id, *args, **kwargs)
+
+
+def _run(analysis_id: int, *args: Any, **kwargs: Any) -> Any:
+    return run_analysis(analysis_id, *args, **kwargs)
 
 
 def analyze_spectra(*args: Any, **kwargs: Any) -> Any:
