@@ -95,17 +95,37 @@ jobs:
           analysis_by_name = {item["name"]: item for item in ANALYSES}
           diagnostic_names = [item["diagnostic"] for item in diagnostics]
           assert len(diagnostic_names) == len(set(diagnostic_names)), "Diagnostic catalog names must be unique"
-          missing = [name for name in diagnostic_names if name not in analysis_by_name]
-          assert not missing, f"Diagnostic catalog entries lack analysis entry points: {missing}"
+
+          # Reference-only catalog rows are deliberately not executable analyses.
+          # Require resolution only for diagnostics that explicitly declare an
+          # implementation; do not fabricate analysis entries for reference rows.
+          implemented_diagnostics = [
+              item for item in diagnostics
+              if item.get("implementation_status") != "Registry reference only"
+              and item.get("execution_contract", {}).get("execution_level") != "reference_only"
+          ]
+          reference_only = [
+              item for item in diagnostics
+              if item.get("implementation_status") == "Registry reference only"
+              or item.get("execution_contract", {}).get("execution_level") == "reference_only"
+          ]
+          implemented_names = [item["diagnostic"] for item in implemented_diagnostics]
+          missing = [name for name in implemented_names if name not in analysis_by_name]
+          assert not missing, f"Implemented diagnostic entries lack analysis entry points: {missing}"
+          for item in reference_only:
+              contract = item.get("execution_contract", {})
+              assert contract.get("execution_level") == "reference_only", item["diagnostic"]
+              assert not contract.get("function_links"), item["diagnostic"]
 
           for item in ANALYSES:
               assert callable(resolve_analysis(item["id"])), item["id"]
-          for name in diagnostic_names:
+          for name in implemented_names:
               assert callable(resolve_analysis(analysis_by_name[name]["id"])), name
 
           print(
-              f"Verified {len(ANALYSES)} analysis entry points and "
-              f"{len(diagnostics)} diagnostic catalog mappings."
+              f"Verified {len(ANALYSES)} analysis entry points, "
+              f"{len(implemented_diagnostics)} implemented diagnostic mappings, and "
+              f"{len(reference_only)} explicitly reference-only catalog rows."
           )
           PY
       - name: Exercise every workspace page with Streamlit AppTest
