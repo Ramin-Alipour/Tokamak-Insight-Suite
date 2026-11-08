@@ -51,7 +51,7 @@ Generated against the canonical registry on the current `main` branch. This is a
 
 - Generic Python API: `tis.products.execute_product_analysis(product_id, analysis_id, *args, **kwargs)`.
 - Thomson specialist API: `tis.products.thomson` (named wrappers for the 10 Thomson family workflows).
-- Langmuir specialist API: `tis.products.langmuir.run_probe_analysis` (ownership-checked dispatch for its registered probe workflows).
+- Langmuir specialist API: `tis.products.langmuir` exposes named facades for Langmuir I-V, compatibility I-V, ball-pen, Gundestrup, multi-pin, and plasma/floating-potential workflows; each uses ownership-checked dispatch to the canonical registry.
 - Dashboard product workspace: `tis/ui/product_workspace_page.py`, reachable from **Advanced Analysis → Specialist Product Workspace**.
 - Existing execution form: **Advanced Analysis → Registered analysis modules** now resolves its family and subanalysis list through the product catalog, then executes the original registry callable.
 - The repository currently exposes a Python execution API and Streamlit dashboard; this change does not claim that a separate HTTP/REST server exists.
@@ -72,7 +72,7 @@ The Thomson facade delegates to the canonical registered functions without reimp
 
 ## Second-product pilot: Langmuir & Electrostatic Probes
 
-The Langmuir facade is deliberately thin and delegates IDs 2 and 16–20 to their registered solvers. It is the first test of reusing the product contract in a second domain. It does not yet claim that every probe workflow has been consolidated into one new solver or that all probe types share the same sheath model.
+The Langmuir facade exposes named entry points for IDs 2 and 16–20 while retaining each diagnostic's distinct physical model. Registry labels for the six workflows are aligned with their actual solver modules. The multi-pin solver propagates shared or time-resolved full cross-pin voltage covariance through its nonuniform finite-difference operator, C_E = D_x C_V D_x^T, and declares the unsupported cross-time and coordinate-uncertainty terms. The product does not assume that all probe types share one sheath model.
 
 ## Dependency audit scope and next refinement
 
