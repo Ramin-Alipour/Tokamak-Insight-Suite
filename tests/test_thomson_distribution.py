@@ -1425,14 +1425,16 @@ def test_selected_maxwellian_model_executes_canonical_fit_with_top_level_radius(
 
 
 def test_relativistic_projected_evdf_retains_rank_deficient_candidate_and_reports_physical_moments():
-    """A rank-deficient relativistic inverse must return a labelled candidate, not crash."""
+    """The public product API returns a labelled candidate for rank-deficient data."""
+    from tis.products.thomson.api import analyze_spectral_distribution as run_product_analysis
+
     wavelength = np.linspace(499.7, 500.3, 61)
     background = np.full_like(wavelength, 3.0)
     signal = (
         900.0 * np.exp(-0.5 * ((wavelength - 500.0) / 0.055) ** 2)
         + background
     )
-    result = analyze_thomson_spectral_distribution(
+    result = run_product_analysis(
         wavelength,
         signal,
         instrument_response_matrix=np.eye(wavelength.size),
