@@ -819,3 +819,18 @@ def test_regularized_evdf_covariance_scales_with_whitened_residual_variance():
         design, penalty, 0.7, residual_variance=4.0
     )
     np.testing.assert_allclose(scaled, 4.0 * base, rtol=1e-12, atol=1e-14)
+
+
+def test_evdf_reports_finite_velocity_support_truncation_without_measurement_covariance():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    options = dict(EXAMPLES["thomson_projected_evdf"])
+    options["boundary_mass_fraction_limit"] = 1.0e-8
+    result = run_advanced_thomson_physics("thomson_projected_evdf", **options)
+    diagnostic = result["velocity_support_diagnostic"]
+    assert np.isfinite(diagnostic["boundary_mass_fraction"])
+    assert 0.0 <= diagnostic["boundary_mass_fraction"] <= 1.0
+    assert diagnostic["boundary_mass_fraction_limit"] == pytest.approx(1.0e-8)
+    assert diagnostic["status"] == "support_truncation_suspected"
+    assert diagnostic["boundary_mass_standard_uncertainty"] is None
