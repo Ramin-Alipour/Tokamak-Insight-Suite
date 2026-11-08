@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline, PchipInterpolator, make_smoothing_spline
 
 from .thomson_scattering import _covariance_is_positive_semidefinite
-from .formula_library import thomson_velocity_projection_relativistic_exact
+from tis.physics.shared.formula_library import thomson_velocity_projection_relativistic_exact
 
 
 
