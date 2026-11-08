@@ -8,6 +8,7 @@ from tokamak_analysis.advanced_inference import (
     propagate_paraxial_beam_covariance,
     bootstrap_reference_pca_basis,
     reconstruct_multiview_3d_evdf,
+    reconstruct_optical_thomson_3d_evdf,
     assess_multiview_evdf_regularization_sensitivity,
 )
 from tokamak_analysis.cts_em_background import (
@@ -293,3 +294,51 @@ def test_multiview_3d_evdf_is_available_through_public_thomson_dispatcher():
     assert result["status"] == "identified_from_multi_view_measurements"
     assert result["evdf_m3_s3"] is not None
     assert result["view_count"] == 3
+
+
+def test_physical_optical_thomson_3d_kernel_conserves_bin_power_and_applies_doppler_projection():
+    wavelength = np.linspace(499.85, 500.15, 151)
+    directions = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+    velocity = np.array([[2.0e4, 0., 0.], [-2.0e4, 0., 0.]])
+    result = reconstruct_optical_thomson_3d_evdf(
+        wavelength, np.ones((3, wavelength.size)), directions, velocity,
+        laser_wavelength_nm=500.0, scattering_angle_rad=np.pi / 2,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=np.zeros((3, wavelength.size)),
+        voxel_volume_m3_s3=np.ones(2), regularization_matrix=np.eye(2),
+        regularization_strength=1e-4,
+    )
+    expected = 500.0 * (1.0 - 2.0*np.sin(np.pi/4.0)
+        * (directions @ velocity.T) / 299792458.0)
+    np.testing.assert_allclose(result["mapped_line_centres_nm"], expected, rtol=0, atol=1e-12)
+    integrated = np.sum(result["physical_spectral_kernels"]
+        * result["wavelength_bin_widths_nm"][None, :, None], axis=1)
+    np.testing.assert_allclose(integrated, np.ones_like(integrated), rtol=1e-12, atol=1e-12)
+    assert result["physical_forward_model"] == "elastic_single_particle_unpolarized_nonrelativistic_optical_thomson"
+    assert result["validity_domain"]["relativistic_corrections_included"] is False
+
+
+def test_physical_optical_thomson_3d_kernel_uses_per_view_response_normalization():
+    wavelength = np.linspace(499.85, 500.15, 101)
+    with pytest.raises(ValueError, match="conserve integrated spectral power"):
+        reconstruct_optical_thomson_3d_evdf(
+            wavelength, np.ones((2,101)), [[1.,0.,0.],[0.,1.,0.]],
+            [[1.0e4,0.,0.],[-1.0e4,0.,0.]],
+            laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+            instrument_response_matrix=np.stack([np.eye(101),0.5*np.eye(101)]),
+            background_spectra=np.zeros((2,101)), voxel_volume_m3_s3=np.ones(2),
+            regularization_matrix=np.eye(2), regularization_strength=1e-3,
+        )
+
+
+def test_physical_optical_thomson_3d_route_rejects_relativistic_velocity_grid():
+    wavelength = np.linspace(499.0, 501.0, 101)
+    with pytest.raises(ValueError, match="non-relativistic"):
+        reconstruct_optical_thomson_3d_evdf(
+            wavelength, np.ones((1,101)), [[1.,0.,0.]],
+            [[0.11*299792458.0,0.,0.]],
+            laser_wavelength_nm=500.0, scattering_angle_rad=np.pi/2,
+            instrument_response_matrix=np.eye(101),
+            background_spectra=np.zeros((1,101)), voxel_volume_m3_s3=np.ones(1),
+            regularization_matrix=np.eye(1), regularization_strength=1e-3,
+        )

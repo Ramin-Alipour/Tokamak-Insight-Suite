@@ -496,7 +496,7 @@ def reconstruct_optical_thomson_3d_evdf(
     if (response.shape != (n_view, n_wave, n_wave)
             or not np.all(np.isfinite(response)) or np.any(response < 0.0)):
         raise ValueError("instrument_response_matrix must be non-negative finite (n_wave,n_wave) or (n_view,n_wave,n_wave)")
-    response_sums = response.sum(axis=1)
+    response_sums = response.sum(axis=0)
     if np.any(response_sums <= 0.0) or not np.allclose(response_sums, 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("each measured response matrix must conserve integrated spectral power: columns sum to one")
     edges = np.empty(n_wave + 1, dtype=float)
