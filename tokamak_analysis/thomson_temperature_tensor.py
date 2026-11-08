@@ -34,6 +34,7 @@ def infer_full_temperature_tensor_from_thomson_projections(
     scattering_vector_unit,
     *,
     projected_temperature_covariance_eV2=None,
+    scattering_vector_covariance=None,
     maximum_geometry_condition_number=1.0e6,
     minimum_consistency_p_value=1.0e-3,
     electron_density_m3=None,
@@ -185,6 +186,100 @@ def infer_full_temperature_tensor_from_thomson_projections(
         else:
             covariance_status = "not_reported_without_absolute_covariance_or_redundant_views"
 
+    # Propagate uncertainty in the calibrated scattering directions.
+    # For each view, d(q.T T q)/dq = 2 T q.  The fitted tensor itself also
+    # changes because the GLS design dyads q q.T change; estimate that
+    # implicit sensitivity by a symmetric finite difference of the same
+    # six-component GLS estimator.  Direction perturbations are projected
+    # back onto the unit sphere, so radial components carry no information.
+    geometry_parameter_covariance = None
+    geometry_jacobian = None
+    if scattering_vector_covariance is not None:
+        raw_geometry_covariance = _finite_array(
+            scattering_vector_covariance, "scattering_vector_covariance", 2
+        )
+        expected_geometry_shape = (3*n, 3*n)
+        if raw_geometry_covariance.shape != expected_geometry_shape:
+            raise ValueError(
+                "scattering_vector_covariance must have shape (3*n_view, 3*n_view) "
+                "in view-major Cartesian direction-component order"
+            )
+        geometry_scale = max(
+            float(np.max(np.abs(raw_geometry_covariance))),
+            np.finfo(float).tiny,
+        )
+        if not np.allclose(
+            raw_geometry_covariance, raw_geometry_covariance.T,
+            rtol=1e-10, atol=1e-12*geometry_scale,
+        ):
+            raise ValueError("scattering_vector_covariance must be symmetric")
+        raw_geometry_covariance = 0.5 * (
+            raw_geometry_covariance + raw_geometry_covariance.T
+        )
+        geometry_eigenvalues = np.linalg.eigvalsh(raw_geometry_covariance)
+        if geometry_eigenvalues[0] < -1e-10 * max(
+            float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny
+        ):
+            raise ValueError("scattering_vector_covariance must be positive semidefinite")
+
+        if not psd_active:
+            def _direction_design(direction_rows):
+                dx, dy, dz = direction_rows.T
+                return np.column_stack((
+                    dx*dx, dy*dy, dz*dz,
+                    2.0*dx*dy, 2.0*dx*dz, 2.0*dy*dz,
+                ))
+
+            geometry_jacobian = np.empty((6, 3*n), dtype=float)
+            finite_difference_step = 1.0e-6
+            for component in range(3*n):
+                view_index, axis_index = divmod(component, 3)
+                plus_directions = directions.copy()
+                minus_directions = directions.copy()
+                plus_directions[view_index, axis_index] += finite_difference_step
+                minus_directions[view_index, axis_index] -= finite_difference_step
+                plus_directions[view_index] /= np.linalg.norm(plus_directions[view_index])
+                minus_directions[view_index] /= np.linalg.norm(minus_directions[view_index])
+                plus_design = _direction_design(plus_directions)
+                minus_design = _direction_design(minus_directions)
+                plus_whitened = np.linalg.solve(chol, plus_design)
+                minus_whitened = np.linalg.solve(chol, minus_design)
+                plus_information = plus_whitened.T @ plus_whitened
+                minus_information = minus_whitened.T @ minus_whitened
+                if (np.linalg.matrix_rank(plus_information) < 6
+                        or np.linalg.matrix_rank(minus_information) < 6):
+                    raise ValueError(
+                        "scattering-vector perturbation makes the temperature-tensor "
+                        "inverse rank deficient; reduce geometry uncertainty or improve view diversity"
+                    )
+                plus_parameters = np.linalg.solve(
+                    plus_information, plus_whitened.T @ whitened_data
+                )
+                minus_parameters = np.linalg.solve(
+                    minus_information, minus_whitened.T @ whitened_data
+                )
+                geometry_jacobian[:, component] = (
+                    plus_parameters - minus_parameters
+                ) / (2.0 * finite_difference_step)
+
+            geometry_parameter_covariance = (
+                geometry_jacobian @ raw_geometry_covariance @ geometry_jacobian.T
+            )
+            geometry_parameter_covariance = 0.5 * (
+                geometry_parameter_covariance + geometry_parameter_covariance.T
+            )
+            if not np.all(np.isfinite(geometry_parameter_covariance)):
+                raise ValueError("propagated scattering-geometry covariance is not finite")
+
+    parameter_covariance_with_geometry = None
+    if geometry_parameter_covariance is not None:
+        parameter_covariance_with_geometry = geometry_parameter_covariance.copy()
+        if parameter_covariance is not None:
+            parameter_covariance_with_geometry += parameter_covariance
+        parameter_covariance_with_geometry = 0.5 * (
+            parameter_covariance_with_geometry + parameter_covariance_with_geometry.T
+        )
+
     eigenvalues, eigenvectors = np.linalg.eigh(tensor)
 
     # Optional thermodynamic closure: P_e = n_e e T_eV. Density is an
@@ -206,8 +301,13 @@ def infer_full_temperature_tensor_from_thomson_projections(
             tensor[0, 1], tensor[0, 2], tensor[1, 2],
         ])
         pressure_tensor = density * _E * tensor
-        if parameter_covariance is not None:
-            pressure_covariance = (density * _E) ** 2 * parameter_covariance
+        pressure_source_covariance = (
+            parameter_covariance_with_geometry
+            if parameter_covariance_with_geometry is not None
+            else parameter_covariance
+        )
+        if pressure_source_covariance is not None:
+            pressure_covariance = (density * _E) ** 2 * pressure_source_covariance
             if density_uncertainty is not None:
                 pressure_covariance += (_E * density_uncertainty) ** 2 * np.outer(
                     tensor_components, tensor_components
@@ -243,6 +343,22 @@ def infer_full_temperature_tensor_from_thomson_projections(
                             "T_xy_eV", "T_xz_eV", "T_yz_eV"],
         "parameter_covariance_eV2": parameter_covariance,
         "parameter_covariance_status": covariance_status,
+        "scattering_vector_covariance_input": (
+            None if scattering_vector_covariance is None
+            else raw_geometry_covariance
+        ),
+        "scattering_geometry_parameter_jacobian": geometry_jacobian,
+        "scattering_geometry_parameter_covariance_eV2": geometry_parameter_covariance,
+        "parameter_covariance_with_geometry_eV2": parameter_covariance_with_geometry,
+        "geometry_covariance_status": (
+            "finite_difference_directional_delta_method_added_to_parameter_covariance"
+            if geometry_parameter_covariance is not None
+            else "not_supplied_or_not_reported_at_active_psd_boundary"
+        ),
+        "geometry_covariance_equation": (
+            "C_T,geom = J_q C_q J_q.T; J_q[:,a] = d vec(T_hat)/d q_a, "
+            "with q_a renormalized to the unit sphere"
+        ),
         "positive_semidefinite_constraint_active": psd_active,
         "covariance_provenance": covariance_source,
         "projection_equation": "T_q_eV = q_hat.T @ T_eV @ q_hat",
