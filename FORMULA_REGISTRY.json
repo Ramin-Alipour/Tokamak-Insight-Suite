@@ -9438,7 +9438,7 @@
   },
   {
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
-    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}^{(2)}=(m_e/e)[⟨v_q²⟩−⟨v_q⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v_q⟩,Var(v_q),σ_v,T_{e,q}^{(2)},skewness,excess kurtosis)",
+    "equation": "u_q=∫v_q f_q(v_q)dv_q; μ_n,q=∫(v_q−u_q)^n f_q(v_q)dv_q (n=2,3,4); σ_q²=μ_2,q; T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; Cov(g)=J_g Cov(f_q) J_gᵀ, g=(u_q,μ_2,q,σ_q,T_eq,q,μ_3,q,μ_4,q,γ_1,q,γ_2,q)",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
     "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance. Separately, Akaike-weighted Maxwellian/Kappa/super-Gaussian model-family uncertainty is propagated into the model-averaged EVDF's six physical moments, with within- and between-family covariance reported separately from measurement and regularization-choice uncertainty.",
     "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is calculated from the projected kinetic-energy variance m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
@@ -9576,7 +9576,8 @@
       "input_data_level": "calibrated_measured_spectrum_and_measured_response",
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Optical Thomson / projected EVDF"
-    }
+    },
+    "description": "Physical central moments and their correlated uncertainty are derived from the response-aware reconstructed normalized q-parallel EVDF using the same nonuniform velocity quadrature as the inverse. A single projected marginal does not identify the unrestricted 3-D EVDF or full parallel heat flux."
   },
   {
     "name": "Three-dimensional Bloch-periodic full-vector Maxwell energy closure",
