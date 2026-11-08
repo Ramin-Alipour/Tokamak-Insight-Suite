@@ -7256,12 +7256,13 @@
     "diagnostic": "Thomson spatial profile reconstruction",
     "quantities": "Channel-resolved radial electron-temperature and electron-density profiles where identifiable, electron-flow projection profiles, and their supported uncertainties inferred directly from measured calibrated Thomson spectra.",
     "status": "D",
-    "method": "Delegates to the canonical multi-channel Thomson physical forward-inference model and returns its radial channel-resolved physical-parameter profiles. It does not interpolate or fit previously derived ne/Te samples. Smoothing-spline reconstruction uses a generalized least-squares natural-cubic objective and GCV hat-matrix effective degrees of freedom when full cross-channel parameter covariance is available; pointwise-only uncertainty retains the diagonal route. A separate PSF-aware inverse solves measured channel values against a fixed supplied spatial mixing operator; it is not interpolation and reports only data-supported latent profiles as primary.",
-    "caveat": "This profile subanalysis uses the same measured calibrated spectral inputs and physical inference as Analysis 1. It does not accept previously inferred density/temperature profiles, perform detector calibration, or claim independent experimental validation. The PSF-aware inverse requires a researcher-supplied fixed mixing operator; PSF uncertainty and spatial null-space modes remain outside its scope. For a finite-volume Gaussian PSF, an optional externally supplied 1-sigma uncertainty in its calibrated width is propagated through the joint physical spectral inverse. A measured PSF matrix remains fixed; its element covariance is not propagated.",
+    "method": "Delegates to the canonical multi-channel Thomson physical forward-inference model and returns its radial channel-resolved physical-parameter profiles. It does not interpolate or fit previously derived ne/Te samples. Smoothing-spline reconstruction uses a generalized least-squares natural-cubic objective and GCV hat-matrix effective degrees of freedom when full cross-channel parameter covariance is available; pointwise-only uncertainty retains the diagonal route. A separate PSF-aware inverse solves measured channel values against a fixed supplied spatial mixing operator; it is not interpolation and reports only data-supported latent profiles as primary. The joint spatial-spectral mode now accepts full covariance of every element of a measured PSF matrix and optional measured-spectrum/PSF cross-covariance, propagated through the same response-convolved physical model and data-only GLS sensitivity. A separate systematic spectral covariance is also exposed in this joint path.",
+    "caveat": "This profile subanalysis uses the same measured calibrated spectral inputs and physical inference as Analysis 1. It does not accept previously inferred density/temperature profiles, perform detector calibration, or claim independent experimental validation. The PSF-aware inverse requires a researcher-supplied fixed mixing operator; PSF uncertainty and spatial null-space modes remain outside its scope. For a finite-volume Gaussian PSF, an optional externally supplied 1-sigma uncertainty in its calibrated width is propagated through the joint physical spectral inverse. A measured PSF matrix remains fixed; its element covariance is not propagated. Full measured-PSF matrix covariance is locally linearized and conditional on the nominal PSF and mixing operator; positivity and finite-column-mass constraints are not enforced on perturbed PSF matrices.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra",
       "tokamak_analysis.thomson_workflow.reconstruct_psf_aware_thomson_profile",
-      "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile"
+      "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile",
+      "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
     ],
     "implementation_status": "Complete as a profile-oriented output of the canonical measured-spectrum physical inference; no separate profile-point input or duplicated physical model is exposed.",
     "execution_contract": {
@@ -7579,6 +7580,24 @@
           "unit": "m; external 1-sigma Gaussian PSF-width calibration uncertainty",
           "required": false,
           "description": "Optional uncertainty of spatial_psf_sigma_m. Propagated through the full measured-spectrum forward model using finite-difference residual sensitivity and implicit GLS covariance. Requires spatial_psf_sigma_m; does not infer PSF width from plasma spectra."
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "full channel-major covariance of correlated systematic spectral effects",
+          "required": false,
+          "description": "Separate additive positive-semidefinite covariance for correlated systematic spectral effects in the joint spatial-spectral GLS fit."
+        },
+        {
+          "name": "spatial_psf_matrix_covariance",
+          "unit": "(n_nodes*n_nodes)^2 covariance of row-major vec(P)",
+          "required": false,
+          "description": "Full measured covariance of all elements of an explicit spatial_psf_matrix. Propagated through the composed H P S forward operator using first-order data-only GLS implicit sensitivity."
+        },
+        {
+          "name": "spectral_psf_cross_covariance",
+          "unit": "(n_channels*n_wavelengths) x (n_nodes*n_nodes) Cov(y,vec(P))",
+          "required": false,
+          "description": "Optional measured-spectrum/PSF-element cross-covariance. Requires measured spectral covariance and a positive-semidefinite joint spectrum/PSF covariance block."
         }
       ],
       "output_specs": [
@@ -7717,6 +7736,18 @@
           "name": "psf_sigma_parameter_sensitivity",
           "unit": "fitted parameter per metre",
           "description": "Local GLS sensitivity of fitted physical/background parameters to the Gaussian PSF width."
+        },
+        {
+          "name": "psf_matrix_calibration_parameter_covariance",
+          "unit": "physical fit-parameter covariance contribution from full measured PSF matrix-element covariance"
+        },
+        {
+          "name": "psf_matrix_cross_covariance_parameter_contribution",
+          "unit": "physical fit-parameter covariance cross contribution from measured spectra and PSF matrix"
+        },
+        {
+          "name": "psf_matrix_parameter_sensitivity",
+          "unit": "physical fit-parameter sensitivity to row-major measured PSF matrix elements"
         }
       ],
       "assumptions": [
@@ -7732,8 +7763,8 @@
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Infer per-channel electron temperature and supported scattering-vector flow from measured calibrated optical Thomson spectra using the selected non-collective Maxwellian, Kappa or relativistic Maxwell-Juttner forward model. Infer absolute density only when calibrated W/nm intensity and complete optical geometry are supplied; reconstruct identifiable radial profiles only within the measured channel interval. Optional joint_spatial_spectral mode directly fits channel-by-wavelength calibrated measurements through a researcher-supplied fixed spatial mixing operator using the selected isotropic Maxwellian, finite-variance Kappa or relativistic Maxwell-Juttner model. The relativistic joint model supports optional single-scattering Compton recoil and polarized Klein-Nishina weighting. Data identifiability is assessed from the measured-data Jacobian alone; regularization rows are excluded so smoothing cannot manufacture measurement constraints.",
-      "uncertainty_model": "The wrapper forwards the measured spectra and all supported uncertainty inputs to the canonical Thomson inference engine. Non-collective Maxwellian and Kappa fits support local covariance and full channel-major GLS; relativistic Maxwell-Juttner uses channel-local covariance plus Monte Carlo propagation of laser-wavelength, scalar-angle or beam-direction, incident-polarization and response-matrix uncertainties, but not full channel-major spectral GLS. Collective CTS retains its own branch-specific uncertainty contract. Absolute-density uncertainty combines the supported spectral/response and optical-factor covariance sources without double counting when scattered-power covariance rows/columns are zero. Profile covariance is propagated from the available fit and input covariance only; no experimental validation is claimed. Profile smoothing uses full supplied cross-channel covariance in a GLS objective when available; Monte Carlo bands remain conditional on the supplied/inferred covariance. Joint spatial-spectral covariance is conditional on the selected regularization and fixed forward operators; the data-only Jacobian rank is reported separately from the regularized optimizer Jacobian. When profile_coordinate_value_cross_covariance is supplied together with both marginal covariance models, the coordinate and inferred-value draws are sampled from the complete joint positive-semidefinite block covariance; otherwise supplied marginals retain the explicitly independent assumption. When spatial_psf_sigma_uncertainty_m is supplied with spatial_psf_sigma_m, the joint spatial-spectral solver propagates this external Gaussian PSF-width calibration uncertainty to fitted amplitude, Te, projected flow, optional fitted Kappa index and detector-background nuisance coefficients using a finite-difference derivative of the complete whitened measured-spectrum residual and implicit data-only GLS sensitivity. Measurement and PSF calibration covariance contributions are returned separately; regularization rows are excluded. This is first-order local propagation conditional on the Gaussian PSF family and fixed mixing operator.",
+      "algorithm": "Infer per-channel electron temperature and supported scattering-vector flow from measured calibrated optical Thomson spectra using the selected non-collective Maxwellian, Kappa or relativistic Maxwell-Juttner forward model. Infer absolute density only when calibrated W/nm intensity and complete optical geometry are supplied; reconstruct identifiable radial profiles only within the measured channel interval. Optional joint_spatial_spectral mode directly fits channel-by-wavelength calibrated measurements through a researcher-supplied fixed spatial mixing operator using the selected isotropic Maxwellian, finite-variance Kappa or relativistic Maxwell-Juttner model. The relativistic joint model supports optional single-scattering Compton recoil and polarized Klein-Nishina weighting. Data identifiability is assessed from the measured-data Jacobian alone; regularization rows are excluded so smoothing cannot manufacture measurement constraints. For an explicit measured PSF matrix P, the derivative dF_c/dP_ab=H_ca R_c[S_b] is computed through the response-convolved forward model. Its data-only GLS implicit sensitivity propagates the full covariance of vec(P), and optional measured-spectrum/PSF cross-covariance contributes the symmetric cross terms. The full joint covariance block is checked for positive semidefiniteness.",
+      "uncertainty_model": "The wrapper forwards the measured spectra and all supported uncertainty inputs to the canonical Thomson inference engine. Non-collective Maxwellian and Kappa fits support local covariance and full channel-major GLS; relativistic Maxwell-Juttner uses channel-local covariance plus Monte Carlo propagation of laser-wavelength, scalar-angle or beam-direction, incident-polarization and response-matrix uncertainties, but not full channel-major spectral GLS. Collective CTS retains its own branch-specific uncertainty contract. Absolute-density uncertainty combines the supported spectral/response and optical-factor covariance sources without double counting when scattered-power covariance rows/columns are zero. Profile covariance is propagated from the available fit and input covariance only; no experimental validation is claimed. Profile smoothing uses full supplied cross-channel covariance in a GLS objective when available; Monte Carlo bands remain conditional on the supplied/inferred covariance. Joint spatial-spectral covariance is conditional on the selected regularization and fixed forward operators; the data-only Jacobian rank is reported separately from the regularized optimizer Jacobian. When profile_coordinate_value_cross_covariance is supplied together with both marginal covariance models, the coordinate and inferred-value draws are sampled from the complete joint positive-semidefinite block covariance; otherwise supplied marginals retain the explicitly independent assumption. When spatial_psf_sigma_uncertainty_m is supplied with spatial_psf_sigma_m, the joint spatial-spectral solver propagates this external Gaussian PSF-width calibration uncertainty to fitted amplitude, Te, projected flow, optional fitted Kappa index and detector-background nuisance coefficients using a finite-difference derivative of the complete whitened measured-spectrum residual and implicit data-only GLS sensitivity. Measurement and PSF calibration covariance contributions are returned separately; regularization rows are excluded. This is first-order local propagation conditional on the Gaussian PSF family and fixed mixing operator. Full measured PSF matrix-element covariance is propagated as S_P C_P S_P^T with S_P=−(J_p^T J_p)^+J_p^T J_P; optional spectrum/PSF cross-covariance contributes S_y C_yP S_P^T plus its transpose. This is a first-order local approximation conditional on the nominal PSF, mixing operator, model, response and regularization; PSF positivity and column-mass constraints are not projected on perturbed realizations.",
       "limitations": [
         "Relativistic Maxwell-Juttner inference is restricted to an isotropic rest-frame distribution with bulk flow parallel to the scattering vector. Recoil is omitted in the default elastic Thomson mode and included only when include_compton_recoil is explicitly true.",
         "Kappa models are parameterized distributions and do not reconstruct an unrestricted electron velocity distribution.",
@@ -7746,7 +7777,8 @@
         "Joint spatial-spectral inversion supports isotropic Maxwellian, finite-variance Kappa, and relativistic Maxwell-Juttner parameterizations; it does not reconstruct an arbitrary EVDF. Geometry, spatial mixing and response operators remain fixed external inputs.",
         "In joint spatial-spectral mode, regularization can select a numerical profile in an underdetermined problem but cannot make that profile data-identifiable; inspect primary_result_status and data_only_jacobian_rank.",
         "Coordinate/value cross-covariance is used only when the complete joint block covariance is supplied and positive semidefinite; no missing cross-covariance is inferred.",
-        "Only scalar Gaussian PSF-width calibration uncertainty is propagated; a full covariance for the elements of a measured PSF matrix or uncertainty in PSF shape is not yet represented."
+        "Only scalar Gaussian PSF-width calibration uncertainty is propagated; a full covariance for the elements of a measured PSF matrix or uncertainty in PSF shape is not yet represented.",
+        "Full measured-PSF matrix covariance is a first-order local linearization; random PSF perturbations are not projected onto non-negative unit-column-sum matrices."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra",
