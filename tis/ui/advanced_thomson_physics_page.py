@@ -213,6 +213,14 @@ MODEL_PHYSICS_NOTES = {
         "spectral space. The fixed-active-set coefficient covariance uses the frequentist "
         "sandwich H^-1 A_w^T A_w H^-1, not H^-1."
     ),
+    "thomson_multiview_3d_evdf_physical": (
+        "Physical optical Thomson 3-D EVDF inversion. For each measured view j and velocity voxel a, "
+        "lambda_ja=lambda_L[1-2 sin(theta/2)(qhat_j dot v_a)/c]. The monochromatic probability is "
+        "conservatively deposited into finite wavelength bins and the measured per-view response acts "
+        "on bin-integrated power. This is an unpolarized, non-relativistic, elastic Thomson shape model; "
+        "it does not infer absolute density, unknown view gains, Compton recoil or relativistic tails. "
+        "The stacked data-only rank gate withholds a unique 3-D EVDF when angular information is insufficient."
+    ),
     "bi_kappa_electrostatic_susceptibility": (
         "Gyrotropic 3-D bi-Kappa distribution projected exactly onto the supplied scattering vector, including electron bulk drift through v_phi,rest = v_phi,lab - u_e dot q_hat. "
         "The directional second-moment temperature is T_q = T_perp + (T_parallel-T_perp)*(b_hat dot q_hat)^2; "
@@ -1085,6 +1093,20 @@ def render_advanced_thomson_physics_page(st) -> None:
                 )
             else:
                 st.success("The selected numerical solver completed. Review its limitations and convergence gates before interpreting results.")
+            if model == "thomson_multiview_3d_evdf_physical" and isinstance(result, Mapping):
+                st.subheader("Physical multi-view optical Thomson forward model")
+                st.latex(r"\lambda_{j,a}=\lambda_L\left[1-2\sin(\theta/2)\,\hat{\mathbf q}_j\cdot\mathbf v_a/c\right],\qquad S_j(\lambda_i)=\sum_a f_a K_{j i a}\,\Delta V_a")
+                st.write({
+                    "forward_model": result.get("physical_forward_model"),
+                    "maximum_velocity_beta": result.get("maximum_velocity_beta"),
+                    "data_only_jacobian_rank": result.get("data_only_jacobian_rank"),
+                    "velocity_voxel_count": result.get("velocity_voxel_count"),
+                    "data_only_condition_number": result.get("data_only_condition_number"),
+                    "identifiability": result.get("identifiability"),
+                    "covariance_components_included": result.get("covariance_components_included"),
+                })
+                if result.get("evdf_m3_s3") is None:
+                    st.warning("The supplied viewing directions do not identify every 3-D velocity voxel. The regularized candidate is shown for sensitivity analysis only; it is not reported as a measured 3-D EVDF.")
             if isinstance(result, Mapping) and "captured_spectral_probability" in result:
                 coverage = np.asarray(result["captured_spectral_probability"], dtype=float).ravel()
                 st.subheader("Measured wavelength-window coverage")

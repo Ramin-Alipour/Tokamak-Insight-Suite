@@ -316,3 +316,12 @@ def test_general_tensor_raw_spectrum_solver_is_exposed_through_advanced_api_and_
     assert result["public_physics_entrypoint"]==model
     assert result["reportable_as_inferred_parameter"] is True
     np.testing.assert_allclose(result["electron_temperature_tensor_eV"],tensor,rtol=3e-3,atol=0.5)
+
+
+def test_physical_multiview_evdf_model_is_exposed_in_dashboard_contract():
+    from tis.ui.advanced_thomson_physics_page import MODEL_LABELS, MODEL_PHYSICS_NOTES, EXAMPLES
+    assert "thomson_multiview_3d_evdf_physical" in MODEL_LABELS
+    assert "thomson_multiview_3d_evdf_physical" in MODEL_PHYSICS_NOTES
+    example = EXAMPLES["thomson_multiview_3d_evdf_physical"]
+    assert len(example["scattering_vector_unit"]) == len(example["measured_spectra"])
+    assert len(example["background_spectra"]) == len(example["measured_spectra"])

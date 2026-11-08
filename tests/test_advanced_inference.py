@@ -342,3 +342,34 @@ def test_physical_optical_thomson_3d_route_rejects_relativistic_velocity_grid():
             background_spectra=np.zeros((1,101)), voxel_volume_m3_s3=np.ones(1),
             regularization_matrix=np.eye(1), regularization_strength=1e-3,
         )
+
+
+def test_physical_multiview_evdf_is_reachable_through_public_analysis1_dispatcher():
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+    wavelength = np.linspace(499.85, 500.15, 101)
+    result = run_advanced_thomson_physics(
+        "thomson_multiview_3d_evdf_physical",
+        wavelength,
+        np.ones((2, wavelength.size)),
+        np.array([[1.,0.,0.],[0.,1.,0.]]),
+        np.array([[1.0e4,0.,0.],[-1.0e4,0.,0.]]),
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi/2,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_spectra=np.zeros((2,wavelength.size)),
+        voxel_volume_m3_s3=np.ones(2),
+        regularization_matrix=np.eye(2),
+        regularization_strength=1e-3,
+    )
+    assert result["physical_forward_model"] == "elastic_single_particle_unpolarized_nonrelativistic_optical_thomson"
+    assert result["physical_spectral_kernels"].shape == (2, wavelength.size, 2)
+
+
+def test_primary_analysis_registry_exposes_physical_multiview_evdf_workflow():
+    from tokamak_analysis.analysis_registry import get_analysis
+    primary = get_analysis(1)
+    modes = primary["execution_contract"]["workflow_modes"]
+    entry = next(item for item in modes if item["name"] == "physical_multiview_3d_evdf_inversion")
+    assert entry["model_selector"] == "thomson_multiview_3d_evdf_physical"
+    assert "scattering_vector_unit (view × 3 unit vectors)" in entry["inputs"]
+    assert "physical_spectral_kernels (view × wavelength × voxel)" in entry["outputs"]
