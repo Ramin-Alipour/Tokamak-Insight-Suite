@@ -1563,9 +1563,9 @@ def test_projected_evdf_physical_moment_covariance_rejects_indefinite_input():
         _projected_evdf_physical_moments,
     )
 
-    velocity = np.linspace(-3.0e5, 3.0e5,  nine := 9)
+    velocity = np.linspace(-3.0e5, 3.0e5, 9)
     density = np.exp(-0.5 * (velocity / 1.0e5) ** 2)
-    covariance = np.eye(nine)
+    covariance = np.eye(velocity.size)
     covariance[0, 1] = covariance[1, 0] = 2.0
     with pytest.raises(ValueError, match="positive semidefinite"):
         _projected_evdf_physical_moments(velocity, density, covariance)

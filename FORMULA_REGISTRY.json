@@ -9438,7 +9438,7 @@
   },
   {
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
-    "equation": "u_q=∫v_q f_q(v_q)dv_q; μ_n,q=∫(v_q−u_q)^n f_q(v_q)dv_q (n=2,3,4); σ_q²=μ_2,q; T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; Cov(g)=J_g Cov(f_q) J_gᵀ, g=(u_q,μ_2,q,σ_q,T_eq,q,μ_3,q,μ_4,q,γ_1,q,γ_2,q)",
+    "equation": "p_i=f_i/(Σ_j w_j f_j); u_q=Σ_i w_i v_i p_i; μ_n,q=Σ_i w_i(v_i−u_q)^n p_i (n=2,3,4); T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; ∂u_q/∂f_i=(w_i/N)(v_i−u_q); ∂μ_2,q/∂f_i=(w_i/N)[(v_i−u_q)²−μ_2,q]; ∂μ_3,q/∂f_i=(w_i/N)[(v_i−u_q)³−μ_3,q−3μ_2,q(v_i−u_q)]; ∂μ_4,q/∂f_i=(w_i/N)[(v_i−u_q)^4−μ_4,q−4μ_3,q(v_i−u_q)]; Cov(g)=J_g Cov(f_q) J_gᵀ",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
     "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance. Separately, Akaike-weighted Maxwellian/Kappa/super-Gaussian model-family uncertainty is propagated into the model-averaged EVDF's six physical moments, with within- and between-family covariance reported separately from measurement and regularization-choice uncertainty.",
     "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is calculated from the projected kinetic-energy variance m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
@@ -9447,7 +9447,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
       "formula_key": "optical_thomson_projected_evdf_velocity_moment_covariance",
       "input_specs": [
         {
@@ -9564,7 +9564,9 @@
         "tests/test_thomson_evdf.py::test_evdf_propagates_signal_background_and_cross_covariance",
         "tests/test_thomson_evdf.py::test_evdf_adds_independent_model_discrepancy_and_systematic_covariance",
         "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated",
-        "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty"
+        "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty",
+        "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_matches_normalized_finite_difference",
+        "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_rejects_indefinite_input"
       ],
       "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
       "raw_data_to_physics": false,
