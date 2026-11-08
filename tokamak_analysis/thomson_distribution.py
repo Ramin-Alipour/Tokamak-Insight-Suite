@@ -1150,30 +1150,17 @@ def analyze_thomson_spectral_distribution(
         inverse = result["projected_evdf_inference"]
         velocity_grid = np.asarray(inverse["velocity_grid_m_s"] if use_relativistic_inverse else inverse["velocity_parallel_m_s"], dtype=float)
         projected_pdf = np.asarray(inverse["projected_evdf_s_m"] if use_relativistic_inverse else inverse["evdf_parallel_s_per_m"], dtype=float)
+        from scipy.integrate import trapezoid
         if (velocity_grid.ndim != 1 or projected_pdf.shape != velocity_grid.shape
-                or velocity_grid.size < 2 or not np.all(np.isfinite(velocity_grid))
-                or np.any(np.diff(velocity_grid) <= 0.0)
+                or not np.all(np.isfinite(velocity_grid))
                 or not np.all(np.isfinite(projected_pdf)) or np.any(projected_pdf < 0.0)):
-            raise ValueError("Projected EVDF returned an invalid probability density on a strictly increasing velocity grid")
-        # The inverse coefficients are nodal probability densities f(v), not
-        # discrete probability masses.  Use the same trapezoidal finite-volume
-        # measure as the inverse solver, including endpoint half cells; using
-        # scipy.trapezoid here silently changes the measure on nonuniform grids.
-        velocity_intervals = np.diff(velocity_grid)
-        velocity_weights = np.empty_like(velocity_grid)
-        velocity_weights[0] = 0.5 * velocity_intervals[0]
-        velocity_weights[-1] = 0.5 * velocity_intervals[-1]
-        velocity_weights[1:-1] = 0.5 * (
-            velocity_intervals[:-1] + velocity_intervals[1:]
-        )
-        evdf_norm = float(np.sum(projected_pdf * velocity_weights))
+            raise ValueError("Projected EVDF returned an invalid probability density")
+        evdf_norm = float(trapezoid(projected_pdf, velocity_grid))
         if not np.isfinite(evdf_norm) or evdf_norm <= 0.0:
             raise ValueError("Projected EVDF has non-positive integrated probability")
         normalized_pdf = projected_pdf / evdf_norm
-        evdf_mean = float(np.sum(velocity_grid * normalized_pdf * velocity_weights))
-        evdf_variance = float(np.sum(
-            (velocity_grid - evdf_mean)**2 * normalized_pdf * velocity_weights
-        ))
+        evdf_mean = float(trapezoid(velocity_grid * normalized_pdf, velocity_grid))
+        evdf_variance = float(trapezoid((velocity_grid - evdf_mean)**2 * normalized_pdf, velocity_grid))
         q = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
         c_light = 299792458.0
         if use_relativistic_inverse:
