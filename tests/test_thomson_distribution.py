@@ -1655,3 +1655,60 @@ def test_projected_evdf_energy_cdf_covariance_matches_finite_difference():
     np.testing.assert_allclose(actual, actual.T, rtol=1.0e-12, atol=1.0e-14)
     assert np.linalg.eigvalsh(actual).min() >= -1.0e-12
     assert energy["cumulative_probability_standard_uncertainty"][-1] == pytest.approx(0.0, abs=1.0e-12)
+
+
+
+def test_projected_evdf_random_energy_moments_match_one_dimensional_maxwellian():
+    from scipy.constants import elementary_charge, electron_mass
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    temperature_eV = 80.0
+    sigma = np.sqrt(elementary_charge * temperature_eV / electron_mass)
+    velocity = np.linspace(-8.0*sigma, 8.0*sigma, 4001)
+    density = np.exp(-0.5*(velocity/sigma)**2) / (np.sqrt(2.0*np.pi)*sigma)
+
+    result = _projected_evdf_physical_moments(velocity, density)
+    assert result["directional_equivalent_temperature_eV"] == pytest.approx(
+        temperature_eV, rel=2.0e-5
+    )
+    assert result["mean_random_kinetic_energy_parallel_eV"] == pytest.approx(
+        temperature_eV / 2.0, rel=2.0e-5
+    )
+    assert result["random_kinetic_energy_parallel_variance_eV2"] == pytest.approx(
+        temperature_eV**2 / 2.0, rel=5.0e-5
+    )
+
+
+def test_projected_evdf_random_energy_moment_covariance_matches_finite_difference():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-4.0e5, 4.0e5, 61)
+    density = np.exp(-0.5*((velocity - 2.0e4)/1.15e5)**2)
+    covariance = np.diag((density*1.0e-4)**2)
+    result = _projected_evdf_physical_moments(velocity, density, covariance)
+    names = (
+        "mean_random_kinetic_energy_parallel_eV",
+        "random_kinetic_energy_parallel_variance_eV2",
+    )
+    indices = [result["moment_covariance_order"].index(name) for name in names]
+    actual = result["moment_covariance"][np.ix_(indices, indices)]
+
+    numerical_jacobian = np.empty((2, velocity.size))
+    for column in range(velocity.size):
+        step = density[column]*1.0e-5
+        plus, minus = density.copy(), density.copy()
+        plus[column] += step
+        minus[column] -= step
+        rp = _projected_evdf_physical_moments(velocity, plus)
+        rm = _projected_evdf_physical_moments(velocity, minus)
+        for row, name in enumerate(names):
+            numerical_jacobian[row, column] = (
+                rp[name] - rm[name]
+            ) / (2.0*step)
+
+    expected = numerical_jacobian @ covariance @ numerical_jacobian.T
+    np.testing.assert_allclose(actual, expected, rtol=3.0e-4, atol=1.0e-18)

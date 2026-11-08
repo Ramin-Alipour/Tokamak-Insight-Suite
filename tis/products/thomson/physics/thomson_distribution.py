@@ -100,6 +100,8 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
         "central_fourth_velocity_moment_m4_s4",
         "skewness",
         "excess_kurtosis",
+        "mean_random_kinetic_energy_parallel_eV",
+        "random_kinetic_energy_parallel_variance_eV2",
     )
     moment_covariance = None
     moment_standard_uncertainty = None
@@ -141,9 +143,17 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
             mu4_gradient / variance**2
             - 2.0 * mu4 * variance_gradient / variance**3
         )
+        # E_q = m_e (v_q-u_q)^2/(2e).  These are random-energy
+        # moments of the projected marginal, not 3-D electron moments.
+        energy_per_velocity_squared = electron_mass / (2.0 * elementary_charge)
+        mean_energy_gradient = energy_per_velocity_squared * variance_gradient
+        energy_variance_gradient = energy_per_velocity_squared**2 * (
+            mu4_gradient - 2.0 * variance * variance_gradient
+        )
         jacobian = np.vstack((
             mean_gradient, variance_gradient, sigma_gradient, temperature_gradient,
             mu3_gradient, mu4_gradient, skewness_gradient, kurtosis_gradient,
+            mean_energy_gradient, energy_variance_gradient,
         ))
         moment_covariance = jacobian @ cov @ jacobian.T
         moment_covariance = 0.5*(moment_covariance + moment_covariance.T)
@@ -263,6 +273,13 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
         "central_fourth_velocity_moment_m4_s4": mu4,
         "skewness": float(skewness),
         "excess_kurtosis": float(excess_kurtosis),
+        "mean_random_kinetic_energy_parallel_eV": float(
+            electron_mass * variance / (2.0 * elementary_charge)
+        ),
+        "random_kinetic_energy_parallel_variance_eV2": float(
+            (electron_mass / (2.0 * elementary_charge))**2
+            * (mu4 - variance**2)
+        ),
         "equations": {
             "mean": "u_q = integral(v_q f_q(v_q) dv_q)",
             "variance": "sigma_q^2 = integral((v_q-u_q)^2 f_q(v_q) dv_q)",
@@ -271,6 +288,8 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
             "fourth_central": "mu_4,q = integral((v_q-u_q)^4 f_q(v_q) dv_q)",
             "skewness": "gamma_1,q = mu_3,q/sigma_q^3",
             "excess_kurtosis": "gamma_2,q = mu_4,q/sigma_q^4 - 3",
+            "mean_random_energy": "mean(E_q) = (m_e/(2e)) sigma_q^2 = T_eq,q/2",
+            "random_energy_variance": "Var(E_q) = (m_e/(2e))^2 (mu_4,q - sigma_q^4)",
         },
         "moment_covariance_order": list(moment_order),
         "moment_covariance": moment_covariance,
