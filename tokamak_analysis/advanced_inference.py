@@ -467,8 +467,8 @@ def build_relativistic_3d_thomson_kernels(
     incident = _real_array(incident_direction, "incident_direction", 2)
     scattered = _real_array(scattered_direction, "scattered_direction", 2)
     gains = _real_array(view_gain, "view_gain", 1)
-    if wavelength.size < 3 or np.any(np.diff(wavelength) <= 0.0):
-        raise ValueError("wavelength_nm must contain at least three strictly increasing bin centres")
+    if wavelength.size < 3 or np.any(wavelength <= 0.0) or np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must contain at least three strictly increasing positive bin centres")
     if velocity.shape[1:] != (3,):
         raise ValueError("velocity_grid_m_s must have shape (n_voxel,3)")
     if incident.shape != scattered.shape or incident.ndim != 2 or incident.shape[1] != 3:
@@ -703,6 +703,7 @@ def reconstruct_relativistic_optical_thomson_3d_evdf(
         "view_gain": np.asarray(view_gain, dtype=float),
         "background_subtracted_spectra": spectra - background,
         "physical_spectral_kernels": kernel_data["spectral_kernels"],
+        "forward_kernel_contract": "internally generated per-view relativistic 3-D optical Thomson/Compton kernels; exact Lorentz aberration and Doppler kinematics; optional rest-frame recoil and unpolarized Klein-Nishina weighting; measured response applied to finite-bin integrated spectral power",
         "relativistic_kinematics": kernel_data,
         "validity_domain": {
             "velocity_grid_subluminal": True,
