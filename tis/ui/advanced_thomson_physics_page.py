@@ -1325,6 +1325,13 @@ def render_advanced_thomson_physics_page(st) -> None:
                         np.asarray(spread["physical_moment_covariance_moment_units_squared"], dtype=float),
                         use_container_width=True,
                     )
+                if spread.get("temperature_tensor_covariance_from_regularization_eV2") is not None:
+                    st.write("Kinetic-temperature tensor covariance from regularization choice (eV^2):")
+                    st.write(spread.get("temperature_tensor_order"))
+                    st.dataframe(
+                        np.asarray(spread["temperature_tensor_covariance_from_regularization_eV2"], dtype=float),
+                        use_container_width=True,
+                    )
                 st.write({
                     "distribution_standard_spread_m3_s3": spread.get("distribution_standard_spread_m3_s3"),
                     "distribution_lower_envelope_m3_s3": spread.get("distribution_lower_envelope_m3_s3"),
