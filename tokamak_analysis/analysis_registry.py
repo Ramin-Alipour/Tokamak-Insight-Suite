@@ -82,7 +82,10 @@ def _sync_analysis_contracts_from_canonical_registry() -> None:
     for entry in ANALYSES:
         if entry["name"] in analysis_one_names:
             contract = deepcopy(by_name[entry["name"]])
-            primary = f"tokamak_analysis.{entry['module']}.{entry['function']}"
+            # The canonical diagnostic catalogue retains the historical import
+            # path; that path is now a compatibility shim to the product-owned solver.
+            legacy_module = entry["module"].rsplit(".", 1)[-1]
+            primary = f"tokamak_analysis.{legacy_module}.{entry['function']}"
             if not contract.get("function_links") or contract["function_links"][0] != primary:
                 raise RuntimeError(
                     f"Canonical Analysis 1 contract for {entry['name']} does not resolve to its registered entry point."
