@@ -401,6 +401,12 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert channel["effective_differential_cross_section_uncertainty_m2_sr"] > 0.0
     evdf = channel["electron_velocity_distribution"]
     assert evdf["analysis_status"] in {"completed", "conditional_regularized_candidate"}
+    assert np.isfinite(evdf["central_third_velocity_moment_m3_s3"])
+    assert np.isfinite(evdf["central_fourth_velocity_moment_m4_s4"])
+    assert evdf["central_fourth_velocity_moment_m4_s4"] > 0.0
+    assert evdf["heat_flux_identifiability"]["status"] == "not_identified_from_single_projected_marginal"
+    assert "central_third_velocity_moment_m3_s3" in evdf["velocity_moment_covariance_order"]
+    assert "central_fourth_velocity_moment_m4_s4" in evdf["velocity_moment_covariance_order"]
     assert evdf["recoil_included"] is False
     assert evdf["scattering_cross_section_model"] == (
         "polarized_single_scattering_Thomson_in_electron_rest_frame"
