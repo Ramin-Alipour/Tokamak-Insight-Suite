@@ -9,7 +9,9 @@ import streamlit as st
 from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
-from tokamak_analysis.analysis_registry import ANALYSES, ANALYSIS_FAMILIES, resolve_analysis
+from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+from tis.products import list_products, get_product, list_product_analyses
+from tis.ui.product_workspace_page import render_product_workspace_page
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
 from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectrum
@@ -3760,7 +3762,9 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Gyrotropic anisotropic multi-view Thomson inference','Analysis 1 / General 3-D temperature-tensor Thomson inversion','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Specialist Product Workspace','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Gyrotropic anisotropic multi-view Thomson inference','Analysis 1 / General 3-D temperature-tensor Thomson inversion','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    if workflow=='Specialist Product Workspace':
+        render_product_workspace_page(st)
     if workflow=='Analysis 1 / Advanced Landau-FDT, kinetic ECE & full-vector wave solvers':
         render_advanced_thomson_physics_page(st)
     elif workflow=='Analysis 1 / Optical multi-channel Thomson inference':
@@ -5011,14 +5015,15 @@ elif page=='Advanced Analysis':
                 except Exception as exc:
                     st.error(f'Poloidal-flux reconstruction failed: {exc}')
     elif workflow=='Registered analysis modules':
+        products=list_products()
         selected_family_id=st.selectbox(
             'Primary analysis (20)',
-            options=[item['id'] for item in ANALYSIS_FAMILIES],
-            format_func=lambda i: f"{i}. {next(item['name'] for item in ANALYSIS_FAMILIES if item['id']==i)}",
+            options=[item['id'] for item in products],
+            format_func=lambda i: f"{i}. {next(item['name'] for item in products if item['id']==i)}",
             key='tis_primary_analysis_family',
         )
-        selected_family=next(item for item in ANALYSIS_FAMILIES if item['id']==selected_family_id)
-        family_entries=[item for item in ANALYSES if item['id'] in selected_family['entry_ids']]
+        selected_family=get_product(selected_family_id)
+        family_entries=list_product_analyses(selected_family_id)
         st.caption(selected_family['description'])
         selected_id=st.selectbox(
             'Subanalysis / workflow',
