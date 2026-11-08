@@ -4066,7 +4066,7 @@ elif page=='Advanced Analysis':
                     velocity_limit_81=st.text_input('Projected velocity support limit (m/s)',value='80000',key='ts81_velocity_limit')
                     velocity_points_81=st.number_input('Projected velocity grid points',min_value=41,max_value=2001,value=121,step=10,key='ts81_velocity_points')
                     regularization_81=st.text_input('Tikhonov strength (blank = GCV selection)',value='',key='ts81_regularization')
-                    polarization_81=st.text_input('Incident polarization x,y,z (required for Compton)',value='1,0,0',key='ts81_polarization')
+                    polarization_81=st.text_input('Incident polarization x,y,z (required for Compton)',value='0,0,1',key='ts81_polarization')
                 if st.button('Run spectral-distribution API 81',type='primary',key='run_ts_spectral_distribution_api_81'):
                     try:
                         if response_upload_81 is None:
