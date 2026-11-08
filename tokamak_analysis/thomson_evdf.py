@@ -1223,6 +1223,13 @@ def reconstruct_thomson_evdf(
         "mean_velocity_parallel_m_s": mean_v,
         "velocity_parallel_standard_deviation_m_s": sigma_v,
         "directional_equivalent_temperature_eV": directional_temperature_ev,
+        "directional_equivalent_temperature_equation": "T_eq,q[eV] = (m_e/e) * Var(v_q)",
+        "directional_temperature_interpretation": (
+            "Second-moment-equivalent temperature of the measured q-parallel marginal. "
+            "It equals thermodynamic electron temperature only for an isotropic or "
+            "directionally Maxwellian closure with the corresponding assumptions; "
+            "for a general non-Maxwellian EVDF it is not a complete thermodynamic state."
+        ),
         "velocity_moment_covariance_order": moment_covariance_order,
         "velocity_moment_covariance": moment_covariance,
         "velocity_moment_standard_uncertainty": moment_standard_uncertainty,
