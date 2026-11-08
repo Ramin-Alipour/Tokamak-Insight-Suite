@@ -232,6 +232,7 @@ def reconstruct_thomson_evdf(
     signal_background_cross_covariance=None,
     model_discrepancy_covariance=None,
     systematic_covariance=None,
+    boundary_mass_fraction_limit=0.01,
     max_iter=3000,
 ):
     """Reconstruct the non-negative 1-D electron-velocity marginal along q.
@@ -275,6 +276,10 @@ def reconstruct_thomson_evdf(
         raise ValueError("velocity_points must be an integer from 41 to 2001")
     if isinstance(max_iter, (bool, np.bool_)) or not isinstance(max_iter, (int, np.integer)) or max_iter < 100:
         raise ValueError("max_iter must be an integer >= 100")
+    if (isinstance(boundary_mass_fraction_limit, (bool, np.bool_))
+            or not np.isfinite(boundary_mass_fraction_limit)
+            or not 0.0 < float(boundary_mass_fraction_limit) < 1.0):
+        raise ValueError("boundary_mass_fraction_limit must lie strictly between 0 and 1")
 
     response = _response_matrix(instrument_response_matrix, wavelength.size)
     if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
@@ -1320,8 +1325,48 @@ def reconstruct_thomson_evdf(
         )
 
 
+    # A finite velocity grid can silently truncate a real high-energy tail.
+    # Quantify probability in the two boundary cells at each end using the
+    # same nonuniform trapezoidal measure as normalization and moments.
+    boundary_mass_weights = np.zeros_like(velocity)
+    boundary_mass_weights[:2] = spacing_weights[:2]
+    boundary_mass_weights[-2:] = spacing_weights[-2:]
+    boundary_mass_fraction = float(boundary_mass_weights @ distribution)
+    boundary_mass_variance = None
+    boundary_mass_standard_uncertainty = None
+    if evdf_covariance_available:
+        boundary_mass_variance = float(
+            boundary_mass_weights @ evdf_covariance @ boundary_mass_weights
+        )
+        if np.isfinite(boundary_mass_variance) and boundary_mass_variance >= -1e-12:
+            boundary_mass_standard_uncertainty = float(
+                np.sqrt(max(boundary_mass_variance, 0.0))
+            )
+        else:
+            boundary_mass_variance = None
+    velocity_support_diagnostic = {
+        "boundary_mass_fraction": boundary_mass_fraction,
+        "boundary_mass_standard_uncertainty": boundary_mass_standard_uncertainty,
+        "boundary_mass_fraction_limit": float(boundary_mass_fraction_limit),
+        "status": (
+            "support_truncation_suspected"
+            if boundary_mass_fraction > float(boundary_mass_fraction_limit)
+            else "boundary_mass_below_declared_limit"
+        ),
+        "boundary_cells_per_side": 2,
+        "integration": "same_nonuniform_trapezoidal_probability_measure_as_evdf_normalization",
+        "interpretation": (
+            "Probability accumulated in the two outer velocity cells at either grid boundary. "
+            "A value above the declared limit indicates that the finite velocity support may "
+            "truncate an unresolved EVDF tail; enlarge or independently justify the velocity "
+            "domain before interpreting tail moments. This is a support diagnostic, not a "
+            "correction or a confidence interval."
+        ),
+    }
+
     return {
         "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
+        "velocity_support_diagnostic": velocity_support_diagnostic,
         "velocity_parallel_m_s": velocity,
         "evdf_parallel_s_per_m": distribution,
         "evdf_normalization": integral(distribution),
