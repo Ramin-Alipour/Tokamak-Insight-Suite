@@ -74,6 +74,7 @@ def _sync_analysis_contracts_from_canonical_registry() -> None:
         "Collective Thomson / coherent scattering (CTS)",
         "Thomson spatial profile reconstruction",
         "Thomson spectral distribution",
+        "General relativistic 3-D optical Thomson EVDF reconstruction",
     }
     missing = sorted(name for name in analysis_one_names if name not in by_name)
     if missing:

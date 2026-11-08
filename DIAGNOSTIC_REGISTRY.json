@@ -9358,5 +9358,192 @@
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
     "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction."
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "General relativistic 3-D optical Thomson EVDF reconstruction",
+    "quantities": "General Cartesian 3-D electron velocity distribution from measured calibrated optical Thomson spectra and independent laboratory incident/scattered geometries; first and second 3-D velocity moments when the data-only operator identifies the full distribution.",
+    "status": "D",
+    "method": "Builds an internally generated detector-space spectral kernel for every velocity voxel and view. Incident and scattered photon four-vectors are Lorentz transformed into the electron rest frame; optional single-scattering Compton recoil uses E_s'/E_i'=[1+(E_i'/m_e c^2)(1-cos chi')]^-1 and the unpolarized Klein-Nishina differential cross-section. The rest-frame cross-section is transformed to the laboratory frame with the incident-flux and outgoing-solid-angle Jacobians, multiplied by E_s/E_i for a spectral-power measurement, deposited into finite wavelength bins, and convolved with the measured per-view response. The stacked multi-view spectra are inverted jointly with a non-negative regularized solver; a primary 3-D EVDF is returned only if the whitened data-only operator has full column rank.",
+    "caveat": "Requires calibrated spectra, measured wavelength response, explicit unit incident/scattered directions, relative view gains and a prescribed strictly subluminal Cartesian velocity grid. Scattering is unpolarized and single-event; absolute density and unknown view gains are not inferred. Regularization cannot restore angular information missing from the measured views. This is a physics-based numerical implementation; independent experimental validation is still required.",
+    "implementation_functions": [
+      "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+      "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
+      "tokamak_analysis.advanced_inference.reconstruct_multiview_3d_evdf"
+    ],
+    "execution_contract": {
+      "schema_version": "2.0",
+      "execution_level": "physical_solver",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated spectral-bin centres",
+          "required": true
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral power density; view x wavelength",
+          "required": true
+        },
+        {
+          "name": "incident_direction",
+          "unit": "unit vector per view in laboratory frame",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "unit vector per view in laboratory frame",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "n_voxel x 3 Cartesian electron velocities; every voxel strictly subluminal",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; scalar or one value per view",
+          "required": true
+        },
+        {
+          "name": "view_gain",
+          "unit": "positive calibrated relative gain per view",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized wavelength response; common or per view",
+          "required": true
+        },
+        {
+          "name": "background_spectra",
+          "unit": "calibrated detector-space background; view x wavelength",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "positive 3-D velocity-space quadrature volume per voxel",
+          "required": true
+        },
+        {
+          "name": "regularization_matrix",
+          "unit": "L operator acting on non-negative velocity-space coefficients",
+          "required": true
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "positive Tikhonov strength",
+          "required": true
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean",
+          "required": false,
+          "default": false,
+          "description": "false selects exact relativistic elastic Thomson kinematics; true applies electron-rest-frame Compton energy-momentum recoil and unpolarized Klein-Nishina weighting."
+        },
+        {
+          "name": "measurement_uncertainty",
+          "unit": "positive pointwise standard uncertainty; view x wavelength",
+          "required": false
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full positive-definite view-major measured spectral covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "additive positive-semidefinite view-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "additive positive-semidefinite view-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "max_iter",
+          "unit": "positive integer optimizer iteration limit",
+          "required": false,
+          "default": 3000
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "evdf_m3_s3",
+          "unit": "normalized 3-D electron velocity distribution; withheld unless data-only rank identifies all voxels"
+        },
+        {
+          "name": "regularized_candidate_evdf_m3_s3",
+          "unit": "conditional non-negative 3-D candidate"
+        },
+        {
+          "name": "distribution_covariance",
+          "unit": "fixed-active-set normalized EVDF covariance; withheld unless identifiable"
+        },
+        {
+          "name": "physical_spectral_kernels",
+          "unit": "per-view exact relativistic detector-space forward kernels"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "view x wavelength calibrated spectral power density"
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "line centres, rest-frame recoil, lab differential cross-section and photon-energy ratios"
+        },
+        {
+          "name": "mean_velocity_vector_m_s",
+          "unit": "3-D first velocity moment; withheld unless identifiable"
+        },
+        {
+          "name": "velocity_covariance_tensor_m2_s2",
+          "unit": "3-D central second velocity moment; withheld unless identifiable"
+        },
+        {
+          "name": "data_only_jacobian_rank",
+          "unit": "rank of the whitened unregularized multi-view forward operator"
+        },
+        {
+          "name": "null_space_dimension",
+          "unit": "number of velocity-space modes not identified by measured views"
+        }
+      ],
+      "algorithm": "For each velocity voxel and view, Lorentz-transform incident and scattered photon four-vectors into the electron rest frame. Optionally apply E_s'/E_i'=[1+(E_i'/m_e c^2)(1-cos chi')]^-1, evaluate the unpolarized Klein-Nishina differential cross-section, transform the solid-angle/incident-flux Jacobian to the laboratory frame, multiply by outgoing/incident photon energy for a power spectrum, conservatively deposit each scattered line into finite wavelength bins, and apply the measured response to bin-integrated power. Invert all views jointly with a non-negative regularized least-squares solver; report a primary 3-D EVDF only if the stacked data-only operator has full column rank.",
+      "assumptions": [
+        "Single scattering from electrons with a prescribed Cartesian velocity grid.",
+        "Unpolarized incident radiation; polarization-resolved scattering is not represented.",
+        "The measured response and relative view gains are supplied calibration inputs; absolute density is not inferred."
+      ],
+      "limitations": [
+        "A full 3-D EVDF is withheld if the stacked data-only multi-view kernel is rank deficient or ill-conditioned; regularization does not create angular information.",
+        "Polarization-resolved Klein-Nishina/Thomson weighting and absolute density calibration are outside this solver.",
+        "This is a numerical physical forward model; experimental validation remains required."
+      ],
+      "uncertainty_model": "Measurement, model-discrepancy and systematic spectral covariance are assembled in view-major order. The non-negative inverse reports fixed-active-set frequentist sandwich covariance and normalized EVDF covariance only when the data-only operator identifies all velocity voxels.",
+      "function_links": [
+        "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+        "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
+        "tokamak_analysis.advanced_inference.reconstruct_multiview_3d_evdf"
+      ],
+      "formula_key": "thomson_general_relativistic_3d_evdf_kernel",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "input_data_level": "measured_calibrated_multi_view_optical_thomson_spectra",
+      "execution_scope": "calibrated_multi_view_spectra_to_general_relativistic_3d_evdf",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "General relativistic 3-D EVDF reconstruction",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_zero_velocity_thomson_limit_recovers_unpolarized_angular_cross_section",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_rest_electron_compton_kernel_recovers_exact_compton_wavelength_shift",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_exact_relativistic_thomson_doppler_map_has_correct_first_order_q_projection_limit",
+        "tests/test_thomson_relativistic_3d_evdf.py::test_relativistic_3d_evdf_inverse_uses_generated_per_view_physical_kernels"
+      ],
+      "function_link": "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"
+    }
   }
 ]
