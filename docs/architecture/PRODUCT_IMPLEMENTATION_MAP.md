@@ -59,7 +59,7 @@ The catalog publishes each package's `api_module`, and `tis.products.load_produc
 - Thomson specialist API: `tis.products.thomson` (named wrappers for the 10 Thomson family workflows).
 - Langmuir specialist API: `tis.products.langmuir` exposes named facades for Langmuir I-V, compatibility I-V, ball-pen, Gundestrup, multi-pin, and plasma/floating-potential workflows; each uses ownership-checked dispatch to the canonical registry.
 - Dashboard product workspace: `tis/ui/product_workspace_page.py`, reachable from **Advanced Analysis → Specialist Product Workspace**.
-- Existing execution form: **Advanced Analysis → Registered analysis modules** now resolves its family and subanalysis list through the product catalog, then executes the original registry callable.
+- Existing execution form: **Advanced Analysis → Registered analysis modules** resolves family/workflow choices through the catalog, imports the selected product's public API module, and dispatches through that product's `run_analysis` method before reaching the canonical solver.
 - The repository currently exposes a Python execution API and Streamlit dashboard; this change does not claim that a separate HTTP/REST server exists.
 
 ## Thomson pilot boundary
