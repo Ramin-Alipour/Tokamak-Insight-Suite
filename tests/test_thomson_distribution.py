@@ -1589,3 +1589,31 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
     assert result["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.01)
     assert result["observed_sigma_nm"] == pytest.approx(0.16, rel=0.04)
     assert result["instrument_response_model"] == "measured_response_matrix_forward_operator"
+
+
+def test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian():
+    from scipy.special import erf
+    from scipy.constants import elementary_charge, electron_mass
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    temperature_eV = 80.0
+    sigma = np.sqrt(elementary_charge * temperature_eV / electron_mass)
+    velocity = np.linspace(-8.0*sigma, 8.0*sigma, 4001)
+    density = np.exp(-0.5*(velocity/sigma)**2) / (np.sqrt(2.0*np.pi)*sigma)
+
+    result = _projected_evdf_physical_moments(velocity, density)
+    energy = result["projected_parallel_kinetic_energy_cdf_eV"]
+    expected = erf(np.sqrt(energy["energy_grid_eV"] / temperature_eV))
+
+    assert energy["distribution_scope"] == "one_dimensional_projected_parallel_energy_only"
+    assert energy["cumulative_probability"][0] == pytest.approx(0.0, abs=1e-12)
+    assert energy["cumulative_probability"][-1] == pytest.approx(1.0, abs=1e-12)
+    assert np.all(np.diff(energy["cumulative_probability"]) >= 0.0)
+    np.testing.assert_allclose(
+        energy["cumulative_probability"][1:-1],
+        expected[1:-1],
+        rtol=2.5e-3,
+        atol=2.5e-4,
+    )

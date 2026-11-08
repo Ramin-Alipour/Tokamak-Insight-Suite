@@ -157,10 +157,47 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
             name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
             for i, name in enumerate(moment_order)
         }
+    # Convert the inferred q-parallel velocity marginal into its cumulative
+    # random kinetic-energy distribution. For E in eV,
+    # v_E=sqrt(2 e E/m_e) and F_q(E)=integral[u_q-v_E,u_q+v_E] f_q(v) dv.
+    # A CDF avoids the integrable E^(-1/2) Jacobian singularity at E=0.
+    from scipy.integrate import trapezoid
+    from scipy.constants import elementary_charge as _elementary_charge
+    energy_max_eV = (
+        0.5 * electron_mass / _elementary_charge
+        * max((velocity[0] - m1)**2, (velocity[-1] - m1)**2)
+    )
+    energy_grid_eV = np.linspace(0.0, energy_max_eV, velocity.size)
+
+    def _energy_cdf(energy_eV):
+        speed = np.sqrt(
+            2.0 * _elementary_charge * float(energy_eV) / electron_mass
+        )
+        lower = max(float(velocity[0]), m1 - speed)
+        upper = min(float(velocity[-1]), m1 + speed)
+        if upper <= lower:
+            return 0.0
+        interior = velocity[(velocity > lower) & (velocity < upper)]
+        nodes = np.concatenate(([lower], interior, [upper]))
+        values = np.interp(nodes, velocity, pdf)
+        return float(trapezoid(values, nodes))
+
+    energy_cdf = np.asarray([_energy_cdf(value) for value in energy_grid_eV])
+    energy_cdf = np.maximum.accumulate(np.clip(energy_cdf, 0.0, 1.0))
+    energy_cdf[-1] = 1.0
+
     return {
         "status": "identified_from_measurement" if covariance is not None else "moments_only_covariance_unavailable",
         "velocity_projection": "q_parallel_one_dimensional_marginal",
         "normalization": normalization,
+        "projected_parallel_kinetic_energy_cdf_eV": {
+            "energy_grid_eV": energy_grid_eV,
+            "cumulative_probability": energy_cdf,
+            "definition": "F_q(E)=integral_[u_q-sqrt(2*e*E/m_e)]^[u_q+sqrt(2*e*E/m_e)] f_q(v) dv",
+            "energy_reference": "kinetic energy in the q-parallel random velocity relative to inferred mean flow",
+            "distribution_scope": "one_dimensional_projected_parallel_energy_only",
+            "jacobian_note": "CDF representation avoids the integrable E^(-1/2) singularity in the transformed pointwise energy density at E=0",
+        },
         "mean_velocity_parallel_m_s": m1,
         "velocity_parallel_variance_m2_s2": variance,
         "velocity_parallel_standard_deviation_m_s": sigma,
