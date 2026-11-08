@@ -9539,6 +9539,10 @@
         {
           "name": "velocity_moment_standard_uncertainty",
           "unit": "one-sigma uncertainty for each reported physical moment"
+        },
+        {
+          "name": "parametric_model_selection_uncertainty",
+          "unit": "Akaike-weighted candidate-family covariance for the projected EVDF and six physical velocity moments, including within- and between-family contributions when available"
         }
       ],
       "prerequisites": [
@@ -9547,7 +9551,7 @@
         "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified.",
         "The directional second-moment temperature is T_eq,eV=m_e Var(v_q)/e. k_B is not included when converting kinetic energy in joules to electronvolts."
       ],
-      "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation.",
+      "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation. Separately, Akaike-weighted Maxwellian, projected Student-t Kappa and super-Gaussian candidate marginals propagate between-family and available within-family covariance through the same six physical moment Jacobians; this model-selection covariance is kept distinct from measurement/background and regularization-choice uncertainty.",
       "limitations": [
         "Non-relativistic q·v Doppler approximation; use the separate relativistic projected-EVDF solver outside this domain.",
         "One scattering view cannot recover unrestricted 3-D anisotropy.",
@@ -9559,7 +9563,8 @@
         "tests/test_thomson_evdf.py::test_evdf_selects_regularization_by_gcv_and_reports_conditional_covariance",
         "tests/test_thomson_evdf.py::test_evdf_propagates_signal_background_and_cross_covariance",
         "tests/test_thomson_evdf.py::test_evdf_adds_independent_model_discrepancy_and_systematic_covariance",
-        "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated"
+        "tests/test_thomson_evdf.py::test_evdf_physical_velocity_moment_covariance_is_propagated_and_correlated",
+        "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty"
       ],
       "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
       "raw_data_to_physics": false,
