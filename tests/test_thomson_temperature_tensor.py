@@ -126,7 +126,7 @@ def test_full_temperature_tensor_rejects_density_uncertainty_without_density():
 
 
 def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
-    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+    from tokamak_analysis.thomson_workflow import analyze_thomson_spectra
 
     c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
     wavelength = np.linspace(529.0, 535.0, 241)
@@ -162,8 +162,9 @@ def test_raw_spectral_fit_recovers_general_non_gyrotropic_temperature_tensor():
     response[1, 1] = 0.8
     widths = np.diff(edges)
     spectra = [(response @ (spectrum * widths)) / widths for spectrum in spectra]
-    result=fit_general_temperature_tensor_thomson_spectra(
-        wavelength,np.asarray(spectra),laser_wavelength_nm=laser,
+    result=analyze_thomson_spectra(
+        wavelength,np.asarray(spectra),model="general_temperature_tensor_maxwellian",
+        laser_wavelength_nm=laser,
         scattering_angle_rad=angle,scattering_vector_unit=q,
         instrument_response_matrix=response,
         signal_uncertainty=np.full((len(q),len(wavelength)),2e-4),
