@@ -1035,7 +1035,6 @@ def assess_multiview_evdf_regularization_sensitivity(
                 "a confidence interval, or a posterior covariance."
             ),
         },
-        "candidate_distributions_m3_s3": np.asarray(candidates),
         "noise_model": noise_model,
         "selection_policy": "no automatic lambda selection; inspect the L-curve and external physical constraints",
         "interpretation": (
