@@ -3737,6 +3737,51 @@ def analyze_thomson_spectra(
                         scattering_angle_uncertainty_rad if model == "non_collective_maxwellian" else None
                     ),
                 )
+                # Bind subanalysis 81 to the already accepted parent physical fit.
+                # Do not launch a second, potentially differently seeded fit here:
+                # the parent result is the authoritative inference for every model
+                # family (Maxwellian, Kappa, relativistic and collective).
+                primary_names = (
+                    ("electron_density_m3", "electron_temperature_eV")
+                    if model in {"collective_maxwellian", "collective_kappa"}
+                    else ("electron_temperature_eV", "electron_velocity_projection_m_s")
+                )
+                primary_values = {
+                    name: channel_result.get(name) for name in primary_names
+                }
+                primary_identified = bool(
+                    channel_result.get("fit_accepted", False)
+                    and all(value is not None and np.isfinite(float(value))
+                            for value in primary_values.values())
+                )
+                canonical_fields = (
+                    "electron_density_m3", "electron_density_uncertainty_m3",
+                    "electron_temperature_eV", "electron_temperature_uncertainty_eV",
+                    "electron_velocity_projection_m_s",
+                    "electron_velocity_projection_uncertainty_m_s",
+                    "kappa_index", "kappa_index_uncertainty",
+                    "physical_parameter_covariance",
+                    "total_physical_parameter_covariance",
+                    "fit_quality_status", "fit_quality_reasons",
+                    "identifiability", "model_validity",
+                )
+                distribution["physical_inference"] = {
+                    "selected_model": model,
+                    "status": (
+                        "identified_from_parent_measured_spectrum_fit"
+                        if primary_identified
+                        else "conditional_or_nonidentifiable_parent_fit"
+                    ),
+                    "reportable_as_primary_inference": primary_identified,
+                    "primary_parameters": primary_values,
+                    "canonical_channel_fit": {
+                        key: channel_result[key]
+                        for key in canonical_fields if key in channel_result
+                    },
+                    "source_spectrum": "same_calibrated_measured_spectrum_as_parent_analysis_1",
+                    "fit_reused_without_refitting": True,
+                    "gaussian_width_used_as_temperature": False,
+                }
                 distribution["analysis_status"] = "completed"
                 distribution["background_source"] = (
                     "background nuisance component from the selected Thomson physical forward fit"
