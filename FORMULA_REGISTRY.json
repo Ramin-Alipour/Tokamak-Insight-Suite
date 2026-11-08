@@ -11048,5 +11048,97 @@
       ]
     },
     "note": "Used directly by the physical multi-view 3-D optical Thomson forward-kernel builder."
+  },
+  {
+    "name": "Full measured PSF matrix covariance in joint Thomson spatial-spectral inversion",
+    "equation": "Y_cλ=R_c[Σ_ab H_ca P_ab S_b(λ;p)]+B_c(λ); S_P=−(J_pᵀJ_p)^+J_pᵀJ_P; C_p,P=S_P C_P S_Pᵀ; C_p,total=C_p,data+C_p,P+S_y C_yP S_Pᵀ+S_P C_yPᵀ S_yᵀ",
+    "inputs": "Channel-major calibrated spectra, measured spectral covariance, fixed spatial mixing matrix H, explicit measured PSF matrix P, full row-major covariance C_P of vec(P), and optional measured-spectrum/PSF cross-covariance C_yP",
+    "output": "Parameter-space covariance contribution from every measured PSF matrix element and optional spectrum/PSF cross-covariance, propagated to amplitude, Te, projected flow, fitted Kappa index and detector-background nuisance parameters",
+    "assumptions": "First-order local data-only GLS sensitivity around a data-identifiable joint physical fit. The measured PSF matrix and mixing operator are fixed nominal forward operators; covariance is externally supplied. Cross-covariance is accepted only when the complete measured-spectrum/PSF covariance block is positive semidefinite. Matrix perturbation constraints are not projected or renormalized.",
+    "status": "D",
+    "category": "Thomson spatial profile inference",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "formula_key": "thomson_measured_psf_matrix_covariance",
+      "input_specs": [
+        {
+          "name": "spatial_psf_matrix",
+          "unit": "n_nodes x n_nodes measured spatial probability operator",
+          "required": true
+        },
+        {
+          "name": "spatial_psf_matrix_covariance",
+          "unit": "(n_nodes*n_nodes)^2 covariance of row-major vec(P)",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty or joint_spectral_covariance",
+          "unit": "channel-major measured spectral covariance",
+          "required": false
+        },
+        {
+          "name": "spectral_psf_cross_covariance",
+          "unit": "(n_channels*n_wavelengths) x (n_nodes*n_nodes)",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "psf_matrix_calibration_parameter_covariance",
+          "unit": "physical fit-parameter covariance"
+        },
+        {
+          "name": "psf_matrix_cross_covariance_parameter_contribution",
+          "unit": "physical fit-parameter covariance cross contribution"
+        },
+        {
+          "name": "psf_matrix_parameter_sensitivity",
+          "unit": "fit-parameter derivative with respect to row-major PSF matrix elements"
+        }
+      ],
+      "prerequisites": [
+        "An explicit researcher-supplied measured PSF matrix; generated Gaussian-width PSFs use the separate scalar-width uncertainty model.",
+        "A data-identifiable joint spectral-spatial physical fit; regularization rows are excluded from the identifiability Jacobian.",
+        "PSF-element covariance must be finite, symmetric and positive semidefinite.",
+        "A spectrum/PSF cross-covariance requires measured spectral covariance and a positive-semidefinite joint block."
+      ],
+      "uncertainty_model": "C_p,P=S_P C_P S_P^T, with S_P=−(J_p^T J_p)^+J_p^T J_P. Optional C_yP contributes S_y C_yP S_P^T plus its transpose. First-order local propagation is conditional on the selected physical model, response, nominal mixing operator, nominal PSF and regularization.",
+      "limitations": [
+        "Local linearized uncertainty only; positivity and finite-column-mass constraints are not enforced on perturbed PSF realizations.",
+        "The covariance is conditional on the selected physical model, instrument response, nominal spatial mixing operator and regularization.",
+        "No PSF calibration or experimental validation is performed by this software."
+      ],
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_full_measured_psf_matrix_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_psf_cross_covariance_and_checks_joint_block",
+        "tests/test_thomson_workflow.py::test_joint_spatial_dispatch_forwards_full_psf_and_systematic_covariances"
+      ],
+      "note": "Element-wise derivative of H P S is propagated through the complete response-convolved spectral model and data-only GLS normal equations.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "input_data_level": "measured_calibrated_spectra_and_measured_spatial_psf",
+      "execution_scope": "joint_measured_spectral_to_spatial_physical_profile_inference",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Spatial profile reconstruction"
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectra_and_measured_spatial_psf",
+    "execution_scope": "joint_measured_spectral_to_spatial_physical_profile_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "function_links": [
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
+      ],
+      "formula_key": "thomson_measured_psf_matrix_covariance",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_full_measured_psf_matrix_covariance",
+        "tests/test_thomson_joint_spatial_spectral.py::test_joint_inverse_propagates_spectrum_psf_cross_covariance_and_checks_joint_block"
+      ]
+    }
   }
 ]

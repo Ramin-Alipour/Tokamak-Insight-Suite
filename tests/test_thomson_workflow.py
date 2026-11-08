@@ -166,3 +166,41 @@ def test_gyrotropic_workflow_rejects_unknown_distribution_without_fallback():
             laser_wavelength_nm=500.0, scattering_angle_rad=np.pi / 2,
             magnetic_field_unit=[0, 0, 1], scattering_vector_unit=[[0, 0, 1]],
             instrument_response_matrix=np.eye(17))
+
+
+def test_joint_spatial_dispatch_forwards_full_psf_and_systematic_covariances(monkeypatch):
+    captured = {}
+    def fake_joint(*args, **kwargs):
+        captured["kwargs"] = kwargs
+        return {"analysis_status": "joint-dispatch-tested"}
+    import tokamak_analysis.thomson_joint_spatial_spectral as joint
+    monkeypatch.setattr(joint, "reconstruct_joint_thomson_spatial_spectra", fake_joint)
+    wavelength = np.linspace(520.0, 544.0, 9)
+    psf_covariance = np.eye(9)
+    spectrum_psf_cross = np.zeros((3*wavelength.size, 9))
+    systematic = np.eye(3*wavelength.size) * 1.0e-6
+    result = workflow.reconstruct_thomson_profile_from_spectra(
+        wavelength, np.ones((3, wavelength.size)), np.array([0.1, 0.2, 0.3]),
+        joint_spatial_spectral=True, spatial_mixing_matrix=np.eye(3),
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2.0,
+        instrument_response=np.eye(wavelength.size), model="non_collective_maxwellian",
+        spatial_psf_matrix=np.eye(3),
+        spatial_psf_matrix_covariance=psf_covariance,
+        spectral_psf_cross_covariance=spectrum_psf_cross,
+        systematic_covariance=systematic,
+    )
+    assert result["analysis_status"] == "joint-dispatch-tested"
+    np.testing.assert_array_equal(captured["kwargs"]["spatial_psf_matrix_covariance"], psf_covariance)
+    np.testing.assert_array_equal(captured["kwargs"]["spectral_psf_cross_covariance"], spectrum_psf_cross)
+    np.testing.assert_array_equal(captured["kwargs"]["systematic_covariance"], systematic)
+
+
+def test_spatial_profile_registry_exposes_full_psf_matrix_uncertainty_contract():
+    from tokamak_analysis.analysis_registry import get_analysis
+    entry = get_analysis(46)
+    inputs = {item["name"] for item in entry["execution_contract"]["input_specs"]}
+    outputs = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    assert "spatial_psf_matrix_covariance" in inputs
+    assert "spectral_psf_cross_covariance" in inputs
+    assert "systematic_covariance" in inputs
+    assert "psf_matrix_calibration_parameter_covariance" in outputs

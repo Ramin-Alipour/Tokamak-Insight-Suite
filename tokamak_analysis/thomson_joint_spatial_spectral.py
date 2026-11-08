@@ -274,6 +274,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
     spatial_psf_matrix=None, spatial_psf_sigma_m=None,
     spatial_psf_sigma_uncertainty_m=None,
+    spatial_psf_matrix_covariance=None,
+    spectral_psf_cross_covariance=None,
     spatial_mixing_matrix_covariance=None,
     spectral_mixing_cross_covariance=None,
     laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
@@ -388,6 +390,10 @@ def reconstruct_joint_thomson_spatial_spectra(
         psf = np.eye(r.size, dtype=float)
         psf_source = "identity_no_additional_psf_operator"
     psf_sigma_uncertainty = None
+    if spatial_psf_matrix_covariance is not None and spatial_psf_sigma_uncertainty_m is not None:
+        raise ValueError("supply spatial_psf_matrix_covariance or spatial_psf_sigma_uncertainty_m, not both")
+    if spatial_psf_matrix_covariance is not None and spatial_psf_matrix is None:
+        raise ValueError("spatial_psf_matrix_covariance requires an explicit measured spatial_psf_matrix")
     if spatial_psf_sigma_uncertainty_m is not None:
         if psf_sigma is None:
             raise ValueError(
@@ -490,6 +496,62 @@ def reconstruct_joint_thomson_spatial_spectra(
         if joint_eigenvalues[0] < -1e-10 * joint_scale:
             raise ValueError(
                 "joint measured-spectrum/spatial-mixing covariance block must be positive semidefinite"
+            )
+
+    psf_matrix_covariance = None
+    if spatial_psf_matrix_covariance is not None:
+        psf_matrix_covariance = _real_array(
+            spatial_psf_matrix_covariance, "spatial_psf_matrix_covariance"
+        )
+        expected_psf_covariance_shape = (r.size*r.size, r.size*r.size)
+        if (psf_matrix_covariance.shape != expected_psf_covariance_shape
+                or not np.allclose(psf_matrix_covariance, psf_matrix_covariance.T,
+                                   rtol=1e-10, atol=1e-13)):
+            raise ValueError(
+                "spatial_psf_matrix_covariance must be a finite symmetric "
+                "(n_nodes*n_nodes)-square covariance in row-major PSF-element order"
+            )
+        psf_matrix_covariance = 0.5 * (
+            psf_matrix_covariance + psf_matrix_covariance.T
+        )
+        psf_eigenvalues = np.linalg.eigvalsh(psf_matrix_covariance)
+        psf_scale = max(float(np.max(np.abs(psf_eigenvalues))), np.finfo(float).tiny)
+        if psf_eigenvalues[0] < -1e-10 * psf_scale:
+            raise ValueError("spatial_psf_matrix_covariance must be positive semidefinite")
+
+    psf_cross_covariance = None
+    if spectral_psf_cross_covariance is not None:
+        if psf_matrix_covariance is None:
+            raise ValueError(
+                "spectral_psf_cross_covariance requires spatial_psf_matrix_covariance"
+            )
+        if measurement_covariance is None:
+            raise ValueError(
+                "spectral_psf_cross_covariance requires measured signal_uncertainty "
+                "or joint_spectral_covariance; model-discrepancy/systematic covariance is not a substitute"
+            )
+        psf_cross_covariance = _real_array(
+            spectral_psf_cross_covariance, "spectral_psf_cross_covariance"
+        )
+        if psf_cross_covariance.shape != (m*nlam, r.size*r.size):
+            raise ValueError(
+                "spectral_psf_cross_covariance must have shape "
+                "(n_channels*n_wavelengths, n_nodes*n_nodes) in channel-major/row-major order"
+            )
+        joint_measurement_psf_covariance = np.block([
+            [measurement_covariance, psf_cross_covariance],
+            [psf_cross_covariance.T, psf_matrix_covariance],
+        ])
+        joint_measurement_psf_covariance = 0.5 * (
+            joint_measurement_psf_covariance + joint_measurement_psf_covariance.T
+        )
+        joint_psf_eigenvalues = np.linalg.eigvalsh(joint_measurement_psf_covariance)
+        joint_psf_scale = max(
+            float(np.max(np.abs(joint_psf_eigenvalues))), np.finfo(float).tiny
+        )
+        if joint_psf_eigenvalues[0] < -1e-10 * joint_psf_scale:
+            raise ValueError(
+                "joint measured-spectrum/PSF covariance block must be positive semidefinite"
             )
 
     discrepancy = None
@@ -881,6 +943,9 @@ def reconstruct_joint_thomson_spatial_spectra(
     spectral_covariance_parameter_components_p = {}
     psf_calibration_covariance_p = None
     psf_sigma_parameter_sensitivity = None
+    psf_matrix_calibration_covariance_p = None
+    psf_matrix_parameter_sensitivity = None
+    psf_matrix_cross_covariance_parameter_p = None
     mixing_calibration_covariance_p = None
     mixing_cross_covariance_parameter_p = None
     mixing_parameter_sensitivity = None
@@ -994,6 +1059,60 @@ def reconstruct_joint_thomson_spatial_spectra(
             )
             data_covariance_p = data_covariance_p + psf_calibration_covariance_p
 
+        if psf_matrix_covariance is not None:
+            # For F = H P S, dF_c/dP_ab = H_ca S_b. Differentiate the
+            # response-convolved detector spectrum and propagate the measured
+            # PSF-element covariance through data-only GLS implicit sensitivity.
+            _, _, _, _, _, fitted_node_spectra = predict(
+                fit.x, return_node_spectra=True
+            )
+            psf_residual_jacobian = np.zeros(
+                (m*nlam, r.size*r.size), dtype=float
+            )
+            for observed_node in range(r.size):
+                for true_node in range(r.size):
+                    derivative = np.zeros((m, nlam), dtype=float)
+                    for channel in range(m):
+                        mixed_component = (
+                            nominal_mixing[channel, observed_node]
+                            * fitted_node_spectra[true_node]
+                        )
+                        detector_derivative = (
+                            response[channel] @ (mixed_component * widths)
+                        ) / widths
+                        derivative[channel] = -detector_derivative
+                    psf_residual_jacobian[:, observed_node*r.size+true_node] = (
+                        whiten(derivative.reshape(-1))
+                    )
+            psf_matrix_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                data_jacobian.T @ psf_residual_jacobian
+            )
+            psf_matrix_calibration_covariance_p = (
+                psf_matrix_parameter_sensitivity @ psf_matrix_covariance
+                @ psf_matrix_parameter_sensitivity.T
+            )
+            psf_matrix_calibration_covariance_p = 0.5 * (
+                psf_matrix_calibration_covariance_p
+                + psf_matrix_calibration_covariance_p.T
+            )
+            data_covariance_p = data_covariance_p + psf_matrix_calibration_covariance_p
+            if psf_cross_covariance is not None:
+                whitening_matrix = np.linalg.solve(
+                    spectral_covariance_cholesky, np.eye(m*nlam)
+                )
+                measurement_parameter_sensitivity = -np.linalg.pinv(data_information) @ (
+                    data_jacobian.T @ whitening_matrix
+                )
+                psf_matrix_cross_covariance_parameter_p = (
+                    measurement_parameter_sensitivity @ psf_cross_covariance
+                    @ psf_matrix_parameter_sensitivity.T
+                )
+                psf_matrix_cross_covariance_parameter_p += (
+                    psf_matrix_cross_covariance_parameter_p.T
+                )
+                data_covariance_p = data_covariance_p + psf_matrix_cross_covariance_parameter_p
+            data_covariance_p = 0.5 * (data_covariance_p + data_covariance_p.T)
+
     transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
                               np.array([fitted_kappa-1.5]) if kappa_parameter_count else np.empty(0),
                               np.ones(m*n_background)])
@@ -1087,6 +1206,18 @@ def reconstruct_joint_thomson_spatial_spectra(
             transform @ psf_calibration_covariance_p @ transform.T
             if psf_calibration_covariance_p is not None else None
         ),
+        "psf_matrix_calibration_parameter_covariance": (
+            transform @ psf_matrix_calibration_covariance_p @ transform.T
+            if psf_matrix_calibration_covariance_p is not None else None
+        ),
+        "psf_matrix_cross_covariance_parameter_contribution": (
+            transform @ psf_matrix_cross_covariance_parameter_p @ transform.T
+            if psf_matrix_cross_covariance_parameter_p is not None else None
+        ),
+        "psf_matrix_parameter_sensitivity": (
+            transform @ psf_matrix_parameter_sensitivity
+            if psf_matrix_parameter_sensitivity is not None else None
+        ),
         "spatial_mixing_calibration_parameter_covariance": (
             transform @ mixing_calibration_covariance_p @ transform.T
             if mixing_calibration_covariance_p is not None else None
@@ -1106,11 +1237,17 @@ def reconstruct_joint_thomson_spatial_spectra(
         "covariance_decomposition": {
             "reported_parameter_covariance": (
                 "data_only_GLS_plus_linearized_external_PSF_calibration_covariance_excluding_regularization_penalty"
-                if psf_calibration_covariance_p is not None else
+                if psf_calibration_covariance_p is not None or psf_matrix_calibration_covariance_p is not None else
                 "data_only_GLS_covariance_excluding_regularization_penalty"
             ),
             "measurement_data_covariance_available": measurement_data_covariance_p is not None and data_identifiable,
-            "psf_calibration_covariance": "implicit_GLS_parameter_sensitivity_to_scalar_Gaussian_PSF_sigma_uncertainty; conditional on fixed PSF shape and mixing operator",
+            "psf_calibration_covariance": (
+                "scalar_Gaussian_PSF_width_covariance" if psf_calibration_covariance_p is not None
+                else "full_measured_PSF_matrix_element_covariance" if psf_matrix_calibration_covariance_p is not None
+                else "not_supplied"
+            ),
+            "psf_matrix_calibration_covariance_available": psf_matrix_calibration_covariance_p is not None,
+            "psf_matrix_spectrum_cross_covariance_available": psf_matrix_cross_covariance_parameter_p is not None,
             "regularized_parameter_covariance": "optimizer_local_covariance_including_selected_regularization_penalty",
             "profile_parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                                        [f"Te_{i}_eV" for i in range(n)] +
@@ -1180,10 +1317,22 @@ def reconstruct_joint_thomson_spatial_spectra(
             ),
             "uncertainty_status": (
                 "propagated"
-                if psf_calibration_covariance_p is not None else
+                if psf_calibration_covariance_p is not None
+                or psf_matrix_calibration_covariance_p is not None else
                 "not_propagated_data_solution_not_identifiable"
-                if psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0 else
+                if (psf_sigma_uncertainty is not None and psf_sigma_uncertainty > 0.0)
+                or psf_matrix_covariance is not None else
                 "not_supplied"
+            ),
+            "matrix_element_covariance_supplied": psf_matrix_covariance is not None,
+            "matrix_element_covariance_shape": (
+                list(psf_matrix_covariance.shape)
+                if psf_matrix_covariance is not None else None
+            ),
+            "spectrum_psf_cross_covariance_supplied": psf_cross_covariance is not None,
+            "matrix_element_uncertainty_method": (
+                "first_order_data_only_GLS_implicit_sensitivity_with_full_row_major_matrix_covariance"
+                if psf_matrix_calibration_covariance_p is not None else "not_propagated"
             ),
         },
         "instrument_response": "researcher_supplied_fixed_forward_operator",
@@ -1301,6 +1450,8 @@ def reconstruct_joint_thomson_spatial_spectra(
                 spatial_psf_matrix=spatial_psf_matrix,
                 spatial_psf_sigma_m=spatial_psf_sigma_m,
                 spatial_psf_sigma_uncertainty_m=spatial_psf_sigma_uncertainty_m,
+                spatial_psf_matrix_covariance=spatial_psf_matrix_covariance,
+                spectral_psf_cross_covariance=spectral_psf_cross_covariance,
                 laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
                 laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
                 signal_uncertainty=signal_uncertainty,

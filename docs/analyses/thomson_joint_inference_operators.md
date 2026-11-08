@@ -50,3 +50,24 @@ These routines operate on calibrated measured spectra and explicit forward
 operators. Unit tests are numerical software regressions, not experimental
 validation. A callback's physics, detector calibration, and validity domain
 remain the responsibility of the selected diagnostic model.
+
+
+## Full measured spatial-PSF matrix uncertainty in the joint spectral inverse
+
+For the joint detector model
+`Y_{cλ}=\mathcal R_c[\sum_{a,b}H_{ca}P_{ab}S_b(λ;p)]+B_c(λ)`,
+the derivative with respect to a measured PSF element is
+`∂Y_c/∂P_{ab}=H_{ca}\mathcal R_c[S_b]`.
+The data-only GLS implicit sensitivity is
+`S_P=−(J_pᵀJ_p)^+J_pᵀJ_P`, giving
+`C_{p,P}=S_P C_P S_Pᵀ`. An optional measured-spectrum/PSF cross-covariance
+`C_{yP}` contributes both terms
+`S_y C_{yP}S_Pᵀ+S_P C_{yP}ᵀ S_yᵀ`. The complete joint
+spectrum/PSF covariance block is checked for positive semidefiniteness before
+the cross term is used. Matrix-element covariance uses row-major order over
+the supplied measured PSF matrix and requires that explicit matrix; it cannot
+be attached to a generated Gaussian-width PSF. This is a first-order local
+linearization conditional on the nominal PSF, mixing matrix, physical model,
+response and selected regularization; it does not enforce positivity or
+column-mass constraints on random PSF perturbations. The Dashboard exposes
+both covariance uploads in the joint spatial-spectral workflow.

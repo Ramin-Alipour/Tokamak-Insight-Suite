@@ -989,6 +989,12 @@ elif page=='Spectral Analysis':
                     type=['csv','txt'],key='ts_infer_systematic_covariance',
                     help='Supply a positive-semidefinite covariance for correlated systematic spectral effects. It is added once to measurement and model-discrepancy covariance; the total GLS covariance must be positive definite.',
                 )
+            elif joint_spatial_spectral:
+                systematic_covariance_upload=st.file_uploader(
+                    'Optional full channel-major systematic spectral covariance CSV',
+                    type=['csv','txt'],key='ts_infer_joint_systematic_covariance',
+                    help='A separate positive-semidefinite covariance for correlated systematic effects across all channel-wavelength samples. It is added once to measurement and model-discrepancy covariance.',
+                )
             channel_background_model='linear'
             channel_background_degree=2
             channel_background_interior_knots=3
@@ -1020,6 +1026,8 @@ elif page=='Spectral Analysis':
             spatial_psf_mode='identity'
             spatial_psf_sigma_text=None
             spatial_psf_upload=None
+            spatial_psf_covariance_upload=None
+            spectral_psf_cross_covariance_upload=None
             spatial_laser_profile_upload=None
             spatial_mixing_covariance_upload=None
             spatial_mixing_mc_samples=100
@@ -1058,6 +1066,16 @@ elif page=='Spectral Analysis':
                     spatial_psf_upload=st.file_uploader(
                         'Measured spatial PSF matrix CSV (observed radial bins × true radial nodes)',
                         type=['csv','txt'],key='ts_infer_spatial_psf_matrix',
+                    )
+                    spatial_psf_covariance_upload=st.file_uploader(
+                        'Optional full measured-PSF matrix-element covariance CSV (row-major PSF element order)',
+                        type=['csv','txt'],key='ts_infer_spatial_psf_matrix_covariance',
+                        help='Supply Cov(vec(P)) for the measured PSF matrix P. The covariance is propagated through H P S using data-only GLS sensitivity; no PSF is inferred from plasma spectra.',
+                    )
+                    spectral_psf_cross_covariance_upload=st.file_uploader(
+                        'Optional measured-spectrum / PSF-element cross-covariance CSV',
+                        type=['csv','txt'],key='ts_infer_spectral_psf_cross_covariance',
+                        help='Rows follow channel-major measured spectra; columns follow row-major PSF matrix elements. Requires both measured spectral covariance and PSF matrix-element covariance.',
                     )
                 spatial_laser_profile_upload=st.file_uploader(
                     'Optional measured incident laser spectrum CSV (incident_wavelength_nm, spectral_density_per_nm)',
@@ -1190,6 +1208,8 @@ elif page=='Spectral Analysis':
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
                 'model_discrepancy_covariance_upload': _ts_upload_digest(model_discrepancy_covariance_upload),
                 'systematic_covariance_upload': _ts_upload_digest(systematic_covariance_upload),
+                'spatial_psf_covariance_upload': _ts_upload_digest(spatial_psf_covariance_upload),
+                'spectral_psf_cross_covariance_upload': _ts_upload_digest(spectral_psf_cross_covariance_upload),
                 'joint_spatial_spectral': joint_spatial_spectral,
                 'channel_background_model': channel_background_model,
                 'channel_background_degree': channel_background_degree,
@@ -1401,6 +1421,14 @@ elif page=='Spectral Analysis':
                             kwargs['spatial_psf_matrix']=pd.read_csv(
                                 spatial_psf_upload,header=None
                             ).to_numpy(dtype=float)
+                            if spatial_psf_covariance_upload is not None:
+                                kwargs['spatial_psf_matrix_covariance']=pd.read_csv(
+                                    spatial_psf_covariance_upload,header=None
+                                ).to_numpy(dtype=float)
+                            if spectral_psf_cross_covariance_upload is not None:
+                                kwargs['spectral_psf_cross_covariance']=pd.read_csv(
+                                    spectral_psf_cross_covariance_upload,header=None
+                                ).to_numpy(dtype=float)
                         if spatial_laser_profile_upload is not None:
                             laser_profile_table=pd.read_csv(
                                 spatial_laser_profile_upload,header=None

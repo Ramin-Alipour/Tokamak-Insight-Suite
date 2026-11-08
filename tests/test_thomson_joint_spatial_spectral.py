@@ -992,3 +992,99 @@ def test_joint_inverse_propagates_spectrum_operator_cross_covariance_and_validat
             spatial_mixing_matrix_covariance=mixing_covariance,
             spectral_mixing_cross_covariance=invalid_cross,
         )
+
+
+def _three_node_measured_psf_case():
+    from tokamak_analysis.thomson_joint_spatial_spectral import (
+        _bin_averaged_maxwellian_spectrum, gaussian_spatial_psf_matrix,
+    )
+    wavelength = np.linspace(520.0, 544.0, 121)
+    radius = np.array([0.0, 0.5, 1.0])
+    mixing = np.array([[0.85, 0.15, 0.0], [0.1, 0.8, 0.1], [0.0, 0.15, 0.85]])
+    temperature = np.array([80.0, 100.0, 120.0])
+    flow = np.array([-5.0e3, 0.0, 5.0e3])
+    amplitude = np.array([1.0, 1.1, 1.0])
+    psf = gaussian_spatial_psf_matrix(radius, 0.045)
+    sigma = 2.0 * 532.0 * np.sqrt(temperature / 510998.95069) * np.sin(np.pi / 4.0)
+    center = 532.0 * (1.0 - 2.0 * np.sin(np.pi / 4.0) * flow / 299792458.0)
+    intrinsic = np.vstack([
+        amplitude[i] * _bin_averaged_maxwellian_spectrum(
+            wavelength, center[i], sigma[i], 1.0
+        ) for i in range(radius.size)
+    ])
+    measured = mixing @ psf @ intrinsic + 0.01
+    return wavelength, measured, radius, mixing, psf
+
+
+def test_joint_inverse_propagates_full_measured_psf_matrix_covariance():
+    wavelength, measured, radius, mixing, psf = _three_node_measured_psf_case()
+    covariance = np.eye(psf.size) * 1.0e-8
+    common = dict(
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(measured, 0.01),
+        spatial_psf_matrix=psf, regularization_strength=0.0,
+    )
+    nominal = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing, **common
+    )
+    propagated = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing,
+        spatial_psf_matrix_covariance=covariance, **common
+    )
+    contribution = propagated["psf_matrix_calibration_parameter_covariance"]
+    assert contribution is not None
+    assert contribution.shape == propagated["parameter_covariance"].shape
+    assert np.all(np.isfinite(contribution))
+    assert np.linalg.norm(contribution) > 0.0
+    assert np.min(np.linalg.eigvalsh(0.5 * (contribution + contribution.T))) >= -1e-10
+    np.testing.assert_allclose(
+        propagated["parameter_covariance"],
+        nominal["parameter_covariance"] + contribution,
+        rtol=2e-5, atol=1e-12,
+    )
+    assert propagated["spatial_psf_contract"]["matrix_element_covariance_supplied"] is True
+    assert propagated["spatial_psf_contract"]["uncertainty_status"] == "propagated"
+
+
+def test_joint_inverse_propagates_spectrum_psf_cross_covariance_and_checks_joint_block():
+    wavelength, measured, radius, mixing, psf = _three_node_measured_psf_case()
+    psf_covariance = np.eye(psf.size) * 1.0e-8
+    signal_sigma = np.full_like(measured, 0.01)
+    cross = np.zeros((measured.size, psf.size))
+    cross[0, 0] = 2.0e-7
+    common = dict(
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=signal_sigma, spatial_psf_matrix=psf,
+        spatial_psf_matrix_covariance=psf_covariance,
+        regularization_strength=0.0,
+    )
+    propagated = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing,
+        spectral_psf_cross_covariance=cross, **common
+    )
+    cross_contribution = propagated["psf_matrix_cross_covariance_parameter_contribution"]
+    assert cross_contribution is not None
+    assert np.linalg.norm(cross_contribution) > 0.0
+    assert np.all(np.isfinite(cross_contribution))
+    assert propagated["spatial_psf_contract"]["spectrum_psf_cross_covariance_supplied"] is True
+
+    invalid = cross.copy()
+    invalid[0, 0] = 1.0e-3
+    with pytest.raises(ValueError, match="joint measured-spectrum/PSF covariance block"):
+        reconstruct_joint_thomson_spatial_spectra(
+            wavelength, measured, radius, mixing,
+            spectral_psf_cross_covariance=invalid, **common
+        )
+
+
+def test_joint_inverse_requires_measured_psf_matrix_for_matrix_covariance():
+    wavelength, measured, radius, mixing, _ = _three_node_measured_psf_case()
+    with pytest.raises(ValueError, match="requires an explicit measured spatial_psf_matrix"):
+        reconstruct_joint_thomson_spatial_spectra(
+            wavelength, measured, radius, mixing,
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2.0,
+            instrument_response=np.eye(wavelength.size),
+            spatial_psf_matrix_covariance=np.eye(radius.size**2),
+        )
