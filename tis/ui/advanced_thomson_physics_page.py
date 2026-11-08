@@ -1369,6 +1369,45 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "principal_temperature_eigenvalues_eV": result.get("temperature_tensor_eigenvalues_eV"),
                     "candidate_tensor_if_not_identifiable": result.get("candidate_temperature_tensor_eV"),
                 })
+            if model == "thomson_full_temperature_tensor" and isinstance(result, Mapping):
+                st.subheader("General 3-D temperature tensor — scattering-geometry uncertainty")
+                st.latex(
+                    r"T_q=\\hat{\\mathbf q}^{T}T_e\\hat{\\mathbf q},"
+                    r"\\qquad C_{T,\\mathrm{geom}}=J_q C_q J_q^{T}"
+                )
+                st.caption(
+                    "The geometry covariance is propagated through the implicit GLS solution "
+                    "using finite differences of the normalized scattering directions. "
+                    "It is kept distinct from projected-temperature measurement covariance."
+                )
+                st.write({
+                    "geometry_covariance_status": result.get("geometry_covariance_status"),
+                    "view_dyad_rank": result.get("view_dyad_rank"),
+                    "view_dyad_condition_number": result.get("view_dyad_condition_number"),
+                    "parameter_covariance_status": result.get("parameter_covariance_status"),
+                    "pressure_covariance_status": result.get("electron_pressure_covariance_status"),
+                })
+                geometry_covariance = result.get(
+                    "scattering_geometry_parameter_covariance_eV2"
+                )
+                total_covariance = result.get("parameter_covariance_with_geometry_eV2")
+                if geometry_covariance is not None:
+                    st.write("Scattering-geometry contribution to tensor covariance (eV²):")
+                    st.dataframe(
+                        np.asarray(geometry_covariance, dtype=float),
+                        use_container_width=True,
+                    )
+                if total_covariance is not None:
+                    st.write("Measurement/residual plus geometry tensor covariance (eV²):")
+                    st.dataframe(
+                        np.asarray(total_covariance, dtype=float),
+                        use_container_width=True,
+                    )
+                if result.get("positive_semidefinite_constraint_active", False):
+                    st.warning(
+                        "The PSD constraint is active. Symmetric local geometry covariance "
+                        "is withheld because boundary-constrained uncertainty is non-Gaussian."
+                    )
             if isinstance(result, Mapping) and "velocity_moment_covariance_order" in result:
                 st.subheader("Projected EVDF — physical velocity moments")
                 st.latex(
