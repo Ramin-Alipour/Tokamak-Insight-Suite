@@ -271,6 +271,34 @@ def test_multiview_evdf_regularization_sensitivity_reports_l_curve_without_auto_
     assert all(level["null_space_dimension"] == 0 for level in result["levels"])
 
 
+def test_multiview_evdf_regularization_spread_propagates_to_3d_physical_moments():
+    kernels = np.zeros((3, 2, 6))
+    for view in range(3):
+        kernels[view, :, 2*view:2*view+2] = np.eye(2)
+    truth = np.array([1., 2., 3., 4., 5., 6.])
+    volume = np.full(6, 0.1)
+    data = (kernels.reshape(6, 6) @ (truth * volume)).reshape(3, 2)
+    velocity = np.array([
+        [-3., 0., 0.], [-2., 1., 0.], [-1., 0., 1.],
+        [1., -1., 0.], [2., 0., -1.], [3., 1., 1.],
+    ])
+    result = assess_multiview_evdf_regularization_sensitivity(
+        kernels, data, velocity,
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=np.diff(np.eye(6), axis=0),
+        regularization_strengths=np.array([1e-8, 1e-5, 1e-2]),
+    )
+    spread = result["regularization_selection_uncertainty"]
+    assert spread["candidate_count"] == 3
+    assert spread["distribution_covariance_m6_s6"].shape == (6, 6)
+    assert spread["physical_moment_candidate_values"].shape == (3, 12)
+    covariance = spread["physical_moment_covariance_moment_units_squared"]
+    assert covariance.shape == (12, 12)
+    assert np.allclose(covariance, covariance.T, atol=1e-12)
+    assert np.linalg.eigvalsh(covariance).min() >= -1e-10
+    assert "not measurement uncertainty" in spread["interpretation"]
+
+
 def test_multiview_3d_evdf_is_available_through_public_thomson_dispatcher():
     from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
