@@ -222,7 +222,10 @@ MODEL_PHYSICS_NOTES = {
         "For each candidate, computes the normalized distribution and its 3-D mean-velocity vector and covariance tensor. "
         "The sample covariance across candidates is reported separately as regularization-selection sensitivity; "
         "it is not measurement noise, a confidence interval, or a posterior. The data-only rank gate is evaluated "
-        "at every strength and regularization never creates angular identifiability."
+        "at every strength and regularization never creates angular identifiability. "
+        "The L-curve residuals are whitened by the complete additive covariance "
+        "Sigma_total = Sigma_measurement + Sigma_model_discrepancy + Sigma_systematic; "
+        "all three components are forwarded to the same constrained physical inverse."
     ),
     "thomson_multiview_3d_evdf_physical": (
         "Physical optical Thomson 3-D EVDF inversion. For each measured view j and velocity voxel a, "
@@ -1312,6 +1315,7 @@ def render_advanced_thomson_physics_page(st) -> None:
                 st.write({
                     "candidate_count": spread.get("candidate_count"),
                     "regularization_strengths": result.get("regularization_strengths"),
+                    "covariance_components_included": result.get("covariance_components_included"),
                     "candidate_levels": result.get("levels"),
                 })
                 if spread.get("physical_moment_covariance_moment_units_squared") is not None:
