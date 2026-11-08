@@ -156,7 +156,6 @@ def test_named_product_workflow_wrappers_dispatch_to_their_own_registered_ids(mo
 
     for product in list_products():
         api = load_product_api(product["product_id"])
-        captured = []
         monkeypatch.setattr(
             api,
             "execute_product_analysis",
