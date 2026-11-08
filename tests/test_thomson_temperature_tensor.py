@@ -432,3 +432,58 @@ def test_raw_tensor_fit_rejects_row_stochastic_but_non_column_stochastic_respons
             scattering_vector_unit=q,
             instrument_response_matrix=response,
         )
+
+
+def test_raw_tensor_fit_separates_measurement_model_discrepancy_and_systematic_parameter_uncertainty():
+    from scipy.special import ndtr
+    from tokamak_analysis.thomson_temperature_tensor import fit_general_temperature_tensor_thomson_spectra
+
+    wavelength = np.linspace(529.0, 535.0, 61)
+    q, tensor, _ = _views()
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    spectra = []
+    for direction in q:
+        projected = float(direction @ tensor @ direction)
+        sigma = 532.0 * 2.0 * np.sin(np.pi / 4.0) * np.sqrt(e * projected / me) / c
+        z = (edges - 532.0) / sigma
+        probability = ndtr(z[1:]) - ndtr(z[:-1])
+        positive = z[:-1] > 0.0
+        probability[positive] = ndtr(-z[:-1][positive]) - ndtr(-z[1:][positive])
+        spectra.append(1.7 * probability / np.diff(edges) + 0.025)
+    spectra = np.asarray(spectra)
+    n_data = spectra.size
+    measurement = np.eye(n_data) * (2.0e-4)**2
+    discrepancy_shape = np.linspace(-1.0, 1.0, n_data)
+    discrepancy = (3.0e-5)**2 * np.outer(discrepancy_shape, discrepancy_shape)
+    systematic = np.eye(n_data) * (1.0e-5)**2
+
+    result = fit_general_temperature_tensor_thomson_spectra(
+        wavelength, spectra,
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        measurement_covariance=measurement,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        initial_temperature_tensor_eV=np.eye(3) * 500.0,
+    )
+    components = result["spectral_parameter_covariance_components"]
+    assert set(components) == {"measurement", "model_discrepancy", "systematic"}
+    assert result["model_selection_uncertainty_included"] is False
+    assert result["model_selection_uncertainty_status"].startswith("not_included")
+    for contribution in components.values():
+        assert contribution.shape == result["parameter_covariance"].shape
+        assert np.min(np.linalg.eigvalsh(contribution)) >= -1e-10 * max(
+            np.max(np.abs(contribution)), 1e-300
+        )
+    summed = sum(components.values())
+    np.testing.assert_allclose(
+        summed, result["parameter_covariance"], rtol=2e-5, atol=1e-18
+    )
+    assert np.trace(components["model_discrepancy"]) > 0.0
+    assert np.trace(components["systematic"]) > 0.0
