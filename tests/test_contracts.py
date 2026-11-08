@@ -6,7 +6,7 @@ from tis.contracts import ContractError, ExecutionContract, ExecutionLevel, Quan
 
 def test_all_eighty_entries_have_explicit_conservative_contracts():
     contracts = get_diagnostic_contracts()
-    assert len(contracts) == 80
+    assert len(contracts) == 81
     assert len({item.name for item in contracts}) == 80
     assert sum(item.completeness == "complete" for item in contracts) == 6
     assert sum(item.completeness == "complete_with_declared_scope" for item in contracts) == 12
@@ -15,6 +15,7 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 47
     assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 16
     assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 17
+    assert sum(item.level is ExecutionLevel.PHYSICAL_SOLVER for item in contracts) == 1
     assert any(item.supports_raw_data for item in contracts)
     assert all(
         not item.supports_raw_data
@@ -161,3 +162,23 @@ def test_all_thomson_and_cts_entry_points_are_subanalyses_of_primary_analysis_1(
     families = json.loads(families_path.read_text(encoding="utf-8"))["families"]
     analysis_1 = next(item for item in families if item["id"] == 1)
     assert analysis_1["entry_ids"] == [1, 30, 46, 81]
+
+
+def test_physical_solver_execution_level_is_runnable_and_calibrated():
+    contract = get_diagnostic_contract("General relativistic 3-D optical Thomson EVDF reconstruction")
+    assert contract.level is ExecutionLevel.PHYSICAL_SOLVER
+    assert contract.runnable
+    assert contract.supports_calibrated_measurements
+
+
+def test_spectral_distribution_registry_matches_public_physical_geometry_arguments():
+    import inspect
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    contract = get_diagnostic_contract("Thomson spectral distribution")
+    declared = {item.name for item in contract.input_specs}
+    public = set(inspect.signature(analyze_thomson_spectral_distribution).parameters)
+    assert {"laser_wavelength_nm", "scattering_angle_rad"} <= declared
+    assert {"laser_wavelength_nm", "scattering_angle_rad"} <= public
+    assert {"physical_initial", "incident_polarization", "include_compton_recoil"} <= declared
+    assert {"physical_initial", "incident_polarization", "include_compton_recoil"} <= public

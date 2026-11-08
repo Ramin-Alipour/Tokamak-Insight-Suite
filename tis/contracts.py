@@ -12,6 +12,7 @@ class ExecutionLevel(str, Enum):
     LIMITED_CALCULATION = "limited_calculation"
     ANALYSIS_PIPELINE = "analysis_pipeline"
     INVERSE_RECONSTRUCTION = "inverse_reconstruction"
+    PHYSICAL_SOLVER = "physical_solver"
 
 class ContractError(ValueError):
     """An analysis request violates a declared contract."""
@@ -58,7 +59,11 @@ class ExecutionContract:
         """Whether measured, calibrated diagnostic data reach a physical result."""
         return (
             self.calibrated_measurements_to_physics
-            and self.level in {ExecutionLevel.ANALYSIS_PIPELINE, ExecutionLevel.INVERSE_RECONSTRUCTION}
+            and self.level in {
+                ExecutionLevel.ANALYSIS_PIPELINE,
+                ExecutionLevel.INVERSE_RECONSTRUCTION,
+                ExecutionLevel.PHYSICAL_SOLVER,
+            }
             and self.completeness in {"complete", "complete_with_declared_scope"}
         )
 

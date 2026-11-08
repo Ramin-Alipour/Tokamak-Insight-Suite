@@ -8949,7 +8949,7 @@
     ],
     "implementation_status": "Observed spectral moments and response-convolved Gaussian shape diagnostics are implemented; explicit Kappa and relativistic Maxwell-Juttner selections dispatch to their native physical forward fit with shared measured response and supplied detector-background/uncertainty inputs.",
     "execution_contract": {
-      "schema_version": "1.0",
+      "schema_version": "1.1",
       "execution_level": "analysis_pipeline",
       "completeness": "complete_with_declared_scope",
       "input_specs": [
@@ -9039,6 +9039,18 @@
           "name": "model_discrepancy_covariance and systematic_covariance",
           "unit": "positive-semidefinite wavelength-space covariance",
           "required": false
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; positive laser wavelength used by the selected physical forward model",
+          "required": false,
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments."
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; scattering angle in (0, pi) used by the selected physical forward model",
+          "required": false,
+          "description": "Required when physical_model selects a physical fit; omitted for descriptive-only spectral moments."
         },
         {
           "name": "physical_fit_options",
@@ -9317,9 +9329,9 @@
         "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background"
       ],
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false,
-      "note": "Input is a measured, calibrated optical Thomson spectrum. This subanalysis reports wavelength-space spectral descriptors only; physical plasma parameters are inferred by the parent Analysis 1 forward model. The optional kinetic physical route is explicitly selected and is not inferred from Gaussian width.",
-      "completion_scope": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics from calibrated measured spectra, without deconvolution or physical-parameter inference. The optional physical route additionally provides finite-bin isotropic-Kappa or relativistic MJ inference with joint structured-background covariance; the descriptive Gaussian width remains non-physical.",
+      "calibrated_measurements_to_physics": true,
+      "note": "The default path reports descriptive wavelength-space moments and response-convolved Gaussian shape diagnostics. When physical_model is explicitly selected, the same calibrated spectrum is passed to the native physical forward fitter; laser_wavelength_nm and scattering_angle_rad are then required. Gaussian width is never converted directly into electron temperature.",
+      "completion_scope": "Observed wavelength-space moments and response-convolved Gaussian diagnostics; optional explicitly selected Kappa, relativistic Maxwell-Juttner or Maxwellian physical inference using calibrated measurements and explicit laser/scattering geometry.",
       "test_links": [
         "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
         "tests/test_thomson_distribution.py::test_distribution_does_not_accept_pre_extracted_physical_parameters_or_width_corrections",
@@ -9353,7 +9365,7 @@
         "scope": "Diagnostic forward/instrument-response modeling context."
       }
     ],
-    "note": "Analysis 1 subanalysis: descriptive observed spectral moments and response-convolved Gaussian shape diagnostics only. Projected EVDF inference belongs to the primary Analysis 1 workflow and its own inverse routine.",
+    "note": "Analysis 1 subanalysis: descriptive observed spectral moments and response-convolved Gaussian diagnostics by default. Its explicitly selected kinetic physical-fit route uses calibrated measured spectra and explicit laser/scattering geometry; it does not infer EVDF from wavelength moments.",
     "primary_analysis_id": 1,
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
