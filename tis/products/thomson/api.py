@@ -22,7 +22,14 @@ def _run(analysis_id: int, *args: Any, **kwargs: Any) -> Any:
 
 
 def analyze_spectra(*args: Any, **kwargs: Any) -> Any:
-    """Run optical Thomson measured-spectrum inference (analysis entry 1)."""
+    """Run the registered optical Thomson spectrum-to-physics pipeline (analysis 1).
+
+    The canonical workflow returns model-specific plasma inference together
+    with a projected q-parallel EVDF when its inverse is enabled. Dimensional
+    third/fourth central velocity moments and their covariance are exposed as
+    projected-marginal quantities; a single view does not identify the full
+    three-dimensional heat flux or unrestricted EVDF.
+    """
     return _run(1, *args, **kwargs)
 
 
