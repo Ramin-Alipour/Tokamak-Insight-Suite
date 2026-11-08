@@ -58,7 +58,10 @@ def analyze_multipin_probe(
     }
 
     if potential_covariance_V2 is not None:
-        covariance = np.asarray(potential_covariance_V2, dtype=float)
+        raw_covariance = np.asarray(potential_covariance_V2)
+        if raw_covariance.dtype.kind not in "iuf":
+            raise ValueError("potential_covariance_V2 must contain real numeric values")
+        covariance = raw_covariance.astype(float, copy=False)
         n_time, n_pin = v.shape
         if covariance.shape == (n_pin, n_pin):
             covariance = np.broadcast_to(covariance, (n_time, n_pin, n_pin))
