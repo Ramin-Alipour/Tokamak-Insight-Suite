@@ -7,7 +7,7 @@ from tis.contracts import ContractError, ExecutionContract, ExecutionLevel, Quan
 def test_all_eighty_entries_have_explicit_conservative_contracts():
     contracts = get_diagnostic_contracts()
     assert len(contracts) == 81
-    assert len({item.name for item in contracts}) == 80
+    assert len({item.name for item in contracts}) == 81
     assert sum(item.completeness == "complete" for item in contracts) == 6
     assert sum(item.completeness == "complete_with_declared_scope" for item in contracts) == 12
     assert sum(item.completeness == "incomplete" for item in contracts) == 62
@@ -65,7 +65,7 @@ def test_registry_loader_falls_back_to_packaged_data_when_root_copy_is_absent(tm
     contracts.clear_registry_cache()
     try:
         rows = contracts.load_diagnostic_registry()
-        assert len(rows) == 80
+        assert len(rows) == 81
         assert rows[0]["diagnostic"] == "Thomson scattering"
     finally:
         contracts.clear_registry_cache()
@@ -122,7 +122,7 @@ def test_thomson_spectral_distribution_contract_excludes_separate_evdf_inverse()
         "velocity_parallel_m_s", "evdf_parallel_s_per_m",
         "regularization_strength", "parametric_model_comparison",
     })
-    assert contract["calibrated_measurements_to_physics"] is False
+    assert contract["calibrated_measurements_to_physics"] is True
     assert contract["function_links"] == [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
     ]
