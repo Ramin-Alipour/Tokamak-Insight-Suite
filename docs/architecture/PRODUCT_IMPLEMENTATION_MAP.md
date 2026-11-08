@@ -76,4 +76,6 @@ The Langmuir facade is deliberately thin and delegates IDs 2 and 16–20 to thei
 
 ## Dependency audit scope and next refinement
 
-The table above records direct registered solver modules and known shared platform surfaces. It is not a complete transitive import graph. Before extracting products into separate distributions, generate and enforce an AST/import dependency graph, classify each edge as platform-to-product or product-to-product, and remove any private cross-product imports through public interfaces. Do not create microservices or duplicate shared services merely to satisfy the product taxonomy.
+The executable AST dependency inventory is available through `tis.products.build_dependency_inventory()`. It follows static local imports from every registered solver module and reports entry-point modules, transitive domain-module closures, modules reused by multiple product closures, product-local modules, and direct shared-platform imports.
+
+The graph intentionally does not claim to resolve dynamic imports, runtime plugin loading, non-Python resources, or third-party package constraints. Before extracting products into separate distributions, review those limitations, classify every cross-product dependency as a public interface or shared platform service, and add import-boundary tests. Do not create microservices or duplicate shared services merely to satisfy the product taxonomy.
