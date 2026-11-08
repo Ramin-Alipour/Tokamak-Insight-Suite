@@ -11,19 +11,19 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.fft import fft2, ifft2, fftfreq
 
-from .cts_landau_fdt import LandauFDTSystem, build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
-from .cts_fdt import (
+from tis.physics.shared.cts_landau_fdt import LandauFDTSystem, build_linearized_landau_fdt, landau_cts_dynamic_structure_factor
+from tis.physics.shared.cts_fdt import (
     quantum_fdt_dynamic_structure_factor,
     quantum_unsymmetrized_dynamic_structure_factor,
 )
-from .cts_landau_em import landau_full_em_current_response, landau_full_em_electric_field_fluctuation_spectrum
-from .cts_full_wave import (solve_stratified_mode_conversion, solve_stratified_full_wave_oblique, solve_3d_periodic_full_wave)
+from tis.physics.shared.cts_landau_em import landau_full_em_current_response, landau_full_em_electric_field_fluctuation_spectrum
+from tis.physics.shared.cts_full_wave import (solve_stratified_mode_conversion, solve_stratified_full_wave_oblique, solve_3d_periodic_full_wave)
 from .ece_kinetic_modes import solve_two_mode_kinetic_ece_profile
 from .ece_kinetic import (
     relativistic_kinetic_ece_absorption_coefficient,
     solve_relativistic_kinetic_ece_profile,
 )
-from .cts_em_background import (
+from tis.physics.shared.cts_em_background import (
     integrate_thermal_microwave_background,
     plasma_charge_state_moments,
     radiance_to_receiver_spectral_power,
@@ -31,18 +31,18 @@ from .cts_em_background import (
     integrate_receiver_spectral_power,
     brightness_temperature_from_radiance,
 )
-from .cts_kappa import kappa_electron_susceptibility, kappa_bgk_electron_susceptibility, bi_kappa_electron_susceptibility
+from tis.physics.shared.cts_kappa import kappa_electron_susceptibility, kappa_bgk_electron_susceptibility, bi_kappa_electron_susceptibility
 from .cts_kappa import maxwellian_electron_susceptibility
-from .cts_kappa_dispersion import kappa_dispersion_function
-from .thomson_generalized_dispersion import (
+from tis.physics.shared.cts_kappa_dispersion import kappa_dispersion_function
+from tis.physics.shared.thomson_generalized_dispersion import (
     collective_tabulated_electron_spectral_density,
     collective_multi_population_tabulated_electron_spectral_density,
     generalized_electron_susceptibility,
 )
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
-from .cts_collisions import multispecies_thermal_coulomb_collision_matrix
-from .cts_bgk_fdt import analyze_conserving_bgk_cts
-from .cts_stokes_transfer import (
+from tis.physics.shared.cts_collisions import multispecies_thermal_coulomb_collision_matrix
+from tis.physics.shared.cts_bgk_fdt import analyze_conserving_bgk_cts
+from tis.physics.shared.cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
 )
@@ -77,7 +77,7 @@ from .thomson_kinetic_models import (
     fit_collective_kappa,
 )
 from .thomson_temperature_tensor import infer_full_temperature_tensor_from_thomson_projections
-from .cts_magnetoionic import (
+from tis.physics.shared.cts_magnetoionic import (
     cold_plasma_dielectric_tensor,
     cold_plasma_magnetoionic_modes,
     cold_plasma_absorbed_power_density,
