@@ -1496,3 +1496,76 @@ def test_projected_evdf_moments_are_stable_for_narrow_high_flow_distribution():
     )
     assert moments["skewness"] == pytest.approx(0.0, abs=1e-8)
     assert moments["excess_kurtosis"] == pytest.approx(0.0, abs=1e-3)
+
+
+def test_projected_evdf_physical_moment_covariance_matches_normalized_finite_difference():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.array([-4.0, -2.7, -1.1, -0.2, 0.8, 2.1, 3.9, 6.2]) * 1.0e5
+    density = (
+        0.72 * np.exp(-0.5 * ((velocity - 0.35e5) / 1.15e5) ** 2)
+        + 0.28 * np.exp(-0.5 * ((velocity - 2.1e5) / 0.72e5) ** 2)
+    )
+    density *= 1.0e-6
+    n = velocity.size
+    base_covariance = np.fromfunction(
+        lambda i, j: 0.35 ** np.abs(i - j), (n, n), dtype=float
+    )
+    scale = np.sqrt(density)
+    covariance = (scale[:, None] * base_covariance) * scale[None, :]
+    result = _projected_evdf_physical_moments(velocity, density, covariance)
+
+    keys = (
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
+        "skewness",
+        "excess_kurtosis",
+    )
+    numerical_jacobian = np.empty((len(keys), n))
+    for j in range(n):
+        step = density[j] * 1.0e-5
+        plus = density.copy()
+        minus = density.copy()
+        plus[j] += step
+        minus[j] -= step
+        p = _projected_evdf_physical_moments(velocity, plus)
+        m = _projected_evdf_physical_moments(velocity, minus)
+        numerical_jacobian[:, j] = [
+            (p[key] - m[key]) / (2.0 * step) for key in keys
+        ]
+
+    expected_covariance = numerical_jacobian @ covariance @ numerical_jacobian.T
+    np.testing.assert_allclose(
+        result["moment_covariance"],
+        expected_covariance,
+        rtol=3.0e-5,
+        atol=1.0e-12,
+    )
+    np.testing.assert_allclose(
+        result["moment_covariance"],
+        result["moment_covariance"].T,
+        rtol=1.0e-12,
+        atol=1.0e-12,
+    )
+    assert np.linalg.eigvalsh(result["moment_covariance"]).min() >= -1.0e-8 * max(
+        np.linalg.norm(result["moment_covariance"], ord=2), 1.0
+    )
+
+
+def test_projected_evdf_physical_moment_covariance_rejects_indefinite_input():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-3.0e5, 3.0e5,  nine := 9)
+    density = np.exp(-0.5 * (velocity / 1.0e5) ** 2)
+    covariance = np.eye(nine)
+    covariance[0, 1] = covariance[1, 0] = 2.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        _projected_evdf_physical_moments(velocity, density, covariance)

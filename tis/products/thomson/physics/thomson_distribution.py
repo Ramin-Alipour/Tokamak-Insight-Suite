@@ -110,26 +110,47 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
         covariance_scale = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
         if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12*covariance_scale):
             raise ValueError("projected EVDF covariance must be symmetric")
-        raw1, raw2, raw3, raw4 = (
-            weights*velocity, weights*velocity**2,
-            weights*velocity**3, weights*velocity**4,
+        # The fitted EVDF is normalized: p_i = f_i / (w @ f).
+        # Therefore every normalized moment derivative must include the
+        # derivative of the normalization. Omitting it biases all propagated
+        # moment uncertainties, especially mean/shape moments.
+        inverse_normalization = 1.0 / normalization
+        mean_gradient = weights * (velocity - m1) * inverse_normalization
+        variance_gradient = (
+            weights * (centered_velocity**2 - variance) * inverse_normalization
         )
-        variance_gradient = raw2 - 2.0*m1*raw1
-        sigma_gradient = variance_gradient/(2.0*sigma)
-        temperature_gradient = (electron_mass/elementary_charge)*variance_gradient
-        mu3_gradient = raw3 + (-3.0*m2 + 6.0*m1**2)*raw1 - 3.0*m1*raw2
+        sigma_gradient = variance_gradient / (2.0 * sigma)
+        temperature_gradient = (
+            electron_mass / elementary_charge
+        ) * variance_gradient
+        mu3_gradient = (
+            weights
+            * (centered_velocity**3 - mu3 - 3.0 * variance * centered_velocity)
+            * inverse_normalization
+        )
         mu4_gradient = (
-            raw4 + (-4.0*m3 + 12.0*m1*m2 - 12.0*m1**3)*raw1
-            - 4.0*m1*raw3 + 6.0*m1**2*raw2
+            weights
+            * (centered_velocity**4 - mu4 - 4.0 * mu3 * centered_velocity)
+            * inverse_normalization
         )
-        skewness_gradient = mu3_gradient/variance**1.5 - 1.5*mu3*variance_gradient/variance**2.5
-        kurtosis_gradient = mu4_gradient/variance**2 - 2.0*mu4*variance_gradient/variance**3
+        skewness_gradient = (
+            mu3_gradient / variance**1.5
+            - 1.5 * mu3 * variance_gradient / variance**2.5
+        )
+        kurtosis_gradient = (
+            mu4_gradient / variance**2
+            - 2.0 * mu4 * variance_gradient / variance**3
+        )
         jacobian = np.vstack((
-            raw1, variance_gradient, sigma_gradient, temperature_gradient,
+            mean_gradient, variance_gradient, sigma_gradient, temperature_gradient,
             mu3_gradient, mu4_gradient, skewness_gradient, kurtosis_gradient,
         ))
         moment_covariance = jacobian @ cov @ jacobian.T
         moment_covariance = 0.5*(moment_covariance + moment_covariance.T)
+        eigenvalues = np.linalg.eigvalsh(cov)
+        psd_tolerance = 1.0e-10 * max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if float(eigenvalues.min()) < -psd_tolerance:
+            raise ValueError("projected EVDF covariance must be positive semidefinite")
         if not np.all(np.isfinite(moment_covariance)):
             raise ValueError("projected EVDF physical-moment covariance is not finite")
         moment_standard_uncertainty = {
