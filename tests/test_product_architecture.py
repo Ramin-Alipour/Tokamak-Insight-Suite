@@ -192,7 +192,9 @@ def test_named_product_workflow_wrappers_dispatch_to_their_own_registered_ids(mo
             calls = [(entry["function"], entry["id"]) for entry in product["entry_points"]]
         for function_name, expected_id in calls:
             function = getattr(api, function_name)
-            if product["id"] == 2 and function_name in {"analyze_ball_pen"}:
+            if product["id"] == 2 and function_name in {"analyze_langmuir_iv", "analyze_probe_iv_compatibility"}:
+                result = function("voltage", "current")
+            elif product["id"] == 2 and function_name in {"analyze_ball_pen"}:
                 result = function([0.0], [1.0])
             elif product["id"] == 2 and function_name == "analyze_gundestrup":
                 result = function([0.0, 1.0, 2.0], [1.0, 2.0, 1.0])
