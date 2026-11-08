@@ -1772,6 +1772,8 @@ elif page=='Spectral Analysis':
                             'mean_velocity_parallel_m_s':evdf.get('mean_velocity_parallel_m_s'),
                             'velocity_parallel_std_m_s':evdf.get('velocity_parallel_standard_deviation_m_s'),
                             'directional_equivalent_temperature_eV':evdf.get('directional_equivalent_temperature_eV'),
+                            'central_third_velocity_moment_m3_s3':evdf.get('central_third_velocity_moment_m3_s3'),
+                            'central_fourth_velocity_moment_m4_s4':evdf.get('central_fourth_velocity_moment_m4_s4'),
                             'skewness':evdf.get('skewness'),
                             'excess_kurtosis':evdf.get('excess_kurtosis'),
                             'regularization_strength':evdf.get('regularization_strength'),
@@ -1843,6 +1845,21 @@ elif page=='Spectral Analysis':
                             if evdf_status=='conditional_regularized_candidate':
                                 st.warning('This is a regularized candidate only: the measured spectrum did not identify the full projected EVDF independently of regularization.')
                             st.caption(evdf.get('interpretation','One-dimensional marginal along the scattering vector; not an unrestricted three-dimensional EVDF.'))
+                            physical_moments={
+                                'Third central projected velocity moment (m^3/s^3)':evdf.get('central_third_velocity_moment_m3_s3'),
+                                'Fourth central projected velocity moment (m^4/s^4)':evdf.get('central_fourth_velocity_moment_m4_s4'),
+                                'Skewness equation':(evdf.get('central_velocity_moment_equations') or {}).get('skewness'),
+                                'Excess-kurtosis equation':(evdf.get('central_velocity_moment_equations') or {}).get('excess_kurtosis'),
+                            }
+                            st.markdown('**Dimensional projected EVDF moments**')
+                            st.json(physical_moments)
+                            heat_flux=evdf.get('heat_flux_identifiability',{})
+                            if heat_flux:
+                                st.caption('Heat-flux identifiability: '+str(heat_flux.get('status'))+'. '+str(heat_flux.get('reason','')))
+                            moment_uncertainty=evdf.get('velocity_moment_standard_uncertainty_including_geometry') or evdf.get('velocity_moment_standard_uncertainty')
+                            if moment_uncertainty:
+                                st.markdown('**Joint uncertainty of projected velocity moments**')
+                                st.json(moment_uncertainty)
                             comparison=evdf.get('parametric_model_comparison')
                             if comparison:
                                 st.markdown('**Parametric comparison of the reconstructed marginal**')
