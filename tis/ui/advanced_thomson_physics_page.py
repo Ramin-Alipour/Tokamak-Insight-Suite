@@ -1692,6 +1692,20 @@ def render_advanced_thomson_physics_page(st) -> None:
                 })
                 if not result.get("reportable_as_inferred_parameter", False):
                     st.warning("The tensor is not reportable as a physical inference outside the declared non-relativistic validity domain.")
+            if model == "thomson_projected_evdf":
+                support = result.get("velocity_support_diagnostic", {})
+                if support:
+                    boundary_fraction = float(support.get("boundary_mass_fraction", 0.0))
+                    st.metric("EVDF probability in outer velocity cells", f"{boundary_fraction:.3%}")
+                    if support.get("status") == "support_truncation_suspected":
+                        st.warning(
+                            "The reconstructed EVDF accumulates probability at the finite velocity-grid "
+                            "boundaries. Expand the velocity domain and repeat the inversion before "
+                            "interpreting tail moments."
+                        )
+                    else:
+                        st.success("EVDF boundary probability is below the declared support limit.")
+                    st.caption(support.get("interpretation", ""))
             st.json(safe)
             st.download_button(
                 "Export advanced physics result (JSON)",
