@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tis.products import get_product, list_products, build_dependency_inventory
+from tis.products import get_product, list_products, build_dependency_inventory, load_product_api
 
 
 def render_product_workspace_page(st: Any) -> None:
@@ -32,6 +32,13 @@ def render_product_workspace_page(st: Any) -> None:
         f"{product['execution_entry_point_count']} registered workflows"
     )
     st.write(product.get("description", ""))
+    product_api = load_product_api(product["product_id"])
+    st.markdown("**Public Python API**")
+    st.code(product["api_module"], language="python")
+    st.caption(
+        "Exported capabilities: "
+        + ", ".join(getattr(product_api, "__all__", ()))
+    )
     if product["id"] == 20:
         st.info(
             "This is a cross-cutting instrumentation-support product. Its "
