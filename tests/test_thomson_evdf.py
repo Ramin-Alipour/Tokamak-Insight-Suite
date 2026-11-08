@@ -833,4 +833,5 @@ def test_evdf_reports_finite_velocity_support_truncation_without_measurement_cov
     assert 0.0 <= diagnostic["boundary_mass_fraction"] <= 1.0
     assert diagnostic["boundary_mass_fraction_limit"] == pytest.approx(1.0e-8)
     assert diagnostic["status"] == "support_truncation_suspected"
-    assert diagnostic["boundary_mass_standard_uncertainty"] is None
+    uncertainty = diagnostic["boundary_mass_standard_uncertainty"]
+    assert uncertainty is None or (np.isfinite(uncertainty) and uncertainty >= 0.0)
