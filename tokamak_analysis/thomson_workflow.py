@@ -50,10 +50,53 @@ def fit_general_temperature_tensor_thomson_spectra(*args, **kwargs):
 def analyze_thomson_spectra(*args, **kwargs):
     """Infer physical plasma parameters directly from measured calibrated spectra.
 
-    All public Thomson workflows start from measured spectra and the selected
-    physical forward model. Pre-derived density/temperature profile inputs are
-    not accepted by this module.
+    The canonical Analysis-1 entry point dispatches both isotropic optical models
+    and the multi-view anisotropic/tensor physical inverses. The latter consume
+    raw spectra and measured q-vector geometry; they are not post-processing of
+    fitted Gaussian widths. Their rank/conditioning gates and covariance are
+    returned unchanged by the native physical solver.
     """
+    model = kwargs.get("model")
+    advanced_models = {
+        "gyrotropic_bi_maxwellian": "gyrotropic_bi_maxwellian_spectral_fit",
+        "gyrotropic_bi_kappa": "gyrotropic_bi_kappa_spectral_fit",
+        "general_temperature_tensor_maxwellian": "thomson_full_temperature_tensor_spectral_fit",
+        "general_temperature_tensor_kappa": "thomson_full_temperature_tensor_spectral_fit",
+    }
+    if model in advanced_models:
+        kwargs = dict(kwargs)
+        kwargs.pop("model")
+        positional = list(args)
+        if len(positional) < 2:
+            wavelength = kwargs.pop("wavelength_nm", None)
+            spectra = kwargs.pop("spectra", None)
+        else:
+            wavelength, spectra = positional[:2]
+            positional = positional[2:]
+        if positional:
+            # The third positional argument is the radial coordinate used by
+            # isotropic profile inference. It is not a parameter of a multi-view
+            # anisotropy inverse, so reject rather than silently reinterpret it.
+            raise TypeError(
+                "Anisotropic/tensor Analysis-1 inference accepts wavelength_nm "
+                "and spectra positionally; pass no positional radius_m."
+            )
+        if wavelength is None or spectra is None:
+            raise ValueError("wavelength_nm and measured spectra are required")
+        if model == "general_temperature_tensor_maxwellian":
+            kwargs["distribution_model"] = "maxwellian"
+        elif model == "general_temperature_tensor_kappa":
+            kwargs["distribution_model"] = "kappa"
+        from .cts_full_physics import run_advanced_thomson_physics
+        result = run_advanced_thomson_physics(
+            advanced_models[model], wavelength, spectra, **kwargs
+        )
+        result = dict(result)
+        result["analysis_id"] = 1
+        result["analysis_model"] = model
+        result["canonical_entry_point"] = "tokamak_analysis.thomson_workflow.analyze_thomson_spectra"
+        return result
+
     from .thomson_inference import analyze_thomson_spectra as _infer
     return _infer(*args, **kwargs)
 
