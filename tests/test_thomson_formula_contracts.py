@@ -163,3 +163,20 @@ def test_temperature_from_thomson_width_propagates_joint_covariance():
                               for i in range(3) for k in range(3)))
     assert result["uncertainty_electron_temperature_eV"] == pytest.approx(expected)
     assert result["temperature_identifiability"].startswith("conditional_on_")
+
+
+def test_thomson_3d_kernel_formula_references():
+    from tokamak_analysis.formula_library import (
+        thomson_nonrelativistic_doppler_wavelength,
+        thomson_unpolarized_differential_cross_section,
+    )
+    c = 299792458.0
+    angle = math.pi/2.0
+    velocity = 1.2e5
+    expected = 532.0*(1.0-2.0*math.sin(angle/2.0)*velocity/c)
+    assert thomson_nonrelativistic_doppler_wavelength(532.0, angle, velocity) == pytest.approx(expected, rel=1e-14)
+    radius = 2.8179403262e-15
+    assert thomson_unpolarized_differential_cross_section(angle) == pytest.approx(radius**2/2.0, rel=1e-14)
+    assert thomson_unpolarized_differential_cross_section(0.0) == pytest.approx(radius**2, rel=1e-14)
+    with pytest.raises(ValueError, match="0.1c"):
+        thomson_nonrelativistic_doppler_wavelength(532.0, angle, 0.11*c)

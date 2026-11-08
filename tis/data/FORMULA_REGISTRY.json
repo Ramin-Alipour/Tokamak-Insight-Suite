@@ -10922,5 +10922,131 @@
         "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa"
       ]
     }
+  },
+  {
+    "name": "Non-relativistic optical Thomson Doppler wavelength mapping",
+    "equation": "lambda_s=lambda_L[1-2 sin(theta/2) v_q/c]",
+    "inputs": "laser_wavelength_nm [nm; positive]; scattering_angle_rad [rad; (0,pi)]; velocity_projection_m_s [m s^-1; |v_q|<0.1c]",
+    "output": "nm; Doppler-shifted photon wavelength",
+    "assumptions": "First-order elastic single-particle Doppler mapping with q=(k_s-k_i); no recoil, relativistic correction or multiple scattering.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_nonrelativistic_doppler_wavelength",
+      "formula_key": "thomson_nonrelativistic_doppler_wavelength",
+      "input_specs": [
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; positive",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; (0,pi)",
+          "required": true
+        },
+        {
+          "name": "velocity_projection_m_s",
+          "unit": "m s^-1; |v_q|<0.1c",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "scattered_wavelength_nm",
+          "unit": "nm; Doppler-shifted photon wavelength"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated scattering geometry",
+        "Finite physical input values"
+      ],
+      "uncertainty_model": "These are deterministic analytic relations. Propagation of input uncertainty is performed by the calling physical inference solver using its joint covariance model; no omitted cross-covariance is assumed.",
+      "limitations": [
+        "Non-relativistic elastic Thomson limit; use the relativistic photon-kinematics route outside the declared speed domain."
+      ],
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_3d_kernel_formula_references"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "execution_scope": "analytic_physical_forward_relation",
+    "input_data_level": "explicit_physical_state",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Physical multi-view 3-D EVDF inversion",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_nonrelativistic_doppler_wavelength",
+      "function_links": [
+        "tokamak_analysis.formula_library.thomson_nonrelativistic_doppler_wavelength",
+        "tokamak_analysis.advanced_inference.reconstruct_optical_thomson_3d_evdf"
+      ],
+      "formula_key": "thomson_nonrelativistic_doppler_wavelength",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_3d_kernel_formula_references"
+      ]
+    },
+    "note": "Used directly by the physical multi-view 3-D optical Thomson forward-kernel builder."
+  },
+  {
+    "name": "Unpolarized Thomson differential cross-section",
+    "equation": "d sigma/d Omega = r_e^2(1+cos^2(theta))/2",
+    "inputs": "scattering_angle_rad [rad; [0,pi]]",
+    "output": "m^2 sr^-1",
+    "assumptions": "Classical unpolarized Thomson scattering from a free electron; polarization-resolved factors and Compton recoil are excluded.",
+    "status": "D",
+    "category": "Optical Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_unpolarized_differential_cross_section",
+      "formula_key": "thomson_unpolarized_differential_cross_section",
+      "input_specs": [
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; [0,pi]",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "differential_cross_section_m2_sr",
+          "unit": "m^2 sr^-1"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated scattering geometry",
+        "Finite physical input values"
+      ],
+      "uncertainty_model": "These are deterministic analytic relations. Propagation of input uncertainty is performed by the calling physical inference solver using its joint covariance model; no omitted cross-covariance is assumed.",
+      "limitations": [
+        "Non-relativistic elastic Thomson limit; use the relativistic photon-kinematics route outside the declared speed domain."
+      ],
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_3d_kernel_formula_references"
+      ]
+    },
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "execution_scope": "analytic_physical_forward_relation",
+    "input_data_level": "explicit_physical_state",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Physical multi-view 3-D EVDF inversion",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_unpolarized_differential_cross_section",
+      "function_links": [
+        "tokamak_analysis.formula_library.thomson_unpolarized_differential_cross_section",
+        "tokamak_analysis.advanced_inference.reconstruct_optical_thomson_3d_evdf"
+      ],
+      "formula_key": "thomson_unpolarized_differential_cross_section",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_3d_kernel_formula_references"
+      ]
+    },
+    "note": "Used directly by the physical multi-view 3-D optical Thomson forward-kernel builder."
   }
 ]

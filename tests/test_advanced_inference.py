@@ -358,6 +358,7 @@ def test_physical_multiview_evdf_is_reachable_through_public_analysis1_dispatche
         np.array([[1.0e4,0.,0.],[-1.0e4,0.,0.]]),
         laser_wavelength_nm=500.0,
         scattering_angle_rad=np.pi/2,
+        view_gain=np.ones(2),
         instrument_response_matrix=np.eye(wavelength.size),
         background_spectra=np.zeros((2,wavelength.size)),
         voxel_volume_m3_s3=np.ones(2),

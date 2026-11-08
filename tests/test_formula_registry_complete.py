@@ -1,4 +1,4 @@
-"""Independent reference and contract checks for all 103 formula registry entries."""
+"""Independent reference and contract checks for all 105 formula registry entries."""
 import ast
 import importlib
 import json
@@ -227,8 +227,8 @@ def test_particle_balance_reference():
 
 def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(rows) == 103
-    assert len({row["name"] for row in rows}) == 103
+    assert len(rows) == 105
+    assert len({row["name"] for row in rows}) == 105
     for row in rows:
         contract = row["execution_contract"]
         assert contract["implementation_link_status"] == "mapped", row["name"]

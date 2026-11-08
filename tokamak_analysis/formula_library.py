@@ -1118,3 +1118,37 @@ def relativistic_mj_effective_differential_cross_section(
         require_full_spectrum=require_full_spectrum,
     )
     return float(result["effective_differential_cross_section_m2_sr"])
+
+
+def thomson_nonrelativistic_doppler_wavelength(
+    laser_wavelength_nm, scattering_angle_rad, velocity_projection_m_s
+):
+    r"""Return lambda_s=lambda_L[1-2 sin(theta/2) v_q/c] in nm.
+
+    The projected velocity is defined positive along q=(k_s-k_i). This
+    elastic, first-order Doppler relation is restricted here to |v_q|<0.1c.
+    Inputs may be scalars or broadcast-compatible finite arrays.
+    """
+    laser = np.asarray(laser_wavelength_nm, dtype=float)
+    angle = np.asarray(scattering_angle_rad, dtype=float)
+    velocity = np.asarray(velocity_projection_m_s, dtype=float)
+    if (not np.all(np.isfinite(laser)) or np.any(laser <= 0.0)
+            or not np.all(np.isfinite(angle)) or np.any(angle <= 0.0)
+            or np.any(angle >= math.pi) or not np.all(np.isfinite(velocity))
+            or np.any(np.abs(velocity) >= 0.1*C_LIGHT)):
+        raise ValueError("laser wavelength must be positive, scattering angle in (0,pi), and projected speed below 0.1c")
+    try:
+        result = laser * (1.0 - 2.0*np.sin(angle/2.0)*velocity/C_LIGHT)
+    except ValueError as exc:
+        raise ValueError("laser wavelength, scattering angle and projected velocity must be broadcast-compatible") from exc
+    return float(result) if np.ndim(result) == 0 else result
+
+
+def thomson_unpolarized_differential_cross_section(scattering_angle_rad):
+    r"""Unpolarized Thomson d sigma/d Omega = r_e^2(1+cos^2 theta)/2 [m^2/sr]."""
+    angle = np.asarray(scattering_angle_rad, dtype=float)
+    if not np.all(np.isfinite(angle)) or np.any(angle < 0.0) or np.any(angle > math.pi):
+        raise ValueError("scattering_angle_rad must be finite and lie in [0, pi]")
+    classical_electron_radius_m = 2.8179403262e-15
+    result = 0.5*classical_electron_radius_m**2*(1.0+np.cos(angle)**2)
+    return float(result) if np.ndim(result) == 0 else result

@@ -492,7 +492,15 @@ def reconstruct_optical_thomson_3d_evdf(
     gains = _real_array(view_gain, "view_gain", 1)
     if gains.shape != (n_view,) or np.any(gains <= 0.0):
         raise ValueError("view_gain must contain one finite positive calibrated relative gain per view")
-    angular_factor = 0.5 * (1.0 + np.cos(angles)**2)
+    from .formula_library import (
+        thomson_nonrelativistic_doppler_wavelength,
+        thomson_unpolarized_differential_cross_section,
+    )
+    classical_electron_radius_m = 2.8179403262e-15
+    angular_factor = (
+        thomson_unpolarized_differential_cross_section(angles)
+        / classical_electron_radius_m**2
+    )
     speed = np.linalg.norm(velocity, axis=1)
     beta_max = float(np.max(speed) / 299792458.0)
     if beta_max >= 0.1:
@@ -520,8 +528,8 @@ def reconstruct_optical_thomson_3d_evdf(
     line_centres = np.empty((n_view, velocity.shape[0]), dtype=float)
     for view, qhat in enumerate(directions):
         projected_velocity = velocity @ qhat
-        centres = float(laser_wavelength_nm) * (
-            1.0 - q_over_ki[view] * projected_velocity / 299792458.0
+        centres = thomson_nonrelativistic_doppler_wavelength(
+            float(laser_wavelength_nm), float(angles[view]), projected_velocity
         )
         line_centres[view] = centres
         if np.any(centres < edges[0]) or np.any(centres > edges[-1]):
