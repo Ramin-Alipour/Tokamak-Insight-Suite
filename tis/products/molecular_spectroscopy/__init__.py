@@ -2,9 +2,11 @@
 from .api import (
     PRODUCT_ID,
     run_analysis,
-    "analyze_molecular_spectrum",
+    analyze_molecular_spectrum,
 )
 
-__all__ = ["PRODUCT_ID", "run_analysis",
+__all__ = [
+    "PRODUCT_ID",
+    "run_analysis",
     "analyze_molecular_spectrum",
 ]
