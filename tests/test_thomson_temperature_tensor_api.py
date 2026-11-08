@@ -246,3 +246,65 @@ def test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa():
     assert result["maximum_projected_superluminal_tail_probability"] < 1.0e-6
     assert np.all(result["projected_superluminal_tail_probability_per_view"] >= 0.0)
     assert result["reportable_as_inferred_parameter"] is True
+
+
+def test_model_selection_comparison_returns_aicc_weights_and_between_family_covariance():
+    from tokamak_analysis.thomson_temperature_tensor import _tensor_finite_bin_kappa_density
+
+    c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
+    laser, angle, true_kappa = 532.0, np.pi / 2.0, 4.2
+    wavelength = np.linspace(432.0, 632.0, 201)
+    q = np.array([
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0],
+    ])
+    q /= np.linalg.norm(q, axis=1)[:, None]
+    tensor = np.array([
+        [400.0, 50.0, 20.0],
+        [50.0, 600.0, -30.0],
+        [20.0, -30.0, 900.0],
+    ])
+    velocity = np.array([2.0e5, -1.0e5, 0.5e5])
+    q_factor = 2.0 * np.sin(angle / 2.0)
+    spectra = []
+    for direction in q:
+        projected = float(direction @ tensor @ direction)
+        flow = float(direction @ velocity)
+        centre = laser * (1.0 - q_factor * flow / c)
+        sigma = laser * q_factor * np.sqrt(e * projected / me) / c
+        density, _, _ = _tensor_finite_bin_kappa_density(
+            wavelength, centre, sigma, true_kappa
+        )
+        spectra.append(5.0e4 * density + 5.0 + 0.2 * (wavelength-laser)/200.0)
+    spectra = np.asarray(spectra)
+
+    result = run_advanced_thomson_physics(
+        "thomson_temperature_tensor_model_selection",
+        wavelength, spectra,
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(spectra, 0.05),
+        initial_temperature_tensor_eV=1.1*tensor,
+        initial_electron_velocity_vector_m_s=velocity,
+        initial_kappa_index=4.0,
+        kappa_bounds=[2.0, 8.0],
+        max_nfev=4000,
+    )
+    comparison = result["model_family_comparison"]
+    assert set(comparison["akaike_weights"]) == {"maxwellian", "ellipsoidal_kappa"}
+    assert sum(comparison["akaike_weights"].values()) == pytest.approx(1.0)
+    assert comparison["weights_are_bayesian_posterior_probabilities"] is False
+    assert result["model_selection_uncertainty_included"] is True
+    assert result["model_averaged_temperature_tensor_eV"].shape == (3, 3)
+    assert result["model_averaged_parameter_covariance_eV2"].shape == (6, 6)
+    assert result["model_selection_parameter_covariance_eV2"].shape == (6, 6)
+    assert np.all(np.linalg.eigvalsh(result["model_averaged_parameter_covariance_eV2"]) >= -1e-10)
+    np.testing.assert_allclose(
+        result["model_averaged_parameter_covariance_eV2"],
+        result["within_model_parameter_covariance_eV2"]
+        + result["model_selection_parameter_covariance_eV2"],
+        rtol=1e-10, atol=1e-18,
+    )
