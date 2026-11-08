@@ -1384,3 +1384,52 @@ def test_spectral_distribution_propagates_joint_laser_angle_calibration_into_pro
     assert inverse["laser_angle_covariance_nm_rad"] == pytest.approx(cross)
     assert inverse["evdf_standard_uncertainty_including_geometry_s_per_m"].shape == (81,)
     assert inverse["velocity_moment_covariance_including_geometry"].shape == (6, 6)
+
+
+def test_selected_maxwellian_model_executes_canonical_fit_with_top_level_radius(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+
+    x, y = _spectrum()
+    captured = {}
+
+    def fake_canonical(wavelength, spectra, radius, **kwargs):
+        captured["wavelength"] = wavelength.copy()
+        captured["spectra"] = spectra.copy()
+        captured["radius"] = radius.copy()
+        captured.update(kwargs)
+        return {
+            "channels": [{"electron_temperature_eV": 120.0}],
+            "result_classification": {
+                "channels": [{
+                    "primary": [
+                        {"parameter": "electron_temperature_eV"},
+                        {"parameter": "electron_velocity_projection_m_s"},
+                    ]
+                }]
+            },
+        }
+
+    monkeypatch.setattr(inference, "analyze_thomson_spectra", fake_canonical)
+    result = _run(
+        x, y,
+        physical_model="non_collective_maxwellian",
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        radius_m=0.42,
+    )
+
+    assert captured["radius"].tolist() == pytest.approx([0.42])
+    assert captured["spectra"].shape == (1, x.size)
+    assert captured["model"] == "non_collective_maxwellian"
+    assert result["physical_inference"]["reportable_as_primary_inference"] is True
+
+
+def test_selected_maxwellian_model_does_not_silently_skip_canonical_fit_without_radius():
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match="physical_fit_options must include radius_m"):
+        _run(
+            x, y,
+            physical_model="non_collective_maxwellian",
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+        )
