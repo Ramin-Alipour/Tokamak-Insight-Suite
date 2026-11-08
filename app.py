@@ -1701,6 +1701,7 @@ elif page=='Spectral Analysis':
                     distribution_rows=[]
                     for channel in result['channels']:
                         distribution=channel.get('spectral_distribution',{})
+                        closure=distribution.get('projected_evdf_spectral_moment_closure',{})
                         distribution_rows.append({
                             'channel_index':channel.get('channel_index'),
                             'radius_m':channel.get('radius_m'),
@@ -1715,6 +1716,10 @@ elif page=='Spectral Analysis':
                             'chi_square':distribution.get('chi_square'),
                             'reduced_chi_square':distribution.get('reduced_chi_square'),
                             'likelihood_covariance_components':distribution.get('gaussian_fit_likelihood_covariance_components'),
+                            'evdf_closure_status':closure.get('status'),
+                            'evdf_centroid_closure_residual_nm':closure.get('centroid_closure_residual_nm'),
+                            'evdf_variance_closure_residual_nm2':closure.get('variance_closure_residual_nm2'),
+                            'evdf_velocity_quadrature':closure.get('velocity_quadrature'),
                         })
                     st.markdown('**Thomson spectral-distribution diagnostics**')
                     st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
