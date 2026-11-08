@@ -162,9 +162,14 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
     # v_E=sqrt(2 e E/m_e) and F_q(E)=integral[u_q-v_E,u_q+v_E] f_q(v) dv.
     # A CDF avoids the integrable E^(-1/2) Jacobian singularity at E=0.
     from scipy.constants import elementary_charge as _elementary_charge
+    # Keep the energy coordinate deterministic with respect to the fitted
+    # EVDF. The full velocity-grid span bounds |v-u_q| for every normalized
+    # non-negative distribution on this grid; a mean-dependent endpoint
+    # would itself move under perturbations and needs a separate x-axis
+    # covariance contract.
     energy_max_eV = (
         0.5 * electron_mass / _elementary_charge
-        * max((velocity[0] - m1)**2, (velocity[-1] - m1)**2)
+        * (velocity[-1] - velocity[0])**2
     )
     energy_grid_eV = np.linspace(0.0, energy_max_eV, velocity.size)
 
