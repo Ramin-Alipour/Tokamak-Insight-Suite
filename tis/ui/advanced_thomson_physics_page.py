@@ -1383,7 +1383,26 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "projected_evdf_model_averaging_equations": selection.get(
                         "projected_evdf_model_averaging_equations"
                     ),
+                    "model_averaged_physical_moment_values": selection.get(
+                        "model_averaged_physical_moment_values"
+                    ),
+                    "physical_moment_model_selection_status": selection.get(
+                        "physical_moment_model_selection_status"
+                    ),
                 })
+                physical_moment_covariance = selection.get(
+                    "model_averaged_physical_moment_covariance"
+                )
+                if physical_moment_covariance is not None:
+                    st.caption(
+                        "The following covariance propagates within- and between-family "
+                        "model uncertainty into mean flow, variance, standard deviation, "
+                        "directional equivalent temperature, skewness and kurtosis."
+                    )
+                    st.dataframe(
+                        np.asarray(physical_moment_covariance, dtype=float),
+                        use_container_width=True,
+                    )
                 model_averaged_pdf = selection.get(
                     "model_averaged_projected_evdf_s_per_m"
                 )
