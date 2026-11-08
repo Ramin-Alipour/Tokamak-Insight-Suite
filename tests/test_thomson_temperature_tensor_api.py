@@ -308,3 +308,21 @@ def test_model_selection_comparison_returns_aicc_weights_and_between_family_cova
         + result["model_selection_parameter_covariance_eV2"],
         rtol=1e-10, atol=1e-18,
     )
+
+
+def test_model_selection_subanalysis_is_registered_in_analysis1_family():
+    from tokamak_analysis.analysis_registry import get_analysis, get_analysis_family, resolve_analysis
+    from tokamak_analysis.thomson_temperature_tensor import compare_general_temperature_tensor_thomson_models
+
+    entry = get_analysis(86)
+    assert entry["module"] == "thomson_temperature_tensor"
+    assert entry["function"] == "compare_general_temperature_tensor_thomson_models"
+    assert resolve_analysis(86) is compare_general_temperature_tensor_thomson_models
+    assert 86 in get_analysis_family(1)["entry_ids"]
+    outputs = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    assert {
+        "model_family_comparison",
+        "model_averaged_temperature_tensor_eV",
+        "model_averaged_parameter_covariance_eV2",
+        "model_selection_parameter_covariance_eV2",
+    } <= outputs
