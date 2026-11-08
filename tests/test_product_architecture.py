@@ -152,12 +152,14 @@ def test_product_packages_do_not_import_another_products_private_modules():
 
 
 def test_named_product_workflow_wrappers_dispatch_to_their_own_registered_ids(monkeypatch):
+    from importlib import import_module
     from tis.products import load_product_api
 
     for product in list_products():
         api = load_product_api(product["product_id"])
+        api_impl = import_module(product["api_module"] + ".api")
         monkeypatch.setattr(
-            api,
+            api_impl,
             "execute_product_analysis",
             lambda product_id, analysis_id, *args, **kwargs: (
                 product_id, analysis_id, args, kwargs
