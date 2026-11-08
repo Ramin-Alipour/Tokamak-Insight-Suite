@@ -46,6 +46,23 @@ result = execute_product_analysis(
 
 # Named Thomson facade for the same canonical workflow:
 # result = analyze_spectra(...)
+
+# The second specialist product has named probe-specific facades.
+from tis.products.langmuir import analyze_langmuir_iv, analyze_multipin
+
+iv_result = analyze_langmuir_iv(
+    probe_voltage_V,
+    probe_current_A,
+    electron_fit_range=(-3.0, 4.0),
+)
+field_result = analyze_multipin(
+    probe_time_s,
+    synchronized_pin_potentials_V,
+    pin_positions_m,
+    potential_covariance_V2=pin_voltage_covariance_V2,
+)
+# The multi-pin solver reports E=-dV/dx and propagates the supplied
+# cross-pin voltage covariance through its nonuniform-grid derivative.
 ```
 
 The product catalog is derived from `ANALYSIS_FAMILIES.json` and the callable analysis registry; it does not duplicate solver metadata. The AST-based dependency inventory is available through `tis.products.build_dependency_inventory()`. See [the product implementation map](docs/architecture/PRODUCT_IMPLEMENTATION_MAP.md) and [the platform architecture](docs/architecture/PRODUCT_PLATFORM_ARCHITECTURE.md).
