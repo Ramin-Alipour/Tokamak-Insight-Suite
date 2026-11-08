@@ -32,6 +32,29 @@ _PRODUCT_SLUGS = {
     20: "instrumentation-measurement-support",
 }
 
+_PRODUCT_API_MODULES = {
+    1: "tis.products.thomson",
+    2: "tis.products.langmuir",
+    3: "tis.products.electron_cyclotron_emission",
+    4: "tis.products.doppler_charge_exchange_spectroscopy",
+    5: "tis.products.molecular_spectroscopy",
+    6: "tis.products.magnetic_diagnostics_equilibrium",
+    7: "tis.products.emission_spectroscopy",
+    8: "tis.products.interferometry_reflectometry",
+    9: "tis.products.bolometry_radiation_tomography",
+    10: "tis.products.imaging_ir_thermography",
+    11: "tis.products.neutron_diagnostics",
+    12: "tis.products.gamma_ray_spectroscopy",
+    13: "tis.products.fast_particle_diagnostics",
+    14: "tis.products.gas_pressure_fueling",
+    15: "tis.products.fluctuation_mhd_transient_analysis",
+    16: "tis.products.transport_confinement_plasma_parameters",
+    17: "tis.products.heating_power_analysis",
+    18: "tis.products.plasma_facing_components_thermal_analysis",
+    19: "tis.products.x_ray_diagnostics",
+    20: "tis.products.instrumentation_measurement_support",
+}
+
 
 def _build_product(family: dict) -> dict:
     """Create a product descriptor without duplicating physics metadata."""
@@ -39,6 +62,7 @@ def _build_product(family: dict) -> dict:
     product["product_id"] = _PRODUCT_SLUGS[family["id"]]
     product["product_version"] = "0.1.0"
     product["product_status"] = "modular_monolith"
+    product["api_module"] = _PRODUCT_API_MODULES[family["id"]]
     product["entry_points"] = [get_analysis(entry_id) for entry_id in family["entry_ids"]]
     product["execution_entry_point_count"] = len(product["entry_points"])
     return product
@@ -106,6 +130,7 @@ def validate_product_catalog() -> dict:
             and len(mapped_ids) == len(set(mapped_ids))
         ),
         "product_slugs_unique": len(set(_PRODUCT_SLUGS.values())) == 20,
+        "product_api_modules_unique": len(set(_PRODUCT_API_MODULES.values())) == 20,
         "instrumentation_support_is_cross_cutting": (
             ANALYSIS_FAMILIES[19].get("category") == "instrumentation_support"
         ),
