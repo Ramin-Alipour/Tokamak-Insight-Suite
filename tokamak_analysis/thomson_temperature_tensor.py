@@ -992,7 +992,7 @@ def compare_general_temperature_tensor_thomson_models(
         [mean[3], mean[1], mean[5]],
         [mean[4], mean[5], mean[2]],
     ])
-    selected = min(weights, key=weights.get)
+    selected = max(weights, key=weights.get)
     output = dict(candidates[selected])
     output.update({
         "model_family_comparison": {
