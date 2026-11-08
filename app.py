@@ -1187,6 +1187,7 @@ elif page=='Spectral Analysis':
                 st.caption('Upload a path-profile CSV with columns: path_coordinate_m, incident_power_profile_W, differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr, optical_efficiency_profile. These are fixed, already-characterized inputs. One integrated power measurement returns only a weighted path-average density, not a pointwise density profile.')
                 path_profile_upload=st.file_uploader('Path-dependent optical/geometry profiles CSV',type=['csv'],key='ts_path_density_profile')
                 path_profile_covariance_upload=st.file_uploader('Optional full optical-profile covariance CSV (4N × 4N; block order: incident power, cross-section, solid angle, efficiency)',type=['csv'],key='ts_path_density_covariance')
+                path_power_profile_cross_covariance_upload=st.file_uploader('Optional scattered-power / optical-profile cross-covariance CSV (vector length 4N; same block order)',type=['csv'],key='ts_path_power_profile_cross_covariance')
                 path_scattered_power_text=st.text_input('Absolutely calibrated integrated scattered power (W)',value='',key='ts_path_density_power')
                 path_scattered_power_unc_text=st.text_input('Integrated scattered-power 1σ uncertainty (W; optional)',value='',key='ts_path_density_power_unc')
             analysis_signature_payload = {
@@ -1206,6 +1207,8 @@ elif page=='Spectral Analysis':
                 'channel_laser_profile_upload': _ts_upload_digest(locals().get('channel_laser_profile_upload')),
                 'channel_response_uncertainty_upload': _ts_upload_digest(response_channel_unc_upload),
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
+                'path_profile_covariance_upload': _ts_upload_digest(locals().get('path_profile_covariance_upload')),
+                'path_power_profile_cross_covariance_upload': _ts_upload_digest(locals().get('path_power_profile_cross_covariance_upload')),
                 'model_discrepancy_covariance_upload': _ts_upload_digest(model_discrepancy_covariance_upload),
                 'systematic_covariance_upload': _ts_upload_digest(systematic_covariance_upload),
                 'spatial_psf_covariance_upload': _ts_upload_digest(spatial_psf_covariance_upload),
@@ -1550,6 +1553,11 @@ elif page=='Spectral Analysis':
                             optical_profile_covariance=(
                                 pd.read_csv(path_profile_covariance_upload,header=None).to_numpy(dtype=float)
                                 if path_profile_covariance_upload is not None else None
+                            ),
+                            scattered_power_optical_profile_cross_covariance=(
+                                pd.read_csv(path_power_profile_cross_covariance_upload,header=None)
+                                .to_numpy(dtype=float).reshape(-1)
+                                if path_power_profile_cross_covariance_upload is not None else None
                             ),
                         )
                         result['path_integrated_density']=path_density_result
