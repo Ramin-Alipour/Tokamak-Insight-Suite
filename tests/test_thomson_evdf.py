@@ -835,3 +835,23 @@ def test_evdf_reports_finite_velocity_support_truncation_without_measurement_cov
     assert diagnostic["status"] == "support_truncation_suspected"
     uncertainty = diagnostic["boundary_mass_standard_uncertainty"]
     assert uncertainty is None or (np.isfinite(uncertainty) and uncertainty >= 0.0)
+
+
+def test_evdf_propagates_scattering_angle_uncertainty_through_inverse_sensitivity():
+    wavelength, signal, background = _case()
+    sigma_theta = 2.0e-4
+    result = _run(wavelength, signal, background, signal_uncertainty=np.full(signal.size, 1.0), scattering_angle_uncertainty_rad=sigma_theta)
+    derivative = np.asarray(result["evdf_scattering_angle_sensitivity_s_per_m_per_rad"], dtype=float)
+    geometry_covariance = np.asarray(result["scattering_geometry_evdf_covariance_s2_per_m2"], dtype=float)
+    np.testing.assert_allclose(geometry_covariance, sigma_theta**2 * np.outer(derivative, derivative), rtol=1e-10, atol=1e-18)
+    total = np.asarray(result["evdf_covariance_including_scattering_geometry"], dtype=float)
+    conditional = np.asarray(result["evdf_covariance"], dtype=float)
+    np.testing.assert_allclose(total, conditional + geometry_covariance, rtol=1e-9, atol=1e-16)
+    assert result["scattering_geometry_covariance_status"] == "first_order_fixed_active_set_implicit_sensitivity"
+    assert np.linalg.norm(geometry_covariance) > 0.0
+
+
+def test_evdf_rejects_scattering_angle_uncertainty_outside_local_gaussian_domain():
+    wavelength, signal, background = _case()
+    with pytest.raises(ValueError, match="3 sigma to remain inside"):
+        _run(wavelength, signal, background, scattering_angle_uncertainty_rad=0.6)

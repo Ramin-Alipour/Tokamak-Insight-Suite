@@ -1071,6 +1071,7 @@ def analyze_thomson_spectral_distribution(
             "background_uncertainty", "background_covariance",
             "signal_background_cross_covariance", "model_discrepancy_covariance",
             "systematic_covariance", "include_compton_recoil", "incident_polarization",
+            "scattering_angle_uncertainty_rad",
         }
         conflicts = sorted(reserved.intersection(options))
         if conflicts:
@@ -1117,6 +1118,10 @@ def analyze_thomson_spectral_distribution(
                 "background_signal": background.copy(),
                 **options,
             }
+        if scattering_angle_uncertainty_rad is not None:
+            if use_relativistic_inverse:
+                raise ValueError("scattering_angle_uncertainty_rad is not yet supported by the relativistic projected-EVDF inverse; use the multi-view geometry uncertainty workflow")
+            evdf_kwargs["scattering_angle_uncertainty_rad"] = float(scattering_angle_uncertainty_rad)
         if uncertainty is not None:
             evdf_kwargs["signal_uncertainty"] = uncertainty.copy()
         elif signal_covariance_matrix is not None:

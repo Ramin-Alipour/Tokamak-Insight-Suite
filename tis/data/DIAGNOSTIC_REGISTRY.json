@@ -915,9 +915,17 @@
           "optional_inputs": [
             "background_uncertainty",
             "background_covariance",
-            "signal_background_cross_covariance"
+            "signal_background_cross_covariance",
+            "scattering_angle_uncertainty_rad"
           ],
-          "uncertainty_rule": "The residual covariance is C(signal-background)=C_signal+C_background-C_signal_background-C_signal_background.T. Signal/background cross-covariance requires both marginal covariance models and a positive-definite joint block covariance. Background-only covariance treats signal noise as not supplied; all uncertainty remains conditional on supplied covariance inputs."
+          "uncertainty_rule": "The residual covariance is C(signal-background)=C_signal+C_background-C_signal_background-C_signal_background.T. Signal/background cross-covariance requires both marginal covariance models and a positive-definite joint block covariance. Background-only covariance treats signal noise as not supplied; all uncertainty remains conditional on supplied covariance inputs. The optional scalar scattering-angle standard uncertainty is propagated through the non-negative Tikhonov inverse by central finite-difference differentiation of the finite-volume Doppler forward operator and implicit differentiation of the fixed-active-set regularized normal equations. Its rank-one EVDF and physical-moment covariance contributions are reported separately and added to conditional measurement covariance only in explicitly named combined outputs; this local Gaussian approximation requires 3 sigma to remain inside (0, pi). It is not available for the relativistic projected-EVDF branch.",
+          "outputs": [
+            "scattering_geometry_evdf_covariance_s2_per_m2",
+            "evdf_covariance_including_scattering_geometry",
+            "evdf_scattering_angle_sensitivity_s_per_m_per_rad",
+            "scattering_geometry_velocity_moment_covariance",
+            "velocity_moment_covariance_including_scattering_geometry"
+          ]
         },
         {
           "name": "Joint structured-background physical Thomson fitting",

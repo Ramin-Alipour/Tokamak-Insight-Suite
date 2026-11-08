@@ -232,6 +232,7 @@ def reconstruct_thomson_evdf(
     signal_background_cross_covariance=None,
     model_discrepancy_covariance=None,
     systematic_covariance=None,
+    scattering_angle_uncertainty_rad=None,
     boundary_mass_fraction_limit=0.01,
     max_iter=3000,
 ):
@@ -266,6 +267,10 @@ def reconstruct_thomson_evdf(
         raise ValueError("laser_wavelength_nm must be finite and positive")
     if isinstance(scattering_angle_rad, (bool, np.bool_)) or not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad < np.pi:
         raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
+    if scattering_angle_uncertainty_rad is not None and (isinstance(scattering_angle_uncertainty_rad, (bool, np.bool_)) or not np.isfinite(scattering_angle_uncertainty_rad) or scattering_angle_uncertainty_rad < 0.0):
+        raise ValueError("scattering_angle_uncertainty_rad must be None or a finite non-negative 1-sigma value")
+    if scattering_angle_uncertainty_rad is not None and scattering_angle_uncertainty_rad > min(float(scattering_angle_rad), np.pi - float(scattering_angle_rad)) / 3.0:
+        raise ValueError("scattering_angle_uncertainty_rad is too large for local Gaussian propagation; require 3 sigma to remain inside (0, pi) or use a bounded Monte Carlo geometry workflow")
     if regularization_strength is not None and (
         isinstance(regularization_strength, (bool, np.bool_))
         or not np.isfinite(regularization_strength)
@@ -796,6 +801,44 @@ def reconstruct_thomson_evdf(
                 name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
                 for i, name in enumerate(moment_covariance_order)
             }
+
+    # First-order propagation of calibrated scattering-angle uncertainty.
+    # Differentiate the finite-volume forward matrix and constrained normal equations:
+    # H dx/dtheta = -[(dA/dtheta)^T r + A^T(dA/dtheta)x].
+    geometry_evdf_covariance = None
+    geometry_moment_covariance = None
+    evdf_covariance_including_geometry = None
+    moment_covariance_including_geometry = None
+    evdf_scattering_angle_sensitivity = None
+    if scattering_angle_uncertainty_rad is not None and scattering_angle_uncertainty_rad > 0.0:
+        theta = float(scattering_angle_rad)
+        angle_step = min(1.0e-5, 0.25 * min(theta, np.pi - theta))
+        forward_plus, _ = _projected_evdf_forward_matrix(wavelength, velocity, response, float(laser_wavelength_nm), 2.0 * np.sin((theta + angle_step) / 2.0))
+        forward_minus, _ = _projected_evdf_forward_matrix(wavelength, velocity, response, float(laser_wavelength_nm), 2.0 * np.sin((theta - angle_step) / 2.0))
+        forward_angle_derivative = (forward_plus - forward_minus) / (2.0 * angle_step)
+        if residual_covariance is not None:
+            design_angle_derivative = np.linalg.solve(chol, forward_angle_derivative)
+        else:
+            unweighted_scale = max(float(np.max(np.abs(residual_data))), np.finfo(float).tiny)
+            design_angle_derivative = forward_angle_derivative / unweighted_scale
+        active_coefficients = coefficients[active]
+        fit_residual_whitened = design @ coefficients - target
+        active_angle_design = design_angle_derivative[:, active]
+        normal_equation_angle_derivative = active_angle_design.T @ fit_residual_whitened + active_design.T @ (active_angle_design @ active_coefficients)
+        active_coefficient_angle_derivative = -np.linalg.pinv(hessian, hermitian=True) @ normal_equation_angle_derivative
+        coefficient_angle_derivative = np.zeros_like(coefficients)
+        coefficient_angle_derivative[active] = active_coefficient_angle_derivative
+        evdf_scattering_angle_sensitivity = normalization_jacobian @ coefficient_angle_derivative
+        angle_variance = float(scattering_angle_uncertainty_rad) ** 2
+        geometry_evdf_covariance = angle_variance * np.outer(evdf_scattering_angle_sensitivity, evdf_scattering_angle_sensitivity)
+        if evdf_covariance_available:
+            evdf_covariance_including_geometry = evdf_covariance + geometry_evdf_covariance
+            evdf_covariance_including_geometry = 0.5 * (evdf_covariance_including_geometry + evdf_covariance_including_geometry.T)
+        if evdf_covariance_available and moment_covariance is not None:
+            moment_angle_sensitivity = moment_jacobian @ evdf_scattering_angle_sensitivity
+            geometry_moment_covariance = angle_variance * np.outer(moment_angle_sensitivity, moment_angle_sensitivity)
+            moment_covariance_including_geometry = moment_covariance + geometry_moment_covariance
+            moment_covariance_including_geometry = 0.5 * (moment_covariance_including_geometry + moment_covariance_including_geometry.T)
 
     singular_values = np.linalg.svd(design, compute_uv=False)
     threshold = np.finfo(float).eps * max(design.shape) * singular_values[0]
@@ -1386,6 +1429,8 @@ def reconstruct_thomson_evdf(
         ),
         "velocity_moment_covariance_order": moment_covariance_order,
         "velocity_moment_covariance": moment_covariance,
+        "velocity_moment_covariance_including_scattering_geometry": moment_covariance_including_geometry,
+        "scattering_geometry_velocity_moment_covariance": geometry_moment_covariance,
         "velocity_moment_standard_uncertainty": moment_standard_uncertainty,
         "velocity_moment_uncertainty_status": (
             "delta_method_propagated_from_normalized_evdf_covariance"
@@ -1413,6 +1458,11 @@ def reconstruct_thomson_evdf(
         "regularization_selection_uncertainty": regularization_selection_uncertainty,
         "regularization": "non-negative second-difference Tikhonov",
         "evdf_covariance": evdf_covariance,
+        "evdf_covariance_including_scattering_geometry": evdf_covariance_including_geometry,
+        "scattering_angle_uncertainty_rad": scattering_angle_uncertainty_rad,
+        "evdf_scattering_angle_sensitivity_s_per_m_per_rad": evdf_scattering_angle_sensitivity,
+        "scattering_geometry_evdf_covariance_s2_per_m2": geometry_evdf_covariance,
+        "scattering_geometry_covariance_status": "first_order_fixed_active_set_implicit_sensitivity" if geometry_evdf_covariance is not None else "not_requested",
         "evdf_standard_uncertainty_s_per_m": evdf_standard_uncertainty,
         "evdf_covariance_available": evdf_covariance_available,
         "evdf_covariance_method": "frequentist_fixed_active_set_tikhonov_sandwich",

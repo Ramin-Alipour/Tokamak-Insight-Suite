@@ -699,6 +699,7 @@ EXAMPLES = {
         "signal": (2.0 + 100.0*np.exp(-0.5*((np.linspace(499.98, 500.02, 41)-500.001)/0.003)**2)).tolist(),
         "laser_wavelength_nm": 500.0,
         "scattering_angle_rad": 1.5707963267948966,
+        "scattering_angle_uncertainty_rad": 0.0005,
         "instrument_response_matrix": np.eye(41).tolist(),
         "background_signal": np.full(41, 2.0).tolist(),
         "model_discrepancy_covariance": None,
