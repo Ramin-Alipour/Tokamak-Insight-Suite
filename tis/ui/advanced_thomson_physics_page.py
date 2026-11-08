@@ -1330,6 +1330,18 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "distribution_lower_envelope_m3_s3": spread.get("distribution_lower_envelope_m3_s3"),
                     "distribution_upper_envelope_m3_s3": spread.get("distribution_upper_envelope_m3_s3"),
                 })
+            if isinstance(result, Mapping) and "temperature_tensor_definition" in result:
+                st.subheader("3-D EVDF — anisotropic kinetic temperature tensor")
+                st.latex(
+                    r"T_{ij}^{(e)}[\\mathrm{eV}]=\\frac{m_e}{e}"
+                    r"\\int f_e(\\mathbf v)(v_i-u_i)(v_j-u_j)\\,d^3v"
+                )
+                st.caption(result.get("temperature_tensor_definition", ""))
+                st.write({
+                    "temperature_tensor_eV": result.get("temperature_tensor_eV"),
+                    "principal_temperature_eigenvalues_eV": result.get("temperature_tensor_eigenvalues_eV"),
+                    "candidate_tensor_if_not_identifiable": result.get("candidate_temperature_tensor_eV"),
+                })
             if isinstance(result, Mapping) and "velocity_moment_covariance_order" in result:
                 st.subheader("Projected EVDF — physical velocity moments")
                 st.latex(
