@@ -9438,10 +9438,10 @@
   },
   {
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
-    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}=m_e/(e k_B)[⟨v²⟩−⟨v⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v⟩,Var(v),σ_v,T_{e,q},skewness,excess kurtosis)",
+    "equation": "f_q(v)=f_q(v)/∫f_q(v)dv; ⟨v^n⟩=∫v^n f_q(v)dv; T_{e,q}^{(2)}=(m_e/e)[⟨v_q²⟩−⟨v_q⟩²]; Cov(g)=J_g Cov(f_q) J_gᵀ, where g=(⟨v_q⟩,Var(v_q),σ_v,T_{e,q}^{(2)},skewness,excess kurtosis)",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
     "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance.",
-    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization.",
+    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is calculated from the projected kinetic-energy variance m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -9526,7 +9526,7 @@
         },
         {
           "name": "directional_equivalent_temperature_eV",
-          "unit": "eV; m_e Var(v_q)/(e k_B)"
+          "unit": "eV; m_e Var(v_q)/e (second-moment-equivalent temperature)"
         },
         {
           "name": "skewness and excess_kurtosis",
@@ -9544,7 +9544,8 @@
       "prerequisites": [
         "A single view identifies only the q-parallel marginal; it cannot identify a general 3-D EVDF or perpendicular velocity components.",
         "A finite normalized-EVDF covariance is required for delta-method physical-moment uncertainty.",
-        "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified."
+        "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified.",
+        "The directional second-moment temperature is T_eq,eV=m_e Var(v_q)/e. k_B is not included when converting kinetic energy in joules to electronvolts."
       ],
       "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation.",
       "limitations": [
