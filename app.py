@@ -4067,6 +4067,15 @@ elif page=='Advanced Analysis':
                     velocity_limit_81=st.text_input('Projected velocity support limit (m/s)',value='80000',key='ts81_velocity_limit')
                     velocity_points_81=st.number_input('Projected velocity grid points',min_value=41,max_value=2001,value=121,step=10,key='ts81_velocity_points')
                     regularization_81=st.text_input('Tikhonov strength (blank = GCV selection)',value='',key='ts81_regularization')
+                    density_81=st.text_input(
+                        'Independent electron density for projected heat-flux calculation (m^-3; optional)',
+                        value='',key='ts81_electron_density',
+                        help='The normalized 1-D EVDF does not identify density. Leave blank to report q_parallel/n_e only; entering an independently measured/inferred density enables the 1-D projected flux q_parallel^(1D), not the full 3-D heat flux.'
+                    )
+                    density_uncertainty_81=st.text_input(
+                        'Independent electron-density 1σ uncertainty (m^-3; optional)',
+                        value='',key='ts81_electron_density_uncertainty'
+                    )
                     polarization_81=st.text_input('Incident polarization x,y,z (required for Compton)',value='0,0,1',key='ts81_polarization')
                 if st.button('Run spectral-distribution API 81',type='primary',key='run_ts_spectral_distribution_api_81'):
                     try:
@@ -4097,6 +4106,14 @@ elif page=='Advanced Analysis':
                             api_kwargs['signal_uncertainty']=df[uncertainty_col_81].to_numpy(dtype=float)
                         if regularization_81.strip():
                             api_kwargs['projected_evdf_options']['regularization_strength']=_parse_ts_scalar(regularization_81,'Tikhonov strength',minimum=1e-15)
+                        if density_81.strip():
+                            api_kwargs['projected_evdf_options']['electron_density_m3']=_parse_ts_scalar(
+                                density_81,'Independent electron density',minimum=1e-30
+                            )
+                        if density_uncertainty_81.strip():
+                            api_kwargs['projected_evdf_options']['electron_density_uncertainty_m3']=_parse_ts_scalar(
+                                density_uncertainty_81,'Independent electron-density uncertainty',minimum=0.0
+                            )
                         if kinematics_81=='compton':
                             polarization_values=np.asarray([float(value.strip()) for value in polarization_81.split(',')],dtype=float)
                             if polarization_values.shape!=(3,) or not np.all(np.isfinite(polarization_values)):
