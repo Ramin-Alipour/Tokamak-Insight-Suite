@@ -1916,3 +1916,27 @@ def test_correlated_projected_heat_flux_relation_is_registered_in_both_formula_c
         item["name"] for item in contract["input_specs"]
     }
     assert all(Path(link.split("::")[0]).exists() for link in contract["test_links"])
+
+
+def test_projected_heat_flux_cross_covariance_is_in_dashboard_diagnostic_contract():
+    from pathlib import Path
+
+    name = "Thomson spectral distribution"
+    root = json.loads(Path("DIAGNOSTIC_REGISTRY.json").read_text())
+    packaged = json.loads(Path("tis/data/DIAGNOSTIC_REGISTRY.json").read_text())
+    root_contract = next(row for row in root if row["diagnostic"] == name)["execution_contract"]
+    packaged_contract = next(row for row in packaged if row["diagnostic"] == name)["execution_contract"]
+
+    assert root_contract == packaged_contract
+    options = next(
+        item for item in root_contract["input_specs"]
+        if item["name"] == "projected_evdf_options"
+    )
+    assert "electron_density_mu3_cross_covariance_s_minus3" in options["description"]
+    assert "heat_flux_density_mu3_cross_covariance_input_s_minus3" in {
+        item["name"] for item in root_contract["output_specs"]
+    }
+    assert any(
+        "test_projected_heat_flux_propagates_density_evdf_cross_covariance" in item
+        for item in root_contract["test_links"]
+    )
