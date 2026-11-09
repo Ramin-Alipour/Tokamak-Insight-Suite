@@ -929,7 +929,7 @@ def reconstruct_optical_thomson_3d_evdf(
     gains = _real_array(view_gain, "view_gain", 1)
     if gains.shape != (n_view,) or np.any(gains <= 0.0):
         raise ValueError("view_gain must contain one finite positive calibrated relative gain per view")
-    from .formula_library import (
+    from tis.physics.shared.formula_library import (
         thomson_nonrelativistic_doppler_wavelength,
         thomson_unpolarized_differential_cross_section,
     )
