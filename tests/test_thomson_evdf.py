@@ -963,3 +963,27 @@ def test_evdf_does_not_call_unweighted_residual_a_chi_square():
     assert quality["chi_square"] is None
     assert quality["reduced_chi_square"] is None
     assert quality["residual_metric"] == "signal_scale_normalized_residual_sum_squares"
+
+
+def test_projected_evdf_fit_quality_equation_is_linked_from_analysis_and_formula_registries():
+    import json
+    from pathlib import Path
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    formula_key = "thomson_projected_evdf_regularized_fit_quality"
+    analysis = get_analysis(81)
+    assert formula_key in analysis["derived_formula_keys"]
+    assert any(
+        item["name"] == "fit_quality"
+        for item in analysis["execution_contract"]["output_specs"]
+    )
+    formulas = json.loads(
+        (Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json").read_text()
+    )
+    formula = next(
+        item for item in formulas
+        if item["execution_contract"]["formula_key"] == formula_key
+    )
+    assert "d_eff" in formula["equation"]
+    assert "χ²_red" in formula["equation"]
+    assert formula["execution_contract"]["implementation_link_status"] == "mapped"
