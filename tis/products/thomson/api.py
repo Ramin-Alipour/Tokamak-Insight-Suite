@@ -44,7 +44,14 @@ def reconstruct_profiles(*args: Any, **kwargs: Any) -> Any:
 
 
 def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
-    """Analyze measured Thomson spectral distribution (entry 81)."""
+    """Analyze measured Thomson spectral distribution (entry 81).
+
+    Set projected_evdf_options to reconstruct the q-parallel EVDF from the
+    same calibrated spectrum. Optional electron_density_m3 and
+    electron_density_uncertainty_m3 inside that mapping enable the
+    one-dimensional projected parallel kinetic-energy-flux estimate; the
+    returned quantity is explicitly not the full 3-D electron heat flux.
+    """
     return _run(81, *args, **kwargs)
 
 
