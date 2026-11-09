@@ -1827,10 +1827,12 @@ def test_projected_evdf_heat_flux_is_exposed_through_product_api():
             "regularization_strength": 1e-3,
             "electron_density_m3": 2.0e19,
             "electron_density_uncertainty_m3": 1.0e18,
+            "electron_density_mu3_cross_covariance_s_minus3": 0.0,
         },
     )
     moments = result["projected_evdf_inference"]["projected_evdf_physical_moments"]
     assert moments["heat_flux_density_input_m3"] == pytest.approx(2.0e19)
+    assert moments["heat_flux_density_mu3_cross_covariance_input_s_minus3"] == pytest.approx(0.0)
     assert np.isfinite(moments["parallel_projected_heat_flux_per_density_W_m"])
     assert np.isfinite(moments["parallel_projected_heat_flux_W_m2"])
     assert moments["heat_flux_physical_scope"].startswith("one_dimensional_parallel")
