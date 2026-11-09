@@ -11856,7 +11856,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tis.products.thomson.physics.thomson_distribution._projected_evdf_physical_moments",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.infer_projected_parallel_heat_flux",
       "formula_key": "thomson_projected_evdf_parallel_heat_flux_1d",
       "input_specs": [
         {
@@ -11878,6 +11878,11 @@
         {
           "name": "electron_density_uncertainty_m3",
           "unit": "m^-3; optional independent 1-sigma",
+          "required": false
+        },
+        {
+          "name": "covariance",
+          "unit": "velocity-grid covariance of unnormalized projected EVDF samples",
           "required": false
         }
       ],
