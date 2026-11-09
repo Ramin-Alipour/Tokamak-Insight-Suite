@@ -12,6 +12,10 @@ from .api import (
     reconstruct_relativistic_evdf,
     compare_temperature_tensor_models,
     infer_path_averaged_density,
+    fit_two_population_relativistic_spectrum,
+    fit_n_population_relativistic_spectrum,
+    fit_kinetic_spectrum_with_background,
+    propagate_full_em_cts_ray_geometry_uncertainty,
 )
 
 __all__ = [
@@ -22,4 +26,8 @@ __all__ = [
     "fit_temperature_tensor", "analyze_landau_fdt_convergence",
     "reconstruct_relativistic_evdf", "compare_temperature_tensor_models",
     "infer_path_averaged_density",
+    "fit_two_population_relativistic_spectrum",
+    "fit_n_population_relativistic_spectrum",
+    "fit_kinetic_spectrum_with_background",
+    "propagate_full_em_cts_ray_geometry_uncertainty",
 ]
