@@ -4129,6 +4129,18 @@ elif page=='Advanced Analysis':
                 if api_result_81:
                     st.markdown('**Registered Analysis 81 result**')
                     st.json(api_result_81)
+                    projected_inverse_81=api_result_81.get('projected_evdf_inference') or {}
+                    projected_moments_81=projected_inverse_81.get('projected_evdf_physical_moments') or {}
+                    if projected_moments_81:
+                        st.markdown('**Physical moments from the reconstructed projected EVDF**')
+                        st.write({
+                            'Mean q-parallel velocity (m/s)':projected_moments_81.get('mean_velocity_parallel_m_s'),
+                            'Directional equivalent temperature (eV)':projected_moments_81.get('directional_equivalent_temperature_eV'),
+                            'Third central q-parallel velocity moment (m^3/s^3)':projected_moments_81.get('central_third_velocity_moment_m3_s3'),
+                            'Projected parallel heat flux per density (W m)':projected_moments_81.get('parallel_projected_heat_flux_per_density_W_m'),
+                            'Projected parallel heat flux (W/m^2)':projected_moments_81.get('parallel_projected_heat_flux_W_m2'),
+                            'Heat-flux scope':projected_moments_81.get('heat_flux_physical_scope'),
+                        })
                     json_download('Export registered Thomson spectral-distribution result',api_result_81,'tis_thomson_spectral_distribution_analysis_81.json')
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
         if df is None:
