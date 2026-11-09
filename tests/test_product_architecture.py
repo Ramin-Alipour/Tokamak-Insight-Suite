@@ -387,3 +387,21 @@ def test_advanced_thomson_dashboard_workflows_use_public_product_api(monkeypatch
             "args": ("measured-input",),
             "kwargs": {"calibration": "explicit"},
         }
+
+
+def test_every_thomson_analysis_resolves_through_product_owned_registry():
+    from tis.products.thomson.registry import THOMSON_ENTRY_POINTS, THOMSON_ANALYSIS_IDS
+    from tis.products.api import resolve_product_analysis
+
+    expected_ids = {1, 30, 46, 81, 82, 83, 84, 85, 86, 87}
+    assert THOMSON_ANALYSIS_IDS == expected_ids
+    assert set(get_product("thomson-scattering")["entry_ids"]) == expected_ids
+
+    for analysis_id in sorted(expected_ids):
+        solver = resolve_product_analysis("thomson-scattering", analysis_id)
+        module_name, function_name = THOMSON_ENTRY_POINTS[analysis_id]
+        assert callable(solver)
+        assert solver.__module__ == (
+            f"tis.products.thomson.physics.{module_name}"
+        )
+        assert solver.__name__ == function_name
