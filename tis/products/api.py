@@ -5,7 +5,6 @@ from inspect import signature
 from importlib import import_module
 from typing import Any
 
-from tokamak_analysis.analysis_registry import get_analysis
 from .catalog import get_product
 
 
@@ -23,7 +22,15 @@ def resolve_product_analysis(product_id: int | str, analysis_id: int):
         raise ValueError(
             f"Analysis ID {analysis_id} is not owned by product {product['product_id']}"
         )
-    entry = get_analysis(analysis_id)
+    entry = next(
+        (item for item in product["entry_points"] if item["id"] == analysis_id),
+        None,
+    )
+    if entry is None:
+        raise RuntimeError(
+            f"Product catalog for {product['product_id']} owns analysis {analysis_id} "
+            "but does not provide its executable entry-point contract"
+        )
     module_path = product["api_module"] + ".physics." + entry["module"]
     module = import_module(module_path)
     return getattr(module, entry["function"])
