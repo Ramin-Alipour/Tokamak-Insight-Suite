@@ -11923,5 +11923,80 @@
       ],
       "note": "Analytic synthetic-mixture verification; no experimental validation is claimed."
     }
+  },
+  {
+    "name": "Correlated density and projected-EVDF heat-flux uncertainty",
+    "equation": "q_parallel^(1D)=(m_e n_e/2) mu_3,parallel; Var(q_parallel^(1D))=(m_e/2)^2[n_e^2 Var(mu_3)+mu_3^2 Var(n_e)+2 n_e mu_3 Cov(n_e,mu_3)]",
+    "inputs": "Independently measured electron density n_e [m^-3], density standard uncertainty [m^-3], projected q-parallel EVDF third-central-moment estimate and its covariance from the measured-spectrum inverse, and Cov(n_e,mu_3) [s^-3]",
+    "output": "Projected one-dimensional parallel kinetic-energy flux [W m^-2] and standard uncertainty [W m^-2]",
+    "assumptions": "The EVDF is the normalized one-dimensional scattering-vector marginal. The density is an independent input; density–EVDF cross-covariance is optional but, when supplied, must satisfy the positive-semidefinite bound |Cov(n_e,mu_3)| <= sigma_n sigma_mu3. This is not the full three-dimensional electron heat flux because perpendicular kinetic-energy contributions are not identified by a single projected marginal.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.infer_projected_parallel_heat_flux",
+      "formula_key": "thomson_projected_heat_flux_correlated_density_evdf_uncertainty",
+      "input_specs": [
+        {
+          "name": "velocity_m_s",
+          "unit": "m s^-1",
+          "required": true
+        },
+        {
+          "name": "probability_density_s_per_m",
+          "unit": "s m^-1",
+          "required": true
+        },
+        {
+          "name": "covariance",
+          "unit": "(s m^-1)^2",
+          "required": false
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": false
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3",
+          "required": false
+        },
+        {
+          "name": "electron_density_mu3_cross_covariance_s_minus3",
+          "unit": "s^-3",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "parallel_projected_heat_flux_W_m2",
+          "unit": "W m^-2"
+        },
+        {
+          "name": "parallel_projected_heat_flux_standard_uncertainty_W_m2",
+          "unit": "W m^-2"
+        },
+        {
+          "name": "heat_flux_physical_scope",
+          "unit": "scope"
+        }
+      ],
+      "assumptions": [
+        "The EVDF is the normalized one-dimensional scattering-vector marginal.",
+        "Electron density is independently supplied; no density is fabricated from normalized EVDF.",
+        "A supplied density–EVDF covariance must satisfy the 2x2 joint covariance PSD bound."
+      ],
+      "limitations": [
+        "Does not infer the complete three-dimensional electron heat-flux vector.",
+        "Does not infer density from the normalized projected EVDF."
+      ],
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_projected_heat_flux_propagates_density_evdf_cross_covariance",
+        "tests/test_thomson_distribution.py::test_projected_heat_flux_rejects_non_psd_density_evdf_cross_covariance",
+        "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_is_exposed_through_product_api"
+      ]
+    }
   }
 ]
