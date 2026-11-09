@@ -549,6 +549,69 @@ def reconstruct_thomson_evdf(
 
     fitted = forward @ coefficients
     residual = residual_data - fitted
+    # Effective degrees of freedom for the selected fixed-active-set
+    # Tikhonov estimator.  This is tr(H^-1 A.T A), not the number of
+    # non-zero EVDF bins: regularization couples all active coefficients.
+    try:
+        effective_model_dof = float(np.trace(
+            np.linalg.solve(hessian, active_design.T @ active_design)
+        ))
+    except np.linalg.LinAlgError as exc:
+        raise ValueError(
+            "Could not evaluate the effective degrees of freedom of the selected EVDF inverse"
+        ) from exc
+    whitened_residual = target - design @ coefficients
+    weighted_residual_sum_squares = float(
+        whitened_residual @ whitened_residual
+    )
+    residual_dof = float(target.size - effective_model_dof)
+    if not np.isfinite(effective_model_dof) or not np.isfinite(weighted_residual_sum_squares):
+        raise ValueError("EVDF fit diagnostics are not finite")
+    if effective_model_dof < 0.0 or effective_model_dof > target.size + 1e-8:
+        raise ValueError("EVDF effective degrees of freedom lie outside the data-space dimension")
+    # Only a supplied measurement/background/model/systematic covariance
+    # makes this a statistically calibrated chi-square.  In the unweighted
+    # fallback, target is merely scaled by signal amplitude and must not be
+    # mislabeled as a chi-square or assigned a probability interpretation.
+    fit_chi_square = (
+        weighted_residual_sum_squares if residual_covariance is not None else None
+    )
+    reduced_fit_chi_square = (
+        float(fit_chi_square / residual_dof)
+        if fit_chi_square is not None and residual_dof > 0.0 else None
+    )
+    fit_quality = {
+        "status": (
+            "covariance_weighted_fit_quality"
+            if residual_covariance is not None
+            else "descriptive_unweighted_fit_quality"
+        ),
+        "residual_metric": (
+            "whitened_chi_square" if residual_covariance is not None
+            else "signal_scale_normalized_residual_sum_squares"
+        ),
+        "chi_square": fit_chi_square,
+        "reduced_chi_square": reduced_fit_chi_square,
+        "weighted_residual_sum_squares": weighted_residual_sum_squares,
+        "whitened_residual_rms": float(
+            np.sqrt(weighted_residual_sum_squares / target.size)
+        ),
+        "effective_model_degrees_of_freedom": effective_model_dof,
+        "residual_degrees_of_freedom": residual_dof,
+        "degrees_of_freedom_method": (
+            "trace((A_active.T A_active + lambda L_active.T L_active)^-1 "
+            "A_active.T A_active)"
+        ),
+        "interpretation": (
+            "Reduced chi-square is conditional on the supplied complete residual covariance, "
+            "selected velocity grid, active set and regularization; it is a fit diagnostic, "
+            "not a universal automatic acceptance threshold."
+            if residual_covariance is not None else
+            "No measurement covariance was supplied. The scale-normalized residual is "
+            "descriptive only; chi-square, reduced chi-square and statistical acceptance "
+            "probabilities are intentionally withheld."
+        ),
+    }
     integral = lambda values: float(trapezoid(values, velocity))
     mean_v = integral(velocity * distribution)
     centred = velocity - mean_v
@@ -1503,6 +1566,7 @@ def reconstruct_thomson_evdf(
         "fitted_spectrum": fitted,
         "residual": residual,
         "residual_sum_squares": float(np.sum(residual**2)),
+        "fit_quality": fit_quality,
         "regularization_strength": selected_regularization_strength,
         "regularization_selection": (
             "generalized_cross_validation_over_logarithmic_candidate_grid"
