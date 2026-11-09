@@ -150,6 +150,29 @@ def render_product_workspace_page(st: Any) -> None:
                 f"Workflow {selected_analysis_id} completed through "
                 f"{product['product_id']} public API."
             )
+            if selected_id == 81:
+                st.markdown("### Projected EVDF physical inference")
+                projected = result.get("projected_evdf_inference")
+                if projected is None:
+                    st.info(
+                        "No projected EVDF was requested. Supply projected_evdf_options "
+                        "with an explicit velocity grid/regularization policy and scattering geometry."
+                    )
+                else:
+                    st.markdown("**Inverse fit quality**")
+                    st.json(projected.get("fit_quality", {
+                        "status": "fit-quality diagnostics unavailable from this solver result"
+                    }))
+                    st.markdown("**Projected physical velocity moments**")
+                    st.json(projected.get("projected_evdf_physical_moments", {
+                        "status": "physical-moment summary unavailable"
+                    }))
+                    st.markdown("**Identifiability and regularization sensitivity**")
+                    st.json({
+                        "identifiability": projected.get("identifiability"),
+                        "regularization_selection": projected.get("regularization_selection"),
+                        "regularization_sensitivity": projected.get("regularization_sensitivity"),
+                    })
             st.write(result)
         except Exception as exc:
             st.error(f"Registered workflow execution failed: {type(exc).__name__}: {exc}")
