@@ -54,6 +54,7 @@ def _wavelength_bin_widths(x):
 def _projected_evdf_physical_moments(
     velocity_m_s, probability_density_s_per_m, covariance=None, *,
     electron_density_m3=None, electron_density_uncertainty_m3=None,
+    electron_density_mu3_cross_covariance_s_minus3=None,
 ):
     """Return physical moments of a normalized q-parallel EVDF and their covariance.
 
@@ -181,6 +182,10 @@ def _projected_evdf_physical_moments(
         raise ValueError(
             "electron_density_uncertainty_m3 requires an independently supplied electron_density_m3"
         )
+    if electron_density_m3 is None and electron_density_mu3_cross_covariance_s_minus3 is not None:
+        raise ValueError(
+            "electron_density_mu3_cross_covariance_s_minus3 requires an independently supplied electron_density_m3"
+        )
     heat_flux_per_density = 0.5 * electron_mass * mu3
     heat_flux_per_density_uncertainty = None
     if covariance is not None:
@@ -205,11 +210,52 @@ def _projected_evdf_physical_moments(
                 raise ValueError("electron_density_uncertainty_m3 must be a finite non-negative scalar")
             density_uncertainty = float(electron_density_uncertainty_m3)
         projected_heat_flux = density_value * heat_flux_per_density
-        if heat_flux_per_density_uncertainty is not None:
-            projected_heat_flux_uncertainty = float(np.sqrt(
-                (density_value * heat_flux_per_density_uncertainty)**2
-                + (heat_flux_per_density * density_uncertainty)**2
-            ))
+        if electron_density_mu3_cross_covariance_s_minus3 is not None:
+            cross_covariance_value = electron_density_mu3_cross_covariance_s_minus3
+            if (
+                isinstance(cross_covariance_value, (bool, np.bool_))
+                or not isinstance(cross_covariance_value, (int, float, np.integer, np.floating))
+                or not np.isfinite(cross_covariance_value)
+            ):
+                raise ValueError(
+                    "electron_density_mu3_cross_covariance_s_minus3 must be a finite real scalar"
+                )
+            if covariance is None or electron_density_uncertainty_m3 is None:
+                raise ValueError(
+                    "density–EVDF cross-covariance requires both EVDF covariance and electron_density_uncertainty_m3"
+                )
+            mu3_index = moment_order.index("central_third_velocity_moment_m3_s3")
+            mu3_variance = float(moment_covariance[mu3_index, mu3_index])
+            density_variance = density_uncertainty**2
+            cross_limit = np.sqrt(max(density_variance * mu3_variance, 0.0))
+            cross_scale = max(cross_limit, abs(float(cross_covariance_value)), np.finfo(float).tiny)
+            if abs(float(cross_covariance_value)) > cross_limit + 1.0e-10 * cross_scale:
+                raise ValueError(
+                    "electron_density_mu3_cross_covariance_s_minus3 violates the joint density/EVDF covariance PSD bound"
+                )
+            cross_term = 2.0 * density_value * mu3 * float(cross_covariance_value)
+        else:
+            mu3_index = moment_order.index("central_third_velocity_moment_m3_s3")
+            mu3_variance = (
+                float(moment_covariance[mu3_index, mu3_index])
+                if covariance is not None else None
+            )
+            cross_term = 0.0
+        if mu3_variance is not None:
+            heat_flux_variance = (0.5 * electron_mass)**2 * (
+                density_value**2 * mu3_variance
+                + mu3**2 * density_uncertainty**2
+                + cross_term
+            )
+            variance_scale = (0.5 * electron_mass)**2 * max(
+                density_value**2 * mu3_variance
+                + mu3**2 * density_uncertainty**2
+                + abs(cross_term),
+                np.finfo(float).tiny,
+            )
+            if heat_flux_variance < -1.0e-10 * variance_scale:
+                raise ValueError("joint density/EVDF covariance produced a negative heat-flux variance")
+            projected_heat_flux_uncertainty = float(np.sqrt(max(heat_flux_variance, 0.0)))
 
     # Convert the inferred q-parallel velocity marginal into its cumulative
     # random kinetic-energy distribution. For E in eV,
@@ -330,6 +376,10 @@ def _projected_evdf_physical_moments(
             None if electron_density_uncertainty_m3 is None
             else float(electron_density_uncertainty_m3)
         ),
+        "heat_flux_density_mu3_cross_covariance_input_s_minus3": (
+            None if electron_density_mu3_cross_covariance_s_minus3 is None
+            else float(electron_density_mu3_cross_covariance_s_minus3)
+        ),
         "heat_flux_physical_scope": (
             "one_dimensional_parallel_kinetic_energy_flux_component_only; "
             "not_the_full_three_dimensional_electron_heat_flux"
@@ -353,6 +403,7 @@ def _projected_evdf_physical_moments(
             "random_energy_variance": "Var(E_q) = (m_e/(2e))^2 (mu_4,q - sigma_q^4)",
             "parallel_projected_heat_flux_per_density": "q_q^(1D)/n_e = (m_e/2) mu_3,q",
             "parallel_projected_heat_flux": "q_q^(1D) = (m_e*n_e/2) mu_3,q; this omits the perpendicular-energy term in the full 3-D heat-flux integral",
+            "parallel_projected_heat_flux_variance": "Var(q_q^(1D)) = (m_e/2)^2 [n_e^2 Var(mu_3,q) + mu_3,q^2 Var(n_e) + 2 n_e mu_3,q Cov(n_e,mu_3,q)]",
         },
         "moment_covariance_order": list(moment_order),
         "moment_covariance": moment_covariance,
@@ -382,6 +433,7 @@ def infer_projected_parallel_heat_flux(
     *,
     electron_density_m3=None,
     electron_density_uncertainty_m3=None,
+    electron_density_mu3_cross_covariance_s_minus3=None,
 ):
     """Compute the identifiable 1-D projected parallel kinetic-energy flux.
 
@@ -1451,6 +1503,9 @@ def analyze_thomson_spectral_distribution(
         heat_flux_density_uncertainty = options.pop(
             "electron_density_uncertainty_m3", None
         )
+        heat_flux_density_mu3_cross_covariance = options.pop(
+            "electron_density_mu3_cross_covariance_s_minus3", None
+        )
         if heat_flux_density is not None and (
             isinstance(heat_flux_density, (bool, np.bool_))
             or not isinstance(heat_flux_density, (int, float, np.integer, np.floating))
@@ -1605,6 +1660,9 @@ def analyze_thomson_spectral_distribution(
             velocity_grid, projected_pdf, moment_covariance_source,
             electron_density_m3=heat_flux_density,
             electron_density_uncertainty_m3=heat_flux_density_uncertainty,
+            electron_density_mu3_cross_covariance_s_minus3=(
+                heat_flux_density_mu3_cross_covariance
+            ),
         )
         moment_summary["status"] = (
             "identified_from_measurement" if evdf_primary_identified
