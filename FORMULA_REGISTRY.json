@@ -11913,7 +11913,8 @@
       ],
       "test_links": [
         "tests/test_thomson_distribution.py::test_projected_evdf_parallel_heat_flux_matches_analytic_skewed_mixture",
-        "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_flux"
+        "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_flux",
+        "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_is_exposed_through_product_api"
       ],
       "note": "Analytic synthetic-mixture verification; no experimental validation is claimed."
     }
