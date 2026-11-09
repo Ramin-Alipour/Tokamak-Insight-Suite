@@ -1879,6 +1879,19 @@ def test_projected_heat_flux_propagates_density_evdf_cross_covariance():
     assert correlated["parallel_projected_heat_flux_standard_uncertainty_W_m2"] != pytest.approx(
         independent["parallel_projected_heat_flux_standard_uncertainty_W_m2"]
     )
+    from tis.products.thomson.physics.thomson_distribution import (
+        infer_projected_parallel_heat_flux,
+    )
+    helper_result = infer_projected_parallel_heat_flux(
+        velocity, pdf, evdf_covariance,
+        electron_density_m3=ne,
+        electron_density_uncertainty_m3=dne,
+        electron_density_mu3_cross_covariance_s_minus3=cov_ne_mu3,
+    )
+    assert helper_result["parallel_projected_heat_flux_standard_uncertainty_W_m2"] == pytest.approx(
+        correlated["parallel_projected_heat_flux_standard_uncertainty_W_m2"],
+        rel=1e-12,
+    )
 
 
 def test_projected_heat_flux_rejects_non_psd_density_evdf_cross_covariance():
