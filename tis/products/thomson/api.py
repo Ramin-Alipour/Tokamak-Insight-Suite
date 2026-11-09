@@ -76,3 +76,26 @@ def compare_temperature_tensor_models(*args: Any, **kwargs: Any) -> Any:
 def infer_path_averaged_density(*args: Any, **kwargs: Any) -> Any:
     """Infer path-averaged density from correlated optical calibration (entry 87)."""
     return _run(87, *args, **kwargs)
+
+def fit_two_population_relativistic_spectrum(*args: Any, **kwargs: Any) -> Any:
+    """Fit the explicitly parameterized two-population relativistic TS model."""
+    from .physics.thomson_workflow import fit_two_population_relativistic_thomson_spectrum
+    return fit_two_population_relativistic_thomson_spectrum(*args, **kwargs)
+
+
+def fit_n_population_relativistic_spectrum(*args: Any, **kwargs: Any) -> Any:
+    """Fit the explicitly parameterized finite N-population relativistic TS model."""
+    from .physics.thomson_workflow import fit_n_population_relativistic_thomson_spectrum
+    return fit_n_population_relativistic_thomson_spectrum(*args, **kwargs)
+
+
+def fit_kinetic_spectrum_with_background(*args: Any, **kwargs: Any) -> Any:
+    """Jointly infer a non-collective kinetic Thomson spectrum and structured background."""
+    from .physics.thomson_workflow import fit_noncollective_kinetic_thomson_with_background
+    return fit_noncollective_kinetic_thomson_with_background(*args, **kwargs)
+
+
+def propagate_full_em_cts_ray_geometry_uncertainty(*args: Any, **kwargs: Any) -> Any:
+    """Propagate supplied ray/equilibrium geometry uncertainty through Full-EM CTS refits."""
+    from .physics.thomson_workflow import propagate_full_em_cts_ray_geometry_uncertainty as propagate
+    return propagate(*args, **kwargs)
