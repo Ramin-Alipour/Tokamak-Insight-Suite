@@ -333,3 +333,14 @@ def test_dashboard_exposes_optical_collective_kappa_population_inference_control
         for item in app.text_area
     )
     assert not app.exception, [str(error.value) for error in app.exception]
+
+
+def test_registered_spectral_distribution_dashboard_exposes_projected_heat_flux_density():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "Independent electron density for projected heat-flux calculation" in source
+    assert "Independent electron-density uncertainty" in source
+    assert "'electron_density_m3'" in source
+    assert "'electron_density_uncertainty_m3'" in source
+    assert "not the full 3-D heat flux" in source
