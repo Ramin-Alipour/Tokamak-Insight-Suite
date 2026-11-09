@@ -374,6 +374,42 @@ def _projected_evdf_physical_moments(
     }
 
 
+
+def infer_projected_parallel_heat_flux(
+    velocity_m_s,
+    probability_density_s_per_m,
+    covariance=None,
+    *,
+    electron_density_m3=None,
+    electron_density_uncertainty_m3=None,
+):
+    """Compute the identifiable 1-D projected parallel kinetic-energy flux.
+
+    The absolute flux is returned only when an independent density is
+    supplied. This function intentionally does not label the result as the
+    complete 3-D electron heat flux.
+    """
+    moments = _projected_evdf_physical_moments(
+        velocity_m_s,
+        probability_density_s_per_m,
+        covariance,
+        electron_density_m3=electron_density_m3,
+        electron_density_uncertainty_m3=electron_density_uncertainty_m3,
+    )
+    return {
+        "parallel_projected_heat_flux_per_density_W_m": moments[
+            "parallel_projected_heat_flux_per_density_W_m"
+        ],
+        "parallel_projected_heat_flux_W_m2": moments[
+            "parallel_projected_heat_flux_W_m2"
+        ],
+        "parallel_projected_heat_flux_standard_uncertainty_W_m2": moments[
+            "parallel_projected_heat_flux_standard_uncertainty_W_m2"
+        ],
+        "heat_flux_physical_scope": moments["heat_flux_physical_scope"],
+    }
+
+
 def _apply_response_matrix(response, spectrum, wavelength_nm):
     """Apply a bin-probability response while conserving integrated spectral power."""
     axis = np.asarray(wavelength_nm, dtype=float)
