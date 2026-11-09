@@ -1,6 +1,6 @@
 """Streamlit entry point for explicit advanced Analysis-1 physics solvers.
 
-The numerical kernels live in tokamak_analysis.cts_full_physics. This page only
+The numerical kernels are owned by the Thomson specialist product. This page
 collects already-calibrated/user-prepared arrays and forwards them unchanged;
 it performs no calibration, geometry reconstruction, or hidden model fallback.
 """
@@ -11,8 +11,8 @@ from collections.abc import Mapping
 import numpy as np
 from scipy.special import ndtr, stdtr
 
-from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
-from tokamak_analysis.advanced_inference import build_relativistic_3d_thomson_kernels
+from tis.products.thomson.physics.cts_full_physics import run_advanced_thomson_physics
+from tis.products.thomson.physics.advanced_inference import build_relativistic_3d_thomson_kernels
 
 
 def _example_wavelength_edges(wavelength_nm):
