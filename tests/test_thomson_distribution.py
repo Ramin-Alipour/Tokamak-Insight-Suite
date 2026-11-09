@@ -1724,7 +1724,7 @@ def test_projected_evdf_parallel_heat_flux_matches_analytic_skewed_mixture():
         _projected_evdf_physical_moments,
     )
 
-    velocity = np.linspace(-5.0, 5.0, 2001)
+    velocity = np.linspace(-5.0, 5.0, 501)
     sigma = 0.5
     # A 3:1 mixture with component means -0.5 and +1.5 has zero
     # mixture mean and analytic third central moment mu3 = 0.75 (m/s)^3.
@@ -1772,6 +1772,10 @@ def test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_f
     with pytest.raises(ValueError, match="electron_density_m3"):
         _projected_evdf_physical_moments(
             velocity, pdf, electron_density_m3="invented"
+        )
+    with pytest.raises(ValueError, match="requires an independently supplied"):
+        _projected_evdf_physical_moments(
+            velocity, pdf, electron_density_uncertainty_m3=1.0e17
         )
 
 
