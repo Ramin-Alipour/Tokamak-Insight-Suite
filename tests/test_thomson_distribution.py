@@ -1896,3 +1896,23 @@ def test_projected_heat_flux_rejects_non_psd_density_evdf_cross_covariance():
             electron_density_uncertainty_m3=1.0e16,
             electron_density_mu3_cross_covariance_s_minus3=1.0e100,
         )
+
+
+def test_correlated_projected_heat_flux_relation_is_registered_in_both_formula_catalogues():
+    from pathlib import Path
+
+    name = "Correlated density and projected-EVDF heat-flux uncertainty"
+    root_registry = json.loads(Path("FORMULA_REGISTRY.json").read_text())
+    packaged_registry = json.loads(Path("tis/data/FORMULA_REGISTRY.json").read_text())
+    root_entry = next(item for item in root_registry if item["name"] == name)
+    packaged_entry = next(item for item in packaged_registry if item["name"] == name)
+
+    assert root_entry == packaged_entry
+    assert "2 n_e mu_3 Cov(n_e,mu_3)" in root_entry["equation"]
+    contract = root_entry["execution_contract"]
+    assert contract["implementation_link_status"] == "mapped"
+    assert contract["function_link"].endswith(".infer_projected_parallel_heat_flux")
+    assert "electron_density_mu3_cross_covariance_s_minus3" in {
+        item["name"] for item in contract["input_specs"]
+    }
+    assert all(Path(link.split("::")[0]).exists() for link in contract["test_links"])
