@@ -1,6 +1,8 @@
-"""Product-owned solvers with shared-domain dependency fallback."""
-from pathlib import Path
+"""Thomson product-owned solver namespace.
 
-_SHARED_PHYSICS = Path(__file__).resolve().parents[3] / "physics" / "shared"
-if _SHARED_PHYSICS.is_dir():
-    __path__.append(str(_SHARED_PHYSICS))
+Shared-domain kernels must be imported explicitly from ``tis.physics.shared``.
+Keeping this package path local prevents accidental resolution of missing
+product modules from a sibling shared directory and makes import ownership
+visible to Python, static analysis, and the dependency inventory.
+"""
+
