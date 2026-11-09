@@ -1415,6 +1415,24 @@ def analyze_thomson_spectral_distribution(
         heat_flux_density_uncertainty = options.pop(
             "electron_density_uncertainty_m3", None
         )
+        if heat_flux_density is not None and (
+            isinstance(heat_flux_density, (bool, np.bool_))
+            or not isinstance(heat_flux_density, (int, float, np.integer, np.floating))
+            or not np.isfinite(heat_flux_density)
+            or float(heat_flux_density) <= 0.0
+        ):
+            raise ValueError("projected_evdf_options.electron_density_m3 must be a positive finite scalar")
+        if heat_flux_density_uncertainty is not None and (
+            isinstance(heat_flux_density_uncertainty, (bool, np.bool_))
+            or not isinstance(heat_flux_density_uncertainty, (int, float, np.integer, np.floating))
+            or not np.isfinite(heat_flux_density_uncertainty)
+            or float(heat_flux_density_uncertainty) < 0.0
+        ):
+            raise ValueError("projected_evdf_options.electron_density_uncertainty_m3 must be finite and non-negative")
+        if heat_flux_density is None and heat_flux_density_uncertainty is not None:
+            raise ValueError(
+                "electron_density_uncertainty_m3 requires an independently supplied electron_density_m3"
+            )
         reserved = {
             "wavelength_nm", "signal", "laser_wavelength_nm",
             "scattering_angle_rad", "instrument_response_matrix",
