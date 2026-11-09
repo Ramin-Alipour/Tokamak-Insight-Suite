@@ -11872,7 +11872,8 @@
         {
           "name": "electron_density_m3",
           "unit": "m^-3; independently measured or inferred",
-          "required": true
+          "required": false,
+          "description": "Optional independently measured or inferred positive density; required only for absolute projected heat flux, not q_parallel^(1D)/n_e."
         },
         {
           "name": "electron_density_uncertainty_m3",
@@ -11902,7 +11903,7 @@
         "A normalized q-parallel EVDF reconstructed from calibrated measured spectrum with a declared identifiability status.",
         "An independently measured or inferred positive electron density for absolute flux; normalized EVDF does not contain density information."
       ],
-      "algorithm": "Compute μ3,parallel=∫(v_parallel-u_parallel)^3 f_parallel(v_parallel)dv_parallel using the same nonuniform-grid quadrature as EVDF normalization. Then q_parallel^(1D)/n_e=(m_e/2)μ3,parallel. If independent n_e is supplied, calculate q_parallel^(1D)=n_e(m_e/2)μ3,parallel. Propagate the normalized-EVDF covariance through the analytic μ3 Jacobian and combine independent density variance by first-order propagation.",
+      "algorithm": "Compute mu_3,parallel=integral[(v_parallel-u_parallel)^3 f_parallel(v_parallel) dv_parallel] using the same nonuniform-grid quadrature as EVDF normalization. Then q_parallel^(1D)/n_e=(m_e/2)mu_3,parallel. If independent n_e is supplied, calculate q_parallel^(1D)=n_e(m_e/2)mu_3,parallel. Propagate the normalized-EVDF covariance through the analytic mu_3 Jacobian and combine independent density variance by first-order propagation.",
       "uncertainty_model": "Delta-method propagation from the normalized projected-EVDF covariance. An optional independent density uncertainty contributes (m_e μ3/2)^2 σ_n^2. No EVDF-density cross covariance is assumed or inferred.",
       "limitations": [
         "This is only the one-dimensional projected parallel kinetic-energy-flux contribution; it is not the full three-dimensional electron heat flux.",
