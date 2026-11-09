@@ -177,6 +177,10 @@ def _projected_evdf_physical_moments(
     # is q_parallel^(1D) = (m_e n_e / 2) * mu_3,parallel.
     projected_heat_flux = None
     projected_heat_flux_uncertainty = None
+    if electron_density_m3 is None and electron_density_uncertainty_m3 is not None:
+        raise ValueError(
+            "electron_density_uncertainty_m3 requires an independently supplied electron_density_m3"
+        )
     heat_flux_per_density = 0.5 * electron_mass * mu3
     heat_flux_per_density_uncertainty = None
     if covariance is not None:
