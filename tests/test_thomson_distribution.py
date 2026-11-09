@@ -1834,3 +1834,63 @@ def test_projected_evdf_heat_flux_is_exposed_through_product_api():
     assert np.isfinite(moments["parallel_projected_heat_flux_per_density_W_m"])
     assert np.isfinite(moments["parallel_projected_heat_flux_W_m2"])
     assert moments["heat_flux_physical_scope"].startswith("one_dimensional_parallel")
+
+
+def test_projected_heat_flux_propagates_density_evdf_cross_covariance():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-4.0e4, 4.0e4, 9)
+    pdf = np.array([0.02, 0.05, 0.10, 0.18, 0.24, 0.19, 0.12, 0.07, 0.03])
+    pdf /= np.trapz(pdf, velocity)
+    evdf_covariance = np.eye(velocity.size) * 1.0e-8
+    ne = 2.0e19
+    dne = 1.0e17
+
+    independent = _projected_evdf_physical_moments(
+        velocity, pdf, evdf_covariance,
+        electron_density_m3=ne,
+        electron_density_uncertainty_m3=dne,
+    )
+    mu3_index = independent["moment_covariance_order"].index(
+        "central_third_velocity_moment_m3_s3"
+    )
+    var_mu3 = independent["moment_covariance"][mu3_index, mu3_index]
+    cov_ne_mu3 = 0.35 * np.sqrt(dne**2 * var_mu3)
+    correlated = _projected_evdf_physical_moments(
+        velocity, pdf, evdf_covariance,
+        electron_density_m3=ne,
+        electron_density_uncertainty_m3=dne,
+        electron_density_mu3_cross_covariance_s_minus3=cov_ne_mu3,
+    )
+    mu3 = correlated["central_third_velocity_moment_m3_s3"]
+    expected_variance = (0.5 * 9.1093837139e-31)**2 * (
+        ne**2 * var_mu3 + mu3**2 * dne**2 + 2.0 * ne * mu3 * cov_ne_mu3
+    )
+    assert correlated["parallel_projected_heat_flux_standard_uncertainty_W_m2"] == pytest.approx(
+        np.sqrt(expected_variance), rel=1e-12
+    )
+    assert correlated["heat_flux_density_mu3_cross_covariance_input_s_minus3"] == pytest.approx(
+        cov_ne_mu3
+    )
+    assert correlated["parallel_projected_heat_flux_standard_uncertainty_W_m2"] != pytest.approx(
+        independent["parallel_projected_heat_flux_standard_uncertainty_W_m2"]
+    )
+
+
+def test_projected_heat_flux_rejects_non_psd_density_evdf_cross_covariance():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-3.0e4, 3.0e4, 9)
+    pdf = np.exp(-0.5 * (velocity / 1.0e4) ** 2)
+    covariance = np.eye(velocity.size) * 1.0e-10
+    with pytest.raises(ValueError, match="joint density/EVDF covariance PSD bound"):
+        _projected_evdf_physical_moments(
+            velocity, pdf, covariance,
+            electron_density_m3=1.0e19,
+            electron_density_uncertainty_m3=1.0e16,
+            electron_density_mu3_cross_covariance_s_minus3=1.0e100,
+        )
