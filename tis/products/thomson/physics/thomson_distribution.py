@@ -51,7 +51,10 @@ def _wavelength_bin_widths(x):
     return widths
 
 
-def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
+def _projected_evdf_physical_moments(
+    velocity_m_s, probability_density_s_per_m, covariance=None, *,
+    electron_density_m3=None, electron_density_uncertainty_m3=None,
+):
     """Return physical moments of a normalized q-parallel EVDF and their covariance.
 
     The reported moments are one-dimensional scattering-vector marginal
@@ -167,6 +170,43 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
             name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
             for i, name in enumerate(moment_order)
         }
+    # A one-dimensional projected EVDF identifies only the parallel
+    # kinetic-energy-flux contribution.  It does NOT identify the complete
+    # 3-D heat flux, whose integrand also contains the perpendicular energy.
+    # With an independently supplied density, the identifiable 1-D component
+    # is q_parallel^(1D) = (m_e n_e / 2) * mu_3,parallel.
+    projected_heat_flux = None
+    projected_heat_flux_uncertainty = None
+    heat_flux_per_density = 0.5 * electron_mass * mu3
+    heat_flux_per_density_uncertainty = None
+    if covariance is not None:
+        mu3_index = moment_order.index("central_third_velocity_moment_m3_s3")
+        heat_flux_per_density_uncertainty = float(
+            0.5 * electron_mass
+            * np.sqrt(max(float(moment_covariance[mu3_index, mu3_index]), 0.0))
+        )
+    if electron_density_m3 is not None:
+        if (isinstance(electron_density_m3, (bool, np.bool_))
+                or not np.isscalar(electron_density_m3)
+                or not np.isfinite(electron_density_m3)
+                or float(electron_density_m3) <= 0.0):
+            raise ValueError("electron_density_m3 must be a positive finite scalar")
+        density_value = float(electron_density_m3)
+        density_uncertainty = 0.0
+        if electron_density_uncertainty_m3 is not None:
+            if (isinstance(electron_density_uncertainty_m3, (bool, np.bool_))
+                    or not np.isscalar(electron_density_uncertainty_m3)
+                    or not np.isfinite(electron_density_uncertainty_m3)
+                    or float(electron_density_uncertainty_m3) < 0.0):
+                raise ValueError("electron_density_uncertainty_m3 must be a finite non-negative scalar")
+            density_uncertainty = float(electron_density_uncertainty_m3)
+        projected_heat_flux = density_value * heat_flux_per_density
+        if heat_flux_per_density_uncertainty is not None:
+            projected_heat_flux_uncertainty = float(np.sqrt(
+                (density_value * heat_flux_per_density_uncertainty)**2
+                + (heat_flux_per_density * density_uncertainty)**2
+            ))
+
     # Convert the inferred q-parallel velocity marginal into its cumulative
     # random kinetic-energy distribution. For E in eV,
     # v_E=sqrt(2 e E/m_e) and F_q(E)=integral[u_q-v_E,u_q+v_E] f_q(v) dv.
@@ -273,6 +313,23 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
         "central_fourth_velocity_moment_m4_s4": mu4,
         "skewness": float(skewness),
         "excess_kurtosis": float(excess_kurtosis),
+        "parallel_projected_heat_flux_per_density_W_m": float(heat_flux_per_density),
+        "parallel_projected_heat_flux_per_density_standard_uncertainty_W_m": heat_flux_per_density_uncertainty,
+        "parallel_projected_heat_flux_W_m2": (
+            None if projected_heat_flux is None else float(projected_heat_flux)
+        ),
+        "parallel_projected_heat_flux_standard_uncertainty_W_m2": projected_heat_flux_uncertainty,
+        "heat_flux_density_input_m3": (
+            None if electron_density_m3 is None else float(electron_density_m3)
+        ),
+        "heat_flux_density_uncertainty_input_m3": (
+            None if electron_density_uncertainty_m3 is None
+            else float(electron_density_uncertainty_m3)
+        ),
+        "heat_flux_physical_scope": (
+            "one_dimensional_parallel_kinetic_energy_flux_component_only; "
+            "not_the_full_three_dimensional_electron_heat_flux"
+        ),
         "mean_random_kinetic_energy_parallel_eV": float(
             electron_mass * variance / (2.0 * elementary_charge)
         ),
@@ -290,6 +347,8 @@ def _projected_evdf_physical_moments(velocity_m_s, probability_density_s_per_m, 
             "excess_kurtosis": "gamma_2,q = mu_4,q/sigma_q^4 - 3",
             "mean_random_energy": "mean(E_q) = (m_e/(2e)) sigma_q^2 = T_eq,q/2",
             "random_energy_variance": "Var(E_q) = (m_e/(2e))^2 (mu_4,q - sigma_q^4)",
+            "parallel_projected_heat_flux_per_density": "q_q^(1D)/n_e = (m_e/2) mu_3,q",
+            "parallel_projected_heat_flux": "q_q^(1D) = (m_e*n_e/2) mu_3,q; this omits the perpendicular-energy term in the full 3-D heat-flux integral",
         },
         "moment_covariance_order": list(moment_order),
         "moment_covariance": moment_covariance,
@@ -1477,8 +1536,17 @@ def analyze_thomson_spectral_distribution(
                 or not np.all(np.isfinite(velocity_grid))
                 or not np.all(np.isfinite(projected_pdf)) or np.any(projected_pdf < 0.0)):
             raise ValueError("Projected EVDF returned an invalid probability density")
+        # Density is not identified by a normalized 1-D EVDF.  Accept it
+        # only as an explicit measured/independently inferred input and never
+        # fabricate it from spectral width or the EVDF normalization.
+        heat_flux_density = options.pop("electron_density_m3", None)
+        heat_flux_density_uncertainty = options.pop(
+            "electron_density_uncertainty_m3", None
+        )
         moment_summary = _projected_evdf_physical_moments(
-            velocity_grid, projected_pdf, moment_covariance_source
+            velocity_grid, projected_pdf, moment_covariance_source,
+            electron_density_m3=heat_flux_density,
+            electron_density_uncertainty_m3=heat_flux_density_uncertainty,
         )
         moment_summary["status"] = (
             "identified_from_measurement" if evdf_primary_identified
