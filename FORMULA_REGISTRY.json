@@ -11755,5 +11755,94 @@
       ],
       "note": "Executable physical moments with analytic covariance propagation; software/physics verification uses synthetic distributions, not experimental validation."
     }
+  },
+  {
+    "name": "Projected Thomson EVDF regularized fit quality and effective degrees of freedom",
+    "equation": "d_eff = Tr[(A_A^T A_A + λ L_A^T L_A)^−1 A_A^T A_A]; χ² = ||C_res^−1/2(y−b−Af)||²; ν_eff = N−d_eff; χ²_red = χ²/ν_eff",
+    "inputs": "Measured spectrum y, explicit background b, projected EVDF forward operator A, active-set second-derivative penalty L_A, selected regularization λ, and complete positive-definite residual covariance C_res",
+    "output": "Effective model degrees of freedom d_eff; covariance-weighted chi-square χ² and reduced chi-square χ²_red when C_res is supplied",
+    "assumptions": "The active set and selected regularization are held fixed for the local smoother degrees-of-freedom calculation. C_res includes every supplied measurement, background, model-discrepancy and systematic covariance component exactly once.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
+      "formula_key": "thomson_projected_evdf_regularized_fit_quality",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; calibrated increasing axis",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "calibrated spectral intensity",
+          "required": true
+        },
+        {
+          "name": "background_signal",
+          "unit": "spectral intensity",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized response matrix",
+          "required": true
+        },
+        {
+          "name": "signal_covariance_or_uncertainty",
+          "unit": "full covariance or pointwise 1-sigma; optional",
+          "required": false
+        },
+        {
+          "name": "background_covariance_or_uncertainty",
+          "unit": "full covariance or pointwise 1-sigma; optional",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "spectral covariance; optional",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "spectral covariance; optional",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "fit_quality.chi_square",
+          "unit": "dimensionless; only when complete residual covariance is supplied"
+        },
+        {
+          "name": "fit_quality.reduced_chi_square",
+          "unit": "dimensionless; chi-square divided by effective residual degrees of freedom"
+        },
+        {
+          "name": "fit_quality.effective_model_degrees_of_freedom",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "fit_quality.residual_degrees_of_freedom",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "A valid non-negative normalized projected EVDF inverse and its selected active set.",
+        "A complete positive-definite residual covariance is required for chi-square reporting."
+      ],
+      "uncertainty_model": "Fit quality is conditional on the supplied covariance, selected velocity grid, active set and regularization. No universal automatic acceptance threshold is applied.",
+      "limitations": [
+        "The effective degrees of freedom are a local fixed-active-set smoother approximation.",
+        "Without supplied residual covariance, only descriptive scale-normalized residual metrics are reported; chi-square and statistical acceptance probabilities are withheld."
+      ],
+      "test_links": [
+        "tests/test_thomson_evdf.py::test_evdf_reports_covariance_weighted_chi_square_and_regularized_effective_dof",
+        "tests/test_thomson_evdf.py::test_evdf_does_not_call_unweighted_residual_a_chi_square"
+      ],
+      "note": "Executable inverse-fit diagnostic verified with synthetic spectra and covariance; not experimental validation."
+    }
   }
 ]
