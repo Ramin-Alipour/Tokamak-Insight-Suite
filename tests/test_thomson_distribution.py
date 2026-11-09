@@ -1753,7 +1753,17 @@ def test_projected_evdf_parallel_heat_flux_matches_analytic_skewed_mixture():
     assert result["parallel_projected_heat_flux_per_density_W_m"] == pytest.approx(
         0.5 * me * expected_mu3, rel=2e-3
     )
-    assert result["parallel_projected_heat_flux_standard_uncertainty_W_m2"] is not None
+    mu3_index = result["moment_covariance_order"].index(
+        "central_third_velocity_moment_m3_s3"
+    )
+    sigma_mu3 = np.sqrt(result["moment_covariance"][mu3_index, mu3_index])
+    expected_flux_sigma = np.sqrt(
+        (0.5 * me * density * sigma_mu3) ** 2
+        + (0.5 * me * expected_mu3 * density_sigma) ** 2
+    )
+    assert result["parallel_projected_heat_flux_standard_uncertainty_W_m2"] == pytest.approx(
+        expected_flux_sigma, rel=1e-10
+    )
     assert "not_the_full_three_dimensional" in result["heat_flux_physical_scope"]
     assert "parallel_projected_heat_flux" in result["equations"]
 
