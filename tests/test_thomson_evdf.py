@@ -930,3 +930,36 @@ def test_evdf_higher_central_moment_uncertainties_are_in_joint_covariance():
     assert np.isfinite(covariance[i4, i4]) and covariance[i4, i4] >= 0.0
     assert "central_third_velocity_moment_m3_s3" in out["velocity_moment_standard_uncertainty"]
     assert "central_fourth_velocity_moment_m4_s4" in out["velocity_moment_standard_uncertainty"]
+
+
+def test_evdf_reports_covariance_weighted_chi_square_and_regularized_effective_dof():
+    wavelength, signal, background = _case()
+    uncertainty = np.full(signal.size, 0.75)
+    out = _run(
+        wavelength, signal, background,
+        signal_uncertainty=uncertainty,
+    )
+    quality = out["fit_quality"]
+    expected_chi_square = float(np.sum((out["residual"] / uncertainty) ** 2))
+    assert quality["status"] == "covariance_weighted_fit_quality"
+    assert quality["residual_metric"] == "whitened_chi_square"
+    assert quality["chi_square"] == pytest.approx(expected_chi_square, rel=1e-10)
+    assert quality["effective_model_degrees_of_freedom"] > 0.0
+    assert quality["effective_model_degrees_of_freedom"] < signal.size
+    assert quality["residual_degrees_of_freedom"] == pytest.approx(
+        signal.size - quality["effective_model_degrees_of_freedom"]
+    )
+    assert quality["reduced_chi_square"] == pytest.approx(
+        expected_chi_square / quality["residual_degrees_of_freedom"]
+    )
+    assert "not a universal automatic acceptance threshold" in quality["interpretation"]
+
+
+def test_evdf_does_not_call_unweighted_residual_a_chi_square():
+    wavelength, signal, background = _case()
+    out = _run(wavelength, signal, background)
+    quality = out["fit_quality"]
+    assert quality["status"] == "descriptive_unweighted_fit_quality"
+    assert quality["chi_square"] is None
+    assert quality["reduced_chi_square"] is None
+    assert quality["residual_metric"] == "signal_scale_normalized_residual_sum_squares"
