@@ -320,3 +320,18 @@ def test_product_solver_resolution_rejects_cross_product_analysis():
 
     with pytest.raises(ValueError, match="not owned by product"):
         api.resolve_product_analysis("thomson-scattering", 2)
+
+def test_thomson_product_import_namespace_is_isolated_from_shared_physics():
+    """Shared kernels resolve explicitly; the product package has no path fallback."""
+    from pathlib import Path
+    import tis.products.thomson.physics as product_physics
+    from tis.products.thomson.physics import advanced_inference
+    from tis.physics.shared import formula_library
+
+    product_root = Path(product_physics.__file__).resolve().parent
+    package_paths = tuple(Path(item).resolve() for item in product_physics.__path__)
+    assert package_paths == (product_root,)
+    assert advanced_inference.__name__ == (
+        "tis.products.thomson.physics.advanced_inference"
+    )
+    assert formula_library.__name__ == "tis.physics.shared.formula_library"
