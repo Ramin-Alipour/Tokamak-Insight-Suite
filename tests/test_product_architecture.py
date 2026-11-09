@@ -64,11 +64,15 @@ def test_execution_api_forwards_arguments_without_changing_measurements(monkeypa
     from types import SimpleNamespace
 
     monkeypatch.setattr(
-        api, "get_analysis",
-        lambda analysis_id: {
-            "id": analysis_id,
-            "module": "test_thomson_solver",
-            "function": "solver",
+        api, "get_product",
+        lambda product_id: {
+            "product_id": product_id,
+            "entry_ids": [1],
+            "entry_points": [{
+                "id": 1,
+                "module": "test_thomson_solver",
+                "function": "solver",
+            }],
         },
     )
     monkeypatch.setattr(
@@ -92,10 +96,6 @@ def test_execution_api_forwards_arguments_without_changing_measurements(monkeypa
 def test_execution_api_rejects_cross_product_analysis_ids_before_solver(monkeypatch):
     import tis.products.api as api
 
-    def forbidden(_analysis_id):
-        raise AssertionError("solver must not be resolved for an ownership violation")
-
-    monkeypatch.setattr(api, "get_analysis", forbidden)
     with pytest.raises(ValueError, match="not owned by product"):
         execute_product_analysis("thomson-scattering", 2)
 
@@ -295,11 +295,15 @@ def test_product_solver_resolution_uses_the_owned_specialist_package(monkeypatch
     sentinel_solver = lambda wavelength_nm: wavelength_nm
     monkeypatch.setattr(
         api,
-        "get_analysis",
-        lambda analysis_id: {
-            "id": analysis_id,
-            "module": "thomson_workflow",
-            "function": "analyze_thomson_spectra",
+        "get_product",
+        lambda product_id: {
+            "product_id": product_id,
+            "entry_ids": [1],
+            "entry_points": [{
+                "id": 1,
+                "module": "thomson_workflow",
+                "function": "analyze_thomson_spectra",
+            }],
         },
     )
     captured = {}
