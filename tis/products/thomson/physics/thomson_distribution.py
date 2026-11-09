@@ -1405,6 +1405,12 @@ def analyze_thomson_spectral_distribution(
                 "laser_wavelength_nm and scattering_angle_rad are required for projected EVDF inversion"
             )
         options = dict(projected_evdf_options)
+        # Density is not identified by a normalized 1-D EVDF. Accept it only
+        # as an explicit measured/independently inferred input.
+        heat_flux_density = options.pop("electron_density_m3", None)
+        heat_flux_density_uncertainty = options.pop(
+            "electron_density_uncertainty_m3", None
+        )
         reserved = {
             "wavelength_nm", "signal", "laser_wavelength_nm",
             "scattering_angle_rad", "instrument_response_matrix",
@@ -1536,13 +1542,7 @@ def analyze_thomson_spectral_distribution(
                 or not np.all(np.isfinite(velocity_grid))
                 or not np.all(np.isfinite(projected_pdf)) or np.any(projected_pdf < 0.0)):
             raise ValueError("Projected EVDF returned an invalid probability density")
-        # Density is not identified by a normalized 1-D EVDF.  Accept it
-        # only as an explicit measured/independently inferred input and never
-        # fabricate it from spectral width or the EVDF normalization.
-        heat_flux_density = options.pop("electron_density_m3", None)
-        heat_flux_density_uncertainty = options.pop(
-            "electron_density_uncertainty_m3", None
-        )
+        # Never fabricate density from the normalized EVDF.
         moment_summary = _projected_evdf_physical_moments(
             velocity_grid, projected_pdf, moment_covariance_source,
             electron_density_m3=heat_flux_density,
