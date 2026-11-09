@@ -1767,6 +1767,24 @@ def test_projected_evdf_parallel_heat_flux_matches_analytic_skewed_mixture():
     assert "not_the_full_three_dimensional" in result["heat_flux_physical_scope"]
     assert "parallel_projected_heat_flux" in result["equations"]
 
+    from tis.products.thomson.physics.thomson_distribution import (
+        infer_projected_parallel_heat_flux,
+    )
+    formula_result = infer_projected_parallel_heat_flux(
+        velocity, pdf, covariance,
+        electron_density_m3=density,
+        electron_density_uncertainty_m3=density_sigma,
+    )
+    assert formula_result["parallel_projected_heat_flux_W_m2"] == pytest.approx(
+        expected_flux, rel=2e-3
+    )
+    assert set(formula_result) == {
+        "parallel_projected_heat_flux_per_density_W_m",
+        "parallel_projected_heat_flux_W_m2",
+        "parallel_projected_heat_flux_standard_uncertainty_W_m2",
+        "heat_flux_physical_scope",
+    }
+
 
 def test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_flux():
     from tis.products.thomson.physics.thomson_distribution import (
