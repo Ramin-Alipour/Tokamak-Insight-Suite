@@ -447,6 +447,9 @@ def infer_projected_parallel_heat_flux(
         covariance,
         electron_density_m3=electron_density_m3,
         electron_density_uncertainty_m3=electron_density_uncertainty_m3,
+        electron_density_mu3_cross_covariance_s_minus3=(
+            electron_density_mu3_cross_covariance_s_minus3
+        ),
     )
     return {
         "parallel_projected_heat_flux_per_density_W_m": moments[
