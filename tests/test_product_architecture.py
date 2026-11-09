@@ -405,3 +405,14 @@ def test_every_thomson_analysis_resolves_through_product_owned_registry():
             f"tis.products.thomson.physics.{module_name}"
         )
         assert solver.__name__ == function_name
+
+
+def test_thomson_public_api_exports_all_dashboard_capabilities():
+    from tis.products.thomson import api
+
+    assert "run_analysis" in api.__all__
+    assert api.PRODUCT_ID == "thomson-scattering"
+    for name in api.__all__:
+        if name == "PRODUCT_ID":
+            continue
+        assert callable(getattr(api, name))
