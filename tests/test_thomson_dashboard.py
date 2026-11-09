@@ -344,3 +344,4 @@ def test_registered_spectral_distribution_dashboard_exposes_projected_heat_flux_
     assert "'electron_density_m3'" in source
     assert "'electron_density_uncertainty_m3'" in source
     assert "not the full 3-D heat flux" in source
+    assert "Projected parallel heat flux (W/m^2)" in source
