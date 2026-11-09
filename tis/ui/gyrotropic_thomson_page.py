@@ -146,7 +146,7 @@ def render_gyrotropic_thomson_page(st) -> None:
                 raise ValueError(f"Model-discrepancy covariance must have shape ({total_size}, {total_size}).")
             if covariance is not None and uncertainty is not None:
                 raise ValueError("Supply measurement covariance or pointwise uncertainty, not both.")
-            from tokamak_analysis.thomson_workflow import analyze_thomson_spectra
+            from tis.products.thomson.api import analyze_spectra as analyze_thomson_spectra
             if model == "bi_maxwellian":
                 api_model = "gyrotropic_bi_maxwellian"
                 options = {}
