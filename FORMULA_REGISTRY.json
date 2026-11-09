@@ -11844,5 +11844,77 @@
       ],
       "note": "Executable inverse-fit diagnostic verified with synthetic spectra and covariance; not experimental validation."
     }
+  },
+  {
+    "name": "Parallel projected kinetic-energy flux from a Thomson q-parallel EVDF",
+    "equation": "q_parallel^(1D)/n_e = (m_e/2) μ_3,parallel; q_parallel^(1D) = (m_e n_e/2) μ_3,parallel; μ_3,parallel = ∫(v_parallel-u_parallel)^3 f_parallel(v_parallel) dv_parallel",
+    "inputs": "Normalized response-aware q-parallel EVDF, independently measured/inferred electron density n_e, and optional independent density uncertainty",
+    "output": "One-dimensional projected parallel kinetic-energy-flux component q_parallel^(1D) [W m^-2] and its density-normalized value [W m]",
+    "assumptions": "A single optical Thomson view identifies only the q-parallel velocity marginal. The third central moment gives the one-dimensional parallel kinetic-energy-flux contribution; it omits the perpendicular-energy contribution in the full three-dimensional heat-flux integral. Density is never inferred from normalized EVDF amplitude.",
+    "status": "D",
+    "category": "Thomson spectral distribution",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution._projected_evdf_physical_moments",
+      "formula_key": "thomson_projected_evdf_parallel_heat_flux_1d",
+      "input_specs": [
+        {
+          "name": "velocity_parallel_m_s",
+          "unit": "m s^-1; strictly increasing velocity grid",
+          "required": true
+        },
+        {
+          "name": "normalized_projected_evdf_s_per_m",
+          "unit": "s m^-1; non-negative and unit-integral",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3; independently measured or inferred",
+          "required": true
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3; optional independent 1-sigma",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "parallel_projected_heat_flux_per_density_W_m",
+          "unit": "W m"
+        },
+        {
+          "name": "parallel_projected_heat_flux_W_m2",
+          "unit": "W m^-2; only when independent density is supplied"
+        },
+        {
+          "name": "parallel_projected_heat_flux_standard_uncertainty_W_m2",
+          "unit": "W m^-2; only when EVDF covariance and optional density uncertainty are available"
+        },
+        {
+          "name": "heat_flux_physical_scope",
+          "unit": "text; explicitly 1-D projected contribution, not full 3-D heat flux"
+        }
+      ],
+      "prerequisites": [
+        "A normalized q-parallel EVDF reconstructed from calibrated measured spectrum with a declared identifiability status.",
+        "An independently measured or inferred positive electron density for absolute flux; normalized EVDF does not contain density information."
+      ],
+      "algorithm": "Compute μ3,parallel=∫(v_parallel-u_parallel)^3 f_parallel(v_parallel)dv_parallel using the same nonuniform-grid quadrature as EVDF normalization. Then q_parallel^(1D)/n_e=(m_e/2)μ3,parallel. If independent n_e is supplied, calculate q_parallel^(1D)=n_e(m_e/2)μ3,parallel. Propagate the normalized-EVDF covariance through the analytic μ3 Jacobian and combine independent density variance by first-order propagation.",
+      "uncertainty_model": "Delta-method propagation from the normalized projected-EVDF covariance. An optional independent density uncertainty contributes (m_e μ3/2)^2 σ_n^2. No EVDF-density cross covariance is assumed or inferred.",
+      "limitations": [
+        "This is only the one-dimensional projected parallel kinetic-energy-flux contribution; it is not the full three-dimensional electron heat flux.",
+        "The perpendicular-energy contribution cannot be recovered from a single q-parallel marginal.",
+        "Absolute flux is withheld unless an independent positive density is supplied.",
+        "The non-relativistic third-moment expression is not a relativistic heat-flux closure."
+      ],
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_projected_evdf_parallel_heat_flux_matches_analytic_skewed_mixture",
+        "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_flux"
+      ],
+      "note": "Analytic synthetic-mixture verification; no experimental validation is claimed."
+    }
   }
 ]
