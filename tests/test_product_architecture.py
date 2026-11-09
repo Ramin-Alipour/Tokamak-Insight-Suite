@@ -335,3 +335,51 @@ def test_thomson_product_import_namespace_is_isolated_from_shared_physics():
         "tis.products.thomson.physics.advanced_inference"
     )
     assert formula_library.__name__ == "tis.physics.shared.formula_library"
+
+def test_advanced_thomson_dashboard_workflows_use_public_product_api(monkeypatch):
+    from tis.products.thomson import api
+    from tis.physics.shared import (
+        thomson_population_mixture,
+        thomson_n_population,
+        thomson_kinetic_background,
+        cts_geometry_uncertainty,
+    )
+
+    cases = (
+        (
+            thomson_population_mixture,
+            "fit_two_population_relativistic_thomson_spectrum",
+            api.fit_two_population_relativistic_spectrum,
+        ),
+        (
+            thomson_n_population,
+            "fit_n_population_relativistic_thomson_spectrum",
+            api.fit_n_population_relativistic_spectrum,
+        ),
+        (
+            thomson_kinetic_background,
+            "fit_noncollective_kinetic_thomson_with_background",
+            api.fit_kinetic_spectrum_with_background,
+        ),
+        (
+            cts_geometry_uncertainty,
+            "propagate_full_em_cts_ray_geometry_uncertainty",
+            api.propagate_full_em_cts_ray_geometry_uncertainty,
+        ),
+    )
+    for module, function_name, public_function in cases:
+        sentinel = object()
+        captured = {}
+
+        def fake_solver(*args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            return sentinel
+
+        monkeypatch.setattr(module, function_name, fake_solver)
+        result = public_function("measured-input", calibration="explicit")
+        assert result is sentinel
+        assert captured == {
+            "args": ("measured-input",),
+            "kwargs": {"calibration": "explicit"},
+        }
