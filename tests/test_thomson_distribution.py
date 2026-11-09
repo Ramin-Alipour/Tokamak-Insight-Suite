@@ -1773,3 +1773,32 @@ def test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_f
         _projected_evdf_physical_moments(
             velocity, pdf, electron_density_m3="invented"
         )
+
+
+def test_projected_evdf_heat_flux_is_exposed_through_product_api():
+    from tis.products.thomson.api import analyze_spectral_distribution
+
+    wavelength = np.linspace(520.0, 544.0, 241)
+    background = np.full_like(wavelength, 0.02)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 1.0) ** 2) + background
+    result = analyze_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        signal_uncertainty=np.full_like(wavelength, 1e-3),
+        projected_evdf_options={
+            "velocity_limit_m_s": 1.0e6,
+            "velocity_points": 81,
+            "regularization_strength": 1e-3,
+            "electron_density_m3": 2.0e19,
+            "electron_density_uncertainty_m3": 1.0e18,
+        },
+    )
+    moments = result["projected_evdf_inference"]["projected_evdf_physical_moments"]
+    assert moments["heat_flux_density_input_m3"] == pytest.approx(2.0e19)
+    assert np.isfinite(moments["parallel_projected_heat_flux_per_density_W_m"])
+    assert np.isfinite(moments["parallel_projected_heat_flux_W_m2"])
+    assert moments["heat_flux_physical_scope"].startswith("one_dimensional_parallel")
