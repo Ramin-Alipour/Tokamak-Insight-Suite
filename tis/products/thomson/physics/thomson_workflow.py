@@ -1222,6 +1222,19 @@ def fit_n_population_relativistic_thomson_spectrum(*args, **kwargs):
     return _fit(*args, **kwargs)
 
 
+def fit_two_population_relativistic_thomson_spectrum(*args, **kwargs):
+    """Fit the explicit two-population relativistic optical Thomson model.
+
+    This is a bounded parametric mixture, not an unrestricted EVDF inversion.
+    The shared implementation owns the kinetic kernel; this product wrapper is
+    the stable Thomson-specific execution boundary used by the Dashboard.
+    """
+    from tis.physics.shared.thomson_population_mixture import (
+        fit_two_population_relativistic_thomson_spectrum as _fit,
+    )
+    return _fit(*args, **kwargs)
+
+
 
 def fit_noncollective_kinetic_thomson_with_background(*args, **kwargs):
     """Fit finite-bin Kappa or relativistic MJ Thomson spectra with a joint background covariance."""
