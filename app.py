@@ -26,7 +26,7 @@ from tis.products.thomson.api import (
     infer_path_averaged_density as infer_thomson_path_averaged_density,
 )
 from tis.ui.advanced_thomson_physics_page import render_advanced_thomson_physics_page
-from tokamak_analysis.cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty
+from tis.products.thomson.physics.thomson_workflow import propagate_full_em_cts_ray_geometry_uncertainty
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
 from tokamak_analysis.poloidal_flux import reconstruct_poloidal_flux
@@ -3794,7 +3794,7 @@ elif page=='Advanced Analysis':
             st.session_state['jump']='Spectral Analysis'
             st.rerun()
     elif workflow=='Analysis 1 / Two-population optical Thomson subanalysis':
-        from tokamak_analysis.thomson_population_mixture import fit_two_population_relativistic_thomson_spectrum
+        from tis.products.thomson.physics.thomson_workflow import fit_two_population_relativistic_thomson_spectrum
         st.info('Fit a measured calibrated optical Thomson spectrum with two isotropic relativistic Maxwell-Juttner electron populations. The fit returns two temperatures, hot-population fraction and one scattering-vector flow projection. Absolute density and unrestricted 3-D EVDF are not inferred.')
         st.caption('Upload a two-column CSV in the existing row order: calibrated wavelength_nm, calibrated spectral intensity. Upload the measured response matrix unchanged. The incident-polarization vector is expressed in the model scattering frame, where the incident direction is [-sin(theta/2), cos(theta/2), 0].')
         pop_spectrum_upload=st.file_uploader('Measured calibrated Thomson spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_population_spectrum')
@@ -3868,7 +3868,7 @@ elif page=='Advanced Analysis':
             except Exception as exc:
                 st.error(f'Two-population Thomson inference failed: {exc}')
     elif workflow=='Analysis 1 / N-population optical Thomson subanalysis':
-        from tokamak_analysis.thomson_workflow import fit_n_population_relativistic_thomson_spectrum
+        from tis.products.thomson.physics.thomson_workflow import fit_n_population_relativistic_thomson_spectrum
         st.info('Fit a measured calibrated optical Thomson spectrum with an explicitly selected finite mixture of 2–8 isotropic relativistic Maxwell-Juttner populations. Temperatures are ordered to prevent label switching, fractions are constrained to sum to one, and each component can have its own fitted scattering-vector flow projection when independent initial flows are supplied. This is a parametric mixture, not an unrestricted EVDF reconstruction.')
         st.caption('Upload the measured two-column spectrum and its measured response matrix. Supply one initial temperature and one number fraction per population; these are optimizer seeds, not measured values.')
         n_pop_spectrum=st.file_uploader('Measured calibrated spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_npop_spectrum')
@@ -3939,7 +3939,7 @@ elif page=='Advanced Analysis':
             except Exception as exc:
                 st.error(f'N-population Thomson inference failed: {exc}')
     elif workflow=='Analysis 1 / Kappa-MJ structured-background subanalysis':
-        from tokamak_analysis.thomson_workflow import fit_noncollective_kinetic_thomson_with_background
+        from tis.products.thomson.physics.thomson_workflow import fit_noncollective_kinetic_thomson_with_background
         st.info('Joint measured-spectrum fit for a finite-variance isotropic Kappa projection or relativistic Maxwell-Juttner electrons, with detector-space background coefficients optimized simultaneously. The full local covariance retains physical/amplitude/background cross terms. Absolute density is not inferred.')
         spectrum_upload=st.file_uploader('Measured calibrated optical Thomson spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_kinetic_bg_spectrum')
         response_upload=st.file_uploader('Measured calibrated wavelength-response matrix CSV',type=['csv','txt'],key='ts_kinetic_bg_response')
