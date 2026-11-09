@@ -1717,3 +1717,59 @@ def test_projected_evdf_random_energy_moment_covariance_matches_finite_differenc
         rtol=3.0e-4, atol=1.0e-18,
     )
     assert set(result["random_energy_moment_standard_uncertainty"]) == set(names)
+
+def test_projected_evdf_parallel_heat_flux_matches_analytic_skewed_mixture():
+    """A skewed 1-D EVDF has nonzero q_parallel^(1D) = m_e*n*mu3/2."""
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-5.0, 5.0, 2001)
+    sigma = 0.5
+    # A 3:1 mixture with component means -0.5 and +1.5 has zero
+    # mixture mean and analytic third central moment mu3 = 0.75 (m/s)^3.
+    pdf = (
+        0.75 * np.exp(-0.5 * ((velocity + 0.5) / sigma) ** 2)
+        + 0.25 * np.exp(-0.5 * ((velocity - 1.5) / sigma) ** 2)
+    ) / (np.sqrt(2.0 * np.pi) * sigma)
+    density = 2.0e19
+    density_sigma = 1.0e18
+    covariance = np.diag(np.full(velocity.size, 1.0e-14))
+    result = _projected_evdf_physical_moments(
+        velocity, pdf, covariance,
+        electron_density_m3=density,
+        electron_density_uncertainty_m3=density_sigma,
+    )
+
+    me = 9.1093837139e-31
+    expected_mu3 = 0.75
+    expected_flux = 0.5 * me * density * expected_mu3
+    assert result["central_third_velocity_moment_m3_s3"] == pytest.approx(
+        expected_mu3, rel=2e-3
+    )
+    assert result["parallel_projected_heat_flux_W_m2"] == pytest.approx(
+        expected_flux, rel=2e-3
+    )
+    assert result["parallel_projected_heat_flux_per_density_W_m"] == pytest.approx(
+        0.5 * me * expected_mu3, rel=2e-3
+    )
+    assert result["parallel_projected_heat_flux_standard_uncertainty_W_m2"] is not None
+    assert "not_the_full_three_dimensional" in result["heat_flux_physical_scope"]
+    assert "parallel_projected_heat_flux" in result["equations"]
+
+
+def test_projected_evdf_heat_flux_does_not_invent_density_or_three_dimensional_flux():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-5.0, 5.0, 501)
+    pdf = np.exp(-0.5 * velocity**2) / np.sqrt(2.0 * np.pi)
+    result = _projected_evdf_physical_moments(velocity, pdf)
+    assert result["parallel_projected_heat_flux_W_m2"] is None
+    assert result["parallel_projected_heat_flux_per_density_W_m"] == pytest.approx(0.0, abs=1e-30)
+    assert result["heat_flux_physical_scope"].startswith("one_dimensional_parallel")
+    with pytest.raises(ValueError, match="electron_density_m3"):
+        _projected_evdf_physical_moments(
+            velocity, pdf, electron_density_m3="invented"
+        )
