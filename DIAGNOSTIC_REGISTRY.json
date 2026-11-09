@@ -9540,7 +9540,8 @@
       ]
     },
     "formula_links": [
-      "thomson_projected_evdf_parallel_heat_flux_1d"
+      "thomson_projected_evdf_parallel_heat_flux_1d",
+      "thomson_projected_heat_flux_correlated_density_evdf_uncertainty"
     ]
   },
   {
