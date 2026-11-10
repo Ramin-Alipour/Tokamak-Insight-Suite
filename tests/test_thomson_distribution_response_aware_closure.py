@@ -118,7 +118,7 @@ def test_projected_evdf_physical_moments_recover_analytic_asymmetric_mixture():
     """A known two-Maxwellian 1-D mixture checks pressure and heat-flux moments.
 
     For weights (3/4, 1/4), component means (-s, 3s), and common
-    component variance s^2, the mixture has mean 0, variance 3s^2,
+    component variance s^2, the mixture has mean 0, variance 4s^2,
     central third moment 6s^3 and central fourth moment 42s^4.
     """
     from scipy.constants import elementary_charge, electron_mass
