@@ -93,7 +93,7 @@ def test_relativistic_spectral_distribution_withholds_nonrelativistic_temperatur
     signal = background + np.exp(-0.5 * ((wavelength - 1060.0) / 0.18) ** 2)
     velocity = np.linspace(-0.3, 0.3, 301) * 299792458.0
     pdf = np.exp(-0.5 * (velocity / (0.06 * 299792458.0)) ** 2)
-    pdf /= np.trapezoid(pdf, velocity)
+    pdf /= np.trapz(pdf, velocity)
     fitted = signal - background
 
     def fake_relativistic_solver(**kwargs):
