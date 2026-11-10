@@ -2,6 +2,7 @@ import numpy as np
 
 from tis.products.thomson.physics.thomson_distribution import (
     _moment_statistics,
+    _projected_evdf_physical_moments,
     analyze_thomson_spectral_distribution,
 )
 
@@ -110,3 +111,46 @@ def test_projected_evdf_accepts_discrepancy_and_systematic_covariance_without_pa
     assert inverse["systematic_covariance_included"] is True
     assert inverse["additive_covariance_independence_assumption"]
     assert "physical_inference" not in result
+
+
+
+def test_projected_evdf_physical_moments_recover_analytic_asymmetric_mixture():
+    """A known two-Maxwellian 1-D mixture checks pressure and heat-flux moments.
+
+    For weights (3/4, 1/4), component means (-s, 3s), and common
+    component variance s^2, the mixture has mean 0, variance 3s^2,
+    central third moment 6s^3 and central fourth moment 42s^4.
+    """
+    from scipy.constants import elementary_charge, electron_mass
+
+    scale = 2.0e5
+    velocity = np.linspace(-10.0 * scale, 12.0 * scale, 12001)
+    gaussian = lambda mean: np.exp(
+        -0.5 * ((velocity - mean) / scale) ** 2
+    ) / (np.sqrt(2.0 * np.pi) * scale)
+    pdf = 0.75 * gaussian(-scale) + 0.25 * gaussian(3.0 * scale)
+    density = 4.0e18
+
+    moments = _projected_evdf_physical_moments(
+        velocity,
+        pdf,
+        electron_density_m3=density,
+    )
+
+    expected_variance = 3.0 * scale**2
+    expected_mu3 = 6.0 * scale**3
+    expected_mu4 = 42.0 * scale**4
+    expected_temperature = electron_mass * expected_variance / elementary_charge
+    expected_pressure = electron_mass * density * expected_variance
+    expected_projected_heat_flux = 0.5 * electron_mass * density * expected_mu3
+
+    assert moments["mean_velocity_parallel_m_s"] == pytest.approx(0.0, abs=2e-6 * scale)
+    assert moments["velocity_parallel_variance_m2_s2"] == pytest.approx(expected_variance, rel=2e-5)
+    assert moments["directional_equivalent_temperature_eV"] == pytest.approx(expected_temperature, rel=2e-5)
+    assert moments["central_third_velocity_moment_m3_s3"] == pytest.approx(expected_mu3, rel=3e-5)
+    assert moments["central_fourth_velocity_moment_m4_s4"] == pytest.approx(expected_mu4, rel=3e-5)
+    assert moments["skewness"] == pytest.approx(6.0 / (3.0 ** 1.5), rel=3e-5)
+    assert moments["excess_kurtosis"] == pytest.approx(42.0 / 9.0 - 3.0, rel=3e-5)
+    assert moments["parallel_projected_pressure_Pa"] == pytest.approx(expected_pressure, rel=2e-5)
+    assert moments["parallel_projected_heat_flux_W_m2"] == pytest.approx(expected_projected_heat_flux, rel=3e-5)
+    assert "not_the_full_three_dimensional_electron_heat_flux" in moments["heat_flux_physical_scope"]
