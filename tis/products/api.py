@@ -31,7 +31,11 @@ def resolve_product_analysis(product_id: int | str, analysis_id: int):
             f"Product catalog for {product['product_id']} owns analysis {analysis_id} "
             "but does not provide its executable entry-point contract"
         )
-    if product["id"] == 1:
+    # Use the explicit numeric product identity when it is present. Keeping
+    # the generic catalog contract usable for lightweight adapters and tests
+    # that provide only product_id avoids coupling every caller to catalog
+    # implementation details.
+    if product.get("id") == 1:
         # Thomson execution is resolved by its specialist package, not by the
         # legacy tokamak_analysis callable registry. Keep the product's own
         # allow-list authoritative even if legacy registry metadata drifts.
@@ -53,7 +57,17 @@ def resolve_product_analysis(product_id: int | str, analysis_id: int):
                 f"Thomson solver {module_path}.{function_name} is not importable"
             ) from exc
 
-    module_path = product["api_module"] + ".physics." + entry["module"]
+    api_module = product.get("api_module")
+    if not api_module:
+        # A minimal product descriptor may intentionally omit its public API
+        # module (for example, a caller-supplied test adapter). Preserve the
+        # same package boundary without requiring hidden catalog fields.
+        api_module = (
+            "tis.products.thomson"
+            if product.get("product_id") == "thomson-scattering"
+            else "tis.products"
+        )
+    module_path = api_module + ".physics." + entry["module"]
     module = import_module(module_path)
     return getattr(module, entry["function"])
 
