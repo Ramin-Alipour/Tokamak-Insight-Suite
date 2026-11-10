@@ -100,7 +100,7 @@ def test_relativistic_spectral_distribution_withholds_nonrelativistic_temperatur
         return {
             "velocity_parallel_m_s": velocity,
             "projected_evdf_s_m": pdf,
-            "projected_evdf_covariance": None,
+            "projected_evdf_covariance": np.zeros((velocity.size, velocity.size)),
             "fitted_scattered_spectrum": fitted,
         }
 
@@ -119,6 +119,8 @@ def test_relativistic_spectral_distribution_withholds_nonrelativistic_temperatur
         projected_evdf_options={
             "kinematics": "relativistic_thomson",
             "velocity_grid_m_s": velocity,
+            "electron_density_m3": 1.0e19,
+            "electron_density_uncertainty_m3": 0.0,
         },
     )
     moments = result["projected_evdf_inference"]["projected_evdf_physical_moments"]
