@@ -1,12 +1,13 @@
 import numpy as np
 import pytest
 import tokamak_analysis.ece_kinetic as ece
+import tis.physics.shared.ece_kinetic as ece_physics
 
 
 def test_profile_solver_builds_frequency_segment_absorption_and_transfer(monkeypatch):
     def fake_absorption(frequency, wavevector, magnetic_field, **kwargs):
         return {"absorption_coefficient_m_inverse": frequency * 1e-12 + kwargs["electron_density_m3"] * 1e-30}
-    monkeypatch.setattr(ece, "kinetic_ece_absorption_coefficient", fake_absorption)
+    monkeypatch.setattr(ece_physics, "kinetic_ece_absorption_coefficient", fake_absorption)
     out = ece.solve_kinetic_ece_profile(
         [80e9, 100e9], [0.2, 0.3],
         wavevector_rad_m=np.array([[1.0, 0, 0], [1.1, 0, 0]]),
@@ -31,7 +32,7 @@ def test_profile_solver_rejects_incomplete_mode_geometry():
 
 def test_profile_solver_does_not_hide_kinetic_gain(monkeypatch):
     monkeypatch.setattr(
-        ece, "kinetic_ece_absorption_coefficient",
+        ece_physics, "kinetic_ece_absorption_coefficient",
         lambda *args, **kwargs: {"absorption_coefficient_m_inverse": -1e-3},
     )
     with pytest.raises(ValueError, match="net gain"):
