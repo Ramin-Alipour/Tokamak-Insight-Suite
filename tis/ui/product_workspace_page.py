@@ -167,6 +167,22 @@ def render_product_workspace_page(st: Any) -> None:
                     st.json(projected.get("projected_evdf_physical_moments", {
                         "status": "physical-moment summary unavailable"
                     }))
+                    physical_moments = projected.get("projected_evdf_physical_moments", {})
+                    relativistic_moments = physical_moments.get("relativistic_lab_frame_moments")
+                    if relativistic_moments is not None:
+                        st.markdown("**Relativistic laboratory-frame kinetic moments**")
+                        st.write({
+                            "mean_kinetic_energy_eV": relativistic_moments.get("mean_kinetic_energy_eV"),
+                            "mean_lorentz_factor": relativistic_moments.get("mean_lorentz_factor"),
+                            "kinetic_energy_flux_per_density_W_m": relativistic_moments.get("kinetic_energy_flux_per_density_W_m"),
+                            "moment_standard_uncertainty": relativistic_moments.get("moment_standard_uncertainty"),
+                            "heat_flux_status": relativistic_moments.get("heat_flux_status"),
+                        })
+                        st.caption(
+                            "This is the exact laboratory-frame kinetic-energy flux of the "
+                            "one-dimensional projected marginal. It is not the comoving "
+                            "three-dimensional relativistic heat flux."
+                        )
                     st.markdown("**Identifiability and regularization sensitivity**")
                     st.json({
                         "identifiability": projected.get("identifiability"),
