@@ -43,3 +43,15 @@ def test_projected_parallel_pressure_rejects_cross_covariance_without_independen
     velocity,pdf=_gaussian_projected_evdf()
     with pytest.raises(ValueError,match="requires an independently supplied"):
         _projected_evdf_physical_moments(velocity,pdf,np.eye(velocity.size),electron_density_variance_cross_covariance_m_minus1_s_minus2=1.0)
+
+
+def test_projected_parallel_pressure_marks_unsupplied_density_uncertainty_as_exact_input():
+    velocity, pdf = _gaussian_projected_evdf()
+    result = _projected_evdf_physical_moments(
+        velocity, pdf, np.eye(velocity.size) * 1.0e-20,
+        electron_density_m3=2.0e19,
+    )
+    assert result["parallel_projected_pressure_Pa"] is not None
+    assert result["parallel_pressure_uncertainty_assumption"] == (
+        "evdf_variance_only_density_uncertainty_not_supplied"
+    )

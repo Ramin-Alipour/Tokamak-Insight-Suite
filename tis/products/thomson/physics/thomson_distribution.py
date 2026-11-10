@@ -288,7 +288,12 @@ def _projected_evdf_physical_moments(
             if pressure_variance < -1.0e-10 * pressure_scale:
                 raise ValueError("joint density/EVDF covariance produced a negative projected-pressure variance")
             projected_parallel_pressure_uncertainty = float(np.sqrt(max(pressure_variance, 0.0)))
-            pressure_uncertainty_assumption = "joint_density_evdf_variance_covariance" if cross_pressure != 0.0 else "first_order_independent_density_and_evdf_variance"
+            if electron_density_uncertainty_m3 is None:
+                pressure_uncertainty_assumption = "evdf_variance_only_density_uncertainty_not_supplied"
+            elif cross_pressure != 0.0:
+                pressure_uncertainty_assumption = "joint_density_evdf_variance_covariance"
+            else:
+                pressure_uncertainty_assumption = "first_order_independent_density_and_evdf_variance"
 
     # Convert the inferred q-parallel velocity marginal into its cumulative
     # random kinetic-energy distribution. For E in eV,
