@@ -126,15 +126,6 @@ def density_from_thomson_scattered_power(
     cross-section is either the stationary-electron polarized Thomson value
     or a model-supplied velocity-averaged relativistic value.
     """
-    raw_scattered_power = np.asarray(scattered_power_W)
-    if raw_scattered_power.ndim == 1:
-        return infer_thomson_channel_path_averaged_densities(
-            scattered_power_W, path_coordinate_m, incident_power_profile_W,
-            differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr,
-            optical_efficiency_profile, joint_input_covariance=joint_input_covariance,
-        )
-    if joint_input_covariance is not None:
-        raise ValueError("joint_input_covariance is supported only for channel-vector scattered_power_W")
     ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
     pi = _positive_finite_scalar(incident_power_W, "incident_power_W")
     length = _positive_finite_scalar(interaction_length_m, "interaction_length_m")
@@ -536,6 +527,15 @@ def infer_thomson_path_averaged_density(
     coordinate. Cross-section units are m^2 sr^-1, solid angle is sr,
     path is m, and incident/scattered powers are W.
     """
+    raw_scattered_power = np.asarray(scattered_power_W)
+    if raw_scattered_power.ndim == 1:
+        return infer_thomson_channel_path_averaged_densities(
+            scattered_power_W, path_coordinate_m, incident_power_profile_W,
+            differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr,
+            optical_efficiency_profile, joint_input_covariance=joint_input_covariance,
+        )
+    if joint_input_covariance is not None:
+        raise ValueError("joint_input_covariance is supported only for channel-vector scattered_power_W")
     ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
     s = np.asarray(path_coordinate_m, dtype=float)
     if s.ndim != 1 or s.size < 2 or not np.all(np.isfinite(s)) or np.any(np.diff(s) <= 0):
