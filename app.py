@@ -4093,7 +4093,7 @@ elif page=='Advanced Analysis':
                         help='Supply only when this cross-covariance is independently characterized. It is checked against the joint density/EVDF covariance PSD bound.'
                     )
                     density_mu3_cross_81=st.text_input(
-                        'Cov(n_e, μ₃,q) density–third-moment cross-covariance (m^-3 s^-3; optional)',
+                        'Cov(n_e, μ₃,q) density–third-moment cross-covariance (s^-3; optional)',
                         value='',key='ts81_density_mu3_cross_covariance',
                         help='Supply only when independently characterized. The complete joint covariance of density, projected variance and third moment is checked for positive semidefiniteness.'
                     )
