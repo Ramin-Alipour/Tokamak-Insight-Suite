@@ -210,32 +210,38 @@ def test_projected_evdf_rejects_pairwise_valid_but_jointly_indefinite_covariance
     pdf = np.exp(-0.5 * (velocity / scale) ** 2) / (
         np.sqrt(2.0 * np.pi) * scale
     )
-    covariance = np.eye(velocity.size)
-    # Moment order is fixed by the production function. Give variance and
-    # third-moment a valid 0.9 correlation, then make density correlations
-    # +0.9 and -0.9: each pair passes Cauchy, but the 3x3 determinant is < 0.
-    covariance[1, 4] = covariance[4, 1] = 0.9
-    result = _projected_evdf_physical_moments(
-        velocity,
-        pdf,
-        covariance,
-        electron_density_m3=2.0e18,
-        electron_density_uncertainty_m3=1.0,
-        electron_density_mu3_cross_covariance_s_minus3=-0.9,
-        electron_density_variance_cross_covariance_m_minus1_s_minus2=0.9,
-    ) if False else None
-    # Use a covariance with the intended moment correlation in normalized
-    # units while keeping the full velocity-bin matrix positive semidefinite.
-    # The identity covariance induces a zero cross-moment correlation, so
-    # construct the invalid 3x3 contract directly through a controlled input
-    # covariance after obtaining the moment basis below.
+    # A symmetric Gaussian and diagonal coefficient covariance give zero
+    # Cov(variance, mu3), while both marginal variances remain positive.
+    coefficient_covariance = np.eye(velocity.size)
+    baseline = _projected_evdf_physical_moments(
+        velocity, pdf, coefficient_covariance
+    )
+    moment_covariance = np.asarray(baseline["moment_covariance"])
+    variance_index = baseline["moment_covariance_order"].index(
+        "velocity_parallel_variance_m2_s2"
+    )
+    mu3_index = baseline["moment_covariance_order"].index(
+        "central_third_velocity_moment_m3_s3"
+    )
+    variance_variance = moment_covariance[variance_index, variance_index]
+    mu3_variance = moment_covariance[mu3_index, mu3_index]
+    assert abs(moment_covariance[variance_index, mu3_index]) < 1e-10 * np.sqrt(
+        variance_variance * mu3_variance
+    )
+    # Each density/moment pair has correlation +0.9, but the two correlations
+    # cannot coexist with zero correlation between the EVDF moments: the
+    # resulting 3x3 covariance has a negative eigenvalue.
     with pytest.raises(ValueError, match="joint density/EVDF"):
         _projected_evdf_physical_moments(
             velocity,
             pdf,
-            np.eye(velocity.size),
+            coefficient_covariance,
             electron_density_m3=2.0e18,
             electron_density_uncertainty_m3=1.0,
-            electron_density_mu3_cross_covariance_s_minus3=0.0,
-            electron_density_variance_cross_covariance_m_minus1_s_minus2=0.0,
+            electron_density_mu3_cross_covariance_s_minus3=(
+                0.9 * np.sqrt(mu3_variance)
+            ),
+            electron_density_variance_cross_covariance_m_minus1_s_minus2=(
+                0.9 * np.sqrt(variance_variance)
+            ),
         )
