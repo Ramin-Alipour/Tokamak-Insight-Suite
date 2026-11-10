@@ -1903,7 +1903,17 @@ def analyze_thomson_spectral_distribution(
             predicted_centroid = float(forward_moments["center"])
             predicted_variance = float(forward_moments["variance"])
             closure = {
-                "status": "conditional_response_aware_moment_closure",
+                "status": (
+                    "identified_response_aware_moment_closure"
+                    if evdf_primary_identified
+                    else "conditional_response_aware_moment_closure"
+                ),
+                "primary_result_status": (
+                    "identified_from_measurement"
+                    if evdf_primary_identified
+                    else "not_fully_identifiable_from_measured_spectrum"
+                ),
+                "closure_is_primary": bool(evdf_primary_identified),
                 "velocity_quadrature": "nonuniform_trapezoidal_finite_volume_nodal_density",
                 "velocity_probability_normalization": evdf_norm,
                 "intrinsic_doppler_formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
