@@ -18,6 +18,7 @@ THOMSON_ENTRY_POINTS = {
     85: ("advanced_inference", "reconstruct_relativistic_optical_thomson_3d_evdf"),
     86: ("thomson_temperature_tensor", "compare_general_temperature_tensor_thomson_models"),
     87: ("thomson_scattering", "infer_thomson_path_averaged_density"),
+    88: ("advanced_inference", "reconstruct_optical_thomson_3d_evdf"),
 }
 
 THOMSON_ANALYSIS_IDS = frozenset(THOMSON_ENTRY_POINTS)
