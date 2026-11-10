@@ -1515,9 +1515,45 @@ def reconstruct_thomson_evdf(
         ),
     }
 
+    higher_order_moment_validity = {
+        "status": (
+            "support_truncation_suspected"
+            if boundary_mass_fraction > float(boundary_mass_fraction_limit)
+            else "within_declared_support_screen"
+        ),
+        "quantitative_reporting_allowed": bool(
+            boundary_mass_fraction <= float(boundary_mass_fraction_limit)
+        ),
+        "boundary_mass_fraction": boundary_mass_fraction,
+        "boundary_mass_fraction_limit": float(boundary_mass_fraction_limit),
+        "affected_quantities": [
+            "central_third_velocity_moment_m3_s3",
+            "central_fourth_velocity_moment_m4_s4",
+            "skewness",
+            "excess_kurtosis",
+            "projected_parallel_kinetic_energy_flux",
+        ],
+        "reason": (
+            "Higher-order moments weight the velocity tails by |v-u|^3 or |v-u|^4. "
+            "A finite-grid boundary probability above the declared threshold means "
+            "the measured support does not constrain those tails sufficiently for "
+            "quantitative reporting. Values are retained only as finite-window "
+            "diagnostics; no unmeasured tail is extrapolated."
+            if boundary_mass_fraction > float(boundary_mass_fraction_limit)
+            else
+            "The probability in the outer velocity cells is below the declared "
+            "support screen. This is a necessary numerical support check, not proof "
+            "that the unmeasured EVDF tail is physically negligible."
+        ),
+        "finite_window_values_are_still_returned": True,
+        "tail_extrapolation_performed": False,
+        "full_three_dimensional_heat_flux_identified": False,
+    }
+
     return {
         "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
         "velocity_support_diagnostic": velocity_support_diagnostic,
+        "higher_order_moment_validity": higher_order_moment_validity,
         "velocity_parallel_m_s": velocity,
         "evdf_parallel_s_per_m": distribution,
         "evdf_normalization": integral(distribution),

@@ -839,6 +839,24 @@ def test_evdf_reports_finite_velocity_support_truncation_without_measurement_cov
     assert uncertainty is None or (np.isfinite(uncertainty) and uncertainty >= 0.0)
 
 
+def test_evdf_withholds_quantitative_higher_moment_interpretation_when_velocity_tails_are_truncated():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES
+    from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
+
+    options = dict(EXAMPLES["thomson_projected_evdf"])
+    options["boundary_mass_fraction_limit"] = 1.0e-8
+    result = run_advanced_thomson_physics("thomson_projected_evdf", **options)
+
+    validity = result["higher_order_moment_validity"]
+    assert validity["status"] == "support_truncation_suspected"
+    assert validity["quantitative_reporting_allowed"] is False
+    assert validity["tail_extrapolation_performed"] is False
+    assert "excess_kurtosis" in validity["affected_quantities"]
+    # Finite-window values remain available for diagnosis, but must not be
+    # mistaken for tail-complete physical moments.
+    assert np.isfinite(result["excess_kurtosis"])
+
+
 def test_evdf_propagates_scattering_angle_uncertainty_through_inverse_sensitivity():
     wavelength, signal, background = _case()
     sigma_theta = 2.0e-4

@@ -1723,6 +1723,19 @@ def render_advanced_thomson_physics_page(st) -> None:
             if model == "thomson_projected_evdf":
                 support = result.get("velocity_support_diagnostic", {})
                 if support:
+                    moment_validity = result.get("higher_order_moment_validity", {})
+                    if moment_validity and not moment_validity.get("quantitative_reporting_allowed", False):
+                        st.error(
+                            "Higher-order EVDF moments (third/fourth moments, skewness, "
+                            "excess kurtosis and projected kinetic-energy flux) are not "
+                            "quantitatively reportable: the finite velocity grid may truncate "
+                            "the tails. The displayed values are finite-window diagnostics only."
+                        )
+                    elif moment_validity:
+                        st.info(
+                            "Higher-order EVDF moments pass the declared boundary-mass screen; "
+                            "this is a necessary support check, not proof of a negligible physical tail."
+                        )
                     boundary_fraction = float(support.get("boundary_mass_fraction", 0.0))
                     st.metric("EVDF probability in outer velocity cells", f"{boundary_fraction:.3%}")
                     if support.get("status") == "support_truncation_suspected":

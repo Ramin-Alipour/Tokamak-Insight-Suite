@@ -731,6 +731,11 @@
         {
           "name": "electron_pressure_tensor_Pa",
           "unit": "Pa; optional density-conditioned pressure tensor from raw-spectrum tensor inference"
+        },
+        {
+          "name": "higher_order_moment_validity",
+          "unit": "structured; finite-velocity-support gate for projected third/fourth moments, skewness, excess kurtosis and projected parallel kinetic-energy flux",
+          "description": "Per-channel projected-EVDF validity status derived from probability in the outer velocity cells. When the declared boundary-mass limit is exceeded, higher-order moment values remain available only as finite-window diagnostics and must not be reported quantitatively; no tail extrapolation or full 3-D heat-flux inference is performed."
         }
       ],
       "assumptions": [
