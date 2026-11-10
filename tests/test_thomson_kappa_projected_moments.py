@@ -41,3 +41,24 @@ def test_projected_kappa_rejects_asymmetric_fit_covariance():
     covariance[2,3] = 0.5
     with pytest.raises(ValueError,match='symmetric'):
         _projected_kappa_moment_closure(0.08,4.0,532.0,np.pi/2.0,covariance)
+
+def test_optical_thomson_product_api_returns_projected_kappa_moments():
+    from tis.products.thomson.api import analyze_spectra
+    from tis.physics.shared.thomson_inference import _kappa_bin_averaged_shape
+
+    wavelength = np.linspace(492.0,572.0,401)
+    temperature_eV = 120.0
+    sigma_nm = 2.0*532.0*np.sqrt(temperature_eV/510998.95069)*np.sin(np.pi/4.0)
+    kappa = 4.0
+    feature, _ = _kappa_bin_averaged_shape(wavelength,900.0,532.0,sigma_nm,kappa)
+    result = analyze_spectra(
+        wavelength, (feature+20.0)[None,:], [0.15],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2.0,
+        instrument_response=np.eye(wavelength.size), model="non_collective_kappa",
+    )
+    closure = result["channels"][0]["projected_evdf_moment_closure"]
+    assert closure["distribution_scope"].startswith("one_dimensional_q_parallel")
+    assert closure["student_t_degrees_of_freedom"] == pytest.approx(7.0, rel=0.05)
+    assert closure["central_fourth_velocity_moment_m4_s4"] is not None
+    assert closure["excess_kurtosis"] == pytest.approx(2.0, rel=0.1)
+    assert closure["central_fourth_moment_standard_uncertainty_m4_s4"] is not None
