@@ -137,7 +137,7 @@ def test_projected_evdf_physical_moments_recover_analytic_asymmetric_mixture():
         electron_density_m3=density,
     )
 
-    expected_variance = 3.0 * scale**2
+    expected_variance = 4.0 * scale**2
     expected_mu3 = 6.0 * scale**3
     expected_mu4 = 42.0 * scale**4
     expected_temperature = electron_mass * expected_variance / elementary_charge
@@ -149,8 +149,8 @@ def test_projected_evdf_physical_moments_recover_analytic_asymmetric_mixture():
     assert moments["directional_equivalent_temperature_eV"] == pytest.approx(expected_temperature, rel=2e-5)
     assert moments["central_third_velocity_moment_m3_s3"] == pytest.approx(expected_mu3, rel=3e-5)
     assert moments["central_fourth_velocity_moment_m4_s4"] == pytest.approx(expected_mu4, rel=3e-5)
-    assert moments["skewness"] == pytest.approx(6.0 / (3.0 ** 1.5), rel=3e-5)
-    assert moments["excess_kurtosis"] == pytest.approx(42.0 / 9.0 - 3.0, rel=3e-5)
+    assert moments["skewness"] == pytest.approx(6.0 / (4.0 ** 1.5), rel=3e-5)
+    assert moments["excess_kurtosis"] == pytest.approx(42.0 / 16.0 - 3.0, rel=3e-5)
     assert moments["parallel_projected_pressure_Pa"] == pytest.approx(expected_pressure, rel=2e-5)
     assert moments["parallel_projected_heat_flux_W_m2"] == pytest.approx(expected_projected_heat_flux, rel=3e-5)
     assert "not_the_full_three_dimensional_electron_heat_flux" in moments["heat_flux_physical_scope"]
