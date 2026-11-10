@@ -11998,5 +11998,90 @@
         "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_is_exposed_through_product_api"
       ]
     }
+  },
+  {
+    "name": "Relativistic projected Thomson EVDF laboratory-frame kinetic moments",
+    "equation": "γ(v)=1/sqrt(1−v_parallel²/c²); E_k(v)=(γ−1)m_e c²; <E_k>=∫E_k f_q dv; Φ_E,q/n_e=∫E_k v_parallel f_q dv, with ∫f_q dv=1",
+    "inputs": "Normalized one-dimensional q-parallel EVDF f_q(v_parallel) [s m^-1] on a strictly increasing subluminal velocity grid; optional full EVDF sample covariance.",
+    "output": "Mean kinetic energy [eV], mean Lorentz factor, laboratory-frame projected kinetic-energy flux per density [W m], and optional covariance.",
+    "assumptions": "Exact single-particle relativistic kinetic energy in the laboratory frame; probability is the normalized one-dimensional q-parallel marginal.",
+    "status": "D",
+    "category": "Thomson scattering — projected EVDF",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution._projected_evdf_relativistic_lab_moments",
+      "function_links": [
+        "tis.products.thomson.physics.thomson_distribution._projected_evdf_relativistic_lab_moments"
+      ],
+      "formula_key": "thomson_projected_evdf_relativistic_lab_kinetic_moments",
+      "input_specs": [
+        {
+          "name": "velocity_m_s",
+          "unit": "m s^-1; strictly increasing and |v|<c",
+          "required": true
+        },
+        {
+          "name": "probability_density_s_per_m",
+          "unit": "s m^-1; non-negative with positive finite integral",
+          "required": true
+        },
+        {
+          "name": "covariance",
+          "unit": "(s m^-1)^2; covariance of EVDF nodal samples",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "mean_velocity_parallel_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "mean_kinetic_energy_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "mean_lorentz_factor",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "kinetic_energy_flux_per_density_W_m",
+          "unit": "W m"
+        },
+        {
+          "name": "moment_covariance",
+          "unit": "covariance of mean velocity, mean kinetic energy in J, and kinetic-energy flux per density"
+        },
+        {
+          "name": "moment_standard_uncertainty",
+          "unit": "1-sigma uncertainties for the three moments"
+        }
+      ],
+      "assumptions": [
+        "The supplied distribution is a normalized one-dimensional q-parallel velocity marginal in the laboratory frame.",
+        "The relativistic kinetic energy is E_k=(gamma-1)m_e c^2.",
+        "The energy-flux observable is E_k*v_parallel; absolute flux requires an independently supplied density."
+      ],
+      "algorithm": "Use nonuniform trapezoidal nodal weights w_i and normalize p_i=w_i f_i/sum_j(w_j f_j). Evaluate gamma_i=(1-v_i^2/c^2)^(-1/2), E_i=(gamma_i-1)m_e c^2, and the expectations of v_i, E_i, and E_i v_i. For covariance C_f of the unnormalized nodal density, the exact normalized-expectation Jacobian is J_(a,i)=(w_i/N)(g_(a,i)-<g_a>), with N=sum_i w_i f_i; propagate C_g=J C_f J^T.",
+      "uncertainty_model": "Full supplied EVDF nodal covariance is propagated through the analytic normalized-expectation Jacobian. No density uncertainty is inferred or included.",
+      "limitations": [
+        "This is the exact laboratory-frame kinetic-energy flux of a one-dimensional projected marginal, not a comoving relativistic heat flux.",
+        "A single projected marginal does not identify perpendicular energy, the full three-dimensional EVDF, or the relativistic heat-flux four-vector.",
+        "The non-relativistic directional temperature and third-moment heat-flux closure are explicitly withheld on this relativistic execution path."
+      ],
+      "test_links": [
+        "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_energy_flux_uses_exact_lorentz_energy",
+        "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_moments_covariance_matches_finite_difference",
+        "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_moments_reject_superluminal_grid"
+      ],
+      "note": "Synthetic numerical verification of the exact Lorentz-energy relation and analytic covariance propagation; no experimental validation is claimed.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "projected_evdf_physical_moment_transform",
+      "input_data_level": "normalized_projected_evdf_and_optional_covariance",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Thomson Spectral Distribution — relativistic projected EVDF moments"
+    }
   }
 ]
