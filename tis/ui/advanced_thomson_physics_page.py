@@ -114,6 +114,7 @@ MODEL_LABELS = {
     "cold_plasma_mode_group_velocity": "CTS — collisionless cold-plasma group velocity and wave-normal walk-off",
     "plasma_charge_state_moments": "CTS — quasineutrality, effective charge and multispecies charge moments",
     "thomson_normalized_poloidal_flux": "Optical Thomson — map channel positions to equilibrium-normalized poloidal flux rho_pol",
+    "thomson_channel_path_averaged_density": "Optical Thomson — channel-resolved path-integrated density with full optical covariance",
 }
 
 # Full-EM response and field-fluctuation routes are explicit Dashboard choices.
@@ -1170,6 +1171,17 @@ EXAMPLES["thomson_joint_spatial_spectra"] = {
 }
 
 
+
+EXAMPLES["thomson_channel_path_averaged_density"] = {
+    "scattered_power_W": [2.4e-11, 3.1e-11],
+    "path_coordinate_m": [0.0, 0.5, 1.0],
+    "incident_power_profile_W": [[10.0, 9.5, 9.0], [8.0, 8.5, 9.0]],
+    "differential_cross_section_profile_m2_sr": [[6.0e-29, 6.0e-29, 6.0e-29], [5.9e-29, 6.0e-29, 6.1e-29]],
+    "collection_solid_angle_profile_sr": [[0.010, 0.010, 0.010], [0.009, 0.010, 0.011]],
+    "optical_efficiency_profile": [[0.40, 0.40, 0.40], [0.38, 0.39, 0.40]],
+    "joint_input_covariance": None
+}
+
 def decode_complex_json(value):
     """Decode nested JSON arrays; {real: ..., imag: ...} denotes complex data."""
     if isinstance(value, Mapping):
@@ -1270,9 +1282,28 @@ def render_advanced_thomson_physics_page(st) -> None:
                 result["dashboard_execution_path"] = (
                     "tis.products.thomson.api.reconstruct_relativistic_evdf -> analysis_id_85"
                 )
+            elif model == "thomson_channel_path_averaged_density":
+                # Channel-resolved path density uses the canonical product API entry 87.
+                from tis.products.thomson.api import infer_path_averaged_density
+                result = dict(infer_path_averaged_density(**config))
+                result["dashboard_execution_path"] = (
+                    "tis.products.thomson.api.infer_path_averaged_density -> analysis_id_87"
+                )
             else:
                 result = run_advanced_thomson_physics(model, **config)
             safe = json_safe(result)
+            if model == "thomson_channel_path_averaged_density" and isinstance(result, Mapping):
+                st.subheader("Channel-resolved path-averaged electron density")
+                st.latex(r"n_{e,j}^{\mathrm{avg}}=\frac{P_{s,j}}{\int P_{i,j}(s)\,\frac{d\sigma_j}{d\Omega}\,\Delta\Omega_j(s)\,\eta_j(s)\,ds},\qquad C_n=J C_{\mathrm{input}}J^T")
+                st.write({
+                    "electron_density_path_averaged_m3": result.get("electron_density_path_averaged_m3"),
+                    "electron_density_path_averaged_uncertainty_m3": result.get("electron_density_path_averaged_uncertainty_m3"),
+                    "electron_density_covariance_m6": result.get("electron_density_covariance_m6"),
+                    "path_integrated_sensitivity_W_m3": result.get("path_integrated_sensitivity_W_m3"),
+                    "identifiability": result.get("identifiability"),
+                    "dashboard_execution_path": result.get("dashboard_execution_path"),
+                })
+                st.caption("Each channel returns a kernel-weighted line average. These values are not local radial samples and do not by themselves define a spatial profile.")
             if isinstance(result, Mapping) and "velocity_grid_convergence" in result:
                 convergence = result["velocity_grid_convergence"]
                 st.subheader("Landau–FDT Full-EM velocity-grid convergence")

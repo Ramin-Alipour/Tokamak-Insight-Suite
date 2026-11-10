@@ -126,6 +126,15 @@ def density_from_thomson_scattered_power(
     cross-section is either the stationary-electron polarized Thomson value
     or a model-supplied velocity-averaged relativistic value.
     """
+    raw_scattered_power = np.asarray(scattered_power_W)
+    if raw_scattered_power.ndim == 1:
+        return infer_thomson_channel_path_averaged_densities(
+            scattered_power_W, path_coordinate_m, incident_power_profile_W,
+            differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr,
+            optical_efficiency_profile, joint_input_covariance=joint_input_covariance,
+        )
+    if joint_input_covariance is not None:
+        raise ValueError("joint_input_covariance is supported only for channel-vector scattered_power_W")
     ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
     pi = _positive_finite_scalar(incident_power_W, "incident_power_W")
     length = _positive_finite_scalar(interaction_length_m, "interaction_length_m")
@@ -348,6 +357,156 @@ def density_from_thomson_scattered_power(
     }
 
 
+def infer_thomson_channel_path_averaged_densities(
+    scattered_power_W,
+    path_coordinate_m,
+    incident_power_profile_W,
+    differential_cross_section_profile_m2_sr,
+    collection_solid_angle_profile_sr,
+    optical_efficiency_profile,
+    *,
+    joint_input_covariance=None,
+):
+    """Infer channel-resolved optical-kernel-weighted Thomson densities.
+
+    Each channel j obeys P_s,j = integral n_e,j(s) K_j(s) ds, where
+    K_j=P_i,j (d sigma_j/d Omega) DeltaOmega_j eta_j. One integrated
+    power returns one weighted path average per channel, not a pointwise
+    density profile. The optional joint covariance is ordered as all channel
+    powers followed by channel-major blocks of the four path profiles
+    (incident power, differential cross-section, solid angle, efficiency).
+    It therefore retains cross-channel, cross-position and cross-factor terms.
+    """
+    raw_power = np.asarray(scattered_power_W)
+    if raw_power.dtype.kind not in "iuf" or raw_power.ndim != 1 or raw_power.size < 1:
+        raise ValueError("scattered_power_W must be a non-empty real channel vector")
+    power = raw_power.astype(float, copy=False)
+    if not np.all(np.isfinite(power)) or np.any(power < 0.0):
+        raise ValueError("scattered_power_W must be finite and non-negative")
+    n_channels = power.size
+
+    path = np.asarray(path_coordinate_m, dtype=float)
+    if path.ndim == 1:
+        if path.size < 2 or not np.all(np.isfinite(path)) or np.any(np.diff(path) <= 0.0):
+            raise ValueError("path_coordinate_m must be strictly increasing with at least two nodes")
+        path = np.broadcast_to(path, (n_channels, path.size))
+    elif path.ndim == 2:
+        if path.shape[0] != n_channels or path.shape[1] < 2 or not np.all(np.isfinite(path)):
+            raise ValueError("2-D path_coordinate_m must have shape (n_channels, n_path) and be finite")
+        if np.any(np.diff(path, axis=1) <= 0.0):
+            raise ValueError("each channel path coordinate must increase strictly")
+    else:
+        raise ValueError("path_coordinate_m must be a shared 1-D path or a channel-by-path matrix")
+    n_path = path.shape[1]
+
+    profile_values = []
+    profile_names = (
+        "incident_power_profile_W",
+        "differential_cross_section_profile_m2_sr",
+        "collection_solid_angle_profile_sr",
+        "optical_efficiency_profile",
+    )
+    for name, value in zip(profile_names, (
+        incident_power_profile_W,
+        differential_cross_section_profile_m2_sr,
+        collection_solid_angle_profile_sr,
+        optical_efficiency_profile,
+    )):
+        raw = np.asarray(value)
+        if raw.dtype.kind not in "iuf" or not np.all(np.isfinite(raw)):
+            raise ValueError(f"{name} must contain finite real values")
+        array = raw.astype(float, copy=False)
+        if array.ndim == 1 and array.shape == (n_path,):
+            array = np.broadcast_to(array, (n_channels, n_path))
+        elif array.shape != (n_channels, n_path):
+            raise ValueError(f"{name} must have shape (n_path,) or (n_channels, n_path)")
+        profile_values.append(array)
+    incident, cross_section, solid_angle, efficiency = profile_values
+    if (np.any(incident <= 0.0) or np.any(cross_section <= 0.0)
+            or np.any(solid_angle <= 0.0) or np.any(efficiency <= 0.0)
+            or np.any(efficiency > 1.0)):
+        raise ValueError("all optical sensitivity profiles must be positive and efficiency must not exceed one")
+
+    kernel = incident * cross_section * solid_angle * efficiency
+    weights = np.empty_like(path)
+    weights[:, 0] = 0.5 * (path[:, 1] - path[:, 0])
+    weights[:, -1] = 0.5 * (path[:, -1] - path[:, -2])
+    if n_path > 2:
+        weights[:, 1:-1] = 0.5 * (path[:, 2:] - path[:, :-2])
+    denominator = np.sum(weights * kernel, axis=1)
+    if np.any(~np.isfinite(denominator)) or np.any(denominator <= 0.0):
+        raise ValueError("every channel must have positive finite path-integrated optical sensitivity")
+    density = power / denominator
+
+    covariance = None
+    density_covariance = None
+    density_uncertainty = None
+    jacobian = np.zeros((n_channels, n_channels + 4 * n_channels * n_path))
+    jacobian[np.arange(n_channels), np.arange(n_channels)] = 1.0 / denominator
+    for channel in range(n_channels):
+        factors = (incident[channel], cross_section[channel], solid_angle[channel], efficiency[channel])
+        for factor_index, _factor in enumerate(factors):
+            other_product = np.ones(n_path)
+            for other_index, other in enumerate(factors):
+                if other_index != factor_index:
+                    other_product *= other
+            start = n_channels + (channel * 4 + factor_index) * n_path
+            jacobian[channel, start:start+n_path] = (
+                -power[channel] / denominator[channel]**2
+                * weights[channel] * other_product
+            )
+
+    if joint_input_covariance is not None:
+        raw_covariance = np.asarray(joint_input_covariance)
+        expected = n_channels + 4 * n_channels * n_path
+        if raw_covariance.dtype.kind not in "iuf" or raw_covariance.shape != (expected, expected):
+            raise ValueError(f"joint_input_covariance must be a real matrix with shape ({expected}, {expected})")
+        covariance = raw_covariance.astype(float, copy=False)
+        if not np.all(np.isfinite(covariance)):
+            raise ValueError("joint_input_covariance must be finite")
+        scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12*scale):
+            raise ValueError("joint_input_covariance must be symmetric")
+        covariance = 0.5 * (covariance + covariance.T)
+        eigenvalues = np.linalg.eigvalsh(covariance)
+        if float(eigenvalues.min()) < -1e-10 * max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny):
+            raise ValueError("joint_input_covariance must be positive semidefinite")
+        density_covariance = jacobian @ covariance @ jacobian.T
+        density_covariance = 0.5 * (density_covariance + density_covariance.T)
+        if not np.all(np.isfinite(density_covariance)):
+            raise ValueError("propagated channel-density covariance is not finite")
+        density_uncertainty = np.sqrt(np.maximum(np.diag(density_covariance), 0.0))
+
+    return {
+        "electron_density_path_averaged_m3": density,
+        "electron_density_path_averaged_uncertainty_m3": density_uncertainty,
+        "electron_density_covariance_m6": density_covariance,
+        "channel_count": int(n_channels),
+        "path_coordinate_m": path.copy(),
+        "path_integrated_sensitivity_W_m3": denominator,
+        "normalized_path_weight": kernel / denominator[:, None],
+        "density_interpretation": "one_measurement_kernel_weighted_path_average_per_channel; not_a_local_density_profile",
+        "identifiability": {
+            "status": "one_weighted_path_average_per_independent_channel_identifiable",
+            "not_identifiable": ["unconstrained_pointwise_density_along_each_sightline"],
+            "reason": "Each channel supplies one integrated power constraint. Multiple channels do not become independent radial samples unless their spatial response operators and geometry support that inversion.",
+        },
+        "equations": {
+            "channel_power": "P_s,j = integral n_e,j(s) P_i,j(s) (d sigma_j/d Omega) DeltaOmega_j(s) eta_j(s) ds",
+            "channel_density": "n_bar_e,j = P_s,j / integral[P_i,j(s) (d sigma_j/d Omega) DeltaOmega_j(s) eta_j(s)] ds",
+            "covariance": "C_n = J C_input J^T, with J = partial(n_bar_e,channels)/partial(P_s,channels,optical_profiles)",
+        },
+        "covariance_order": (
+            ["scattered_power_W[channel]", "then channel-major blocks of incident_power_profile_W, differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr, optical_efficiency_profile"]
+            if covariance is not None else None
+        ),
+        "uncertainty_model": (
+            "Full first-order joint-covariance propagation including cross-channel, cross-position and cross-optical-factor correlations."
+            if covariance is not None else "No joint input covariance supplied; channel density covariance is unavailable."
+        ),
+    }
+
+
 def infer_thomson_path_averaged_density(
     scattered_power_W,
     path_coordinate_m,
@@ -359,14 +518,17 @@ def infer_thomson_path_averaged_density(
     scattered_power_uncertainty_W=None,
     optical_profile_covariance=None,
     scattered_power_optical_profile_cross_covariance=None,
+    joint_input_covariance=None,
 ):
     """Infer the measurement-kernel-weighted electron density along a sightline.
 
     This is the path-integrated single-scattering relation
         P_s = integral[n_e(s) P_i(s) (d sigma/d Omega)(s)
                        DeltaOmega(s) eta(s) ds].
-    A single measured P_s identifies only the weighted path average, not an
-    arbitrary spatial density profile. The supplied path-dependent factors
+    A scalar measured P_s identifies one weighted path average. A 1-D channel
+    vector dispatches to the channel-resolved joint-Jacobian implementation.
+    Neither mode identifies an arbitrary pointwise spatial density profile.
+    The supplied path-dependent factors
     are fixed, already-characterized inputs; this routine does not calibrate
     an instrument or infer missing geometry/optical factors.
 

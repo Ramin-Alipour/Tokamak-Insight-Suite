@@ -350,3 +350,15 @@ def test_relativistic_3d_evdf_dashboard_uses_registered_product_api_entry_85():
     )
     assert "third_central_velocity_moment_tensor_m3_s3" in result
     assert "heat_flux_status" in result
+
+
+def test_dashboard_channel_path_density_uses_registered_thomson_product_api():
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES, MODEL_LABELS
+    from tis.products.thomson.api import infer_path_averaged_density
+
+    model = "thomson_channel_path_averaged_density"
+    assert model in MODEL_LABELS and model in EXAMPLES
+    result = infer_path_averaged_density(**dict(EXAMPLES[model]))
+    assert result["channel_count"] == 2
+    assert np.asarray(result["electron_density_path_averaged_m3"]).shape == (2,)
+    assert result["identifiability"]["status"] == "one_weighted_path_average_per_independent_channel_identifiable"

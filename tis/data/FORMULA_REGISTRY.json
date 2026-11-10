@@ -11342,9 +11342,9 @@
   {
     "name": "Thomson measurement-kernel-weighted path-average density with power/optical cross covariance",
     "equation": "P_s = ∫ n_e(s) K(s) ds; K=P_i(dσ_eff/dΩ)ΔΩη; n̄_e=P_s/D, D=∫K ds; Var(n̄_e)=gᵀ C_joint g, g=[1/D, −(P_s/D²)∇D]",
-    "inputs": "Absolutely calibrated integrated scattered power P_s; path coordinate s; incident-power, effective differential-cross-section, collection-solid-angle and optical-efficiency profiles; optional full 4N×4N optical covariance and 1×4N scattered-power/profile cross covariance",
-    "output": "Measurement-kernel-weighted path-averaged electron density [m⁻³] and first-order uncertainty [m⁻³]",
-    "assumptions": "Optically thin single scattering; fixed characterized path profiles; one integrated power identifies only the weighted path average, not an arbitrary local density profile. The joint covariance of power and optical factors must be positive semidefinite.",
+    "inputs": "Absolutely calibrated scattered power (scalar or channel vector); shared or per-channel path coordinates; shared 1-D or channel-by-path incident-power, effective differential-cross-section, collection-solid-angle and efficiency profiles; optional scalar-mode legacy covariance inputs or channel-mode full joint covariance.",
+    "output": "One measurement-kernel-weighted path-averaged electron density per sightline [m⁻³]; channel mode additionally returns the full channel density covariance [m⁻⁶] and per-channel standard uncertainties [m⁻³].",
+    "assumptions": "Optically thin single scattering; fixed characterized path profiles; one integrated power identifies only the weighted path average, not an arbitrary local density profile. The joint covariance of power and optical factors must be positive semidefinite. Channel-vector mode integrates each sightline with its own path coordinate and optical kernel; its full joint input covariance may retain cross-channel, cross-position and cross-factor correlations.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -11355,32 +11355,32 @@
       "input_specs": [
         {
           "name": "scattered_power_W",
-          "unit": "W",
+          "unit": "W; scalar or 1-D channel vector",
           "required": true
         },
         {
           "name": "path_coordinate_m",
-          "unit": "m; strictly increasing",
+          "unit": "m; shared 1-D path or (N_channel,N_path)",
           "required": true
         },
         {
           "name": "incident_power_profile_W",
-          "unit": "W",
+          "unit": "W; shared 1-D or channel-by-path matrix",
           "required": true
         },
         {
           "name": "differential_cross_section_profile_m2_sr",
-          "unit": "m² sr⁻¹",
+          "unit": "m² sr⁻¹; shared 1-D or channel-by-path matrix",
           "required": true
         },
         {
           "name": "collection_solid_angle_profile_sr",
-          "unit": "sr",
+          "unit": "sr; shared 1-D or channel-by-path matrix",
           "required": true
         },
         {
           "name": "optical_efficiency_profile",
-          "unit": "dimensionless; (0,1]",
+          "unit": "dimensionless; (0,1]; shared 1-D or channel-by-path matrix",
           "required": true
         },
         {
@@ -11398,6 +11398,12 @@
           "unit": "length-4N covariance vector",
           "required": false,
           "description": "Requires both marginal covariance inputs; the complete joint covariance is PSD-validated."
+        },
+        {
+          "name": "joint_input_covariance",
+          "unit": "(N_channel + 4 N_channel N_path) square covariance",
+          "required": false,
+          "description": "Channel-vector mode only; channel powers followed by channel-major blocks of incident power, differential cross-section, solid angle and efficiency path profiles. Includes all cross-channel and cross-position terms."
         }
       ],
       "output_specs": [
@@ -11416,14 +11422,27 @@
         {
           "name": "identifiability",
           "unit": "weighted path-average only"
+        },
+        {
+          "name": "electron_density_covariance_m6",
+          "unit": "N_channel x N_channel; channel-vector mode"
+        },
+        {
+          "name": "channel_count",
+          "unit": "count; channel-vector mode"
         }
       ],
-      "uncertainty_model": "Full first-order Jacobian propagation of the joint covariance of integrated scattered power and the four path-resolved optical/geometry factors, including cross-position, cross-factor and scattered-power/profile covariance.",
+      "uncertainty_model": "Full first-order Jacobian propagation of the joint covariance of integrated scattered power and the four path-resolved optical/geometry factors, including cross-position, cross-factor and scattered-power/profile covariance. Channel-vector mode propagates C_n=J C_input J^T through the full joint covariance, including cross-channel, cross-position and cross-optical-factor correlations.",
       "test_links": [
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_correlated_optical_profile_covariance",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
-        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_recovers_distinct_kernel_weighted_densities",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_propagates_full_cross_channel_covariance",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_rejects_invalid_joint_covariance",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_accepts_channel_specific_path_coordinates",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_is_reachable_through_product_api_entry_87"
       ],
       "note": "Analytic single-scattering path integral and first-order covariance propagation; numerical tests verify limiting and correlated cases. Experimental validation remains required."
     },
@@ -11444,7 +11463,8 @@
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
       ]
-    }
+    },
+    "note": "Analytic single-scattering path integral and full first-order covariance propagation; scalar and channel-resolved synthetic tests verify limiting cases and correlated uncertainties. Experimental validation remains required."
   },
   {
     "name": "Number-conserving BGK Kappa electrostatic susceptibility",

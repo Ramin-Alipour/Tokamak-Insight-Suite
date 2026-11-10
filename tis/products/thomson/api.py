@@ -85,7 +85,13 @@ def compare_temperature_tensor_models(*args: Any, **kwargs: Any) -> Any:
 
 
 def infer_path_averaged_density(*args: Any, **kwargs: Any) -> Any:
-    """Infer path-averaged density from correlated optical calibration (entry 87)."""
+    """Infer Thomson sightline density (entry 87).
+
+    A scalar scattered_power_W returns one kernel-weighted path average.
+    A channel vector returns one weighted path average per sightline and can
+    propagate the full joint covariance of all channel powers and path-resolved
+    optical factors. Neither mode claims a pointwise density profile.
+    """
     return _run(87, *args, **kwargs)
 
 def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
