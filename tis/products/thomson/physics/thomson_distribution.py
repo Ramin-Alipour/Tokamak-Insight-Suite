@@ -1419,7 +1419,7 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("physical_fit_options.radius_m must be finite")
         if uncertainty is not None and signal_covariance_matrix is not None:
             raise ValueError("internal error: signal uncertainty and covariance are mutually exclusive")
-        from tis.physics.shared.thomson_inference import analyze_thomson_spectra as canonical_fit
+        from .thomson_workflow import analyze_thomson_spectra as canonical_fit
         canonical_kwargs = dict(
             laser_wavelength_nm=float(laser_wavelength_nm),
             scattering_angle_rad=float(scattering_angle_rad),
