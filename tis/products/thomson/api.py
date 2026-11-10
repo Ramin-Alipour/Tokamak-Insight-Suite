@@ -88,6 +88,11 @@ def infer_path_averaged_density(*args: Any, **kwargs: Any) -> Any:
     """Infer path-averaged density from correlated optical calibration (entry 87)."""
     return _run(87, *args, **kwargs)
 
+def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
+    """Reconstruct a physical non-relativistic 3-D EVDF from multi-view optical spectra (entry 88)."""
+    return _run(88, *args, **kwargs)
+
+
 def fit_two_population_relativistic_spectrum(*args: Any, **kwargs: Any) -> Any:
     """Fit the explicitly parameterized two-population relativistic TS model."""
     from .physics.thomson_workflow import fit_two_population_relativistic_thomson_spectrum
