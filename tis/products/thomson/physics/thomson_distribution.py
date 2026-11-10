@@ -1759,6 +1759,11 @@ def analyze_thomson_spectral_distribution(
             moment_summary["nonrelativistic_heat_flux_validity"] = (
                 "withheld_for_relativistic_kinematics"
             )
+            moment_summary["directional_equivalent_temperature_eV"] = None
+            moment_summary["mean_random_kinetic_energy_parallel_eV"] = None
+            moment_summary["random_kinetic_energy_parallel_variance_eV2"] = None
+            moment_summary["parallel_projected_heat_flux_per_density_W_m"] = None
+            moment_summary["parallel_projected_heat_flux_per_density_standard_uncertainty_W_m"] = None
             moment_summary["parallel_projected_heat_flux_W_m2"] = None
             moment_summary["parallel_projected_heat_flux_standard_uncertainty_W_m2"] = None
             moment_summary["heat_flux_physical_scope"] = (
