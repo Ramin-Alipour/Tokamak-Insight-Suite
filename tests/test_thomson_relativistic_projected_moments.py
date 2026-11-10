@@ -79,3 +79,51 @@ def test_relativistic_projected_moments_reject_superluminal_grid():
     f = np.ones_like(v)
     with pytest.raises(ValueError, match=r"\|v\| < c"):
         _projected_evdf_relativistic_lab_moments(v, f)
+
+
+
+def test_relativistic_spectral_distribution_withholds_nonrelativistic_temperature_and_heat_flux(monkeypatch):
+    from tis.physics.shared import thomson_gap_closure
+    from tis.products.thomson.physics.thomson_distribution import (
+        analyze_thomson_spectral_distribution,
+    )
+
+    wavelength = np.linspace(1059.0, 1061.0, 41)
+    background = np.full_like(wavelength, 0.02)
+    signal = background + np.exp(-0.5 * ((wavelength - 1060.0) / 0.18) ** 2)
+    velocity = np.linspace(-0.3, 0.3, 301) * 299792458.0
+    pdf = np.exp(-0.5 * (velocity / (0.06 * 299792458.0)) ** 2)
+    pdf /= np.trapezoid(pdf, velocity)
+    fitted = signal - background
+
+    def fake_relativistic_solver(**kwargs):
+        return {
+            "velocity_parallel_m_s": velocity,
+            "projected_evdf_s_m": pdf,
+            "projected_evdf_covariance": None,
+            "fitted_scattered_spectrum": fitted,
+        }
+
+    monkeypatch.setattr(
+        thomson_gap_closure,
+        "reconstruct_relativistic_projected_thomson_evdf",
+        fake_relativistic_solver,
+    )
+    result = analyze_thomson_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        laser_wavelength_nm=1060.0,
+        scattering_angle_rad=np.pi / 2.0,
+        projected_evdf_options={
+            "kinematics": "relativistic_thomson",
+            "velocity_grid_m_s": velocity,
+        },
+    )
+    moments = result["projected_evdf_inference"]["projected_evdf_physical_moments"]
+    assert moments["relativistic_lab_frame_moments"]["mean_kinetic_energy_eV"] > 0.0
+    assert moments["directional_equivalent_temperature_eV"] is None
+    assert moments["parallel_projected_heat_flux_per_density_W_m"] is None
+    assert moments["parallel_projected_heat_flux_W_m2"] is None
+    assert moments["nonrelativistic_heat_flux_validity"] == "withheld_for_relativistic_kinematics"
