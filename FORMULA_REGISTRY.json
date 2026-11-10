@@ -12078,7 +12078,7 @@
       ],
       "note": "Synthetic numerical verification of the exact Lorentz-energy relation and analytic covariance propagation; no experimental validation is claimed.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": true,
+      "calibrated_measurements_to_physics": false,
       "execution_scope": "projected_evdf_physical_moment_transform",
       "input_data_level": "normalized_projected_evdf_and_optional_covariance",
       "analysis_family": "Analysis 1 — Thomson scattering",
