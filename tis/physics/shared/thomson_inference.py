@@ -681,6 +681,87 @@ def _kappa_profile_likelihood_diagnostic(
         "interpretation": "Conditional one-parameter profile likelihood; all selected background coefficients are re-optimized at fixed Kappa. A grid-censored limit is not a physical bound."
     }
 
+
+def _projected_kappa_moment_closure(sigma_nm, kappa, laser_nm, angle, fit_covariance=None):
+    """Analytic moments of the 1-D Student-t marginal of an isotropic 3-D Kappa EVDF.
+
+    nu=2*kappa-1. Variance is finite for kappa>3/2, the absolute third
+    moment for kappa>2, and the fourth moment for kappa>5/2. Divergent
+    moments are returned as None, never estimated from a truncated grid.
+    """
+    sigma_nm = _finite_scalar(sigma_nm, "sigma_nm", minimum=np.finfo(float).tiny)
+    kappa = _finite_scalar(kappa, "kappa", minimum=1.500000000001)
+    laser_nm = _finite_scalar(laser_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
+    angle = _finite_scalar(angle, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
+    if angle >= np.pi:
+        raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
+    q = 2.0*np.sin(angle/2.0)
+    velocity_per_nm = C_M_S/(laser_nm*q)
+    sigma_v = velocity_per_nm*sigma_nm
+    nu = 2.0*kappa-1.0
+    result = {
+        "status": "finite_variance_projected_kappa_marginal",
+        "distribution_scope": "one_dimensional_q_parallel_marginal_of_isotropic_three_dimensional_kappa_evdf",
+        "student_t_degrees_of_freedom": float(nu),
+        "projected_velocity_standard_deviation_m_s": float(sigma_v),
+        "velocity_variance_m2_s2": float(sigma_v**2),
+        "central_third_velocity_moment_m3_s3": 0.0 if kappa > 2.0 else None,
+        "central_third_moment_status": (
+            "finite_zero_by_symmetric_equilibrium_kappa_model" if kappa > 2.0
+            else "divergent_absolute_third_moment_for_kappa_at_or_below_2"
+        ),
+        "central_fourth_velocity_moment_m4_s4": None,
+        "excess_kurtosis": None,
+        "fourth_moment_status": (
+            "finite_for_kappa_greater_than_2p5" if kappa > 2.5
+            else "divergent_fourth_moment_for_kappa_at_or_below_2p5"
+        ),
+        "central_fourth_moment_standard_uncertainty_m4_s4": None,
+        "excess_kurtosis_standard_uncertainty": None,
+        "physical_relations": {
+            "projected_student_t_df": "nu=2*kappa-1",
+            "variance": "mu2=sigma_v^2; finite for kappa>3/2",
+            "third_moment": "mu3=0 by symmetry; absolutely finite only for kappa>2",
+            "fourth_moment": "mu4=3*sigma_v^4*(2*kappa-3)/(2*kappa-5); finite only for kappa>5/2",
+            "excess_kurtosis": "6/(2*kappa-5); finite only for kappa>5/2",
+        },
+        "heat_flux_interpretation": (
+            "Zero central third moment is imposed by the symmetric equilibrium Kappa model, not independently inferred."
+            if kappa > 2.0 else
+            "A finite projected heat-flux moment does not exist for this Kappa index."
+        ),
+        "limitations": [
+            "These are moments of the one-dimensional scattering-vector marginal, not an unrestricted 3-D EVDF.",
+            "The symmetric-model third moment is not an independent measurement of non-equilibrium heat flux.",
+        ],
+        "moment_covariance_method": "delta_method_using_sigma_kappa_and_fit_covariance",
+    }
+    if kappa > 2.5:
+        denominator = 2.0*kappa-5.0
+        mu4 = 3.0*sigma_v**4*(2.0*kappa-3.0)/denominator
+        result["central_fourth_velocity_moment_m4_s4"] = float(mu4)
+        result["excess_kurtosis"] = float(6.0/denominator)
+        if fit_covariance is not None:
+            cov = np.asarray(fit_covariance, dtype=float)
+            if cov.ndim != 2 or cov.shape[0] < 4 or cov.shape[1] < 4 or not np.all(np.isfinite(cov)):
+                raise ValueError("Kappa fit covariance must be finite and include sigma and kappa parameters")
+            if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-14):
+                raise ValueError("Kappa fit covariance must be symmetric")
+            ds = 4.0*mu4/sigma_nm
+            dk = -12.0*sigma_v**4/denominator**2
+            var_mu4 = ds**2*cov[2,2] + dk**2*cov[3,3] + 2.0*ds*dk*cov[2,3]
+            scale = max(abs(ds**2*cov[2,2])+abs(dk**2*cov[3,3])+abs(2.0*ds*dk*cov[2,3]), np.finfo(float).tiny)
+            if var_mu4 < -1e-10*scale:
+                raise ValueError("Kappa fit covariance gives a negative fourth-moment variance")
+            dkurt = -12.0/denominator**2
+            var_kurt = dkurt**2*cov[3,3]
+            if var_kurt < -1e-12*max(abs(var_kurt), np.finfo(float).tiny):
+                raise ValueError("Kappa fit covariance gives a negative excess-kurtosis variance")
+            result["central_fourth_moment_standard_uncertainty_m4_s4"] = float(np.sqrt(max(var_mu4,0.0)))
+            result["excess_kurtosis_standard_uncertainty"] = float(np.sqrt(max(var_kurt,0.0)))
+    return result
+
+
 def _fit_kappa(
     wavelength, signal, laser_nm, angle, response, uncertainty,
     spectral_covariance=None, *, background_model="linear",
@@ -928,6 +1009,7 @@ def _fit_kappa(
         "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
         "kappa_index": kappa, "kappa_index_identifiability": kappa_identifiability,
         "kappa_profile_likelihood": kappa_profile_likelihood,
+        "projected_evdf_moment_closure": _projected_kappa_moment_closure(sigma, kappa, laser_nm, angle, fit_covariance=cov),
         "amplitude": amp, "background_intercept": background_intercept,
         "background_slope_per_nm": background_slope,
         "background_model": background_model,
