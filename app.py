@@ -1733,11 +1733,17 @@ elif page=='Spectral Analysis':
                             'reduced_chi_square':distribution.get('reduced_chi_square'),
                             'likelihood_covariance_components':distribution.get('gaussian_fit_likelihood_covariance_components'),
                             'evdf_closure_status':closure.get('status'),
+                            'evdf_predicted_response_aware_centroid_nm':closure.get('evdf_predicted_spectral_centroid_nm'),
+                            'evdf_measured_centroid_nm':closure.get('measured_spectral_centroid_nm'),
                             'evdf_centroid_closure_residual_nm':closure.get('centroid_closure_residual_nm'),
+                            'evdf_predicted_response_aware_variance_nm2':closure.get('evdf_predicted_spectral_variance_nm2'),
+                            'evdf_measured_variance_nm2':closure.get('measured_spectral_variance_nm2'),
                             'evdf_variance_closure_residual_nm2':closure.get('variance_closure_residual_nm2'),
-                            'evdf_velocity_quadrature':closure.get('velocity_quadrature'),
+                            'evdf_finite_window_captured_probability':closure.get('finite_window_captured_probability'),
+                            'evdf_measured_response_applied':closure.get('measured_instrument_and_laser_response_applied'),
                         })
                     st.markdown('**Thomson spectral-distribution diagnostics**')
+                    st.caption('EVDF spectral closure is evaluated by forwarding the reconstructed projected distribution through the finite-volume Doppler mapping and the composed measured laser/detector response. The comparison is conditioned on the recorded wavelength window; it is not an independent temperature estimate.')
                     st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
                     validity_rows=[]
                     for channel in result['channels']:
