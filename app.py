@@ -4092,6 +4092,11 @@ elif page=='Advanced Analysis':
                         value='',key='ts81_density_variance_cross_covariance',
                         help='Supply only when this cross-covariance is independently characterized. It is checked against the joint density/EVDF covariance PSD bound.'
                     )
+                    density_mu3_cross_81=st.text_input(
+                        'Cov(n_e, μ₃,q) density–third-moment cross-covariance (m^-3 s^-3; optional)',
+                        value='',key='ts81_density_mu3_cross_covariance',
+                        help='Supply only when independently characterized. The complete joint covariance of density, projected variance and third moment is checked for positive semidefiniteness.'
+                    )
                     polarization_81=st.text_input('Incident polarization x,y,z (required for Compton)',value='0,0,1',key='ts81_polarization')
                 if st.button('Run spectral-distribution API 81',type='primary',key='run_ts_spectral_distribution_api_81'):
                     try:
@@ -4134,6 +4139,10 @@ elif page=='Advanced Analysis':
                             api_kwargs['projected_evdf_options']['electron_density_variance_cross_covariance_m_minus1_s_minus2']=_parse_ts_scalar(
                                 density_variance_cross_81,'Density–EVDF variance cross-covariance'
                             )
+                        if density_mu3_cross_81.strip():
+                            api_kwargs['projected_evdf_options']['electron_density_mu3_cross_covariance_s_minus3']=_parse_ts_scalar(
+                                density_mu3_cross_81,'Density–EVDF third-moment cross-covariance'
+                            )
                         if kinematics_81=='compton':
                             polarization_values=np.asarray([float(value.strip()) for value in polarization_81.split(',')],dtype=float)
                             if polarization_values.shape!=(3,) or not np.all(np.isfinite(polarization_values)):
@@ -4164,6 +4173,17 @@ elif page=='Advanced Analysis':
                             'Pressure uncertainty assumption':projected_moments_81.get('parallel_pressure_uncertainty_assumption'),
                             'Heat-flux scope':projected_moments_81.get('heat_flux_physical_scope'),
                         })
+                        joint_covariance_81=projected_moments_81.get('parallel_pressure_heat_flux_joint_covariance')
+                        if joint_covariance_81 is not None:
+                            st.markdown('**Joint covariance of projected pressure and parallel kinetic-energy flux**')
+                            st.caption('First-order joint covariance retaining supplied density–EVDF cross-covariances and Cov(σ²_q, μ₃,q). It is not the full 3-D heat-flux covariance.')
+                            st.json({
+                                'observable_order':projected_moments_81.get('parallel_pressure_heat_flux_joint_covariance_order'),
+                                'covariance':joint_covariance_81,
+                                'standard_uncertainty':projected_moments_81.get('parallel_pressure_heat_flux_joint_standard_uncertainty'),
+                                'moment_input_order':projected_moments_81.get('density_evdf_moment_joint_covariance_order'),
+                                'moment_input_covariance':projected_moments_81.get('density_evdf_moment_joint_covariance'),
+                            })
                     json_download('Export registered Thomson spectral-distribution result',api_result_81,'tis_thomson_spectral_distribution_analysis_81.json')
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
         if df is None:
@@ -4256,23 +4276,6 @@ elif page=='Advanced Analysis':
                         elif moment_validity:
                             st.info('Higher-order moments pass the declared boundary-mass screen; physical tail completeness is not thereby proven.')
                         st.json(evdf_moments)
-                        # Surface the joint pressure/parallel-energy-flux
-                        # uncertainty produced by the registered spectral
-                        # distribution inverse. This is not the full 3-D heat
-                        # flux and is shown only when density was supplied.
-                        spectral_inverse=(distribution or {}).get('projected_evdf_inference') or {}
-                        spectral_physical_moments=spectral_inverse.get('projected_evdf_physical_moments') or {}
-                        joint_covariance=spectral_physical_moments.get('parallel_pressure_heat_flux_joint_covariance')
-                        if joint_covariance is not None:
-                            st.markdown('**Joint covariance of projected pressure and parallel kinetic-energy flux**')
-                            st.caption('First-order joint covariance retaining supplied density–EVDF cross-covariances and the covariance between the second and third projected velocity moments. This is not the full 3-D heat-flux covariance.')
-                            st.json({
-                                'observable_order':spectral_physical_moments.get('parallel_pressure_heat_flux_joint_covariance_order'),
-                                'covariance':joint_covariance,
-                                'standard_uncertainty':spectral_physical_moments.get('parallel_pressure_heat_flux_joint_standard_uncertainty'),
-                                'moment_input_order':spectral_physical_moments.get('density_evdf_moment_joint_covariance_order'),
-                                'moment_input_covariance':spectral_physical_moments.get('density_evdf_moment_joint_covariance'),
-                            })
                         if evdf_status=='conditional_regularized_candidate':
                             st.warning('The displayed moments belong to a regularized candidate; they are not independently identified by the measured spectrum.')
                     else:

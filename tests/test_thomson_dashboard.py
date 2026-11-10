@@ -183,6 +183,8 @@ def test_dashboard_exposes_joint_projected_pressure_heat_flux_covariance():
     assert "parallel_pressure_heat_flux_joint_covariance" in source
     assert "density_evdf_moment_joint_covariance" in source
     assert "not the full 3-D heat-flux covariance" in source
+    assert "Cov(n_e, μ₃,q) density–third-moment cross-covariance" in source
+    assert "electron_density_mu3_cross_covariance_s_minus3" in source
 
 
 def test_dashboard_exposes_response_aware_evdf_spectral_closure():
