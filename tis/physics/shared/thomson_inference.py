@@ -3630,7 +3630,7 @@ def analyze_thomson_spectra(
     # channel, using the background nuisance term already fitted by the selected
     # physical forward model. This avoids a second, unrelated edge-background fit.
     from .thomson_distribution import analyze_thomson_spectral_distribution
-    from .thomson_evdf import reconstruct_thomson_evdf
+    from .thomson_evdf import reconstruct_thomson_evdf, _projected_evdf_forward_matrix
     if not isinstance(enable_evdf_reconstruction, (bool, np.bool_)):
         raise ValueError("enable_evdf_reconstruction must be boolean")
     if isinstance(evdf_velocity_points, (bool, np.bool_)) or not isinstance(evdf_velocity_points, (int, np.integer)) or not 41 <= evdf_velocity_points <= 2001:
@@ -3973,7 +3973,6 @@ def analyze_thomson_spectra(
                     },
                 }
         channel_result["electron_velocity_distribution"] = evdf
-        evdf_results.append(evdf)
         # Reuse the EVDF already reconstructed by the parent API and close its
         # first two velocity moments against the same-channel measured spectrum.
         # This avoids a duplicate inverse solve and keeps API/Dashboard output aligned.
@@ -3997,22 +3996,67 @@ def analyze_thomson_spectra(
                     variance_v = float(trapezoid((velocity_grid - mean_v)**2 * pdf, velocity_grid))
                     q = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
                     if float(np.max(np.abs(velocity_grid))) < 0.1 * C_M_S:
-                        predicted_center = float(laser_wavelength_nm) * (1.0 - q * mean_v / C_M_S)
-                        predicted_variance = (float(laser_wavelength_nm) * q / C_M_S)**2 * variance_v
-                        distribution["projected_evdf_spectral_moment_closure"] = {
-                            "status": "conditional_moment_closure",
-                            "formula": "lambda=lambda_0*(1-q*v_parallel/c), q=2*sin(theta/2)",
-                            "evdf_mean_velocity_parallel_m_s": mean_v,
-                            "evdf_variance_velocity_parallel_m2_s2": variance_v,
-                            "evdf_predicted_spectral_centroid_nm": predicted_center,
-                            "evdf_predicted_spectral_variance_nm2": predicted_variance,
-                            "measured_spectral_centroid_nm": float(distribution["spectral_centroid_nm"]),
-                            "measured_spectral_variance_nm2": float(distribution["observed_variance_nm2"]),
-                            "centroid_closure_residual_nm": float(distribution["spectral_centroid_nm"] - predicted_center),
-                            "variance_closure_residual_nm2": float(distribution["observed_variance_nm2"] - predicted_variance),
-                            "evdf_status": evdf["analysis_status"],
-                            "interpretation": "Conditional forward-moment consistency check; finite window, background, response and regularization must be considered. It does not convert Gaussian width into a definitive electron temperature.",
-                        }
+                        # Close the EVDF against the *measured spectral operator*.
+                        # The old moment-only shortcut mapped velocity variance
+                        # directly to wavelength variance and therefore omitted
+                        # broadening by the calibrated laser profile and detector
+                        # line-spread function.  Reapply the same finite-volume
+                        # Doppler operator and the composed response used by the
+                        # inverse before comparing spectral moments.
+                        wavelength_axis = np.asarray(xs[channel_index], dtype=float)
+                        forward_operator, forward_metadata = _projected_evdf_forward_matrix(
+                            wavelength_axis,
+                            velocity_grid,
+                            channel_responses[channel_index],
+                            float(laser_wavelength_nm),
+                            q,
+                        )
+                        predicted_spectrum = forward_operator @ pdf
+                        bin_edges = np.empty(wavelength_axis.size + 1, dtype=float)
+                        bin_edges[1:-1] = 0.5 * (wavelength_axis[:-1] + wavelength_axis[1:])
+                        bin_edges[0] = wavelength_axis[0] - 0.5 * (wavelength_axis[1] - wavelength_axis[0])
+                        bin_edges[-1] = wavelength_axis[-1] + 0.5 * (wavelength_axis[-1] - wavelength_axis[-2])
+                        bin_widths = np.diff(bin_edges)
+                        predicted_measure = predicted_spectrum * bin_widths
+                        predicted_area = float(np.sum(predicted_measure))
+                        if np.isfinite(predicted_area) and predicted_area > np.finfo(float).tiny:
+                            predicted_probability = predicted_measure / predicted_area
+                            predicted_center = float(np.sum(predicted_probability * wavelength_axis))
+                            predicted_centered = wavelength_axis - predicted_center
+                            predicted_variance = float(np.sum(predicted_probability * predicted_centered**2))
+                            predicted_skewness = float(
+                                np.sum(predicted_probability * predicted_centered**3)
+                                / predicted_variance**1.5
+                            ) if predicted_variance > 0.0 else np.nan
+                            predicted_excess_kurtosis = float(
+                                np.sum(predicted_probability * predicted_centered**4)
+                                / predicted_variance**2 - 3.0
+                            ) if predicted_variance > 0.0 else np.nan
+                            distribution["projected_evdf_spectral_moment_closure"] = {
+                                "status": "conditional_response_aware_moment_closure",
+                                "formula": "S_meas(lambda)=R_meas(lambda,lambda') integral f_q(v) K_Doppler(lambda'|v) dv; lambda'=lambda_0*(1-q*v_parallel/c)",
+                                "evdf_mean_velocity_parallel_m_s": mean_v,
+                                "evdf_variance_velocity_parallel_m2_s2": variance_v,
+                                "evdf_predicted_spectral_centroid_nm": predicted_center,
+                                "evdf_predicted_spectral_variance_nm2": predicted_variance,
+                                "evdf_predicted_spectral_skewness": predicted_skewness,
+                                "evdf_predicted_spectral_excess_kurtosis": predicted_excess_kurtosis,
+                                "measured_spectral_centroid_nm": float(distribution["spectral_centroid_nm"]),
+                                "measured_spectral_variance_nm2": float(distribution["observed_variance_nm2"]),
+                                "centroid_closure_residual_nm": float(distribution["spectral_centroid_nm"] - predicted_center),
+                                "variance_closure_residual_nm2": float(distribution["observed_variance_nm2"] - predicted_variance),
+                                "finite_window_captured_probability": predicted_area,
+                                "moments_conditioned_on_measured_wavelength_window": True,
+                                "measured_instrument_and_laser_response_applied": True,
+                                "response_operator_column_area_min": float(np.min(
+                                    forward_metadata["column_integrated_spectral_power_per_unit_evdf"]
+                                )),
+                                "response_operator_column_area_max": float(np.max(
+                                    forward_metadata["column_integrated_spectral_power_per_unit_evdf"]
+                                )),
+                                "evdf_status": evdf["analysis_status"],
+                                "interpretation": "The reconstructed projected EVDF is forward-mapped through the same finite-volume Doppler, incident-laser spectral and measured detector-response operators before spectral moments are compared. The closure remains conditional on the finite wavelength window, fitted background, supplied response and regularization; it does not identify a 3-D EVDF or convert Gaussian width into a definitive electron temperature.",
+                            }
         evdf_results.append(evdf)
     output["spectral_distribution"] = spectral_distribution_results
     output["electron_velocity_distribution"] = evdf_results

@@ -429,6 +429,27 @@ def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
     assert result["electron_temperature_profile_eV"][0] == pytest.approx(100.0, rel=0.05)
 
 
+def test_projected_evdf_spectral_closure_reapplies_measured_response_operator():
+    x, intrinsic, _ = _spectral_case(100.0)
+    response = _asymmetric_lsf(x.size)
+    measured = response @ (intrinsic - 25.0) + 25.0
+    result = analyze_thomson_spectra(
+        x, measured[None, :], [0.2], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=response,
+    )
+    closure = result["channels"][0]["spectral_distribution"].get(
+        "projected_evdf_spectral_moment_closure"
+    )
+    assert closure is not None
+    assert closure["status"] == "conditional_response_aware_moment_closure"
+    assert closure["measured_instrument_and_laser_response_applied"] is True
+    assert closure["moments_conditioned_on_measured_wavelength_window"] is True
+    assert np.isfinite(closure["evdf_predicted_spectral_centroid_nm"])
+    assert np.isfinite(closure["evdf_predicted_spectral_variance_nm2"])
+    assert closure["evdf_predicted_spectral_variance_nm2"] > 0.0
+    assert 0.0 < closure["finite_window_captured_probability"] <= 1.0 + 1e-8
+
+
 def test_instrument_response_uncertainty_is_monte_carlo_propagated():
     x,y,_=_spectral_case(100.0)
     response=np.eye(x.size)
