@@ -295,6 +295,92 @@ def _projected_evdf_physical_moments(
             else:
                 pressure_uncertainty_assumption = "first_order_independent_density_and_evdf_variance"
 
+    # Build the *joint* covariance of the independently supplied density and
+    # the two EVDF moments used by P_qq and q_q^(1D). Pairwise Cauchy bounds
+    # alone do not guarantee that a 3-variable covariance is positive
+    # semidefinite. The off-diagonal Cov(sigma_q^2, mu_3,q) is already present
+    # in the full EVDF moment covariance and must be retained.
+    projected_moment_joint_covariance = None
+    projected_output_joint_covariance = None
+    projected_output_joint_standard_uncertainty = None
+    projected_output_covariance_order = (
+        "parallel_projected_pressure_Pa",
+        "parallel_projected_heat_flux_W_m2",
+    )
+    if electron_density_m3 is not None and moment_covariance is not None:
+        variance_index = moment_order.index("velocity_parallel_variance_m2_s2")
+        mu3_index = moment_order.index("central_third_velocity_moment_m3_s3")
+        variance_variance = float(moment_covariance[variance_index, variance_index])
+        mu3_variance = float(moment_covariance[mu3_index, mu3_index])
+        variance_mu3_covariance = float(
+            moment_covariance[variance_index, mu3_index]
+        )
+        density_variance = float(electron_density_uncertainty_m3 or 0.0) ** 2
+        density_variance_cross = float(
+            electron_density_variance_cross_covariance_m_minus1_s_minus2 or 0.0
+        )
+        density_mu3_cross = float(
+            electron_density_mu3_cross_covariance_s_minus3 or 0.0
+        )
+        projected_moment_joint_covariance = np.array([
+            [density_variance, density_variance_cross, density_mu3_cross],
+            [density_variance_cross, variance_variance, variance_mu3_covariance],
+            [density_mu3_cross, variance_mu3_covariance, mu3_variance],
+        ], dtype=float)
+        projected_moment_joint_covariance = 0.5 * (
+            projected_moment_joint_covariance
+            + projected_moment_joint_covariance.T
+        )
+        joint_eigenvalues = np.linalg.eigvalsh(
+            projected_moment_joint_covariance
+        )
+        joint_scale = max(
+            float(np.max(np.abs(joint_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if float(joint_eigenvalues.min()) < -1.0e-10 * joint_scale:
+            raise ValueError(
+                "joint density/EVDF (variance, third-moment) covariance "
+                "must be positive semidefinite; pairwise covariance bounds "
+                "are not sufficient"
+            )
+        density_value = float(electron_density_m3)
+        output_jacobian = np.array([
+            [
+                electron_mass * variance,
+                electron_mass * density_value,
+                0.0,
+            ],
+            [
+                0.5 * electron_mass * mu3,
+                0.0,
+                0.5 * electron_mass * density_value,
+            ],
+        ], dtype=float)
+        projected_output_joint_covariance = (
+            output_jacobian
+            @ projected_moment_joint_covariance
+            @ output_jacobian.T
+        )
+        projected_output_joint_covariance = 0.5 * (
+            projected_output_joint_covariance
+            + projected_output_joint_covariance.T
+        )
+        output_eigenvalues = np.linalg.eigvalsh(
+            projected_output_joint_covariance
+        )
+        output_scale = max(
+            float(np.max(np.abs(output_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if float(output_eigenvalues.min()) < -1.0e-10 * output_scale:
+            raise ValueError(
+                "joint projected pressure/heat-flux covariance is not positive semidefinite"
+            )
+        projected_output_joint_standard_uncertainty = np.sqrt(
+            np.maximum(np.diag(projected_output_joint_covariance), 0.0)
+        )
+
     # Convert the inferred q-parallel velocity marginal into its cumulative
     # random kinetic-energy distribution. For E in eV,
     # v_E=sqrt(2 e E/m_e) and F_q(E)=integral[u_q-v_E,u_q+v_E] f_q(v) dv.
@@ -410,6 +496,20 @@ def _projected_evdf_physical_moments(
         "parallel_projected_pressure_Pa": projected_parallel_pressure,
         "parallel_projected_pressure_standard_uncertainty_Pa": projected_parallel_pressure_uncertainty,
         "parallel_pressure_uncertainty_assumption": pressure_uncertainty_assumption,
+        "parallel_pressure_heat_flux_joint_covariance": projected_output_joint_covariance,
+        "parallel_pressure_heat_flux_joint_covariance_order": list(projected_output_covariance_order),
+        "parallel_pressure_heat_flux_joint_standard_uncertainty": projected_output_joint_standard_uncertainty,
+        "density_evdf_moment_joint_covariance_order": (
+            "electron_density_m3",
+            "velocity_parallel_variance_m2_s2",
+            "central_third_velocity_moment_m3_s3",
+        ),
+        "density_evdf_moment_joint_covariance": projected_moment_joint_covariance,
+        "parallel_pressure_heat_flux_covariance_interpretation": (
+            "First-order joint delta-method covariance retaining Cov(n_e, sigma_q^2), "
+            "Cov(n_e, mu_3,q), and Cov(sigma_q^2, mu_3,q); density cross-covariances "
+            "not supplied by the caller are treated as zero, never inferred."
+        ),
         "parallel_pressure_density_input_m3": None if electron_density_m3 is None else float(electron_density_m3),
         "parallel_pressure_density_variance_cross_covariance_m_minus1_s_minus2": None if electron_density_variance_cross_covariance_m_minus1_s_minus2 is None else float(electron_density_variance_cross_covariance_m_minus1_s_minus2),
         "heat_flux_density_input_m3": (
@@ -440,6 +540,7 @@ def _projected_evdf_physical_moments(
             "directional_temperature": "T_eq,q[eV] = (m_e/e) sigma_q^2",
             "parallel_projected_pressure": "P_qq = m_e n_e sigma_q^2; independent density required; q-direction component only",
             "parallel_projected_pressure_variance": "Var(P_qq) = m_e^2 [n_e^2 Var(sigma_q^2) + sigma_q^4 Var(n_e) + 2 n_e sigma_q^2 Cov(n_e,sigma_q^2)]",
+            "joint_pressure_heat_flux_covariance": "Cov([P_qq,q_q^(1D)]) = J Cov([n_e,sigma_q^2,mu_3,q]) J^T; J = [[m_e sigma_q^2,m_e n_e,0],[m_e mu_3,q/2,0,m_e n_e/2]] with the final row interpreted over [n_e,sigma_q^2,mu_3,q]",
             "third_central": "mu_3,q = integral((v_q-u_q)^3 f_q(v_q) dv_q)",
             "fourth_central": "mu_4,q = integral((v_q-u_q)^4 f_q(v_q) dv_q)",
             "skewness": "gamma_1,q = mu_3,q/sigma_q^3",
