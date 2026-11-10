@@ -4076,6 +4076,11 @@ elif page=='Advanced Analysis':
                         'Independent electron-density 1σ uncertainty (m^-3; optional)',
                         value='',key='ts81_electron_density_uncertainty'
                     )
+                    density_variance_cross_81=st.text_input(
+                        'Cov(n_e, σ²_q) density–EVDF cross-covariance (m^-1 s^-2; optional)',
+                        value='',key='ts81_density_variance_cross_covariance',
+                        help='Supply only when this cross-covariance is independently characterized. It is checked against the joint density/EVDF covariance PSD bound.'
+                    )
                     polarization_81=st.text_input('Incident polarization x,y,z (required for Compton)',value='0,0,1',key='ts81_polarization')
                 if st.button('Run spectral-distribution API 81',type='primary',key='run_ts_spectral_distribution_api_81'):
                     try:
@@ -4114,6 +4119,10 @@ elif page=='Advanced Analysis':
                             api_kwargs['projected_evdf_options']['electron_density_uncertainty_m3']=_parse_ts_scalar(
                                 density_uncertainty_81,'Independent electron-density uncertainty',minimum=0.0
                             )
+                        if density_variance_cross_81.strip():
+                            api_kwargs['projected_evdf_options']['electron_density_variance_cross_covariance_m_minus1_s_minus2']=_parse_ts_scalar(
+                                density_variance_cross_81,'Density–EVDF variance cross-covariance'
+                            )
                         if kinematics_81=='compton':
                             polarization_values=np.asarray([float(value.strip()) for value in polarization_81.split(',')],dtype=float)
                             if polarization_values.shape!=(3,) or not np.all(np.isfinite(polarization_values)):
@@ -4139,6 +4148,9 @@ elif page=='Advanced Analysis':
                             'Third central q-parallel velocity moment (m^3/s^3)':projected_moments_81.get('central_third_velocity_moment_m3_s3'),
                             'Projected parallel heat flux per density (W m)':projected_moments_81.get('parallel_projected_heat_flux_per_density_W_m'),
                             'Projected parallel heat flux (W/m^2)':projected_moments_81.get('parallel_projected_heat_flux_W_m2'),
+                            'Projected q-direction electron pressure (Pa)':projected_moments_81.get('parallel_projected_pressure_Pa'),
+                            'Projected q-direction pressure 1σ uncertainty (Pa)':projected_moments_81.get('parallel_projected_pressure_standard_uncertainty_Pa'),
+                            'Pressure uncertainty assumption':projected_moments_81.get('parallel_pressure_uncertainty_assumption'),
                             'Heat-flux scope':projected_moments_81.get('heat_flux_physical_scope'),
                         })
                     json_download('Export registered Thomson spectral-distribution result',api_result_81,'tis_thomson_spectral_distribution_analysis_81.json')

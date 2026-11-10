@@ -353,3 +353,11 @@ def test_product_workspace_routes_spectral_distribution_outputs_by_analysis_id()
     assert "if selected_id == 81:" not in source
     assert "Projected EVDF physical inference" in source
 
+
+
+def test_registered_spectral_distribution_dashboard_exposes_projected_pressure_inputs_and_outputs():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "Cov(n_e, σ²_q) density–EVDF cross-covariance" in source
+    assert "electron_density_variance_cross_covariance_m_minus1_s_minus2" in source
+    assert "Projected q-direction electron pressure (Pa)" in source
+    assert "Projected q-direction pressure 1σ uncertainty (Pa)" in source
