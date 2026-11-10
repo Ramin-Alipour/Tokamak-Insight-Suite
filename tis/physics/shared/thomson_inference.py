@@ -3927,6 +3927,36 @@ def analyze_thomson_spectra(
                         ],
                     },
                 }
+        elif model in collective_models:
+            # A collective spectrum is the dielectric/Dynamic-Structure-Factor
+            # response, not a single-particle Doppler line integral. Feeding it
+            # to reconstruct_thomson_evdf would invert the wrong forward
+            # operator and produce a physically mislabeled projected EVDF.
+            # Until a joint dielectric-operator EVDF inverse is implemented,
+            # explicitly withhold this dependent result rather than fabricate
+            # a non-collective velocity marginal.
+            evdf = {
+                "analysis_status": "unavailable_model_mismatch",
+                "reason": (
+                    "The selected optical collective Thomson fit uses a kinetic "
+                    "dielectric/Dynamic-Structure-Factor forward model. The current "
+                    "projected-EVDF inverse uses a non-collective single-particle "
+                    "Doppler operator and is therefore not a valid inverse for this "
+                    "spectrum."
+                ),
+                "required_forward_model": (
+                    "collective_dielectric_response_with_species_resolved_susceptibilities"
+                ),
+                "identifiability": {
+                    "primary": [],
+                    "conditional": [
+                        "A projected electron EVDF requires an inverse that refits the collective dielectric response and its ion-species contributions."
+                    ],
+                    "non_identifiable": [
+                        "The electron EVDF from the non-collective Doppler inversion applied to a collective spectrum."
+                    ],
+                },
+            }
         else:
             try:
                 q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)

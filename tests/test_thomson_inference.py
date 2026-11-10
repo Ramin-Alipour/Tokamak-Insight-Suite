@@ -243,9 +243,12 @@ def test_collective_kappa_is_executable_through_canonical_optical_analysis():
         collective_kappa_initial=3.5,
         collective_kappa_bounds=[2.0, 6.0],
         collective_external_parameter_mc_samples=20,
-        enable_evdf_reconstruction=False,
+        enable_evdf_reconstruction=True,
     )
     channel = result["channels"][0]
+    projected_evdf = result["electron_velocity_distribution"][0]
+    assert projected_evdf["analysis_status"] == "unavailable_model_mismatch"
+    assert projected_evdf["required_forward_model"] == "collective_dielectric_response_with_species_resolved_susceptibilities"
     assert result["model"] == "collective_kappa"
     assert channel["optimizer_success"] is True
     assert channel["spectral_covariance_used"] is True

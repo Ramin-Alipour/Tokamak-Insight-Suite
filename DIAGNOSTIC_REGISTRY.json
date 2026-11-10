@@ -574,7 +574,7 @@
         {
           "name": "electron_velocity_distribution",
           "unit": "per-channel structured EVDF inference",
-          "description": "Per-channel normalized 1-D electron-velocity marginal along the scattering vector, attempted only for non-relativistic Maxwellian/Kappa optical fits; for relativistic Maxwell-Juttner the inverse is explicitly unavailable pending a matching relativistic inverse operator."
+          "description": "Per-channel projected EVDF only when the selected spectrum is compatible with the implemented inverse forward operator. The current non-collective Doppler inverse is explicitly withheld for collective dielectric/Dynamic-Structure-Factor spectra until a matching dielectric-operator inverse is available; no non-collective EVDF is inferred from collective data."
         },
         {
           "name": "parameter_identifiability",
