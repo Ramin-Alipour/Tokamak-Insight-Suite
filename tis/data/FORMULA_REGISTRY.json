@@ -12084,5 +12084,83 @@
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Thomson Spectral Distribution — relativistic projected EVDF moments"
     }
+  },
+  {
+    "name": "Projected q-direction electron pressure from a Thomson EVDF",
+    "equation": "P_qq = m_e n_e μ_2,parallel; μ_2,parallel = ∫(v_parallel-u_parallel)^2 f_parallel(v_parallel) dv_parallel; Var(P_qq)=m_e^2[n_e^2 Var(μ_2)+μ_2^2 Var(n_e)+2 n_e μ_2 Cov(n_e,μ_2)]",
+    "inputs": "Normalized response-aware q-parallel EVDF, independently measured/inferred electron density, optional density uncertainty and optional Cov(n_e, μ_2) cross-covariance",
+    "output": "One-dimensional q-direction electron pressure component P_qq [Pa] and first-order standard uncertainty when EVDF covariance is available",
+    "assumptions": "The pressure is the second central moment of the one-dimensional scattering-vector marginal. Density is external because normalized EVDF amplitude does not identify n_e. A single projection yields only P_qq, not the full three-dimensional pressure tensor or its trace.",
+    "status": "D",
+    "category": "Thomson spectral distribution",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+      "function_links": [
+        "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution"
+      ],
+      "formula_key": "thomson_projected_evdf_parallel_pressure",
+      "input_specs": [
+        {
+          "name": "projected_evdf_options.electron_density_m3",
+          "unit": "m^-3; independent measured/inferred density",
+          "required": true
+        },
+        {
+          "name": "projected_evdf_options.electron_density_uncertainty_m3",
+          "unit": "m^-3; optional 1-sigma",
+          "required": false
+        },
+        {
+          "name": "projected_evdf_options.electron_density_variance_cross_covariance_m_minus1_s_minus2",
+          "unit": "Cov(n_e, μ_2,parallel)",
+          "required": false
+        },
+        {
+          "name": "projected_evdf_options.velocity_grid_m_s",
+          "unit": "m s^-1; increasing q-parallel velocity grid",
+          "required": true
+        },
+        {
+          "name": "projected_evdf_options.regularization_strength",
+          "unit": "non-negative regularization parameter or null for GCV",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "parallel_projected_pressure_Pa",
+          "unit": "Pa"
+        },
+        {
+          "name": "parallel_projected_pressure_standard_uncertainty_Pa",
+          "unit": "Pa; when EVDF covariance is available"
+        },
+        {
+          "name": "parallel_pressure_uncertainty_assumption",
+          "unit": "text"
+        }
+      ],
+      "prerequisites": [
+        "A calibrated spectrum and measured instrument response for the projected EVDF inverse.",
+        "An independently measured/inferred positive electron density for absolute pressure.",
+        "EVDF covariance for a complete first-order uncertainty of the pressure."
+      ],
+      "algorithm": "Reconstruct normalized f_parallel(v) from the measured spectrum with the non-negative response-aware inverse. Compute μ_2,parallel=∫(v_parallel-u_parallel)^2 f_parallel(v_parallel) dv_parallel using the same nonuniform trapezoidal quadrature. Then P_qq=m_e n_e μ_2,parallel. Propagate Var(P_qq)=m_e^2[n_e^2 Var(μ_2)+μ_2^2 Var(n_e)+2n_e μ_2 Cov(n_e,μ_2)] using the normalized-EVDF moment Jacobian and only an explicitly supplied density/variance cross-covariance; check the joint covariance PSD bound.",
+      "uncertainty_model": "First-order delta-method propagation of EVDF covariance and independent density variance, with optional explicit density/variance cross-covariance. If no cross-covariance is supplied, independence is stated rather than inferred from data.",
+      "limitations": [
+        "Only the q-direction pressure component is identified; this is not the full 3-D pressure tensor or pressure trace.",
+        "Absolute pressure is withheld without independent positive density.",
+        "The non-relativistic m_e μ_2 relation is withheld for relativistic kinematics.",
+        "Experimental validation remains required."
+      ],
+      "test_links": [
+        "tests/test_thomson_projected_pressure.py::test_projected_parallel_pressure_uses_second_central_evdf_moment",
+        "tests/test_thomson_projected_pressure.py::test_projected_parallel_pressure_propagates_density_variance_cross_covariance",
+        "tests/test_thomson_projected_pressure.py::test_projected_parallel_pressure_rejects_cross_covariance_without_independent_density"
+      ],
+      "note": "Analytic synthetic-distribution and covariance-bound tests; no experimental validation is claimed."
+    }
   }
 ]
