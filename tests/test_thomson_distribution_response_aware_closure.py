@@ -42,9 +42,10 @@ def test_projected_evdf_moment_closure_includes_measured_response():
     inverse = result["projected_evdf_inference"]
     closure = inverse["spectral_moment_closure"]
     expected_primary = (
-        inverse.get("primary_result_status", "identified_from_measurement")
-        == "identified_from_measurement"
+        inverse.get("primary_result_status") == "identified_from_measurement"
     )
+    assert inverse["primary_result_status"] == "not_fully_identifiable_from_measured_spectrum"
+    assert "did not explicitly certify data identifiability" in inverse["primary_result_status_reason"]
     assert closure["status"] == (
         "identified_response_aware_moment_closure"
         if expected_primary else "conditional_response_aware_moment_closure"
