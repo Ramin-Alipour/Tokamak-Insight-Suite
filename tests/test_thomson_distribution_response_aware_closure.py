@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tis.products.thomson.physics.thomson_distribution import (
     _moment_statistics,
