@@ -126,4 +126,8 @@ def test_relativistic_spectral_distribution_withholds_nonrelativistic_temperatur
     assert moments["directional_equivalent_temperature_eV"] is None
     assert moments["parallel_projected_heat_flux_per_density_W_m"] is None
     assert moments["parallel_projected_heat_flux_W_m2"] is None
+    assert moments["parallel_pressure_heat_flux_joint_covariance"] is None
+    assert moments["parallel_pressure_heat_flux_joint_standard_uncertainty"] is None
+    assert moments["density_evdf_moment_joint_covariance"] is None
+    assert moments["parallel_pressure_heat_flux_covariance_status"] == "withheld_for_relativistic_kinematics"
     assert moments["nonrelativistic_heat_flux_validity"] == "withheld_for_relativistic_kinematics"

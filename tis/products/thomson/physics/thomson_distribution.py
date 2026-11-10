@@ -1939,6 +1939,17 @@ def analyze_thomson_spectral_distribution(
             moment_summary["parallel_projected_pressure_Pa"] = None
             moment_summary["parallel_projected_pressure_standard_uncertainty_Pa"] = None
             moment_summary["parallel_pressure_uncertainty_assumption"] = "withheld_for_relativistic_kinematics"
+            # The joint P_qq / q_q^(1D) covariance is derived from the
+            # non-relativistic closures P_qq=m_e*n_e*sigma_q^2 and
+            # q_q^(1D)=m_e*n_e*mu_3,q/2. Do not expose it for relativistic
+            # kinematics, where the exact lab-frame energy-flux moments use
+            # Lorentz energy and the non-relativistic closures are withheld.
+            moment_summary["parallel_pressure_heat_flux_joint_covariance"] = None
+            moment_summary["parallel_pressure_heat_flux_joint_standard_uncertainty"] = None
+            moment_summary["density_evdf_moment_joint_covariance"] = None
+            moment_summary["parallel_pressure_heat_flux_covariance_status"] = (
+                "withheld_for_relativistic_kinematics"
+            )
             moment_summary["heat_flux_physical_scope"] = (
                 "not_inferred; relativistic lab-frame energy flux is reported separately"
             )
