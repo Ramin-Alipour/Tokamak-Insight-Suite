@@ -177,6 +177,14 @@ def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     assert not app.exception, [str(error.value) for error in app.exception]
 
 
+def test_dashboard_exposes_response_aware_evdf_spectral_closure():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "evdf_predicted_response_aware_centroid_nm" in source
+    assert "evdf_predicted_response_aware_variance_nm2" in source
+    assert "evdf_finite_window_captured_probability" in source
+    assert "measured laser/detector response" in source
+
+
 def test_dashboard_source_renders_projected_evdf_profiles_and_uncertainty():
     source = APP_PATH.read_text(encoding="utf-8")
     assert "Projected electron velocity distribution (EVDF) from calibrated Thomson spectra" in source

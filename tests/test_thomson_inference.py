@@ -433,10 +433,14 @@ def test_projected_evdf_spectral_closure_reapplies_measured_response_operator():
     x, intrinsic, _ = _spectral_case(100.0)
     response = _asymmetric_lsf(x.size)
     measured = response @ (intrinsic - 25.0) + 25.0
-    result = analyze_thomson_spectra(
+    # Exercise the product API and product-owned registry, not only the
+    # legacy import facade used by older unit fixtures.
+    from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
+    result = product_analyze_spectra(
         x, measured[None, :], [0.2], laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi / 2, instrument_response=response,
     )
+    assert len(result["electron_velocity_distribution"]) == result["channel_count"] == 1
     closure = result["channels"][0]["spectral_distribution"].get(
         "projected_evdf_spectral_moment_closure"
     )
