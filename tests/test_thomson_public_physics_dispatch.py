@@ -43,6 +43,14 @@ def test_full_em_response_name_reaches_landau_fdt_constitutive_solver(monkeypatc
     assert result["public_physics_entrypoint"] == "landau_fdt_full_em_response"
 
 
+def test_spectral_distribution_entry_81_resolves_product_owned_physics_solver():
+    from tis.products.api import resolve_product_analysis
+
+    solver = resolve_product_analysis("thomson-scattering", 81)
+    assert solver.__module__ == "tis.products.thomson.physics.thomson_distribution"
+    assert solver.__name__ == "analyze_thomson_spectral_distribution"
+
+
 def test_path_averaged_thomson_density_is_reachable_through_public_dispatcher():
     path = np.linspace(0.0, 0.2, 21)
     result = physics.run_advanced_thomson_physics(

@@ -4256,6 +4256,23 @@ elif page=='Advanced Analysis':
                         elif moment_validity:
                             st.info('Higher-order moments pass the declared boundary-mass screen; physical tail completeness is not thereby proven.')
                         st.json(evdf_moments)
+                        # Surface the joint pressure/parallel-energy-flux
+                        # uncertainty produced by the registered spectral
+                        # distribution inverse. This is not the full 3-D heat
+                        # flux and is shown only when density was supplied.
+                        spectral_inverse=(distribution or {}).get('projected_evdf_inference') or {}
+                        spectral_physical_moments=spectral_inverse.get('projected_evdf_physical_moments') or {}
+                        joint_covariance=spectral_physical_moments.get('parallel_pressure_heat_flux_joint_covariance')
+                        if joint_covariance is not None:
+                            st.markdown('**Joint covariance of projected pressure and parallel kinetic-energy flux**')
+                            st.caption('First-order joint covariance retaining supplied density–EVDF cross-covariances and the covariance between the second and third projected velocity moments. This is not the full 3-D heat-flux covariance.')
+                            st.json({
+                                'observable_order':spectral_physical_moments.get('parallel_pressure_heat_flux_joint_covariance_order'),
+                                'covariance':joint_covariance,
+                                'standard_uncertainty':spectral_physical_moments.get('parallel_pressure_heat_flux_joint_standard_uncertainty'),
+                                'moment_input_order':spectral_physical_moments.get('density_evdf_moment_joint_covariance_order'),
+                                'moment_input_covariance':spectral_physical_moments.get('density_evdf_moment_joint_covariance'),
+                            })
                         if evdf_status=='conditional_regularized_candidate':
                             st.warning('The displayed moments belong to a regularized candidate; they are not independently identified by the measured spectrum.')
                     else:

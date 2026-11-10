@@ -53,8 +53,10 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     returned quantity is explicitly not the full 3-D electron heat flux.
     The same options expose P_qq = m_e n_e sigma_q^2, the q-direction
     pressure component, with optional density/EVDF-variance cross-covariance.
-    This is not the full 3-D pressure tensor and is withheld for relativistic
-    kinematics.
+    The physical-moment result also returns the joint first-order covariance
+    of (P_qq, q_q^(1D)), retaining Cov(sigma_q^2, mu_3,q) from the EVDF fit
+    and only caller-supplied density cross-covariances. This is not the full
+    3-D pressure tensor and is withheld for relativistic kinematics.
     """
     return _run(81, *args, **kwargs)
 

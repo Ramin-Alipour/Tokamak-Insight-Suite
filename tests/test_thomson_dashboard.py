@@ -177,6 +177,14 @@ def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     assert not app.exception, [str(error.value) for error in app.exception]
 
 
+def test_dashboard_exposes_joint_projected_pressure_heat_flux_covariance():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "Joint covariance of projected pressure and parallel kinetic-energy flux" in source
+    assert "parallel_pressure_heat_flux_joint_covariance" in source
+    assert "density_evdf_moment_joint_covariance" in source
+    assert "not the full 3-D heat-flux covariance" in source
+
+
 def test_dashboard_exposes_response_aware_evdf_spectral_closure():
     source = APP_PATH.read_text(encoding="utf-8")
     assert "evdf_predicted_response_aware_centroid_nm" in source
