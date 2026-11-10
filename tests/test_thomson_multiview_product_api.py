@@ -93,5 +93,5 @@ def test_registered_entry_and_product_api_contract_are_consistent():
 def test_physical_multiview_evdf_rejects_relativistic_velocity_grid():
     config, _ = _synthetic_multiview_case()
     config["velocity_grid_m_s"] = np.array([[0.0, 0.0, 0.0], [0.11 * 299792458.0, 0.0, 0.0]])
-    with pytest.raises(ValueError, match="max\(\|v\|\)/c < 0.1"):
+    with pytest.raises(ValueError, match=r"max\(\|v\|\)/c < 0.1"):
         reconstruct_nonrelativistic_3d_evdf(**config)
