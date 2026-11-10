@@ -9753,5 +9753,175 @@
       ],
       "function_link": "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"
     }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Optical Thomson physical multi-view 3-D EVDF reconstruction",
+    "quantities": "Normalized three-dimensional electron velocity distribution, 3-D mean flow, full velocity covariance/temperature tensor, third central velocity moments and classical heat-flux-per-density vector from measured multi-view optical Thomson spectra.",
+    "status": "D",
+    "method": "For view j and velocity voxel a, λ_ja=λ_L[1−2 sin(θ_j/2)(qhat_j·v_a)/c]. The unpolarized angular factor is (1+cos²θ_j)/2. Deposit each monochromatic line conservatively into finite wavelength bins, apply the measured per-view response to integrated bin power, and form S_j(λ_i)=g_j[(1+cos²θ_j)/2]Σ_a f_a K_jia ΔV_a. Solve the stacked non-negative Tikhonov inverse and propagate the fixed-active-set frequentist covariance. Report a primary EVDF and derived moments only when the unregularized data-only operator is full rank and adequately conditioned.",
+    "caveat": "Requires max(|v|)/c < 0.1; relativistic and Compton physics use the separate relativistic 3-D entry 85. Assumes unpolarized single-scattering optical Thomson response and known relative view gains. Absolute density is not inferred from the normalized EVDF. Regularization cannot recover velocity-space modes absent from the measured angular/spectral operator.",
+    "implementation_functions": [
+      "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf"
+    ],
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "physical_solver",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated bin centres",
+          "required": true
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral power density; view × wavelength",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "unit q-direction vector per view; shape (n_view,3)",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "Cartesian electron velocity grid; shape (n_voxel,3); |v|/c < 0.1",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; positive",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; scalar or one per view in (0,π)",
+          "required": true
+        },
+        {
+          "name": "view_gain",
+          "unit": "positive calibrated relative gain per view",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized wavelength response; common or per view",
+          "required": true
+        },
+        {
+          "name": "background_spectra",
+          "unit": "calibrated detector-space background; view × wavelength",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "positive velocity-space quadrature volume per voxel",
+          "required": true
+        },
+        {
+          "name": "regularization_matrix",
+          "unit": "L operator on non-negative velocity-space coefficients",
+          "required": true
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "positive Tikhonov strength",
+          "required": true
+        },
+        {
+          "name": "measurement_uncertainty",
+          "unit": "positive pointwise 1σ; view × wavelength",
+          "required": false
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full positive-definite stacked view-major covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "additive positive-semidefinite stacked view-major covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "additive positive-semidefinite stacked view-major covariance",
+          "required": false
+        },
+        {
+          "name": "max_iter",
+          "unit": "positive optimizer iteration limit",
+          "required": false,
+          "default": 3000
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "evdf_m3_s3",
+          "unit": "normalized 3-D EVDF; withheld unless data-only operator is full-rank and conditioned"
+        },
+        {
+          "name": "regularized_candidate_evdf_m3_s3",
+          "unit": "conditional non-negative 3-D EVDF candidate"
+        },
+        {
+          "name": "physical_spectral_kernels",
+          "unit": "per-view finite-bin Doppler and measured-response kernels"
+        },
+        {
+          "name": "temperature_tensor_eV",
+          "unit": "3-D central second-moment kinetic-temperature tensor; only when identifiable"
+        },
+        {
+          "name": "third_central_velocity_moment_tensor_m3_s3",
+          "unit": "3-D third central velocity-moment tensor; only when identifiable"
+        },
+        {
+          "name": "heat_flux_per_density_W_m",
+          "unit": "classical 3-D heat-flux vector per density; only within declared non-relativistic validity domain and when identifiable"
+        },
+        {
+          "name": "data_only_jacobian_rank",
+          "unit": "rank of stacked unregularized physical multi-view operator"
+        },
+        {
+          "name": "null_space_dimension",
+          "unit": "unidentified velocity-space degrees of freedom"
+        }
+      ],
+      "assumptions": [
+        "Single-scattering, unpolarized, non-relativistic optical Thomson shape inference.",
+        "Measured per-view response, relative gains, scattering directions and angles are explicit inputs.",
+        "The normalized 3-D EVDF is identifiable only if the stacked data-only physical operator has full column rank and condition number below 1e12."
+      ],
+      "algorithm": "For view j and velocity voxel a, λ_ja=λ_L[1−2 sin(θ_j/2)(qhat_j·v_a)/c]. The unpolarized angular factor is (1+cos²θ_j)/2. Deposit each monochromatic line conservatively into finite wavelength bins, apply the measured per-view response to integrated bin power, and form S_j(λ_i)=g_j[(1+cos²θ_j)/2]Σ_a f_a K_jia ΔV_a. Solve the stacked non-negative Tikhonov inverse and propagate the fixed-active-set frequentist covariance. Report a primary EVDF and derived moments only when the unregularized data-only operator is full rank and adequately conditioned.",
+      "uncertainty_model": "Stacked view-major measurement, model-discrepancy and systematic covariance are added as independent components when supplied; the solver uses their full covariance in GLS whitening and fixed-active-set sandwich covariance. No missing cross-covariance is invented.",
+      "limitations": [
+        "Requires max(|v|)/c < 0.1; relativistic and Compton physics use the separate relativistic 3-D entry 85.",
+        "Assumes unpolarized single-scattering optical Thomson response and known relative view gains.",
+        "Absolute density is not inferred from the normalized EVDF.",
+        "Regularization cannot recover velocity-space modes absent from the measured angular/spectral operator."
+      ],
+      "function_links": [
+        "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf"
+      ],
+      "formula_key": "thomson_nonrelativistic_physical_multiview_3d_evdf",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "input_data_level": "measured_calibrated_multi_view_optical_thomson_spectra",
+      "execution_scope": "calibrated_multi_view_spectra_to_nonrelativistic_3d_evdf",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson physical multi-view 3-D EVDF reconstruction",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_multiview_product_api.py::test_registered_physical_multiview_evdf_recovers_synthetic_distribution",
+        "tests/test_thomson_multiview_product_api.py::test_registered_entry_and_product_api_contract_are_consistent"
+      ]
+    },
+    "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf",
+    "function_links": [
+      "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf"
+    ]
   }
 ]
