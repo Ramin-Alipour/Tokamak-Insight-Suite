@@ -9917,7 +9917,8 @@
       "test_links": [
         "tests/test_thomson_multiview_product_api.py::test_registered_physical_multiview_evdf_recovers_synthetic_distribution",
         "tests/test_thomson_multiview_product_api.py::test_registered_entry_and_product_api_contract_are_consistent"
-      ]
+      ],
+      "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf"
     },
     "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf",
     "function_links": [
