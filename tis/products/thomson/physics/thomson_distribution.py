@@ -1772,7 +1772,25 @@ def analyze_thomson_spectral_distribution(
             moment_covariance_source = inverse.get("projected_evdf_covariance") if evdf_primary_identified else None
         else:
             projected_pdf = inverse.get("evdf_parallel_s_per_m")
-            evdf_primary_identified = inverse.get("primary_result_status", "identified_from_measurement") == "identified_from_measurement"
+            # A regularized inverse is not promoted to a data-identified
+            # distribution merely because the solver omitted an explicit
+            # primary-result declaration. Fail closed: only a solver that
+            # certifies measurement identifiability can produce primary
+            # physical moments.
+            evdf_primary_identified = (
+                inverse.get("primary_result_status") == "identified_from_measurement"
+            )
+            if not evdf_primary_identified:
+                inverse.setdefault(
+                    "primary_result_status",
+                    "not_fully_identifiable_from_measured_spectrum",
+                )
+                inverse.setdefault(
+                    "primary_result_status_reason",
+                    "The inverse solver did not explicitly certify data identifiability; "
+                    "the regularized projected EVDF and its moments remain conditional "
+                    "on the selected velocity grid, response, background and regularization.",
+                )
             moment_covariance_source = inverse.get("evdf_covariance_including_geometry")
             if moment_covariance_source is None:
                 moment_covariance_source = inverse.get("evdf_covariance")
