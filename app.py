@@ -1861,6 +1861,11 @@ elif page=='Spectral Analysis':
                                 'Skewness equation':(evdf.get('central_velocity_moment_equations') or {}).get('skewness'),
                                 'Excess-kurtosis equation':(evdf.get('central_velocity_moment_equations') or {}).get('excess_kurtosis'),
                             }
+                            moment_validity=evdf.get('higher_order_moment_validity',{})
+                            if moment_validity and not moment_validity.get('quantitative_reporting_allowed',False):
+                                st.error('Higher-order projected-EVDF moments are finite-window diagnostics only: the velocity grid may truncate the tails. Do not interpret third/fourth moments, skewness, excess kurtosis or projected kinetic-energy flux quantitatively.')
+                            elif moment_validity:
+                                st.info('Higher-order projected-EVDF moments pass the declared boundary-mass screen; this is necessary but does not prove the physical tail is negligible.')
                             st.markdown('**Dimensional projected EVDF moments**')
                             st.json(physical_moments)
                             heat_flux=evdf.get('heat_flux_identifiability',{})
@@ -4240,6 +4245,11 @@ elif page=='Advanced Analysis':
                             'moment_standard_uncertainty':projected_evdf.get('velocity_moment_standard_uncertainty_including_geometry') or projected_evdf.get('velocity_moment_standard_uncertainty'),
                             'heat_flux_identifiability':projected_evdf.get('heat_flux_identifiability'),
                         }
+                        moment_validity=projected_evdf.get('higher_order_moment_validity',{})
+                        if moment_validity and not moment_validity.get('quantitative_reporting_allowed',False):
+                            st.error('Higher-order projected-EVDF moments are finite-window diagnostics only because the finite velocity grid may truncate the tails.')
+                        elif moment_validity:
+                            st.info('Higher-order moments pass the declared boundary-mass screen; physical tail completeness is not thereby proven.')
                         st.json(evdf_moments)
                         if evdf_status=='conditional_regularized_candidate':
                             st.warning('The displayed moments belong to a regularized candidate; they are not independently identified by the measured spectrum.')
