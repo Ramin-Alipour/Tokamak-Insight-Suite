@@ -4216,6 +4216,11 @@ elif page=='Advanced Analysis':
                         st.success('Spectral-distribution diagnostics and physical parameters are available from the same calibrated measured spectrum.')
                         st.markdown('**Physical parameters from the canonical Thomson fit**')
                         st.json(physical)
+                    kappa_moments=channel_result.get('projected_evdf_moment_closure')
+                    if kappa_moments:
+                        st.markdown('**Analytic projected-Kappa EVDF moments**')
+                        st.caption('These are moments of the q-parallel marginal. Divergent moments are withheld according to the fitted Kappa index; zero skewness follows from the symmetric equilibrium model.')
+                        st.json(kappa_moments)
                     else:
                         st.warning('The canonical fit did not return identifiable electron temperature and scattering-vector flow for this channel; spectral-distribution descriptors remain separate from physical-parameter extraction.')
                     conditional_physics=distribution.get('physical_inference') or {}
