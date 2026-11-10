@@ -12073,7 +12073,8 @@
       "test_links": [
         "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_energy_flux_uses_exact_lorentz_energy",
         "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_moments_covariance_matches_finite_difference",
-        "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_moments_reject_superluminal_grid"
+        "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_projected_moments_reject_superluminal_grid",
+        "tests/test_thomson_relativistic_projected_moments.py::test_relativistic_spectral_distribution_withholds_nonrelativistic_temperature_and_heat_flux"
       ],
       "note": "Synthetic numerical verification of the exact Lorentz-energy relation and analytic covariance propagation; no experimental validation is claimed.",
       "raw_data_to_physics": false,
