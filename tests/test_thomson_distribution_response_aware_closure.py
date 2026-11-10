@@ -1,6 +1,6 @@
 import numpy as np
 
-from tokamak_analysis.thomson_distribution import (
+from tis.products.thomson.physics.thomson_distribution import (
     _moment_statistics,
     analyze_thomson_spectral_distribution,
 )
@@ -39,7 +39,19 @@ def test_projected_evdf_moment_closure_includes_measured_response():
 
     inverse = result["projected_evdf_inference"]
     closure = inverse["spectral_moment_closure"]
-    assert closure["status"] == "conditional_response_aware_moment_closure"
+    expected_primary = (
+        inverse.get("primary_result_status", "identified_from_measurement")
+        == "identified_from_measurement"
+    )
+    assert closure["status"] == (
+        "identified_response_aware_moment_closure"
+        if expected_primary else "conditional_response_aware_moment_closure"
+    )
+    assert closure["closure_is_primary"] is expected_primary
+    assert closure["primary_result_status"] == (
+        "identified_from_measurement"
+        if expected_primary else "not_fully_identifiable_from_measured_spectrum"
+    )
     assert closure["instrument_response_in_closure"] is True
     assert closure["background_model_shared_with_measured_moments"] is True
 
