@@ -55,3 +55,34 @@ def test_projected_parallel_pressure_marks_unsupplied_density_uncertainty_as_exa
     assert result["parallel_pressure_uncertainty_assumption"] == (
         "evdf_variance_only_density_uncertainty_not_supplied"
     )
+
+
+def test_projected_pressure_is_exposed_through_specialist_product_api():
+    from tis.products.thomson.api import analyze_spectral_distribution
+
+    wavelength = np.linspace(520.0, 544.0, 241)
+    background = np.full_like(wavelength, 0.02)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 1.0) ** 2) + background
+    result = analyze_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        signal_uncertainty=np.full_like(wavelength, 1.0e-3),
+        projected_evdf_options={
+            "velocity_limit_m_s": 1.0e6,
+            "velocity_points": 81,
+            "regularization_strength": 1.0e-3,
+            "electron_density_m3": 2.0e19,
+            "electron_density_uncertainty_m3": 1.0e18,
+            "electron_density_variance_cross_covariance_m_minus1_s_minus2": 0.0,
+        },
+    )
+    moments = result["projected_evdf_inference"]["projected_evdf_physical_moments"]
+    assert moments["parallel_projected_pressure_Pa"] > 0.0
+    assert np.isfinite(moments["parallel_projected_pressure_standard_uncertainty_Pa"])
+    assert moments["parallel_pressure_uncertainty_assumption"] == (
+        "first_order_independent_density_and_evdf_variance"
+    )
