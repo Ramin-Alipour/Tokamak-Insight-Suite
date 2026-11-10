@@ -9503,7 +9503,12 @@
         "tests/test_thomson_dashboard.py::test_registered_spectral_distribution_dashboard_exposes_projected_heat_flux_density",
         "tests/test_thomson_distribution.py::test_projected_heat_flux_propagates_density_evdf_cross_covariance",
         "tests/test_thomson_distribution.py::test_projected_heat_flux_rejects_non_psd_density_evdf_cross_covariance",
-        "tests/test_thomson_distribution.py::test_correlated_projected_heat_flux_relation_is_registered_in_both_formula_catalogues"
+        "tests/test_thomson_distribution.py::test_correlated_projected_heat_flux_relation_is_registered_in_both_formula_catalogues",
+        "tests/test_thomson_projected_pressure.py::test_projected_parallel_pressure_uses_second_central_evdf_moment",
+        "tests/test_thomson_projected_pressure.py::test_projected_parallel_pressure_propagates_density_variance_cross_covariance",
+        "tests/test_thomson_projected_pressure.py::test_projected_parallel_pressure_rejects_cross_covariance_without_independent_density",
+        "tests/test_thomson_dashboard.py::test_registered_spectral_distribution_dashboard_exposes_projected_pressure_inputs_and_outputs",
+        "tests/test_thomson_dashboard.py::test_product_workspace_routes_spectral_distribution_outputs_by_analysis_id"
       ],
       "input_data_level": "measured_calibrated_spectrum",
       "implementation_status": "undefined The absolute projected-flux uncertainty now accepts an explicit Cov(n_e,mu_3,parallel) term and propagates the correlated product variance; invalid joint density/EVDF covariance is rejected."
