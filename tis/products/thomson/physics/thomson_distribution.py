@@ -426,6 +426,83 @@ def _projected_evdf_physical_moments(
 
 
 
+def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
+    """Return exact 1-D relativistic lab-frame kinetic moments of a projected EVDF.
+
+    The probability measure is the supplied normalized q-parallel marginal.
+    This deliberately reports lab-frame kinetic-energy flux, not comoving
+    heat flux: a single projected marginal does not determine the full
+    relativistic 3-D heat-flux four-vector.
+    """
+    velocity = np.asarray(velocity_m_s, dtype=float)
+    density = np.asarray(probability_density_s_per_m, dtype=float)
+    c_light = 299792458.0
+    electron_mass = 9.1093837139e-31
+    if (velocity.ndim != 1 or density.shape != velocity.shape or velocity.size < 3
+            or not np.all(np.isfinite(velocity)) or not np.all(np.isfinite(density))
+            or np.any(np.diff(velocity) <= 0.0) or np.any(density < 0.0)):
+        raise ValueError("relativistic projected moments require matching finite non-negative density and increasing velocity vectors")
+    if np.any(np.abs(velocity) >= c_light):
+        raise ValueError("relativistic projected EVDF velocities must satisfy |v| < c")
+    intervals = np.diff(velocity)
+    weights = np.empty_like(velocity)
+    weights[0] = 0.5 * intervals[0]
+    weights[-1] = 0.5 * intervals[-1]
+    weights[1:-1] = 0.5 * (intervals[:-1] + intervals[1:])
+    normalization = float(weights @ density)
+    if not np.isfinite(normalization) or normalization <= np.finfo(float).tiny:
+        raise ValueError("relativistic projected EVDF has no positive finite probability integral")
+    probability = weights * density / normalization
+    beta = velocity / c_light
+    gamma = 1.0 / np.sqrt(1.0 - beta**2)
+    kinetic_energy_j = (gamma - 1.0) * electron_mass * c_light**2
+    observables = np.vstack((velocity, kinetic_energy_j, kinetic_energy_j * velocity))
+    means = observables @ probability
+    covariance_out = None
+    uncertainty_out = None
+    if covariance is not None:
+        cov = np.asarray(covariance, dtype=float)
+        if cov.shape != (velocity.size, velocity.size) or not np.all(np.isfinite(cov)):
+            raise ValueError("relativistic projected EVDF covariance must be finite and square on the velocity grid")
+        scale = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+        if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12 * scale):
+            raise ValueError("relativistic projected EVDF covariance must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(cov)
+        if float(eigenvalues.min()) < -1e-10 * max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny):
+            raise ValueError("relativistic projected EVDF covariance must be positive semidefinite")
+        jacobian = (observables - means[:, None]) * (weights / normalization)[None, :]
+        covariance_out = jacobian @ cov @ jacobian.T
+        covariance_out = 0.5 * (covariance_out + covariance_out.T)
+        if not np.all(np.isfinite(covariance_out)):
+            raise ValueError("relativistic projected physical-moment covariance is not finite")
+        uncertainty_out = np.sqrt(np.maximum(np.diag(covariance_out), 0.0))
+    return {
+        "status": "relativistic_lab_frame_moments_with_covariance" if covariance is not None else "relativistic_lab_frame_moments_only",
+        "frame": "laboratory",
+        "distribution_scope": "one_dimensional_q_parallel_velocity_marginal",
+        "mean_velocity_parallel_m_s": float(means[0]),
+        "mean_kinetic_energy_eV": float(means[1] / 1.602176634e-19),
+        "mean_lorentz_factor": float(1.0 + means[1] / (electron_mass * c_light**2)),
+        "kinetic_energy_flux_per_density_W_m": float(means[2]),
+        "moment_order": ["mean_velocity_parallel_m_s", "mean_kinetic_energy_J", "kinetic_energy_flux_per_density_W_m"],
+        "moment_covariance": covariance_out,
+        "moment_standard_uncertainty": (
+            None if uncertainty_out is None else {
+                "mean_velocity_parallel_m_s": float(uncertainty_out[0]),
+                "mean_kinetic_energy_J": float(uncertainty_out[1]),
+                "kinetic_energy_flux_per_density_W_m": float(uncertainty_out[2]),
+            }
+        ),
+        "kinetic_energy_definition": "E_k=(gamma-1)*m_e*c^2; gamma=(1-v_parallel^2/c^2)^(-1/2)",
+        "flux_definition": "n_e*integral(E_k*v_parallel*f_q(v_parallel)dv_parallel); absolute flux requires independent n_e",
+        "heat_flux_status": "not_inferred_from_single_projected_marginal",
+        "limitations": [
+            "This is the exact relativistic laboratory-frame kinetic-energy flux of the measured q-parallel marginal, not the comoving heat flux.",
+            "A single projected marginal does not identify perpendicular energy, the full 3-D EVDF, or the relativistic heat-flux four-vector.",
+        ],
+    }
+
+
 def infer_projected_parallel_heat_flux(
     velocity_m_s,
     probability_density_s_per_m,
@@ -1667,6 +1744,26 @@ def analyze_thomson_spectral_distribution(
                 heat_flux_density_mu3_cross_covariance
             ),
         )
+        if use_relativistic_inverse:
+            # Do not interpret the non-relativistic variance/heat-flux closure
+            # as relativistic thermodynamics. Add exact lab-frame kinetic
+            # moments and explicitly withhold the non-relativistic heat flux.
+            moment_summary["relativistic_lab_frame_moments"] = (
+                _projected_evdf_relativistic_lab_moments(
+                    velocity_grid, projected_pdf, moment_covariance_source
+                )
+            )
+            moment_summary["nonrelativistic_temperature_validity"] = (
+                "outside_declared_nonrelativistic_closure"
+            )
+            moment_summary["nonrelativistic_heat_flux_validity"] = (
+                "withheld_for_relativistic_kinematics"
+            )
+            moment_summary["parallel_projected_heat_flux_W_m2"] = None
+            moment_summary["parallel_projected_heat_flux_standard_uncertainty_W_m2"] = None
+            moment_summary["heat_flux_physical_scope"] = (
+                "not_inferred; relativistic lab-frame energy flux is reported separately"
+            )
         moment_summary["status"] = (
             "identified_from_measurement" if evdf_primary_identified
             else "conditional_regularized_candidate_not_primary"
