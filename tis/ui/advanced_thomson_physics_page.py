@@ -1254,7 +1254,15 @@ def render_advanced_thomson_physics_page(st) -> None:
             if not isinstance(parsed, dict):
                 raise ValueError("The solver configuration must be a JSON object.")
             config = decode_complex_json(parsed)
-            if model == "thomson_relativistic_3d_evdf":
+            if model == "thomson_multiview_3d_evdf_physical":
+                # Use the registered Thomson product API entry 88, not a parallel dispatcher.
+                from tis.products.thomson.api import reconstruct_nonrelativistic_3d_evdf
+                result = reconstruct_nonrelativistic_3d_evdf(**config)
+                result = dict(result)
+                result["dashboard_execution_path"] = (
+                    "tis.products.thomson.api.reconstruct_nonrelativistic_3d_evdf -> analysis_id_88"
+                )
+            elif model == "thomson_relativistic_3d_evdf":
                 # Use the registered Thomson product API entry 85, not a parallel dispatcher.
                 from tis.products.thomson.api import reconstruct_relativistic_evdf
                 result = reconstruct_relativistic_evdf(**config)
