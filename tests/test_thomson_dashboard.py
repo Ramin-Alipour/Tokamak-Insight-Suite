@@ -345,3 +345,11 @@ def test_registered_spectral_distribution_dashboard_exposes_projected_heat_flux_
     assert "'electron_density_uncertainty_m3'" in source
     assert "not the full 3-D heat flux" in source
     assert "Projected parallel heat flux (W/m^2)" in source
+
+
+def test_product_workspace_routes_spectral_distribution_outputs_by_analysis_id():
+    source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "product_workspace_page.py").read_text(encoding="utf-8")
+    assert "if selected_id == 1 and selected_analysis_id == 81:" in source
+    assert "if selected_id == 81:" not in source
+    assert "Projected EVDF physical inference" in source
+

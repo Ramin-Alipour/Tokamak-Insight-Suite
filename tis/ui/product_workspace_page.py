@@ -150,7 +150,7 @@ def render_product_workspace_page(st: Any) -> None:
                 f"Workflow {selected_analysis_id} completed through "
                 f"{product['product_id']} public API."
             )
-            if selected_id == 81:
+            if selected_id == 1 and selected_analysis_id == 81:
                 st.markdown("### Projected EVDF physical inference")
                 projected = result.get("projected_evdf_inference")
                 if projected is None:

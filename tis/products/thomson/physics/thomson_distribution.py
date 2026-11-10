@@ -55,6 +55,7 @@ def _projected_evdf_physical_moments(
     velocity_m_s, probability_density_s_per_m, covariance=None, *,
     electron_density_m3=None, electron_density_uncertainty_m3=None,
     electron_density_mu3_cross_covariance_s_minus3=None,
+    electron_density_variance_cross_covariance_m_minus1_s_minus2=None,
 ):
     """Return physical moments of a normalized q-parallel EVDF and their covariance.
 
@@ -257,6 +258,38 @@ def _projected_evdf_physical_moments(
                 raise ValueError("joint density/EVDF covariance produced a negative heat-flux variance")
             projected_heat_flux_uncertainty = float(np.sqrt(max(heat_flux_variance, 0.0)))
 
+    # P_qq is the second central moment of the q-parallel marginal, not a 3-D pressure trace.
+    projected_parallel_pressure = None
+    projected_parallel_pressure_uncertainty = None
+    pressure_uncertainty_assumption = "unavailable_without_evdf_covariance"
+    if electron_density_variance_cross_covariance_m_minus1_s_minus2 is not None:
+        if electron_density_m3 is None:
+            raise ValueError("electron_density_variance_cross_covariance_m_minus1_s_minus2 requires an independently supplied electron_density_m3")
+        if electron_density_uncertainty_m3 is None or covariance is None:
+            raise ValueError("density/variance cross-covariance requires electron_density_uncertainty_m3 and EVDF covariance")
+        cross_pressure = electron_density_variance_cross_covariance_m_minus1_s_minus2
+        if (isinstance(cross_pressure, (bool, np.bool_)) or not isinstance(cross_pressure, (int, float, np.integer, np.floating)) or not np.isfinite(cross_pressure)):
+            raise ValueError("electron_density_variance_cross_covariance_m_minus1_s_minus2 must be a finite real scalar")
+    else:
+        cross_pressure = 0.0
+    if electron_density_m3 is not None:
+        density_value = float(electron_density_m3)
+        density_uncertainty = float(electron_density_uncertainty_m3 or 0.0)
+        projected_parallel_pressure = electron_mass * density_value * variance
+        variance_index = moment_order.index("velocity_parallel_variance_m2_s2")
+        variance_variance = float(moment_covariance[variance_index, variance_index]) if moment_covariance is not None else None
+        if variance_variance is not None:
+            cross_limit = np.sqrt(max(density_uncertainty**2 * variance_variance, 0.0))
+            cross_scale = max(cross_limit, abs(float(cross_pressure)), np.finfo(float).tiny)
+            if abs(float(cross_pressure)) > cross_limit + 1.0e-10 * cross_scale:
+                raise ValueError("electron-density/EVDF-variance cross-covariance violates the joint covariance PSD bound")
+            pressure_variance = electron_mass**2 * (density_value**2 * variance_variance + variance**2 * density_uncertainty**2 + 2.0 * density_value * variance * float(cross_pressure))
+            pressure_scale = electron_mass**2 * max(density_value**2 * variance_variance + variance**2 * density_uncertainty**2 + 2.0 * abs(density_value * variance * float(cross_pressure)), np.finfo(float).tiny)
+            if pressure_variance < -1.0e-10 * pressure_scale:
+                raise ValueError("joint density/EVDF covariance produced a negative projected-pressure variance")
+            projected_parallel_pressure_uncertainty = float(np.sqrt(max(pressure_variance, 0.0)))
+            pressure_uncertainty_assumption = "joint_density_evdf_variance_covariance" if cross_pressure != 0.0 else "first_order_independent_density_and_evdf_variance"
+
     # Convert the inferred q-parallel velocity marginal into its cumulative
     # random kinetic-energy distribution. For E in eV,
     # v_E=sqrt(2 e E/m_e) and F_q(E)=integral[u_q-v_E,u_q+v_E] f_q(v) dv.
@@ -369,6 +402,11 @@ def _projected_evdf_physical_moments(
             None if projected_heat_flux is None else float(projected_heat_flux)
         ),
         "parallel_projected_heat_flux_standard_uncertainty_W_m2": projected_heat_flux_uncertainty,
+        "parallel_projected_pressure_Pa": projected_parallel_pressure,
+        "parallel_projected_pressure_standard_uncertainty_Pa": projected_parallel_pressure_uncertainty,
+        "parallel_pressure_uncertainty_assumption": pressure_uncertainty_assumption,
+        "parallel_pressure_density_input_m3": None if electron_density_m3 is None else float(electron_density_m3),
+        "parallel_pressure_density_variance_cross_covariance_m_minus1_s_minus2": None if electron_density_variance_cross_covariance_m_minus1_s_minus2 is None else float(electron_density_variance_cross_covariance_m_minus1_s_minus2),
         "heat_flux_density_input_m3": (
             None if electron_density_m3 is None else float(electron_density_m3)
         ),
@@ -395,6 +433,8 @@ def _projected_evdf_physical_moments(
             "mean": "u_q = integral(v_q f_q(v_q) dv_q)",
             "variance": "sigma_q^2 = integral((v_q-u_q)^2 f_q(v_q) dv_q)",
             "directional_temperature": "T_eq,q[eV] = (m_e/e) sigma_q^2",
+            "parallel_projected_pressure": "P_qq = m_e n_e sigma_q^2; independent density required; q-direction component only",
+            "parallel_projected_pressure_variance": "Var(P_qq) = m_e^2 [n_e^2 Var(sigma_q^2) + sigma_q^4 Var(n_e) + 2 n_e sigma_q^2 Cov(n_e,sigma_q^2)]",
             "third_central": "mu_3,q = integral((v_q-u_q)^3 f_q(v_q) dv_q)",
             "fourth_central": "mu_4,q = integral((v_q-u_q)^4 f_q(v_q) dv_q)",
             "skewness": "gamma_1,q = mu_3,q/sigma_q^3",
@@ -1586,6 +1626,9 @@ def analyze_thomson_spectral_distribution(
         heat_flux_density_mu3_cross_covariance = options.pop(
             "electron_density_mu3_cross_covariance_s_minus3", None
         )
+        heat_flux_density_variance_cross_covariance = options.pop(
+            "electron_density_variance_cross_covariance_m_minus1_s_minus2", None
+        )
         if heat_flux_density is not None and (
             isinstance(heat_flux_density, (bool, np.bool_))
             or not isinstance(heat_flux_density, (int, float, np.integer, np.floating))
@@ -1743,6 +1786,9 @@ def analyze_thomson_spectral_distribution(
             electron_density_mu3_cross_covariance_s_minus3=(
                 heat_flux_density_mu3_cross_covariance
             ),
+            electron_density_variance_cross_covariance_m_minus1_s_minus2=(
+                heat_flux_density_variance_cross_covariance
+            ),
         )
         if use_relativistic_inverse:
             # Do not interpret the non-relativistic variance/heat-flux closure
@@ -1766,6 +1812,9 @@ def analyze_thomson_spectral_distribution(
             moment_summary["parallel_projected_heat_flux_per_density_standard_uncertainty_W_m"] = None
             moment_summary["parallel_projected_heat_flux_W_m2"] = None
             moment_summary["parallel_projected_heat_flux_standard_uncertainty_W_m2"] = None
+            moment_summary["parallel_projected_pressure_Pa"] = None
+            moment_summary["parallel_projected_pressure_standard_uncertainty_Pa"] = None
+            moment_summary["parallel_pressure_uncertainty_assumption"] = "withheld_for_relativistic_kinematics"
             moment_summary["heat_flux_physical_scope"] = (
                 "not_inferred; relativistic lab-frame energy flux is reported separately"
             )
