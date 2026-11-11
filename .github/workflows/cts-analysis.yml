@@ -65,7 +65,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: >-
-          python -m pytest -q
+          python -m pytest -q -x --tb=short
           tests/test_cts_*.py
           tests/test_ece_*.py
           tests/test_thomson_*.py

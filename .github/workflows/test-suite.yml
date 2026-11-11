@@ -39,4 +39,4 @@ jobs:
       - name: Install Chromium for real-browser tests
         run: python -m playwright install --with-deps chromium
       - name: Run complete test suite, including real-browser ECE workflow
-        run: python -m pytest -q
+        run: python -m pytest -q -x --tb=short
