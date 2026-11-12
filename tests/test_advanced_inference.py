@@ -128,9 +128,11 @@ def test_free_free_and_ece_radiative_transfer():
         nu, [0.1, 0.2], [1000., 1200.], electron_density_m3=[2e19, 2e19],
         ion_densities_m3=[[1e19], [1e19]], ion_charge_states=[1],
         ece_absorption_coefficient_m_inverse=np.full((2, 5), 0.01),
+        ece_lte=True,
     )
     assert result["spectral_radiance_W_m2_sr_Hz"].shape == nu.shape
     assert np.all(result["ece_optical_depth"] > 0)
+    assert result["ece_source_model"] == "explicit_LTE_Planck_source_function"
 
 
 

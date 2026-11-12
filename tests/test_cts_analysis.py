@@ -256,7 +256,7 @@ def test_cts_maxwellian_fast_ion_requires_explicit_temperature_initial_estimate(
             electron_temperature_initial_eV=1200.0,ion_temperature_initial_eV=800.0,
             ion_velocity_initial_m_s=0.0,
             fast_ion={"kind":"maxwellian","species_index":0,"fraction_initial":0.1},
-            global_search=False,
+            global_search=False, inversion_method="local_least_squares",
         )
 
 
