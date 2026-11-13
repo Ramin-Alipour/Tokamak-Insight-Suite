@@ -125,6 +125,16 @@ MODEL_LABELS["landau_fdt_full_em_response"] = "Full-EM CTS — conserving Landau
 MODEL_LABELS["landau_fdt_full_em_field_fluctuations"] = "Full-EM CTS — Maxwell propagation of Landau–FDT electric and magnetic fluctuations"
 
 MODEL_PHYSICS_NOTES = {
+    "thomson_poisson_count_fit": (
+        "Finite-bin count-space optical Thomson inference. The forward model integrates the "
+        "Maxwellian wavelength probability over detector bins, applies the calibrated response "
+        "matrix to expected counts, and adds a non-negative detector-space linear background. "
+        "The independent-Poisson deviance is minimized; uncertainty uses the expected Fisher "
+        "matrix I_ab = sum_i (1/mu_i)(d mu_i/d p_a)(d mu_i/d p_b), with rank and conditioning "
+        "gates. Geometry covariance and fitted-center/geometry cross-covariance propagate "
+        "through C_(Te,vq)=J C_input J^T. Counts alone do not determine absolute density or "
+        "scattered power in watts."
+    ),
     "kappa_bgk_electrostatic_susceptibility": (
         "Linearized number-conserving BGK response: chi_BGK=chi_L(omega+i nu)/[1-nu J0/(i k)], "
         "where J0 is the full-tail Kappa marginal integral of f0(v)/(v-(omega+i nu)/k). "
