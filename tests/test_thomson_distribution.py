@@ -2270,3 +2270,71 @@ def test_relativistic_projected_moment_covariance_matches_normalized_functional_
     assert uncertainty["mean_lorentz_factor"] == pytest.approx(
         uncertainty["mean_kinetic_energy_J"] / (9.1093837139e-31 * c**2)
     )
+
+
+
+def test_relativistic_projected_lab_energy_flux_uses_only_explicit_density_and_joint_uncertainty():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_relativistic_lab_moments,
+    )
+
+    c = 299792458.0
+    velocity = c * np.array([-0.18, -0.09, 0.02, 0.11, 0.2])
+    density = np.array([0.08, 0.55, 1.0, 0.62, 0.12])
+    factor = np.diag([2e-5, 3e-5, 2e-5, 3e-5, 2e-5])
+    evdf_covariance = factor @ factor.T
+    without_density = _projected_evdf_relativistic_lab_moments(
+        velocity, density, evdf_covariance
+    )
+    assert without_density["kinetic_energy_flux_W_m2"] is None
+
+    ne = 2.4e19
+    dne = 1.2e18
+    independent = _projected_evdf_relativistic_lab_moments(
+        velocity, density, evdf_covariance,
+        electron_density_m3=ne,
+        electron_density_uncertainty_m3=dne,
+    )
+    flux_per_density = independent["kinetic_energy_flux_per_density_W_m"]
+    variance_per_density = independent["moment_covariance"][2, 2]
+    expected_flux = ne * flux_per_density
+    expected_variance = ne**2 * variance_per_density + flux_per_density**2 * dne**2
+    assert independent["kinetic_energy_flux_W_m2"] == pytest.approx(expected_flux)
+    assert independent["kinetic_energy_flux_standard_uncertainty_W_m2"] == pytest.approx(
+        np.sqrt(expected_variance)
+    )
+
+    cross = 0.25 * np.sqrt(dne**2 * variance_per_density)
+    correlated = _projected_evdf_relativistic_lab_moments(
+        velocity, density, evdf_covariance,
+        electron_density_m3=ne,
+        electron_density_uncertainty_m3=dne,
+        electron_density_flux_per_density_cross_covariance_W_m2=cross,
+    )
+    correlated_variance = (
+        ne**2 * variance_per_density
+        + flux_per_density**2 * dne**2
+        + 2.0 * ne * flux_per_density * cross
+    )
+    assert correlated["kinetic_energy_flux_standard_uncertainty_W_m2"] == pytest.approx(
+        np.sqrt(correlated_variance)
+    )
+    assert correlated["kinetic_energy_flux_uncertainty_assumption"] == (
+        "joint_density_evdf_flux_covariance"
+    )
+
+
+def test_relativistic_projected_lab_flux_rejects_density_cross_covariance_without_joint_inputs():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_relativistic_lab_moments,
+    )
+
+    c = 299792458.0
+    velocity = c * np.linspace(-0.2, 0.2, 5)
+    density = np.array([0.1, 0.6, 1.0, 0.6, 0.1])
+    with pytest.raises(ValueError, match="requires EVDF covariance"):
+        _projected_evdf_relativistic_lab_moments(
+            velocity, density,
+            electron_density_m3=1e19,
+            electron_density_flux_per_density_cross_covariance_W_m2=0.0,
+        )
