@@ -1973,3 +1973,29 @@ def test_maxwellian_physical_covariance_preserves_center_width_correlation():
         physical_covariance[0, 1] /
         np.sqrt(physical_covariance[0, 0] * physical_covariance[1, 1])
     )
+
+
+
+def test_product_api_exposes_maxwellian_identifiability_and_physical_covariance():
+    from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
+
+    wavelength, measured, _ = _spectral_case(100.0, n=401)
+    result = product_analyze_spectra(
+        wavelength,
+        measured[None, :],
+        np.array([0.15]),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        model="non_collective_maxwellian",
+    )
+    channel = result["channels"][0]
+    assert result["analysis_id"] == 1
+    assert channel["identifiability"]["status"] in {
+        "locally_identified", "weakly_identified", "ill_conditioned"
+    }
+    assert channel["identifiability"]["whitened_jacobian_rank"] == channel["identifiability"]["fitted_parameter_count"]
+    assert np.asarray(channel["physical_parameter_covariance_fit_only"]).shape == (2, 2)
+    assert channel["physical_parameter_covariance_order"] == [
+        "electron_temperature_eV", "electron_velocity_projection_m_s"
+    ]
