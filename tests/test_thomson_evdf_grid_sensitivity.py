@@ -1,5 +1,6 @@
 """Physics checks for projected Thomson EVDF velocity-grid truncation diagnostics."""
 import numpy as np
+import pytest
 
 from tis.products.thomson.physics.thomson_distribution import (
     _projected_evdf_grid_truncation_sensitivity,
@@ -14,6 +15,7 @@ def test_symmetric_maxwellian_like_evdf_has_small_edge_mass_and_zero_skewness():
 
     assert result["status"] == "computed_one_edge_cell_truncation_sensitivity"
     assert result["boundary_interval_probability_fraction"] < 1.0e-5
+    assert result["boundary_interval_bounds_m_s"] == [[-5.0e6, -4.975e6], [4.975e6, 5.0e6]]
     assert result["boundary_node_density_fraction_of_peak"] < 1.0e-5
     assert abs(result["full_grid_moments"]["mean_velocity_parallel_m_s"]) < 1.0e-7
     assert abs(result["full_grid_moments"]["skewness"]) < 1.0e-10
@@ -40,5 +42,3 @@ def test_grid_truncation_diagnostic_rejects_invalid_velocity_grid():
             [0.0, 1.0, 2.0, 3.0], [0.0, 1.0, 1.0, 0.0]
         )
 
-
-import pytest
