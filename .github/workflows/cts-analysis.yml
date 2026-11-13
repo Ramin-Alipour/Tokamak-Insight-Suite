@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "tokamak_analysis/**"
+      - "tis/products/thomson/**"
       - "tis/contracts.py"
       - "tis/data/ANALYSIS_FAMILIES.json"
       - "tis/data/DIAGNOSTIC_REGISTRY.json"
@@ -23,6 +24,7 @@ on:
   pull_request:
     paths:
       - "tokamak_analysis/**"
+      - "tis/products/thomson/**"
       - "tis/contracts.py"
       - "tis/data/ANALYSIS_FAMILIES.json"
       - "tis/data/DIAGNOSTIC_REGISTRY.json"
