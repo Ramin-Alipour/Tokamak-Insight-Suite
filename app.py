@@ -5623,7 +5623,11 @@ elif page=='Advanced Analysis':
                                     {
                                         'Quantity': label,
                                         'Value': relativistic_moments.get(key),
-                                        '1σ uncertainty': relativistic_uncertainty.get(key),
+                                        '1σ uncertainty': (
+                                            relativistic_moments.get('kinetic_energy_flux_standard_uncertainty_W_m2')
+                                            if key == 'kinetic_energy_flux_W_m2'
+                                            else relativistic_uncertainty.get(key)
+                                        ),
                                         'Unit': unit,
                                     }
                                     for label, key, unit in relativistic_rows
