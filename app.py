@@ -5355,6 +5355,44 @@ elif page=='Advanced Analysis':
                                 'One-dimensional marginal along the scattering vector only. '
                                 'This is not an unrestricted 3-D EVDF and does not identify absolute density.'
                             )
+                        evdf_fit_key = (
+                            'fitted_scattered_spectrum'
+                            if 'fitted_scattered_spectrum' in evdf_result else 'fitted_spectrum'
+                        )
+                        evdf_scattered_fit = evdf_result.get(evdf_fit_key)
+                        measured_background = result.get('background')
+                        if evdf_scattered_fit is not None and measured_background is not None:
+                            evdf_scattered_fit = np.asarray(evdf_scattered_fit, dtype=float)
+                            measured_background = np.asarray(measured_background, dtype=float)
+                            if (evdf_scattered_fit.shape == np.asarray(result.get('signal')).shape
+                                    and measured_background.shape == evdf_scattered_fit.shape):
+                                evdf_total_fit = evdf_scattered_fit + measured_background
+                                evdf_measured = np.asarray(result['signal'], dtype=float)
+                                if np.all(np.isfinite(evdf_total_fit)):
+                                    evdf_fit_frame = pd.DataFrame({
+                                        'Measured spectrum': evdf_measured,
+                                        'EVDF forward fit + supplied background': evdf_total_fit,
+                                    }, index=np.asarray(result['wavelength_nm'], dtype=float))
+                                    evdf_fit_frame.index.name = 'Wavelength (nm)'
+                                    st.markdown('**Projected-EVDF forward fit in measured wavelength space**')
+                                    st.line_chart(evdf_fit_frame)
+                                    st.markdown('**Projected-EVDF measured-space residual**')
+                                    st.line_chart(pd.Series(
+                                        evdf_measured - evdf_total_fit,
+                                        index=evdf_fit_frame.index,
+                                        name='Measured − EVDF forward fit',
+                                    ))
+                        closure = evdf_result.get('spectral_moment_closure')
+                        if isinstance(closure, dict):
+                            st.markdown('**Spectral-moment closure of the projected EVDF**')
+                            st.json({
+                                'status': closure.get('status'),
+                                'comparison_performed': closure.get('comparison_performed'),
+                                'centroid_closure_residual_nm': closure.get('centroid_closure_residual_nm'),
+                                'variance_closure_residual_nm2': closure.get('variance_closure_residual_nm2'),
+                                'instrument_response_in_closure': closure.get('instrument_response_in_closure'),
+                                'background_model_shared_with_measured_moments': closure.get('background_model_shared_with_measured_moments'),
+                            })
                         physical_moments = evdf_result.get('projected_evdf_physical_moments')
                         if isinstance(physical_moments, dict):
                             st.markdown('**Physical moments of the projected EVDF**')
@@ -5436,8 +5474,14 @@ elif page=='Advanced Analysis':
                                 probability = np.asarray(energy_cdf.get('cumulative_probability', []), dtype=float)
                                 if energy_axis.ndim == 1 and energy_axis.size and probability.shape == energy_axis.shape:
                                     st.markdown('**Cumulative projected parallel random-energy distribution**')
+                                    cdf_uncertainty = energy_cdf.get('cumulative_probability_standard_uncertainty')
+                                    cdf_columns = {'Cumulative probability': probability}
+                                    if cdf_uncertainty is not None:
+                                        cdf_uncertainty = np.asarray(cdf_uncertainty, dtype=float)
+                                        if cdf_uncertainty.shape == probability.shape:
+                                            cdf_columns['Cumulative probability 1σ'] = cdf_uncertainty
                                     st.line_chart(pd.DataFrame(
-                                        {'Cumulative probability': probability},
+                                        cdf_columns,
                                         index=pd.Index(energy_axis, name='Parallel random energy (eV)'),
                                     ))
                             moment_covariance = physical_moments.get('moment_covariance')
