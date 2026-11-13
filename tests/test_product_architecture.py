@@ -417,3 +417,38 @@ def test_thomson_public_api_exports_all_dashboard_capabilities():
         if name == "PRODUCT_ID":
             continue
         assert callable(getattr(api, name))
+
+
+
+def test_analysis_one_reports_product_owned_canonical_entry_point(monkeypatch):
+    from importlib import import_module
+    from tis.products.thomson.physics import thomson_workflow
+
+    shared_inference = import_module("tis.physics.shared.thomson_inference")
+    monkeypatch.setattr(
+        shared_inference,
+        "analyze_thomson_spectra",
+        lambda *args, **kwargs: {"solver": "shared-kernel"},
+    )
+    shared_result = thomson_workflow.analyze_thomson_spectra(
+        [526.0, 527.0, 528.0], [[1.0, 2.0, 1.0]]
+    )
+    expected_entry_point = (
+        "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra"
+    )
+    assert shared_result["analysis_id"] == 1
+    assert shared_result["canonical_entry_point"] == expected_entry_point
+
+    full_physics = import_module("tis.products.thomson.physics.cts_full_physics")
+    monkeypatch.setattr(
+        full_physics,
+        "run_advanced_thomson_physics",
+        lambda *args, **kwargs: {"solver": "advanced-kernel"},
+    )
+    advanced_result = thomson_workflow.analyze_thomson_spectra(
+        [526.0, 527.0, 528.0],
+        [[1.0, 2.0, 1.0], [1.5, 2.5, 1.5]],
+        model="gyrotropic_bi_maxwellian",
+    )
+    assert advanced_result["analysis_id"] == 1
+    assert advanced_result["canonical_entry_point"] == expected_entry_point
