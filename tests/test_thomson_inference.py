@@ -2069,3 +2069,73 @@ def test_joint_gls_uses_finite_bin_gaussian_forward_model_on_nonuniform_grid():
         == "joint channel-major GLS with shared cross-channel spectral covariance"
         for channel in result["channels"]
     )
+
+
+def test_poisson_optical_thomson_recovers_temperature_flow_and_joint_geometry_covariance():
+    from tis.physics.shared.thomson_inference import fit_optical_thomson_poisson_counts
+    from tis.products.thomson.api import fit_optical_thomson_poisson_counts as product_poisson_fit
+
+    rng = np.random.default_rng(20261113)
+    wavelength = np.linspace(528.0, 536.0, 401)
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    laser = 532.0
+    angle = np.pi / 2.0
+    true_te = 120.0
+    true_flow = 5.0e4
+    q = 2.0 * np.sin(angle / 2.0)
+    center = laser * (1.0 - q * true_flow / 299792458.0)
+    sigma = laser * q * np.sqrt(true_te / 510998.95069)
+    from scipy.special import ndtr
+    probability = np.diff(ndtr((edges - center) / sigma))
+    widths = np.diff(edges)
+    expected = 8.0e5 * probability + (180.0 + 20.0 * (wavelength - wavelength.mean())) * widths
+    counts = rng.poisson(expected)
+
+    result = fit_optical_thomson_poisson_counts(
+        wavelength, counts,
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        laser_wavelength_uncertainty_nm=0.01,
+        scattering_angle_uncertainty_rad=0.001,
+        laser_angle_covariance_nm_rad=2.0e-6,
+    )
+    assert result["likelihood"] == "independent_Poisson"
+    assert result["electron_temperature_eV"] == pytest.approx(true_te, rel=0.08)
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(true_flow, abs=1.5e4)
+    assert result["identifiability"]["status"] in {"locally_identified", "weakly_identified"}
+    assert result["identifiability"]["whitened_jacobian_rank"] == 5
+    assert result["physical_parameter_covariance"].shape == (2, 2)
+    assert np.linalg.eigvalsh(result["physical_parameter_covariance"]).min() >= -1e-10
+    assert result["electron_temperature_uncertainty_eV"] > 0.0
+    assert result["electron_velocity_projection_uncertainty_m_s"] > 0.0
+    assert result["density_inference_available"] is False
+    assert result["poisson_deviance"] >= 0.0
+
+    routed = product_poisson_fit(
+        wavelength, counts,
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+    )
+    assert routed["analysis_id"] == 1
+    assert routed["analysis_model"] == "noncollective_maxwellian_independent_Poisson"
+
+
+def test_poisson_optical_thomson_rejects_inconsistent_joint_geometry_covariance():
+    from tis.physics.shared.thomson_inference import fit_optical_thomson_poisson_counts
+
+    wavelength = np.linspace(528.0, 536.0, 101)
+    counts = np.rint(1000.0 * np.exp(-0.5 * ((wavelength - 532.0) / 0.5) ** 2) + 10.0).astype(int)
+    with pytest.raises(ValueError, match="geometry covariance must be positive semidefinite"):
+        fit_optical_thomson_poisson_counts(
+            wavelength, counts,
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            laser_wavelength_uncertainty_nm=0.01,
+            scattering_angle_uncertainty_rad=0.001,
+            laser_angle_covariance_nm_rad=1.0,
+        )
