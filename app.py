@@ -5425,6 +5425,11 @@ elif page=='Advanced Analysis':
                                     'Pqq = me ne σq²; q(1D) = (me ne / 2) μ3,q. '
                                     'These are q-direction quantities only, not the complete 3-D heat flux.'
                                 )
+                            else:
+                                st.info(
+                                    'Absolute projected pressure and kinetic-energy flux are withheld '
+                                    'because independent density and/or EVDF covariance inputs were not supplied.'
+                                )
                             energy_cdf = physical_moments.get('projected_parallel_kinetic_energy_cdf_eV')
                             if isinstance(energy_cdf, dict):
                                 energy_axis = np.asarray(energy_cdf.get('energy_grid_eV', []), dtype=float)
