@@ -1612,19 +1612,33 @@ elif page=='Spectral Analysis':
                 if result.get('validity_screening'):
                     st.markdown('**Selected-model validity screening**')
                     st.json(result['validity_screening'])
-                channel_identifiability_rows = [
-                    {
-                        'channel_index': channel.get('channel_index'),
-                        'radius_m': channel.get('radius_m'),
-                        'status': (channel.get('identifiability') or {}).get('status'),
-                        'whitened_jacobian_rank': (channel.get('identifiability') or {}).get('whitened_jacobian_rank'),
-                        'fitted_parameter_count': (channel.get('identifiability') or {}).get('fitted_parameter_count'),
-                        'condition_number': (channel.get('identifiability') or {}).get('whitened_jacobian_condition_number'),
-                        'Te_vq_correlation': channel.get('physical_parameter_correlation_fit_only'),
-                    }
-                    for channel in result.get('channels', [])
-                    if channel.get('identifiability')
-                ]
+                channel_identifiability_rows = []
+                for channel in result.get('channels', []):
+                    diagnostic = (
+                        channel.get('identifiability')
+                        or channel.get('kappa_index_identifiability')
+                        or {}
+                    )
+                    if diagnostic:
+                        channel_identifiability_rows.append({
+                            'channel_index': channel.get('channel_index'),
+                            'radius_m': channel.get('radius_m'),
+                            'status': diagnostic.get('status'),
+                            'whitened_jacobian_rank': diagnostic.get(
+                                'whitened_jacobian_rank', diagnostic.get('jacobian_rank')
+                            ),
+                            'fitted_parameter_count': diagnostic.get(
+                                'fitted_parameter_count', diagnostic.get('parameter_count')
+                            ),
+                            'condition_number': diagnostic.get(
+                                'whitened_jacobian_condition_number',
+                                diagnostic.get('normalized_jacobian_condition_number')
+                            ),
+                            'physical_covariance_status': channel.get(
+                                'physical_parameter_covariance_status', 'fit covariance available'
+                            ),
+                            'Te_vq_correlation': channel.get('physical_parameter_correlation_fit_only'),
+                        })
                 if channel_identifiability_rows:
                     st.markdown('**Maxwellian likelihood identifiability and physical covariance**')
                     st.caption(
