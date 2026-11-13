@@ -2338,3 +2338,34 @@ def test_relativistic_projected_lab_flux_rejects_density_cross_covariance_withou
             electron_density_m3=1e19,
             electron_density_flux_per_density_cross_covariance_W_m2=0.0,
         )
+
+
+
+def test_analysis_81_registry_and_formula_registry_expose_relativistic_lab_flux_contract():
+    from pathlib import Path
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    entry = get_analysis(81)
+    contract = entry["execution_contract"]
+    projected_spec = next(
+        item for item in contract["input_specs"]
+        if item["name"] == "projected_evdf_options"
+    )
+    assert "electron_density_flux_per_density_cross_covariance_W_m2" in projected_spec["description"]
+    output_names = {item["name"] for item in contract["output_specs"]}
+    assert "relativistic_lab_frame_moments" in output_names
+    assert "kinetic_energy_flux_W_m2" in output_names
+    assert "kinetic_energy_flux_standard_uncertainty_W_m2" in output_names
+
+    formula_registry = json.loads(
+        (Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    formula = next(
+        item for item in formula_registry
+        if item.get("execution_contract", {}).get("formula_key")
+        == "thomson_relativistic_projected_lab_energy_flux"
+    )
+    assert formula["execution_contract"]["implementation_link_status"] == "mapped"
+    assert formula["execution_contract"]["test_links"]
