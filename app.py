@@ -5447,16 +5447,18 @@ elif page=='Advanced Analysis':
                                     pcol.metric(
                                         'Projected pressure Pqq',
                                         f"{float(pressure):.5g} Pa",
-                                        None if pressure_sigma is None else f"± {float(pressure_sigma):.3g} Pa",
                                     )
+                                    if pressure_sigma is not None:
+                                        pcol.caption(f"1σ uncertainty: {float(pressure_sigma):.3g} Pa")
                                 else:
                                     pcol.info('Pqq withheld: independent electron density and/or EVDF covariance not supplied.')
                                 if heat_flux is not None:
                                     qcol.metric(
                                         'Projected kinetic-energy flux q(1D)',
                                         f"{float(heat_flux):.5g} W/m²",
-                                        None if heat_flux_sigma is None else f"± {float(heat_flux_sigma):.3g} W/m²",
                                     )
+                                    if heat_flux_sigma is not None:
+                                        qcol.caption(f"1σ uncertainty: {float(heat_flux_sigma):.3g} W/m²")
                                 else:
                                     qcol.info('Absolute projected flux withheld: independent electron density not supplied.')
                                 st.caption(
@@ -5464,10 +5466,18 @@ elif page=='Advanced Analysis':
                                     'These are q-direction quantities only, not the complete 3-D heat flux.'
                                 )
                             else:
-                                st.info(
-                                    'Absolute projected pressure and kinetic-energy flux are withheld '
-                                    'because independent density and/or EVDF covariance inputs were not supplied.'
-                                )
+                                if evdf_result.get('kinematic_model') in {
+                                    'exact_relativistic_thomson', 'exact_relativistic_compton'
+                                }:
+                                    st.info(
+                                        'Non-relativistic Pqq and q(1D) closures are withheld for relativistic kinematics; '
+                                        'the exact relativistic lab-frame moments are reported separately.'
+                                    )
+                                else:
+                                    st.info(
+                                        'Absolute projected pressure and kinetic-energy flux are withheld '
+                                        'because independent density and/or EVDF covariance inputs were not supplied.'
+                                    )
                             energy_cdf = physical_moments.get('projected_parallel_kinetic_energy_cdf_eV')
                             if isinstance(energy_cdf, dict):
                                 energy_axis = np.asarray(energy_cdf.get('energy_grid_eV', []), dtype=float)
