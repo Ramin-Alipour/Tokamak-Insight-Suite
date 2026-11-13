@@ -53,6 +53,10 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     returned quantity is explicitly not the full 3-D electron heat flux.
     The same options expose P_qq = m_e n_e sigma_q^2, the q-direction
     pressure component, with optional density/EVDF-variance cross-covariance.
+    For relativistic kinematics, the same independent density also enables
+    absolute laboratory-frame projected kinetic-energy flux; supply
+    electron_density_flux_per_density_cross_covariance_W_m2 when its
+    covariance with the EVDF flux-per-density estimate is known.
     The physical-moment result also returns exact piecewise-linear EVDF
     moments through fourth order, their full first-order covariance, a separate
     one-edge-cell velocity-grid truncation sensitivity diagnostic (not folded
