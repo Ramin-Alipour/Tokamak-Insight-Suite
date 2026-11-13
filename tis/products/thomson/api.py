@@ -147,6 +147,7 @@ __all__ = [
     "reconstruct_relativistic_evdf",
     "compare_temperature_tensor_models",
     "infer_path_averaged_density",
+    "reconstruct_nonrelativistic_3d_evdf",
     "fit_optical_thomson_poisson_counts",
     "fit_two_population_relativistic_spectrum",
     "fit_n_population_relativistic_spectrum",
