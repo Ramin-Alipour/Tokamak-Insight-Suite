@@ -54,8 +54,10 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     The same options expose P_qq = m_e n_e sigma_q^2, the q-direction
     pressure component, with optional density/EVDF-variance cross-covariance.
     The physical-moment result also returns exact piecewise-linear EVDF
-    moments through fourth order, their full first-order covariance, and the
-    cumulative q-parallel random-energy distribution with covariance. With an
+    moments through fourth order, their full first-order covariance, a separate
+    one-edge-cell velocity-grid truncation sensitivity diagnostic (not folded
+    into statistical uncertainty), and the cumulative q-parallel random-energy
+    distribution with covariance. With an
     independent density and uncertainty, it returns P_qq and q_q^(1D) plus
     their joint covariance, retaining Cov(sigma_q^2, mu_3,q) and only
     caller-supplied density cross-covariances. These are one-dimensional
