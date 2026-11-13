@@ -5355,6 +5355,96 @@ elif page=='Advanced Analysis':
                                 'One-dimensional marginal along the scattering vector only. '
                                 'This is not an unrestricted 3-D EVDF and does not identify absolute density.'
                             )
+                        physical_moments = evdf_result.get('projected_evdf_physical_moments')
+                        if isinstance(physical_moments, dict):
+                            st.markdown('**Physical moments of the projected EVDF**')
+                            st.caption(
+                                'All velocity moments below refer to the one-dimensional marginal '
+                                'parallel to q. They are not wavelength-space moments and do not '
+                                'constitute a full 3-D pressure tensor or heat flux.'
+                            )
+                            moment_rows = [
+                                ('Mean q-parallel velocity', 'mean_velocity_parallel_m_s', 'm/s'),
+                                ('q-parallel velocity variance', 'velocity_parallel_variance_m2_s2', 'm²/s²'),
+                                ('q-parallel velocity standard deviation', 'velocity_parallel_standard_deviation_m_s', 'm/s'),
+                                ('Directional-equivalent temperature', 'directional_equivalent_temperature_eV', 'eV'),
+                                ('Third central velocity moment', 'central_third_velocity_moment_m3_s3', 'm³/s³'),
+                                ('Fourth central velocity moment', 'central_fourth_velocity_moment_m4_s4', 'm⁴/s⁴'),
+                                ('Velocity skewness', 'skewness', '1'),
+                                ('Velocity excess kurtosis', 'excess_kurtosis', '1'),
+                            ]
+                            moment_table = []
+                            standard_uncertainty = physical_moments.get('moment_standard_uncertainty') or {}
+                            for label, key, unit in moment_rows:
+                                value = physical_moments.get(key)
+                                if value is not None:
+                                    uncertainty_key = key
+                                    uncertainty_value = standard_uncertainty.get(uncertainty_key)
+                                    moment_table.append({
+                                        'Physical quantity': label,
+                                        'Value': float(value),
+                                        '1σ uncertainty': (
+                                            None if uncertainty_value is None else float(uncertainty_value)
+                                        ),
+                                        'Unit': unit,
+                                    })
+                            if moment_table:
+                                st.dataframe(pd.DataFrame(moment_table), width='stretch', hide_index=True)
+                            st.caption(
+                                f"EVDF moment status: {physical_moments.get('status', 'not declared')}; "
+                                f"primary-result status: {physical_moments.get('primary_result_status', 'not declared')}."
+                            )
+                            if physical_moments.get('moment_candidate_used'):
+                                st.warning(
+                                    'These moments describe a regularized conditional candidate; '
+                                    'the inverse did not establish full data identifiability.'
+                                )
+                            pressure = physical_moments.get('parallel_projected_pressure_Pa')
+                            pressure_sigma = physical_moments.get('parallel_projected_pressure_standard_uncertainty_Pa')
+                            heat_flux = physical_moments.get('parallel_projected_heat_flux_W_m2')
+                            heat_flux_sigma = physical_moments.get('parallel_projected_heat_flux_standard_uncertainty_W_m2')
+                            if pressure is not None or heat_flux is not None:
+                                pcol, qcol = st.columns(2)
+                                if pressure is not None:
+                                    pcol.metric(
+                                        'Projected pressure Pqq',
+                                        f"{float(pressure):.5g} Pa",
+                                        None if pressure_sigma is None else f"± {float(pressure_sigma):.3g} Pa",
+                                    )
+                                else:
+                                    pcol.info('Pqq withheld: independent electron density and/or EVDF covariance not supplied.')
+                                if heat_flux is not None:
+                                    qcol.metric(
+                                        'Projected kinetic-energy flux q(1D)',
+                                        f"{float(heat_flux):.5g} W/m²",
+                                        None if heat_flux_sigma is None else f"± {float(heat_flux_sigma):.3g} W/m²",
+                                    )
+                                else:
+                                    qcol.info('Absolute projected flux withheld: independent electron density not supplied.')
+                                st.caption(
+                                    'Pqq = me ne σq²; q(1D) = (me ne / 2) μ3,q. '
+                                    'These are q-direction quantities only, not the complete 3-D heat flux.'
+                                )
+                            energy_cdf = physical_moments.get('projected_parallel_kinetic_energy_cdf_eV')
+                            if isinstance(energy_cdf, dict):
+                                energy_axis = np.asarray(energy_cdf.get('energy_grid_eV', []), dtype=float)
+                                probability = np.asarray(energy_cdf.get('cumulative_probability', []), dtype=float)
+                                if energy_axis.ndim == 1 and energy_axis.size and probability.shape == energy_axis.shape:
+                                    st.markdown('**Cumulative projected parallel random-energy distribution**')
+                                    st.line_chart(pd.DataFrame(
+                                        {'Cumulative probability': probability},
+                                        index=pd.Index(energy_axis, name='Parallel random energy (eV)'),
+                                    ))
+                            joint_covariance = physical_moments.get('parallel_pressure_heat_flux_joint_covariance')
+                            joint_order = physical_moments.get('parallel_pressure_heat_flux_joint_covariance_order')
+                            if joint_covariance is not None and joint_order is not None:
+                                joint_covariance = np.asarray(joint_covariance, dtype=float)
+                                if joint_covariance.shape == (len(joint_order), len(joint_order)):
+                                    with st.expander('Joint pressure / projected-flux covariance'):
+                                        st.dataframe(
+                                            pd.DataFrame(joint_covariance, index=joint_order, columns=joint_order),
+                                            width='stretch',
+                                        )
                 if selected_id == 1 and isinstance(result, dict) and {'radius_m', 'density_m3', 'temperature_eV'} <= set(result):
                     profile_frame = pd.DataFrame({'Radius (m)': result['radius_m'], 'Electron density (m^-3)': result['density_m3'], 'Electron temperature (eV)': result['temperature_eV']})
                     st.markdown('**Electron-density profile**')
