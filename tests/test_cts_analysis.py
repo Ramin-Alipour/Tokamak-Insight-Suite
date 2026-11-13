@@ -7,6 +7,26 @@ def _case():
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 
+
+def test_cts_forward_model_has_finite_dilute_density_limit():
+    f0, f, geometry, ions, fractions, _ = _case()
+    spectrum = cts_spectral_density(
+        f, f0, geometry,
+        electron_density_m3=1e-300,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=fractions,
+        electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=0.0,
+    )
+    # Optimizers may probe representable but extremely dilute trial states.
+    # The Maxwellian susceptibility must approach zero continuously rather
+    # than divide by an underflowed n*(Z*e)^2 intermediate.
+    assert np.all(np.isfinite(spectrum))
+    assert np.all(spectrum >= 0.0)
+    assert np.any(spectrum > 0.0)
+
 def test_cts_scattering_wave_number_includes_scattered_photon_frequency():
     from tokamak_analysis.cts_analysis import _frequency_dependent_scattering_wave_number
 
