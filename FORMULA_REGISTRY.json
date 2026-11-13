@@ -12342,5 +12342,75 @@
       ],
       "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf"
     }
+  },
+  {
+    "name": "Relativistic projected Thomson lab-frame kinetic-energy flux",
+    "equation": "E_k(v_parallel)=(gamma-1)m_e c^2; gamma=(1-v_parallel^2/c^2)^(-1/2); F_E,q=n_e integral[E_k(v_parallel)*v_parallel*f_q(v_parallel) dv_parallel]",
+    "inputs": "Normalized one-dimensional q-parallel projected EVDF f_q(v_parallel); independently measured/inferred electron density n_e",
+    "output": "W m^-2",
+    "assumptions": "Exact relativistic single-electron kinetic energy in the laboratory frame; one-dimensional q-parallel marginal; normalized EVDF; independent density for absolute flux. This is not the comoving three-dimensional electron heat flux.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.api.analyze_spectral_distribution",
+      "formula_key": "thomson_relativistic_projected_lab_energy_flux",
+      "input_specs": [
+        {
+          "name": "projected_evdf_options.kinematics",
+          "unit": "relativistic_thomson or compton",
+          "required": true,
+          "description": "Select exact relativistic Thomson kinematics or Compton recoil explicitly."
+        },
+        {
+          "name": "projected_evdf_options.electron_density_m3",
+          "unit": "m^-3",
+          "required": true,
+          "description": "Independent measured/inferred density; normalized projected EVDF does not identify density."
+        },
+        {
+          "name": "projected_evdf_options.electron_density_uncertainty_m3",
+          "unit": "m^-3; 1-sigma",
+          "required": false,
+          "description": "Independent density uncertainty for first-order absolute-flux uncertainty propagation."
+        },
+        {
+          "name": "projected_evdf_options.electron_density_flux_per_density_cross_covariance_W_m2",
+          "unit": "W m^-2",
+          "required": false,
+          "description": "Covariance between independent density and relativistic EVDF flux-per-density; requires density uncertainty and EVDF covariance."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "kinetic_energy_flux_per_density_W_m",
+          "unit": "W m",
+          "description": "Relativistic lab-frame projected energy flux per electron density."
+        },
+        {
+          "name": "kinetic_energy_flux_W_m2",
+          "unit": "W m^-2",
+          "description": "Absolute q-parallel laboratory-frame kinetic-energy flux; withheld without independent density."
+        },
+        {
+          "name": "kinetic_energy_flux_standard_uncertainty_W_m2",
+          "unit": "W m^-2",
+          "description": "First-order uncertainty including density/EVDF covariance when supplied."
+        }
+      ],
+      "prerequisites": [
+        "A measured Thomson spectrum and response-aware projected EVDF inverse.",
+        "Independent electron density for absolute flux."
+      ],
+      "uncertainty_model": "The normalized EVDF functional covariance is propagated through the piecewise-linear interval Gauss-Legendre moment operator. Absolute flux F=n_e*g uses Var(F)=n_e^2 Var(g)+g^2 Var(n_e)+2 n_e g Cov(n_e,g); missing cross-covariance is treated as zero only when explicitly declared by the solver contract, and the supplied 2x2 covariance must be positive semidefinite.",
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_relativistic_projected_moments_integrate_piecewise_linear_evdf_not_nodal_trapezoids",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_moment_covariance_matches_normalized_functional_finite_difference",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_lab_energy_flux_uses_only_explicit_density_and_joint_uncertainty",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_lab_flux_rejects_density_cross_covariance_without_joint_inputs"
+      ],
+      "note": "Analytic and numerical software verification only; not experimental validation."
+    }
   }
 ]
