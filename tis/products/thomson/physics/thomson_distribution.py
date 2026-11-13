@@ -93,8 +93,10 @@ def _projected_evdf_physical_moments(
 
     The reported moments are one-dimensional scattering-vector marginal
     moments. They are not the full 3-D electron heat flux or a 3-D EVDF.
-    Covariance is propagated with the same nonuniform trapezoidal quadrature
-    used to normalize the reconstructed density.
+    The EVDF is treated as piecewise linear between nodes; polynomial moments
+    through fourth order are integrated exactly on each segment with
+    three-point Gauss-Legendre quadrature. Normalization remains the same
+    composite trapezoidal integral used by the inverse solver.
     """
     velocity = np.asarray(velocity_m_s, dtype=float)
     density = np.asarray(probability_density_s_per_m, dtype=float)
