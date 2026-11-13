@@ -5612,6 +5612,7 @@ elif page=='Advanced Analysis':
                                     ('Mean kinetic energy', 'mean_kinetic_energy_eV', 'eV'),
                                     ('Mean Lorentz factor', 'mean_lorentz_factor', '1'),
                                     ('Lab-frame kinetic-energy flux per density', 'kinetic_energy_flux_per_density_W_m', 'W·m'),
+                                    ('Absolute projected lab-frame kinetic-energy flux', 'kinetic_energy_flux_W_m2', 'W/m²'),
                                 ]
                                 st.caption(
                                     'Integration: ' + str(relativistic_moments.get('integration_method', 'method not reported'))
