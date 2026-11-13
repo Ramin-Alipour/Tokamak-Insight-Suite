@@ -485,7 +485,9 @@ def _fit_noncollective(
     # A pseudo-inverse can silently turn an underdetermined spectrum/background
     # decomposition into apparently precise plasma parameters. Require a
     # locally full-rank likelihood Jacobian before reporting Te or flow.
-    singular_values = np.linalg.svd(fit.jac, compute_uv=False)
+    _, singular_values, right_singular_vectors = np.linalg.svd(
+        fit.jac, full_matrices=False
+    )
     largest_singular_value = float(singular_values[0]) if singular_values.size else 0.0
     rank_tolerance = (
         max(fit.jac.shape) * np.finfo(float).eps * largest_singular_value
@@ -503,10 +505,11 @@ def _fit_noncollective(
     jacobian_condition_number = float(
         singular_values[0] / singular_values[-1]
     )
-    normal_matrix = fit.jac.T @ fit.jac
-    covariance_scaled = np.linalg.solve(
-        normal_matrix, np.eye(normal_matrix.shape[0], dtype=float)
-    )
+    # Construct (J^T J)^-1 from the SVD without explicitly squaring
+    # the Jacobian condition number in a normal-equation solve.
+    covariance_scaled = (
+        right_singular_vectors.T / np.square(singular_values)
+    ) @ right_singular_vectors
     if sigma_y is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun@fit.fun/dof)
     scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
