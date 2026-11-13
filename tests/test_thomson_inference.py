@@ -814,7 +814,9 @@ def test_joint_multi_channel_gls_rejects_non_positive_definite_covariance():
 
 
 def test_joint_multi_channel_gls_supports_kappa_projected_spectra():
-    x=np.linspace(492.0,572.0,161)
+    coordinate=np.linspace(-40.0,40.0,161)
+    x=532.0+coordinate+0.0015*coordinate**2
+    assert np.all(np.diff(x)>0.0)
     kappa=4.0
     def spectrum(te):
         sigma=2.0*532.0*np.sqrt(te/510998.95069)*np.sin(np.pi/4)
