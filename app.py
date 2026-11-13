@@ -5606,10 +5606,26 @@ elif page=='Advanced Analysis':
                                     'These are exact relativistic moments of the one-dimensional q-parallel marginal. '
                                     'The energy flux is per density and is not the comoving 3-D heat flux.'
                                 )
+                                relativistic_uncertainty = relativistic_moments.get('moment_standard_uncertainty') or {}
+                                relativistic_rows = [
+                                    ('Mean parallel velocity', 'mean_velocity_parallel_m_s', 'm/s'),
+                                    ('Mean kinetic energy', 'mean_kinetic_energy_eV', 'eV'),
+                                    ('Mean Lorentz factor', 'mean_lorentz_factor', '1'),
+                                    ('Lab-frame kinetic-energy flux per density', 'kinetic_energy_flux_per_density_W_m', 'W·m'),
+                                ]
+                                st.caption(
+                                    'Integration: ' + str(relativistic_moments.get('integration_method', 'method not reported'))
+                                    + '; normalization: '
+                                    + str(relativistic_moments.get('normalization_method', 'method not reported'))
+                                )
                                 st.dataframe(pd.DataFrame([
-                                    {'Quantity': 'Mean kinetic energy', 'Value': relativistic_moments.get('mean_kinetic_energy_eV'), 'Unit': 'eV'},
-                                    {'Quantity': 'Mean Lorentz factor', 'Value': relativistic_moments.get('mean_lorentz_factor'), 'Unit': '1'},
-                                    {'Quantity': 'Lab-frame kinetic-energy flux per density', 'Value': relativistic_moments.get('kinetic_energy_flux_per_density_W_m'), 'Unit': 'W·m'},
+                                    {
+                                        'Quantity': label,
+                                        'Value': relativistic_moments.get(key),
+                                        '1σ uncertainty': relativistic_uncertainty.get(key),
+                                        'Unit': unit,
+                                    }
+                                    for label, key, unit in relativistic_rows
                                 ]), width='stretch', hide_index=True)
                             energy_cdf = physical_moments.get('projected_parallel_kinetic_energy_cdf_eV')
                             if isinstance(energy_cdf, dict):
