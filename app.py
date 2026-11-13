@@ -5505,6 +5505,10 @@ elif page=='Advanced Analysis':
                                     'Maximum edge-node density / peak density',
                                     f"{float(grid_sensitivity.get('boundary_node_density_fraction_of_peak', 0.0)):.4g}"
                                 )
+                                st.caption(
+                                    'Velocity intervals tested (m/s): '
+                                    + str(grid_sensitivity.get('boundary_interval_bounds_m_s'))
+                                )
                                 full_moments = grid_sensitivity.get('full_grid_moments') or {}
                                 interior_moments = grid_sensitivity.get('interior_grid_moments') or {}
                                 delta_moments = grid_sensitivity.get('interior_minus_full_moments') or {}
