@@ -106,7 +106,7 @@ def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
 
 
 def fit_optical_thomson_poisson_counts(*args: Any, **kwargs: Any) -> Any:
-    """Fit calibrated optical Thomson photon/count spectra with an independent Poisson likelihood."""
+    """Run the Analysis-1 finite-bin Poisson count likelihood with joint geometry covariance."""
     kwargs["likelihood"] = "independent_Poisson"
     return _run(1, *args, **kwargs)
 
