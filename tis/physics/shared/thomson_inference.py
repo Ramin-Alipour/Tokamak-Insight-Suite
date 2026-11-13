@@ -3142,12 +3142,20 @@ def analyze_thomson_spectra(
                 p = parameters[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
                 if model == "non_collective_maxwellian":
                     amp, center, sigma = p[:3]
-                    signal_component = amp*np.exp(-0.5*((xs[channel]-center)/sigma)**2)
+                    # Match the canonical marginal fitter: integrate the
+                    # physical line shape over each measured wavelength bin
+                    # before applying the measured instrument response.
+                    signal_component, _ = _gaussian_bin_averaged_shape(
+                        xs[channel], amp, center, sigma
+                    )
                 else:
                     amp, center, sigma, kappa = p[:4]
-                    df = 2.0*kappa-1.0
-                    scale = sigma*np.sqrt((df-2.0)/df)
-                    signal_component = amp*(1.0+((xs[channel]-center)/scale)**2/df)**(-kappa)
+                    # Kappa tails must be integrated with the Student-t CDF;
+                    # point-sampling biases both width and tail probability,
+                    # especially on non-uniform detector wavelength grids.
+                    signal_component, _ = _kappa_bin_averaged_shape(
+                        xs[channel], amp, center, sigma, kappa
+                    )
                 background_coefficients = p[physical_parameter_count:]
                 background_component = background_designs[channel] @ background_coefficients
                 predicted.append(
@@ -3161,11 +3169,44 @@ def analyze_thomson_spectra(
         joint_fit = least_squares(joint_residual, initial, bounds=(lower, upper), x_scale="jac", max_nfev=30000)
         joint_column_norms = np.linalg.norm(joint_fit.jac, axis=0)
         joint_scaled_jacobian = joint_fit.jac / np.maximum(joint_column_norms, np.finfo(float).tiny)[None, :]
-        joint_rank = int(np.linalg.matrix_rank(joint_scaled_jacobian))
-        joint_condition = float(np.linalg.cond(joint_scaled_jacobian))
+        joint_singular_values = np.linalg.svd(
+            joint_scaled_jacobian, compute_uv=False
+        )
+        joint_rank_tolerance = (
+            np.finfo(float).eps * max(joint_scaled_jacobian.shape)
+            * (float(joint_singular_values[0]) if joint_singular_values.size else 0.0)
+        )
+        joint_rank = int(np.count_nonzero(
+            joint_singular_values > joint_rank_tolerance
+        ))
+        joint_condition = (
+            float(joint_singular_values[0] / joint_singular_values[-1])
+            if joint_singular_values.size and joint_singular_values[-1] > joint_rank_tolerance
+            else float("inf")
+        )
         if not joint_fit.success or joint_rank < initial.size or not np.isfinite(joint_condition) or joint_condition > 1e12:
             raise ValueError("Joint Thomson GLS fit rejected: optimizer failure or non-identifiable channel parameters")
-        parameter_covariance = np.linalg.pinv(joint_fit.jac.T @ joint_fit.jac)
+        # Use the SVD of the already-whitened joint Jacobian for covariance;
+        # the full cross-channel blocks are retained without normal-equation
+        # condition-number squaring.
+        _, joint_covariance_singular_values, joint_right_vectors = np.linalg.svd(
+            joint_fit.jac, full_matrices=False
+        )
+        joint_covariance_tolerance = (
+            max(joint_fit.jac.shape) * np.finfo(float).eps
+            * float(joint_covariance_singular_values[0])
+        )
+        joint_covariance_rank = int(np.count_nonzero(
+            joint_covariance_singular_values > joint_covariance_tolerance
+        ))
+        if joint_covariance_rank < initial.size:
+            raise ValueError(
+                "Joint Thomson GLS covariance is not identifiable: "
+                f"whitened Jacobian rank {joint_covariance_rank}/{initial.size}"
+            )
+        parameter_covariance = (
+            joint_right_vectors.T / np.square(joint_covariance_singular_values)
+        ) @ joint_right_vectors
         dof_joint = max(1, measured_flat.size-initial.size)
         standardized = joint_residual(joint_fit.x)
         reduced_chi2_joint = float(standardized @ standardized / dof_joint)
@@ -3299,6 +3340,31 @@ def analyze_thomson_spectra(
             )
             physical_indices = [te_index, velocity_index]
             fit["physical_parameter_covariance"] = physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
+            fit["physical_parameter_covariance_fit_only"] = physical_covariance[
+                np.ix_(physical_indices, physical_indices)
+            ].copy()
+            fit["physical_parameter_covariance_order"] = [
+                "electron_temperature_eV", "electron_velocity_projection_m_s"
+            ]
+            channel_physical_covariance = physical_covariance[
+                np.ix_(physical_indices, physical_indices)
+            ]
+            channel_variance_product = float(
+                channel_physical_covariance[0, 0] * channel_physical_covariance[1, 1]
+            )
+            fit["physical_parameter_correlation_fit_only"] = (
+                float(channel_physical_covariance[0, 1] / np.sqrt(channel_variance_product))
+                if channel_variance_product > 0.0 else None
+            )
+            fit["identifiability"] = {
+                "status": "locally_identified",
+                "whitened_jacobian_rank": joint_rank,
+                "fitted_parameter_count": int(initial.size),
+                "whitened_jacobian_condition_number": joint_condition,
+                "singular_values": joint_singular_values.copy(),
+                "rank_tolerance": float(joint_rank_tolerance),
+                "scope": "joint channel-major GLS with shared cross-channel spectral covariance",
+            }
             fit["model_discrepancy_covariance"] = (discrepancy_scale * block).copy()
             fit["model_discrepancy_physical_parameter_covariance"] = discrepancy_covariance[np.ix_(physical_indices, physical_indices)].copy()
             fit["total_fit_covariance_including_discrepancy"] = block + discrepancy_scale * block
