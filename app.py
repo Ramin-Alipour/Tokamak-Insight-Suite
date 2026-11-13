@@ -1626,14 +1626,19 @@ elif page=='Spectral Analysis':
                             'radius_m': channel.get('radius_m'),
                             'status': diagnostic.get('status'),
                             'whitened_jacobian_rank': diagnostic.get(
-                                'whitened_jacobian_rank', diagnostic.get('jacobian_rank')
+                                'whitened_jacobian_rank', diagnostic.get(
+                                    'jacobian_rank', diagnostic.get('scaled_whitened_jacobian_rank')
+                                )
                             ),
                             'fitted_parameter_count': diagnostic.get(
                                 'fitted_parameter_count', diagnostic.get('parameter_count')
                             ),
                             'condition_number': diagnostic.get(
                                 'whitened_jacobian_condition_number',
-                                diagnostic.get('normalized_jacobian_condition_number')
+                                diagnostic.get(
+                                    'normalized_jacobian_condition_number',
+                                    diagnostic.get('scaled_whitened_jacobian_condition_number')
+                                )
                             ),
                             'physical_covariance_status': channel.get(
                                 'physical_parameter_covariance_status', 'fit covariance available'
