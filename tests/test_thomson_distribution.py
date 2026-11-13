@@ -2191,7 +2191,7 @@ def test_relativistic_projected_moments_integrate_piecewise_linear_evdf_not_noda
     velocity = c * np.array([-0.72, -0.51, -0.23, 0.04, 0.31, 0.58, 0.79])
     density = np.array([0.03, 0.18, 0.62, 1.0, 0.74, 0.29, 0.06])
     result = _projected_evdf_relativistic_lab_moments(velocity, density)
-    norm = np.trapezoid(density, velocity)
+    norm = np.trapz(density, velocity)
 
     def f(v):
         return float(np.interp(v, velocity, density))
