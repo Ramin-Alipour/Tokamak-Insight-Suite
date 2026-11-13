@@ -699,18 +699,54 @@ def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_densit
     }
 
 
-def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
-    """Return exact 1-D relativistic lab-frame kinetic moments of a projected EVDF.
+def _piecewise_linear_functional_weights(velocity_m_s, function, *, quadrature_order=24):
+    """Integrate a smooth scalar functional against every piecewise-linear EVDF hat.
 
-    The probability measure is the supplied normalized q-parallel marginal.
-    This deliberately reports lab-frame kinetic-energy flux, not comoving
-    heat flux: a single projected marginal does not determine the full
-    relativistic 3-D heat-flux four-vector.
+    The returned vector a satisfies integral(g(v) f(v) dv) ~= a @ f for
+    the piecewise-linear interpolant of nodal f. Gauss-Legendre quadrature is
+    applied interval-by-interval, so nonuniform velocity grids are supported.
+    """
+    velocity = np.asarray(velocity_m_s, dtype=float)
+    if (velocity.ndim != 1 or velocity.size < 2
+            or not np.all(np.isfinite(velocity))
+            or np.any(np.diff(velocity) <= 0.0)):
+        raise ValueError("functional integration requires a finite increasing velocity grid")
+    if (isinstance(quadrature_order, (bool, np.bool_))
+            or not isinstance(quadrature_order, (int, np.integer))
+            or quadrature_order < 2 or quadrature_order > 128):
+        raise ValueError("quadrature_order must be an integer from 2 to 128")
+    nodes, quadrature = np.polynomial.legendre.leggauss(int(quadrature_order))
+    result = np.zeros(velocity.size, dtype=float)
+    for index, (left, right) in enumerate(zip(velocity[:-1], velocity[1:])):
+        half_width = 0.5 * (right - left)
+        midpoint = 0.5 * (right + left)
+        points = midpoint + half_width * nodes
+        values = np.asarray(function(points), dtype=float)
+        if values.shape != points.shape or not np.all(np.isfinite(values)):
+            raise ValueError("functional integrand must return finite values matching its input")
+        weighted = half_width * quadrature * values
+        left_basis = (right - points) / (right - left)
+        right_basis = (points - left) / (right - left)
+        result[index] += float(weighted @ left_basis)
+        result[index + 1] += float(weighted @ right_basis)
+    return result
+
+
+def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
+    """Return relativistic lab-frame moments of a projected q-parallel EVDF.
+
+    Each observable is integrated against the piecewise-linear EVDF using
+    interval-wise Gauss-Legendre quadrature. The normalized probability
+    measure uses the exact trapezoidal integral of that same interpolant.
+    Covariance propagation differentiates the normalized functional, including
+    its normalization denominator. This is a lab-frame kinetic-energy flux,
+    not the comoving 3-D heat-flux four-vector.
     """
     velocity = np.asarray(velocity_m_s, dtype=float)
     density = np.asarray(probability_density_s_per_m, dtype=float)
     c_light = 299792458.0
     electron_mass = 9.1093837139e-31
+    elementary_charge = 1.602176634e-19
     if (velocity.ndim != 1 or density.shape != velocity.shape or velocity.size < 3
             or not np.all(np.isfinite(velocity)) or not np.all(np.isfinite(density))
             or np.any(np.diff(velocity) <= 0.0) or np.any(density < 0.0)):
@@ -718,19 +754,27 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
     if np.any(np.abs(velocity) >= c_light):
         raise ValueError("relativistic projected EVDF velocities must satisfy |v| < c")
     intervals = np.diff(velocity)
-    weights = np.empty_like(velocity)
-    weights[0] = 0.5 * intervals[0]
-    weights[-1] = 0.5 * intervals[-1]
-    weights[1:-1] = 0.5 * (intervals[:-1] + intervals[1:])
-    normalization = float(weights @ density)
+    normalization_weights = np.empty_like(velocity)
+    normalization_weights[0] = 0.5 * intervals[0]
+    normalization_weights[-1] = 0.5 * intervals[-1]
+    normalization_weights[1:-1] = 0.5 * (intervals[:-1] + intervals[1:])
+    normalization = float(normalization_weights @ density)
     if not np.isfinite(normalization) or normalization <= np.finfo(float).tiny:
         raise ValueError("relativistic projected EVDF has no positive finite probability integral")
-    probability = weights * density / normalization
-    beta = velocity / c_light
-    gamma = 1.0 / np.sqrt(1.0 - beta**2)
-    kinetic_energy_j = (gamma - 1.0) * electron_mass * c_light**2
-    observables = np.vstack((velocity, kinetic_energy_j, kinetic_energy_j * velocity))
-    means = observables @ probability
+
+    def kinetic_energy(v):
+        beta = v / c_light
+        return (1.0 / np.sqrt(1.0 - beta**2) - 1.0) * electron_mass * c_light**2
+
+    # Integrate g(v) times the piecewise-linear EVDF, rather than applying
+    # nodal trapezoids to the nonlinear relativistic energy and energy-flux
+    # integrands. The same weights are used in the covariance Jacobian.
+    observable_weights = np.vstack((
+        _piecewise_linear_functional_weights(velocity, lambda v: v),
+        _piecewise_linear_functional_weights(velocity, kinetic_energy),
+        _piecewise_linear_functional_weights(velocity, lambda v: kinetic_energy(v) * v),
+    ))
+    means = observable_weights @ density / normalization
     covariance_out = None
     uncertainty_out = None
     if covariance is not None:
@@ -743,7 +787,9 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
         eigenvalues = np.linalg.eigvalsh(cov)
         if float(eigenvalues.min()) < -1e-10 * max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny):
             raise ValueError("relativistic projected EVDF covariance must be positive semidefinite")
-        jacobian = (observables - means[:, None]) * (weights / normalization)[None, :]
+        jacobian = (
+            observable_weights - means[:, None] * normalization_weights[None, :]
+        ) / normalization
         covariance_out = jacobian @ cov @ jacobian.T
         covariance_out = 0.5 * (covariance_out + covariance_out.T)
         if not np.all(np.isfinite(covariance_out)):
@@ -753,8 +799,10 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
         "status": "relativistic_lab_frame_moments_with_covariance" if covariance is not None else "relativistic_lab_frame_moments_only",
         "frame": "laboratory",
         "distribution_scope": "one_dimensional_q_parallel_velocity_marginal",
+        "integration_method": "piecewise_linear_evdf_interval_gauss_legendre_24_point",
+        "normalization_method": "exact_trapezoidal_integral_of_piecewise_linear_evdf",
         "mean_velocity_parallel_m_s": float(means[0]),
-        "mean_kinetic_energy_eV": float(means[1] / 1.602176634e-19),
+        "mean_kinetic_energy_eV": float(means[1] / elementary_charge),
         "mean_lorentz_factor": float(1.0 + means[1] / (electron_mass * c_light**2)),
         "kinetic_energy_flux_per_density_W_m": float(means[2]),
         "moment_order": ["mean_velocity_parallel_m_s", "mean_kinetic_energy_J", "kinetic_energy_flux_per_density_W_m"],
@@ -766,6 +814,13 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
                 "kinetic_energy_flux_per_density_W_m": float(uncertainty_out[2]),
             }
         ),
+        "equations": {
+            "lorentz_factor": "gamma(v)=1/sqrt(1-v^2/c^2)",
+            "kinetic_energy": "E_k(v)=(gamma(v)-1)*m_e*c^2",
+            "mean_kinetic_energy": "<E_k>=integral(E_k(v)*f_q(v)dv)",
+            "lab_frame_energy_flux_per_density": "F_E,q/n_e=integral(E_k(v)*v*f_q(v)dv)",
+            "normalized_moment_jacobian": "d<M>/df_i=[a_i-<M>*w_i]/(w.f), where a_i=integral(g(v)*phi_i(v)dv) and w_i=integral(phi_i(v)dv)",
+        },
         "kinetic_energy_definition": "E_k=(gamma-1)*m_e*c^2; gamma=(1-v_parallel^2/c^2)^(-1/2)",
         "flux_definition": "n_e*integral(E_k*v_parallel*f_q(v_parallel)dv_parallel); absolute flux requires independent n_e",
         "heat_flux_status": "not_inferred_from_single_projected_marginal",
