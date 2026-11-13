@@ -670,6 +670,10 @@ def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_densit
         "boundary_interval_probability_fraction": float(
             np.clip(boundary_area / full_norm, 0.0, 1.0)
         ),
+        "boundary_interval_bounds_m_s": [
+            [float(velocity[0]), float(velocity[1])],
+            [float(velocity[-2]), float(velocity[-1])],
+        ],
         "boundary_node_density_fraction_of_peak": (
             0.0 if peak <= 0.0 else float(max(density[0], density[-1]) / peak)
         ),
