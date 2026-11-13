@@ -482,7 +482,31 @@ def _fit_noncollective(
     fitted = signal_scale*fitted_scaled
     residual_physical = np.asarray(signal,dtype=float)-fitted
     dof = max(1, wavelength.size-fit.x.size)
-    covariance_scaled = np.linalg.pinv(fit.jac.T@fit.jac)
+    # A pseudo-inverse can silently turn an underdetermined spectrum/background
+    # decomposition into apparently precise plasma parameters. Require a
+    # locally full-rank likelihood Jacobian before reporting Te or flow.
+    singular_values = np.linalg.svd(fit.jac, compute_uv=False)
+    largest_singular_value = float(singular_values[0]) if singular_values.size else 0.0
+    rank_tolerance = (
+        max(fit.jac.shape) * np.finfo(float).eps * largest_singular_value
+    )
+    jacobian_rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    parameter_count = int(fit.x.size)
+    if jacobian_rank < parameter_count:
+        raise ValueError(
+            "Maxwellian Thomson inference is locally non-identifiable: "
+            f"whitened likelihood Jacobian rank {jacobian_rank} is below "
+            f"the {parameter_count} fitted parameters. Reduce the background "
+            "basis, improve spectral coverage, or supply an independently "
+            "constrained background."
+        )
+    jacobian_condition_number = float(
+        singular_values[0] / singular_values[-1]
+    )
+    normal_matrix = fit.jac.T @ fit.jac
+    covariance_scaled = np.linalg.solve(
+        normal_matrix, np.eye(normal_matrix.shape[0], dtype=float)
+    )
     if sigma_y is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun@fit.fun/dof)
     scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
@@ -521,7 +545,30 @@ def _fit_noncollective(
         fit_parameters = np.r_[amp,center,width,coefficients]
         fit_parameter_names = ["amplitude","center_nm","intrinsic_sigma_nm"]+[f"background_coefficient_{i}" for i in range(n_background)]
         background_coefficient_covariance = covariance[3:,3:]
-    te_unc = float(te*2*np.sqrt(max(covariance[2,2],0.0))/width)
+    # Transform the fitted [center, intrinsic width] covariance into the
+    # physical [Te, v_q] covariance. Keeping the off-diagonal term matters:
+    # line-center/width correlations otherwise disappear from the reported
+    # physical uncertainty budget.
+    physical_jacobian = np.array([
+        [0.0, 2.0 * te / width],
+        [-C_M_S / (laser_nm * q_projection), 0.0],
+    ], dtype=float)
+    center_width_covariance = covariance[np.ix_([1, 2], [1, 2])]
+    physical_covariance_fit_only = (
+        physical_jacobian @ center_width_covariance @ physical_jacobian.T
+    )
+    physical_covariance_fit_only = 0.5 * (
+        physical_covariance_fit_only + physical_covariance_fit_only.T
+    )
+    te_unc = float(np.sqrt(max(physical_covariance_fit_only[0, 0], 0.0)))
+    velocity_unc = float(np.sqrt(max(physical_covariance_fit_only[1, 1], 0.0)))
+    physical_variance_product = float(
+        physical_covariance_fit_only[0, 0] * physical_covariance_fit_only[1, 1]
+    )
+    physical_correlation = (
+        float(physical_covariance_fit_only[0, 1] / np.sqrt(physical_variance_product))
+        if physical_variance_product > 0.0 else None
+    )
     area = float(amp*width*np.sqrt(2.0*np.pi))
     area_gradient = np.zeros(fit_parameters.size)
     area_gradient[:3] = [width*np.sqrt(2.0*np.pi),0.0,amp*np.sqrt(2.0*np.pi)]
@@ -530,7 +577,30 @@ def _fit_noncollective(
         "electron_temperature_eV": float(te),
         "electron_temperature_uncertainty_eV": te_unc,
         "electron_velocity_projection_m_s": float(velocity),
-        "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(covariance[1,1],0.0))/(laser_nm*q_projection)),
+        "electron_velocity_projection_uncertainty_m_s": velocity_unc,
+        "physical_parameter_covariance_fit_only": physical_covariance_fit_only,
+        "physical_parameter_covariance_order": [
+            "electron_temperature_eV", "electron_velocity_projection_m_s"
+        ],
+        "physical_parameter_correlation_fit_only": physical_correlation,
+        "identifiability": {
+            "status": (
+                "locally_identified"
+                if jacobian_condition_number <= 1.0e8 else
+                "weakly_identified"
+                if jacobian_condition_number <= 1.0e12 else
+                "ill_conditioned"
+            ),
+            "whitened_jacobian_rank": jacobian_rank,
+            "fitted_parameter_count": parameter_count,
+            "whitened_jacobian_condition_number": jacobian_condition_number,
+            "singular_values": singular_values.copy(),
+            "rank_tolerance": float(rank_tolerance),
+            "physical_covariance_scope": (
+                "fit likelihood only; geometry, response, systematic and "
+                "model-discrepancy contributions are reported separately"
+            ),
+        },
         "fitted_center_nm": center, "intrinsic_sigma_nm": width,
         "amplitude": amp,
         "background_intercept": background_at_center,
