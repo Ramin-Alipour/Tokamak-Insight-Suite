@@ -76,12 +76,23 @@ def analyze_thomson_spectra(*args, **kwargs):
             if response is not None:
                 raise ValueError("Supply instrument_response or instrument_response_matrix once, not both")
             response = kwargs.pop("instrument_response_matrix")
+        geometry_options = {
+            name: kwargs.pop(name)
+            for name in (
+                "laser_wavelength_uncertainty_nm",
+                "scattering_angle_uncertainty_rad",
+                "laser_angle_covariance_nm_rad",
+                "fit_geometry_cross_covariance_nm2_rad",
+            )
+            if name in kwargs
+        }
         if kwargs:
             raise TypeError("Unsupported Poisson Analysis-1 options: " + ", ".join(sorted(kwargs)))
         from tis.physics.shared.thomson_inference import fit_optical_thomson_poisson_counts
         result = fit_optical_thomson_poisson_counts(
             wavelength, counts, laser_wavelength_nm=laser_nm,
             scattering_angle_rad=angle, instrument_response=response,
+            **geometry_options,
         )
         result["analysis_id"] = 1
         result["analysis_model"] = "noncollective_maxwellian_independent_Poisson"
