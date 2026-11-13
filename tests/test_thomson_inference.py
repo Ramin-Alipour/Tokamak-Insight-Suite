@@ -2130,7 +2130,7 @@ def test_poisson_optical_thomson_rejects_inconsistent_joint_geometry_covariance(
 
     wavelength = np.linspace(528.0, 536.0, 101)
     counts = np.rint(1000.0 * np.exp(-0.5 * ((wavelength - 532.0) / 0.5) ** 2) + 10.0).astype(int)
-    with pytest.raises(ValueError, match="geometry covariance must be positive semidefinite"):
+    with pytest.raises(ValueError, match="calibration covariance must be positive semidefinite"):
         fit_optical_thomson_poisson_counts(
             wavelength, counts,
             laser_wavelength_nm=532.0,
