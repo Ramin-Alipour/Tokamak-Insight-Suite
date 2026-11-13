@@ -60,6 +60,7 @@ def _example_kappa_bin_density(wavelength_nm, laser_nm, q_factor, flow_m_s,
 
 MODEL_LABELS = {
     "thomson_temperature_from_spectral_width": "Optical Thomson — conditional Maxwellian temperature from intrinsic thermal width with joint covariance",
+    "thomson_poisson_count_fit": "Optical Thomson — finite-bin Maxwellian inference from photon counts with Poisson likelihood and joint geometry covariance",
     "thomson_kinetic_background_fit": "Optical Thomson — finite-bin Kappa / relativistic Maxwell-Juttner inference with structured background and joint covariance",
     "thomson_n_population_relativistic_fit": "Optical Thomson — joint inference of 2–8 relativistic Maxwell-Juttner populations, number fractions and shared or component flows",
     "thomson_multiview_3d_evdf": "Optical Thomson — rank-gated 3-D EVDF inversion from caller-supplied kernels",
@@ -562,6 +563,21 @@ EXAMPLES = {
         "electron_velocity_m_s": [0.0, 0.0, 0.0], "ion_velocity_m_s": [[0.0, 0.0, 0.0]],
         "incident_direction": [1.0, 0.0, 0.0], "scattered_direction": [0.0, 1.0, 0.0],
         "landau_limit": False, "pole_imaginary_part_m_s": 100.0
+    },
+    "thomson_poisson_count_fit": {
+        "wavelength_nm": np.linspace(529.0, 535.0, 121).tolist(),
+        "observed_counts": np.rint(
+            1000000.0 * np.diff(ndtr(
+                (_example_wavelength_edges(np.linspace(529.0, 535.0, 121)) - 532.0) / 0.45
+            )) + 200.0 * np.diff(_example_wavelength_edges(np.linspace(529.0, 535.0, 121)))
+        ).astype(int).tolist(),
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response": np.eye(121).tolist(),
+        "laser_wavelength_uncertainty_nm": 0.01,
+        "scattering_angle_uncertainty_rad": 0.001,
+        "laser_angle_covariance_nm_rad": 0.0,
+        "fit_geometry_cross_covariance_nm2_rad": None
     },
     "thomson_temperature_from_spectral_width": {
         "intrinsic_sigma_nm": 0.02,
@@ -1266,7 +1282,15 @@ def render_advanced_thomson_physics_page(st) -> None:
             if not isinstance(parsed, dict):
                 raise ValueError("The solver configuration must be a JSON object.")
             config = decode_complex_json(parsed)
-            if model == "thomson_multiview_3d_evdf_physical":
+            if model == "thomson_poisson_count_fit":
+                # Route count-space inference through the canonical Analysis-1 product API.
+                from tis.products.thomson.api import fit_optical_thomson_poisson_counts
+                result = dict(fit_optical_thomson_poisson_counts(**config))
+                result["dashboard_execution_path"] = (
+                    "tis.ui.advanced_thomson_physics_page -> "
+                    "tis.products.thomson.api.fit_optical_thomson_poisson_counts -> analysis_id_1"
+                )
+            elif model == "thomson_multiview_3d_evdf_physical":
                 # Use the registered Thomson product API entry 88, not a parallel dispatcher.
                 from tis.products.thomson.api import reconstruct_nonrelativistic_3d_evdf
                 result = reconstruct_nonrelativistic_3d_evdf(**config)
