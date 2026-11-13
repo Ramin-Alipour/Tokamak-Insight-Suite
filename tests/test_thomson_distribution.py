@@ -1953,3 +1953,79 @@ def test_projected_heat_flux_cross_covariance_is_in_dashboard_diagnostic_contrac
         "test_projected_heat_flux_propagates_density_evdf_cross_covariance" in item
         for item in root_contract["test_links"]
     )
+
+
+
+def test_piecewise_linear_evdf_polynomial_moments_are_cell_exact_on_nonuniform_grid():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _piecewise_linear_moment_weights,
+    )
+
+    velocity = np.array([-3.0, -1.7, -0.2, 0.4, 2.8, 5.1])
+    # A piecewise-linear density with deliberately nonuniform nodes.
+    density = np.array([0.4, 1.2, 0.7, 1.8, 0.5, 0.9])
+    center = 0.37
+    nodes, weights = np.polynomial.legendre.leggauss(12)
+    for power in range(5):
+        coefficients = _piecewise_linear_moment_weights(
+            velocity, power, center
+        )
+        actual = float(coefficients @ density)
+        expected = 0.0
+        for index, (left, right) in enumerate(zip(velocity[:-1], velocity[1:])):
+            half_width = 0.5 * (right - left)
+            midpoint = 0.5 * (right + left)
+            points = midpoint + half_width * nodes
+            fraction = (points - left) / (right - left)
+            interpolated = (
+                (1.0 - fraction) * density[index]
+                + fraction * density[index + 1]
+            )
+            expected += half_width * float(
+                weights @ (interpolated * (points - center) ** power)
+            )
+        assert actual == pytest.approx(expected, rel=2e-13, abs=2e-13)
+
+    # Zeroth-order integration must remain identical to the inverse solver's
+    # composite trapezoidal normalization contract.
+    zeroth = _piecewise_linear_moment_weights(velocity, 0)
+    assert float(zeroth @ density) == pytest.approx(
+        float(np.trapz(density, velocity)), rel=2e-14, abs=2e-14
+    )
+
+
+def test_piecewise_linear_evdf_moment_covariance_uses_exact_cell_integrals():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.array([-5.0, -3.2, -1.1, -0.3, 1.4, 4.7, 7.0])
+    density = (
+        0.65 * np.exp(-0.5 * ((velocity + 0.4) / 1.5) ** 2)
+        + 0.35 * np.exp(-0.5 * ((velocity - 2.3) / 0.9) ** 2)
+    )
+    covariance = np.diag((0.015 * density + 1e-5) ** 2)
+    result = _projected_evdf_physical_moments(velocity, density, covariance)
+    keys = (
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
+        "skewness",
+        "excess_kurtosis",
+    )
+    numerical = np.empty((len(keys), velocity.size))
+    for column in range(velocity.size):
+        step = density[column] * 1e-5
+        plus, minus = density.copy(), density.copy()
+        plus[column] += step
+        minus[column] -= step
+        p = _projected_evdf_physical_moments(velocity, plus)
+        m = _projected_evdf_physical_moments(velocity, minus)
+        numerical[:, column] = [
+            (p[key] - m[key]) / (2.0 * step) for key in keys
+        ]
+    expected = numerical @ covariance @ numerical.T
+    indices = [result["moment_covariance_order"].index(key) for key in keys]
+    actual = result["moment_covariance"][np.ix_(indices, indices)]
+    np.testing.assert_allclose(actual, expected, rtol=4e-5, atol=1e-12)
