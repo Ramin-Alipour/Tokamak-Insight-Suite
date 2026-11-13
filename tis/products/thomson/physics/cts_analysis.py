@@ -194,9 +194,19 @@ def _frequency_dependent_scattering_wave_number(frequency_shift_Hz, probe_freque
 def _component(omega,k,n,T,m,Z,u):
     if n<=0: return np.zeros_like(omega,dtype=complex),np.zeros_like(omega)
     vt=np.sqrt(2*T*E/m); z=(omega/k-u)/vt
-    lam2=EPS0*T*E/(n*(Z*E)**2)
+    # 1/(k^2 lambda_D^2) = n Z^2 e / (epsilon_0 T_eV k^2).
+    # Evaluate the coupling in log space: forming n*(Z*e)^2 first can
+    # underflow to zero for finite, very dilute trial states explored by the
+    # unconstrained optimizer, even though the physical susceptibility tends
+    # smoothly to zero in that limit.
+    log_coupling = (
+        np.log(n) + 2.0*np.log(abs(Z)) + np.log(E)
+        - np.log(EPS0) - np.log(T) - 2.0*np.log(k)
+    )
+    with np.errstate(under="ignore"):
+        coupling = np.exp(log_coupling)
     plasma_z=1j*np.sqrt(np.pi)*wofz(z)
-    chi=(1/(k*k*lam2))*(1+z*plasma_z)
+    chi=coupling*(1+z*plasma_z)
     f=np.exp(-z*z)/(np.sqrt(np.pi)*vt)
     return chi,f
 

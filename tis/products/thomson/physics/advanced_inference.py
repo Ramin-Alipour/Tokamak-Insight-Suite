@@ -1294,7 +1294,12 @@ def fit_nonlinear_nonnegative_distribution(
         sigma = _real_array(measurement_uncertainty, "measurement_uncertainty", 1)
         if sigma.shape != y.shape or np.any(sigma <= 0):
             raise ValueError("measurement_uncertainty must be positive and match measured_spectrum")
-        whiten = lambda z: np.asarray(z) / sigma
+        # Pointwise uncertainties weight spectral rows.  Preserve that
+        # row-wise scaling for both residual vectors and multi-column design
+        # matrices used to profile the linear amplitude and offset.
+        whiten = lambda z: np.asarray(z) / sigma.reshape(
+            (-1,) + (1,) * (np.ndim(z) - 1)
+        )
         noise_status = "supplied_pointwise_measurement_uncertainty"
     elif measurement_covariance is not None:
         covariance = _real_array(measurement_covariance, "measurement_covariance", 2)
