@@ -4696,15 +4696,34 @@ def fit_optical_thomson_poisson_counts(
         )
 
     fitted = expected_counts(fit.x)
-    # The signed square-root Poisson-deviance residual has unit local
-    # information weighting at the optimum: J^T J approximates the expected
-    # Poisson Fisher information. Normalize columns before SVD so parameter
-    # units do not masquerade as a physical identifiability problem.
-    jacobian = np.asarray(fit.jac, dtype=float)
-    column_norms = np.linalg.norm(jacobian, axis=0)
+    # Construct the expected Poisson Fisher information directly from
+    # d(mu_i)/d(parameter), rather than treating the observed deviance
+    # residual Jacobian as Fisher information. The latter gives half the
+    # information for bins with n_i=0, because their signed-deviance residual
+    # is -sqrt(2 mu_i). Central finite differences are applied to the exact
+    # finite-bin + response-convolved expected-count operator.
+    parameter_scales = np.array([
+        max(abs(amplitude), 1.0),
+        max(span, spacing),
+        max(sigma, spacing),
+        max(abs(background_left), 1.0),
+        max(abs(background_right), 1.0),
+    ], dtype=float)
+    expected_jacobian = np.empty((wavelength.size, fit.x.size), dtype=float)
+    for parameter_index, parameter_scale in enumerate(parameter_scales):
+        step = np.cbrt(np.finfo(float).eps) * parameter_scale
+        plus = np.asarray(fit.x, dtype=float).copy()
+        minus = np.asarray(fit.x, dtype=float).copy()
+        plus[parameter_index] += step
+        minus[parameter_index] -= step
+        expected_jacobian[:, parameter_index] = (
+            expected_counts(plus) - expected_counts(minus)
+        ) / (2.0 * step)
+    fisher_sqrt_jacobian = expected_jacobian / np.sqrt(fitted)[:, None]
+    column_norms = np.linalg.norm(fisher_sqrt_jacobian, axis=0)
     if np.any(~np.isfinite(column_norms)) or np.any(column_norms <= np.finfo(float).tiny):
-        raise ValueError("Poisson Thomson inference is locally non-identifiable: a fitted parameter has zero likelihood sensitivity")
-    normalized_jacobian = jacobian / column_norms[None, :]
+        raise ValueError("Poisson Thomson inference is locally non-identifiable: a fitted parameter has zero Fisher information")
+    normalized_jacobian = fisher_sqrt_jacobian / column_norms[None, :]
     _, singular_values, right_vectors = np.linalg.svd(
         normalized_jacobian, full_matrices=False
     )
@@ -4732,7 +4751,11 @@ def fit_optical_thomson_poisson_counts(
         / column_norms[None, :]
     )
     covariance = 0.5 * (covariance + covariance.T)
-    if np.any(np.linalg.eigvalsh(covariance) < -1e-10 * max(float(np.max(np.abs(covariance))), 1.0)):
+    covariance_eigenvalues = np.linalg.eigvalsh(covariance)
+    covariance_scale = max(
+        float(np.max(np.abs(covariance_eigenvalues))), np.finfo(float).tiny
+    )
+    if covariance_eigenvalues[0] < -1e-10 * covariance_scale:
         raise ValueError("Poisson likelihood parameter covariance is not positive semidefinite")
 
     q = 2.0 * np.sin(angle / 2.0)
