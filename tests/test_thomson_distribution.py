@@ -2029,3 +2029,33 @@ def test_piecewise_linear_evdf_moment_covariance_uses_exact_cell_integrals():
     indices = [result["moment_covariance_order"].index(key) for key in keys]
     actual = result["moment_covariance"][np.ix_(indices, indices)]
     np.testing.assert_allclose(actual, expected, rtol=4e-5, atol=1e-12)
+
+
+
+def test_analysis_81_contract_exposes_the_physical_evdf_moment_covariance():
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    entry = get_analysis(81)
+    contract = entry["execution_contract"]
+    inputs = {item["name"]: item for item in contract["input_specs"]}
+    outputs = {item["name"]: item for item in contract["output_specs"]}
+
+    assert "projected_evdf_options" in inputs
+    assert "electron_density_mu3_cross_covariance_s_minus3" in inputs[
+        "projected_evdf_options"
+    ]["description"]
+    required_outputs = {
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
+        "skewness",
+        "excess_kurtosis",
+        "moment_covariance",
+        "parallel_projected_pressure_heat_flux_joint_covariance",
+        "density_evdf_moment_joint_covariance",
+        "parallel_projected_heat_flux_W_m2",
+        "parallel_projected_pressure_Pa",
+    }
+    assert required_outputs.issubset(outputs)
+    assert "not a 3-D pressure tensor or heat flux" in inputs[
+        "projected_evdf_options"
+    ]["description"]
