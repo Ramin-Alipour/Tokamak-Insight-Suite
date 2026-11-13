@@ -948,7 +948,30 @@ def _fit_kappa(
     fit = min(candidate_fits, key=lambda candidate: float(candidate.fun @ candidate.fun))
     p_scaled = np.asarray(fit.x, dtype=float)
     dof_fit = max(1, wavelength.size - p_scaled.size)
-    covariance_scaled = np.linalg.pinv(fit.jac.T @ fit.jac)
+    # Retain the SVD rank information instead of allowing a pseudo-inverse
+    # to make an unidentifiable Kappa/background decomposition look precise.
+    _, fit_singular_values, fit_right_vectors = np.linalg.svd(
+        fit.jac, full_matrices=False
+    )
+    fit_rank_tolerance = (
+        max(fit.jac.shape) * np.finfo(float).eps
+        * (float(fit_singular_values[0]) if fit_singular_values.size else 0.0)
+    )
+    fit_jacobian_rank = int(np.count_nonzero(
+        fit_singular_values > fit_rank_tolerance
+    ))
+    fit_parameter_count = int(fit.x.size)
+    if fit_jacobian_rank == fit_parameter_count:
+        covariance_scaled = (
+            fit_right_vectors.T / np.square(fit_singular_values)
+        ) @ fit_right_vectors
+    else:
+        # A diagnostic generalized inverse is retained only to support the
+        # optimizer's profile-likelihood exploration. Its plasma uncertainties
+        # are explicitly marked non-reportable below.
+        covariance_scaled = np.linalg.pinv(
+            fit.jac.T @ fit.jac, rcond=max(fit.jac.shape) * np.finfo(float).eps
+        )
     if uncertainty_scaled is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun @ fit.fun / dof_fit)
     parameter_scales = np.r_[signal_scale, 1.0, 1.0, 1.0,
@@ -1035,6 +1058,33 @@ def _fit_kappa(
         and jacobian_condition <= 1e12 and conditional_kappa_sensitivity > 1e-8
         and np.isfinite(kappa_standard_uncertainty)
     )
+    physical_parameter_covariance = None
+    physical_parameter_correlation = None
+    physical_covariance_status = (
+        "identified_from_local_likelihood"
+        if fit_jacobian_rank == fit_parameter_count else
+        "not_reportable_rank_deficient_likelihood"
+    )
+    if fit_jacobian_rank == fit_parameter_count:
+        physical_jacobian = np.array([
+            [0.0, 2.0 * te / sigma],
+            [-C_M_S / (laser_nm * q_projection), 0.0],
+        ], dtype=float)
+        center_width_covariance = cov[np.ix_([1, 2], [1, 2])]
+        physical_parameter_covariance = (
+            physical_jacobian @ center_width_covariance @ physical_jacobian.T
+        )
+        physical_parameter_covariance = 0.5 * (
+            physical_parameter_covariance + physical_parameter_covariance.T
+        )
+        variance_product = float(
+            physical_parameter_covariance[0, 0]
+            * physical_parameter_covariance[1, 1]
+        )
+        if variance_product > 0.0:
+            physical_parameter_correlation = float(
+                physical_parameter_covariance[0, 1] / np.sqrt(variance_product)
+            )
     kappa_identifiability = {
         "status": "locally_identifiable" if kappa_identifiable else "weak_or_non_identifiable",
         "reportable_as_inferred_parameter": kappa_identifiable,
@@ -1076,9 +1126,23 @@ def _fit_kappa(
     ]
     return {
         "electron_temperature_eV": float(te),
-        "electron_temperature_uncertainty_eV": float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
+        "electron_temperature_uncertainty_eV": (
+            float(np.sqrt(max(physical_parameter_covariance[0, 0], 0.0)))
+            if physical_parameter_covariance is not None else None
+        ),
         "electron_velocity_projection_m_s": float(velocity),
-        "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
+        "electron_velocity_projection_uncertainty_m_s": (
+            float(np.sqrt(max(physical_parameter_covariance[1, 1], 0.0)))
+            if physical_parameter_covariance is not None else None
+        ),
+        "physical_parameter_covariance_fit_only": physical_parameter_covariance,
+        "physical_parameter_covariance_order": [
+            "electron_temperature_eV", "electron_velocity_projection_m_s"
+        ],
+        "physical_parameter_correlation_fit_only": physical_parameter_correlation,
+        "physical_parameter_covariance_status": physical_covariance_status,
+        "likelihood_jacobian_rank": fit_jacobian_rank,
+        "likelihood_parameter_count": fit_parameter_count,
         "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
         "kappa_index": kappa, "kappa_index_identifiability": kappa_identifiability,
         "kappa_profile_likelihood": kappa_profile_likelihood,
