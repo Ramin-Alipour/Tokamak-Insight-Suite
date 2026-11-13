@@ -51,6 +51,38 @@ def _wavelength_bin_widths(x):
     return widths
 
 
+def _piecewise_linear_moment_weights(velocity_m_s, power, center_m_s=0.0):
+    """Integrate each nodal hat basis times (v-center)**power exactly.
+
+    The reconstructed EVDF is piecewise linear between velocity nodes. A
+    three-point Gauss-Legendre rule integrates its product with powers through
+    fourth order exactly (the highest polynomial degree is five). The
+    zeroth-order weights reduce to the trapezoidal normalization weights.
+    """
+    velocity = np.asarray(velocity_m_s, dtype=float)
+    if (velocity.ndim != 1 or velocity.size < 2
+            or not np.all(np.isfinite(velocity))
+            or np.any(np.diff(velocity) <= 0.0)):
+        raise ValueError("velocity grid must be finite, strictly increasing and contain at least two nodes")
+    if isinstance(power, (bool, np.bool_)) or not isinstance(power, (int, np.integer)) or not 0 <= int(power) <= 4:
+        raise ValueError("piecewise-linear EVDF moment power must be an integer from zero to four")
+    center = float(center_m_s)
+    if not np.isfinite(center):
+        raise ValueError("moment center must be finite")
+    nodes, quadrature = np.polynomial.legendre.leggauss(3)
+    result = np.zeros(velocity.size, dtype=float)
+    for index, (left, right) in enumerate(zip(velocity[:-1], velocity[1:])):
+        half_width = 0.5 * (right - left)
+        midpoint = 0.5 * (right + left)
+        points = midpoint + half_width * nodes
+        left_basis = (right - points) / (right - left)
+        right_basis = (points - left) / (right - left)
+        weighted_power = half_width * quadrature * (points - center) ** int(power)
+        result[index] += float(weighted_power @ left_basis)
+        result[index + 1] += float(weighted_power @ right_basis)
+    return result
+
+
 def _projected_evdf_physical_moments(
     velocity_m_s, probability_density_s_per_m, covariance=None, *,
     electron_density_m3=None, electron_density_uncertainty_m3=None,
@@ -78,20 +110,22 @@ def _projected_evdf_physical_moments(
     normalization = float(weights @ density)
     if not np.isfinite(normalization) or normalization <= np.finfo(float).tiny:
         raise ValueError("projected EVDF has no positive finite probability integral")
-    pdf = density / normalization
-    m1 = float(weights @ (velocity * pdf))
-    m2 = float(weights @ (velocity**2 * pdf))
-    m3 = float(weights @ (velocity**3 * pdf))
-    m4 = float(weights @ (velocity**4 * pdf))
+
+    # Integrate the piecewise-linear EVDF against powers of velocity exactly.
+    # Applying trapezoidal quadrature to (v-u)^k*f(v) is not exact for k>0,
+    # even though the trapezoid rule exactly normalizes a piecewise-linear f.
+    first_weights = _piecewise_linear_moment_weights(velocity, 1)
+    m1 = float(first_weights @ density) / normalization
     centered_velocity = velocity - m1
-    variance = float(weights @ (centered_velocity**2 * pdf))
+    variance_weights = _piecewise_linear_moment_weights(velocity, 2, m1)
+    third_weights = _piecewise_linear_moment_weights(velocity, 3, m1)
+    fourth_weights = _piecewise_linear_moment_weights(velocity, 4, m1)
+    variance = float(variance_weights @ density) / normalization
     if not np.isfinite(variance) or variance <= 0.0:
         raise ValueError("projected EVDF has non-positive velocity variance")
     sigma = float(np.sqrt(variance))
-    # Evaluate central moments directly about the inferred mean to avoid
-    # catastrophic cancellation for a narrow distribution with large flow.
-    mu3 = float(weights @ (centered_velocity**3 * pdf))
-    mu4 = float(weights @ (centered_velocity**4 * pdf))
+    mu3 = float(third_weights @ density) / normalization
+    mu4 = float(fourth_weights @ density) / normalization
     skewness = mu3 / sigma**3
     excess_kurtosis = mu4 / variance**2 - 3.0
     electron_mass = 9.1093837139e-31
@@ -122,24 +156,22 @@ def _projected_evdf_physical_moments(
         # derivative of the normalization. Omitting it biases all propagated
         # moment uncertainties, especially mean/shape moments.
         inverse_normalization = 1.0 / normalization
-        mean_gradient = weights * (velocity - m1) * inverse_normalization
+        mean_gradient = (
+            first_weights - m1 * weights
+        ) * inverse_normalization
         variance_gradient = (
-            weights * (centered_velocity**2 - variance) * inverse_normalization
-        )
+            variance_weights - variance * weights
+        ) * inverse_normalization
         sigma_gradient = variance_gradient / (2.0 * sigma)
         temperature_gradient = (
             electron_mass / elementary_charge
         ) * variance_gradient
         mu3_gradient = (
-            weights
-            * (centered_velocity**3 - mu3 - 3.0 * variance * centered_velocity)
-            * inverse_normalization
-        )
+            third_weights - mu3 * weights
+        ) * inverse_normalization - 3.0 * variance * mean_gradient
         mu4_gradient = (
-            weights
-            * (centered_velocity**4 - mu4 - 4.0 * mu3 * centered_velocity)
-            * inverse_normalization
-        )
+            fourth_weights - mu4 * weights
+        ) * inverse_normalization - 4.0 * mu3 * mean_gradient
         skewness_gradient = (
             mu3_gradient / variance**1.5
             - 1.5 * mu3 * variance_gradient / variance**2.5
