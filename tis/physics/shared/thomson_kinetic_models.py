@@ -1135,10 +1135,10 @@ def fit_relativistic_maxwell_juttner(
     # Form the covariance from an SVD of the actual whitened Jacobian instead
     # of a pseudo-inverse of normal equations (which squares its condition).
     _, covariance_singular_values, covariance_right_vectors = np.linalg.svd(
-        fit.jac, full_matrices=False
+        scaled_jacobian, full_matrices=False
     )
     covariance_rank_tolerance = (
-        max(fit.jac.shape) * np.finfo(float).eps
+        max(scaled_jacobian.shape) * np.finfo(float).eps
         * float(covariance_singular_values[0])
     )
     covariance_rank = int(np.count_nonzero(
@@ -1149,9 +1149,14 @@ def fit_relativistic_maxwell_juttner(
             "relativistic Maxwell-Juttner covariance is not identifiable: "
             f"whitened Jacobian rank {covariance_rank}/5"
         )
-    covariance_fit = (
+    normalized_covariance_fit = (
         covariance_right_vectors.T / np.square(covariance_singular_values)
     ) @ covariance_right_vectors
+    covariance_fit = (
+        normalized_covariance_fit
+        / column_norms[:, None]
+        / column_norms[None, :]
+    )
     if unc is None and covariance_cholesky is None:
         covariance_fit *= float(2.0*fit.cost/dof)
     te = float(np.exp(np.clip(fit.x[0], -700.0, 700.0)))
