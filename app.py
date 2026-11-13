@@ -1617,6 +1617,7 @@ elif page=='Spectral Analysis':
                     diagnostic = (
                         channel.get('identifiability')
                         or channel.get('kappa_index_identifiability')
+                        or channel.get('parameter_identifiability')
                         or {}
                     )
                     if diagnostic:
