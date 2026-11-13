@@ -732,7 +732,11 @@ def _piecewise_linear_functional_weights(velocity_m_s, function, *, quadrature_o
     return result
 
 
-def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
+def _projected_evdf_relativistic_lab_moments(
+    velocity_m_s, probability_density_s_per_m, covariance=None, *,
+    electron_density_m3=None, electron_density_uncertainty_m3=None,
+    electron_density_flux_per_density_cross_covariance_W_m2=None,
+):
     """Return relativistic lab-frame moments of a projected q-parallel EVDF.
 
     Each observable is integrated against the piecewise-linear EVDF using
@@ -795,6 +799,94 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
         if not np.all(np.isfinite(covariance_out)):
             raise ValueError("relativistic projected physical-moment covariance is not finite")
         uncertainty_out = np.sqrt(np.maximum(np.diag(covariance_out), 0.0))
+    if electron_density_m3 is None and electron_density_uncertainty_m3 is not None:
+        raise ValueError(
+            "electron_density_uncertainty_m3 requires an independently supplied electron_density_m3"
+        )
+    if electron_density_m3 is None and electron_density_flux_per_density_cross_covariance_W_m2 is not None:
+        raise ValueError(
+            "electron_density_flux_per_density_cross_covariance_W_m2 requires an independently supplied electron_density_m3"
+        )
+    if electron_density_uncertainty_m3 is not None and (
+        isinstance(electron_density_uncertainty_m3, (bool, np.bool_))
+        or not isinstance(electron_density_uncertainty_m3, (int, float, np.integer, np.floating))
+        or not np.isfinite(electron_density_uncertainty_m3)
+        or float(electron_density_uncertainty_m3) < 0.0
+    ):
+        raise ValueError("electron_density_uncertainty_m3 must be finite and non-negative")
+    if electron_density_m3 is not None and (
+        isinstance(electron_density_m3, (bool, np.bool_))
+        or not isinstance(electron_density_m3, (int, float, np.integer, np.floating))
+        or not np.isfinite(electron_density_m3)
+        or float(electron_density_m3) <= 0.0
+    ):
+        raise ValueError("electron_density_m3 must be a positive finite scalar")
+    if electron_density_flux_per_density_cross_covariance_W_m2 is not None and (
+        isinstance(electron_density_flux_per_density_cross_covariance_W_m2, (bool, np.bool_))
+        or not isinstance(electron_density_flux_per_density_cross_covariance_W_m2, (int, float, np.integer, np.floating))
+        or not np.isfinite(electron_density_flux_per_density_cross_covariance_W_m2)
+    ):
+        raise ValueError(
+            "electron_density_flux_per_density_cross_covariance_W_m2 must be a finite real scalar"
+        )
+
+    absolute_energy_flux = None
+    absolute_energy_flux_uncertainty = None
+    absolute_flux_uncertainty_assumption = "unavailable_without_evdf_covariance"
+    if electron_density_m3 is not None:
+        density_value = float(electron_density_m3)
+        density_sigma = (
+            0.0 if electron_density_uncertainty_m3 is None
+            else float(electron_density_uncertainty_m3)
+        )
+        absolute_energy_flux = density_value * float(means[2])
+        if electron_density_flux_per_density_cross_covariance_W_m2 is not None and (
+            covariance_out is None or electron_density_uncertainty_m3 is None
+        ):
+            raise ValueError(
+                "density/relativistic-flux cross-covariance requires EVDF covariance "
+                "and electron_density_uncertainty_m3"
+            )
+        if covariance_out is not None:
+            flux_per_density_variance = float(covariance_out[2, 2])
+            density_variance = density_sigma**2
+            cross_covariance = float(
+                electron_density_flux_per_density_cross_covariance_W_m2 or 0.0
+            )
+            cross_limit = np.sqrt(max(density_variance * flux_per_density_variance, 0.0))
+            cross_scale = max(
+                cross_limit, abs(cross_covariance), np.finfo(float).tiny
+            )
+            if abs(cross_covariance) > cross_limit + 1e-10 * cross_scale:
+                raise ValueError(
+                    "density/relativistic-flux cross-covariance violates the joint PSD bound"
+                )
+            flux_variance = (
+                density_value**2 * flux_per_density_variance
+                + float(means[2])**2 * density_variance
+                + 2.0 * density_value * float(means[2]) * cross_covariance
+            )
+            variance_scale = max(
+                density_value**2 * flux_per_density_variance
+                + float(means[2])**2 * density_variance
+                + 2.0 * abs(density_value * float(means[2]) * cross_covariance),
+                np.finfo(float).tiny,
+            )
+            if flux_variance < -1e-10 * variance_scale:
+                raise ValueError(
+                    "joint density/relativistic-flux covariance produced negative variance"
+                )
+            absolute_energy_flux_uncertainty = float(
+                np.sqrt(max(flux_variance, 0.0))
+            )
+            absolute_flux_uncertainty_assumption = (
+                "joint_density_evdf_flux_covariance"
+                if electron_density_flux_per_density_cross_covariance_W_m2 is not None
+                else "independent_density_and_evdf_flux; density treated as exact when uncertainty omitted"
+                if electron_density_uncertainty_m3 is None
+                else "first_order_independent_density_and_evdf_flux"
+            )
+
     return {
         "status": "relativistic_lab_frame_moments_with_covariance" if covariance is not None else "relativistic_lab_frame_moments_only",
         "frame": "laboratory",
@@ -805,6 +897,12 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
         "mean_kinetic_energy_eV": float(means[1] / elementary_charge),
         "mean_lorentz_factor": float(1.0 + means[1] / (electron_mass * c_light**2)),
         "kinetic_energy_flux_per_density_W_m": float(means[2]),
+        "electron_density_input_m3": (
+            None if electron_density_m3 is None else float(electron_density_m3)
+        ),
+        "kinetic_energy_flux_W_m2": absolute_energy_flux,
+        "kinetic_energy_flux_standard_uncertainty_W_m2": absolute_energy_flux_uncertainty,
+        "kinetic_energy_flux_uncertainty_assumption": absolute_flux_uncertainty_assumption,
         "moment_order": ["mean_velocity_parallel_m_s", "mean_kinetic_energy_J", "kinetic_energy_flux_per_density_W_m"],
         "moment_covariance": covariance_out,
         "moment_standard_uncertainty": (
@@ -1921,6 +2019,9 @@ def analyze_thomson_spectral_distribution(
         heat_flux_density_variance_cross_covariance = options.pop(
             "electron_density_variance_cross_covariance_m_minus1_s_minus2", None
         )
+        heat_flux_density_relativistic_cross_covariance = options.pop(
+            "electron_density_flux_per_density_cross_covariance_W_m2", None
+        )
         if heat_flux_density is not None and (
             isinstance(heat_flux_density, (bool, np.bool_))
             or not isinstance(heat_flux_density, (int, float, np.integer, np.floating))
@@ -2114,7 +2215,14 @@ def analyze_thomson_spectral_distribution(
             # moments and explicitly withhold the non-relativistic heat flux.
             moment_summary["relativistic_lab_frame_moments"] = (
                 _projected_evdf_relativistic_lab_moments(
-                    velocity_grid, projected_pdf, moment_covariance_source
+                    velocity_grid,
+                    projected_pdf,
+                    moment_covariance_source,
+                    electron_density_m3=heat_flux_density,
+                    electron_density_uncertainty_m3=heat_flux_density_uncertainty,
+                    electron_density_flux_per_density_cross_covariance_W_m2=(
+                        heat_flux_density_relativistic_cross_covariance
+                    ),
                 )
             )
             moment_summary["nonrelativistic_temperature_validity"] = (
