@@ -4558,15 +4558,20 @@ def fit_optical_thomson_poisson_counts(
     laser_wavelength_nm,
     scattering_angle_rad,
     instrument_response=None,
+    laser_wavelength_uncertainty_nm=0.0,
+    scattering_angle_uncertainty_rad=0.0,
+    laser_angle_covariance_nm_rad=0.0,
+    fit_geometry_cross_covariance_nm2_rad=None,
 ):
-    """Fit a non-collective Maxwellian optical-TS spectrum using Poisson counts.
+    """Infer Maxwellian optical-TS temperature and q-flow from integer counts.
 
-    The Gaussian Maxwellian line is integrated over finite wavelength bins,
-    passed through the calibrated count-response operator, and combined with
-    a non-negative detector-space linear background.  The likelihood is the
-    independent Poisson likelihood; no Gaussian error model or absolute-power
-    calibration is assumed.  Consequently this fit cannot infer density or
-    report integrated scattered power in watts.
+    The finite-bin Gaussian probability is convolved in count space with the
+    calibrated response operator. Independent Poisson deviance is minimized;
+    local parameter covariance is obtained from the whitened deviance
+    Jacobian, with an explicit rank/conditioning gate. Geometry and
+    fit-geometry cross-covariance are propagated through the physical
+    (Te, v_q) transformation. Count data alone do not identify absolute
+    density or calibrated scattered power in watts.
     """
     wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
     counts = _finite_array(observed_counts, "observed_counts", 1)
@@ -4576,10 +4581,46 @@ def fit_optical_thomson_poisson_counts(
         raise ValueError("wavelength_nm must be strictly increasing")
     if np.any(counts < 0.0) or np.any(np.abs(counts - np.rint(counts)) > 1e-8):
         raise ValueError("observed_counts must contain non-negative integer-valued counts")
+    if not np.any(counts > 0.0):
+        raise ValueError("observed_counts must contain a non-zero Thomson signal or detector background")
     laser_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
     angle = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
     if angle >= np.pi:
         raise ValueError("scattering_angle_rad must be strictly less than pi")
+    laser_unc = _finite_scalar(
+        laser_wavelength_uncertainty_nm, "laser_wavelength_uncertainty_nm",
+        minimum=0.0,
+    )
+    angle_unc = _finite_scalar(
+        scattering_angle_uncertainty_rad, "scattering_angle_uncertainty_rad",
+        minimum=0.0,
+    )
+    geometry_cross = _finite_scalar(
+        laser_angle_covariance_nm_rad, "laser_angle_covariance_nm_rad"
+    )
+    geometry_covariance = np.array([
+        [laser_unc**2, geometry_cross],
+        [geometry_cross, angle_unc**2],
+    ], dtype=float)
+    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+    geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
+    if geometry_eigenvalues[0] < -1e-12 * geometry_scale:
+        raise ValueError(
+            "laser/angle calibration covariance must be positive semidefinite; "
+            "require |covariance| <= laser_uncertainty * angle_uncertainty"
+        )
+    if fit_geometry_cross_covariance_nm2_rad is None:
+        fit_geometry_cross = np.zeros((2, 2), dtype=float)
+    else:
+        raw_cross = np.asarray(fit_geometry_cross_covariance_nm2_rad)
+        if (raw_cross.dtype.kind not in "iuf" or raw_cross.shape != (2, 2)
+                or not np.all(np.isfinite(raw_cross))):
+            raise ValueError(
+                "fit_geometry_cross_covariance_nm2_rad must be a finite real 2x2 "
+                "cross-covariance for [fitted_center_nm, intrinsic_sigma_nm] "
+                "against [laser_wavelength_nm, scattering_angle_rad]"
+            )
+        fit_geometry_cross = raw_cross.astype(float, copy=False)
 
     edges = _wavelength_bin_edges(wavelength)
     widths = np.diff(edges)
@@ -4635,8 +4676,8 @@ def fit_optical_thomson_poisson_counts(
         raise ValueError(f"Poisson Maxwellian Thomson fit failed: {fit.message}")
 
     amplitude, center, sigma, background_left, background_right = map(float, fit.x)
-    if sigma <= 0.0:
-        raise ValueError("Fitted intrinsic Maxwellian spectral width must be positive")
+    if amplitude <= 0.0 or sigma <= 0.0:
+        raise ValueError("The fitted Maxwellian signal amplitude and intrinsic width must be positive")
     if center - 3.0 * sigma < wavelength[0] or center + 3.0 * sigma > wavelength[-1]:
         raise ValueError("Wavelength coverage must include at least +/-3 fitted intrinsic widths")
     temperature = thomson_electron_temperature_from_spectral_width(
@@ -4655,53 +4696,176 @@ def fit_optical_thomson_poisson_counts(
         )
 
     fitted = expected_counts(fit.x)
-    covariance = np.linalg.pinv(fit.jac.T @ fit.jac)
-    dof = max(1, wavelength.size - fit.x.size)
+    # The signed square-root Poisson-deviance residual has unit local
+    # information weighting at the optimum: J^T J approximates the expected
+    # Poisson Fisher information. Normalize columns before SVD so parameter
+    # units do not masquerade as a physical identifiability problem.
+    jacobian = np.asarray(fit.jac, dtype=float)
+    column_norms = np.linalg.norm(jacobian, axis=0)
+    if np.any(~np.isfinite(column_norms)) or np.any(column_norms <= np.finfo(float).tiny):
+        raise ValueError("Poisson Thomson inference is locally non-identifiable: a fitted parameter has zero likelihood sensitivity")
+    normalized_jacobian = jacobian / column_norms[None, :]
+    _, singular_values, right_vectors = np.linalg.svd(
+        normalized_jacobian, full_matrices=False
+    )
+    largest = float(singular_values[0]) if singular_values.size else 0.0
+    rank_tolerance = max(normalized_jacobian.shape) * np.finfo(float).eps * largest
+    jacobian_rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    parameter_count = int(fit.x.size)
+    if jacobian_rank < parameter_count:
+        raise ValueError(
+            "Poisson Thomson inference is locally non-identifiable: "
+            f"likelihood Jacobian rank {jacobian_rank} is below {parameter_count} fitted parameters"
+        )
+    condition_number = float(singular_values[0] / singular_values[-1])
+    if not np.isfinite(condition_number) or condition_number > 1e12:
+        raise ValueError(
+            "Poisson Thomson inference is ill-conditioned: normalized likelihood "
+            f"Jacobian condition number is {condition_number:.6g} (limit 1e12)"
+        )
+    covariance_normalized = (
+        right_vectors.T / np.square(singular_values)
+    ) @ right_vectors
+    covariance = (
+        covariance_normalized
+        / column_norms[:, None]
+        / column_norms[None, :]
+    )
+    covariance = 0.5 * (covariance + covariance.T)
+    if np.any(np.linalg.eigvalsh(covariance) < -1e-10 * max(float(np.max(np.abs(covariance))), 1.0)):
+        raise ValueError("Poisson likelihood parameter covariance is not positive semidefinite")
+
+    q = 2.0 * np.sin(angle / 2.0)
+    cot_half = 1.0 / np.tan(angle / 2.0)
+    temperature_gradient = np.array([
+        0.0,
+        0.0,
+        2.0 * temperature / sigma,
+        0.0,
+        0.0,
+    ])
+    velocity_gradient = np.array([
+        0.0,
+        -C_M_S / (laser_nm * q),
+        0.0,
+        0.0,
+        0.0,
+    ])
+    fit_physical_jacobian = np.vstack((temperature_gradient, velocity_gradient))
+    physical_covariance_fit_only = (
+        fit_physical_jacobian @ covariance @ fit_physical_jacobian.T
+    )
+    input_covariance = np.zeros((4, 4), dtype=float)
+    input_covariance[:2, :2] = covariance[np.ix_([1, 2], [1, 2])]
+    input_covariance[2:, 2:] = geometry_covariance
+    input_covariance[:2, 2:] = fit_geometry_cross
+    input_covariance[2:, :2] = fit_geometry_cross.T
+    input_covariance = 0.5 * (input_covariance + input_covariance.T)
+    joint_eigenvalues = np.linalg.eigvalsh(input_covariance)
+    joint_scale = max(float(np.max(np.abs(joint_eigenvalues))), np.finfo(float).tiny)
+    if joint_eigenvalues[0] < -1e-10 * joint_scale:
+        raise ValueError(
+            "joint fitted-count/laser/angle covariance must be positive semidefinite; "
+            "the supplied fit-geometry cross-covariance is inconsistent"
+        )
+    physical_jacobian = np.array([
+        [0.0, 2.0 * temperature / sigma, -2.0 * temperature / laser_nm,
+         -temperature * cot_half],
+        [-C_M_S / (laser_nm * q), 0.0,
+         C_M_S * center / (laser_nm**2 * q),
+         -0.5 * velocity * cot_half],
+    ], dtype=float)
+    physical_covariance = physical_jacobian @ input_covariance @ physical_jacobian.T
+    physical_covariance = 0.5 * (physical_covariance + physical_covariance.T)
+    physical_uncertainties = {
+        "electron_temperature_eV": float(np.sqrt(max(physical_covariance[0, 0], 0.0))),
+        "electron_velocity_projection_m_s": float(np.sqrt(max(physical_covariance[1, 1], 0.0))),
+    }
     probability = float(
         ndtr((edges[-1] - center) / sigma)
         - ndtr((edges[0] - center) / sigma)
     )
     integrated_counts = float(amplitude * np.sqrt(2.0 * np.pi) * sigma * probability)
-    temperature_uncertainty = float(
-        temperature * 2.0 * np.sqrt(max(float(covariance[2, 2]), 0.0)) / sigma
-    )
+    deviance = float(np.sum(poisson_deviance_residual(fit.x)**2))
+    dof = max(1, wavelength.size - parameter_count)
+    log_likelihood = float(np.sum(
+        counts * np.log(fitted) - fitted - gammaln(counts + 1.0)
+    ))
+    physical_correlation = None
+    variance_product = float(physical_covariance[0, 0] * physical_covariance[1, 1])
+    if variance_product > 0.0:
+        physical_correlation = float(physical_covariance[0, 1] / np.sqrt(variance_product))
     return {
         "electron_temperature_eV": float(temperature),
-        "electron_temperature_uncertainty_eV": temperature_uncertainty,
+        "electron_temperature_uncertainty_eV": physical_uncertainties["electron_temperature_eV"],
         "electron_velocity_projection_m_s": float(velocity),
-        "fitted_center_nm": center,
-        "intrinsic_sigma_nm": sigma,
-        "amplitude_counts_per_nm": amplitude,
-        "background_model": "nonnegative_detector_space_linear",
-        "background_endpoint_rates_counts_per_nm": [background_left, background_right],
-        "integrated_signal_counts": integrated_counts,
-        "expected_counts": fitted,
-        "fitted_spectrum": fitted,
-        "residual": counts - fitted,
+        "electron_velocity_projection_uncertainty_m_s": physical_uncertainties["electron_velocity_projection_m_s"],
+        "physical_parameter_covariance": physical_covariance,
+        "physical_parameter_covariance_fit_only": physical_covariance_fit_only,
+        "physical_parameter_covariance_order": [
+            "electron_temperature_eV", "electron_velocity_projection_m_s"
+        ],
+        "physical_parameter_correlation": physical_correlation,
+        "geometry_covariance_nm2_rad2": geometry_covariance,
+        "fit_geometry_cross_covariance_nm2_rad": fit_geometry_cross,
+        "joint_fit_geometry_covariance": input_covariance,
         "fit_covariance": covariance,
         "fit_parameters": np.asarray(fit.x, dtype=float),
         "fit_parameter_names": [
             "amplitude_counts_per_nm", "center_nm", "intrinsic_sigma_nm",
             "background_left_counts_per_nm", "background_right_counts_per_nm",
         ],
+        "identifiability": {
+            "status": "locally_identified" if condition_number <= 1e8 else "weakly_identified",
+            "whitened_jacobian_rank": jacobian_rank,
+            "fitted_parameter_count": parameter_count,
+            "whitened_jacobian_condition_number": condition_number,
+            "singular_values": singular_values.copy(),
+            "rank_tolerance": float(rank_tolerance),
+        },
+        "fitted_center_nm": center,
+        "intrinsic_sigma_nm": sigma,
+        "amplitude_counts_per_nm": amplitude,
+        "background_model": "nonnegative_detector_space_linear",
+        "background_endpoint_rates_counts_per_nm": [background_left, background_right],
+        "integrated_signal_counts": integrated_counts,
+        "captured_spectral_probability": probability,
+        "expected_counts": fitted,
+        "fitted_spectrum": fitted,
+        "residual": counts - fitted,
+        "poisson_deviance": deviance,
+        "reduced_poisson_deviance": deviance / dof,
+        "poisson_log_likelihood": log_likelihood,
         "likelihood": "independent_Poisson",
-        "reduced_chi_square": None,
         "density_inference_available": False,
+        "absolute_power_inference_available": False,
         "instrument_response_applied": True,
+        "instrument_response_supplied": instrument_response is not None,
         "spectral_bin_integration": "exact_Gaussian_CDF_finite_volume_bin_averages",
         "optimizer": {
             "success": bool(fit.success),
             "message": str(fit.message),
             "nfev": int(fit.nfev),
-            "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
-            "parameter_count": int(fit.x.size),
+            "jacobian_rank": jacobian_rank,
+            "jacobian_condition_number": condition_number,
+            "parameter_count": parameter_count,
         },
+        "uncertainty_method": (
+            "Poisson_deviance_likelihood_local_covariance_with_joint_laser_angle_geometry_propagation"
+        ),
         "model": "non-collective_non-relativistic_Maxwellian_optical_Thomson",
+        "formulae": {
+            "expected_bin_counts": "mu_i = sum_j R_ij A_j + integral_bin_i b(lambda) d_lambda",
+            "poisson_deviance": "D = 2 sum_i [mu_i - n_i + n_i log(n_i/mu_i)]",
+            "electron_temperature": "T_e = (m_e c^2/e) [sigma_lambda/(lambda_0 2 sin(theta/2))]^2",
+            "q_parallel_flow": "v_q = c (1 - lambda_c/lambda_0)/(2 sin(theta/2))",
+            "physical_covariance": "C_(Te,vq) = J C_(center,sigma,lambda0,theta) J^T",
+        },
         "assumptions": [
             "independent Poisson-distributed detector counts",
             "single-scattering non-collective regime",
             "isotropic non-relativistic Maxwellian electrons",
-            "known laser wavelength and scattering angle",
+            "known scattering geometry with optional calibration covariance",
             "calibrated photon/count response operator",
             "non-negative linear detector-space background",
         ],
