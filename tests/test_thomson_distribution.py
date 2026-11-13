@@ -2263,3 +2263,10 @@ def test_relativistic_projected_moment_covariance_matches_normalized_functional_
     numerical_covariance = numerical_jacobian @ covariance @ numerical_jacobian.T
     assert predicted == pytest.approx(numerical_covariance, rel=2e-5, abs=1e-10)
     assert np.linalg.eigvalsh(predicted).min() >= -1e-12
+    uncertainty = result["moment_standard_uncertainty"]
+    assert uncertainty["mean_kinetic_energy_eV"] == pytest.approx(
+        uncertainty["mean_kinetic_energy_J"] / 1.602176634e-19
+    )
+    assert uncertainty["mean_lorentz_factor"] == pytest.approx(
+        uncertainty["mean_kinetic_energy_J"] / (9.1093837139e-31 * c**2)
+    )
