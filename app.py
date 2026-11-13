@@ -1661,6 +1661,46 @@ elif page=='Spectral Analysis':
                                 "[electron_temperature_eV, electron_velocity_projection_m_s]"
                             )
                             st.json(channel['physical_parameter_covariance_fit_only'])
+                joint_inference = result.get('joint_inference')
+                if isinstance(joint_inference, dict):
+                    st.markdown('**Joint multi-channel physical inference**')
+                    st.caption(
+                        'This is a separate shared-parameter GLS inference using the full '
+                        'channel-major spectral covariance, not an average of independent '
+                        'channel fits.'
+                    )
+                    joint_summary_display = {
+                        key: joint_inference.get(key)
+                        for key in (
+                            'method', 'integration_status', 'channel_major_covariance_order',
+                            'joint_parameter_count_per_channel', 'reduced_chi_square',
+                            'reduced_chi_square_policy', 'jacobian_rank',
+                            'jacobian_condition_number', 'degrees_of_freedom',
+                            'model_discrepancy_scale', 'model_discrepancy_interpretation',
+                        )
+                        if joint_inference.get(key) is not None
+                    }
+                    if joint_summary_display:
+                        st.json(joint_summary_display)
+                    physical_order = joint_inference.get('physical_parameter_order')
+                    for covariance_key, title in (
+                        ('physical_parameter_covariance', 'Joint fit-only physical covariance'),
+                        ('total_physical_parameter_covariance', 'Joint total physical covariance'),
+                    ):
+                        matrix = joint_inference.get(covariance_key)
+                        if matrix is not None:
+                            matrix_array = np.asarray(matrix, dtype=float)
+                            if matrix_array.ndim == 2 and matrix_array.shape[0] == matrix_array.shape[1]:
+                                labels = (
+                                    physical_order if physical_order
+                                    and len(physical_order) == matrix_array.shape[0]
+                                    else [f'parameter_{index}' for index in range(matrix_array.shape[0])]
+                                )
+                                st.markdown(f'**{title}**')
+                                st.dataframe(
+                                    pd.DataFrame(matrix_array, index=labels, columns=labels),
+                                    width='stretch',
+                                )
                 if result.get('path_integrated_density'):
                     st.markdown('**Conditional path-integrated density result**')
                     st.json(result['path_integrated_density'])
