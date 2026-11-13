@@ -2022,3 +2022,48 @@ def test_product_api_exposes_maxwellian_identifiability_and_physical_covariance(
     assert channel["physical_parameter_covariance_order"] == [
         "electron_temperature_eV", "electron_velocity_projection_m_s"
     ]
+
+
+
+def test_joint_gls_uses_finite_bin_gaussian_forward_model_on_nonuniform_grid():
+    from tis.physics.shared.thomson_inference import _gaussian_bin_averaged_shape
+
+    coordinate = np.linspace(-35.0, 35.0, 241)
+    wavelength = 532.0 + coordinate + 0.002 * coordinate**2
+    assert np.all(np.diff(wavelength) > 0.0)
+    temperatures = (100.0, 145.0)
+    spectra = []
+    for temperature in temperatures:
+        sigma = (
+            2.0 * 532.0 * np.sqrt(temperature / 510998.95069)
+            * np.sin(np.pi / 4.0)
+        )
+        feature, _ = _gaussian_bin_averaged_shape(
+            wavelength, 1200.0, 532.0, sigma
+        )
+        spectra.append(feature + 25.0 + 0.1 * (wavelength - 532.0))
+    measured = np.asarray(spectra)
+    n_wavelength = wavelength.size
+    covariance = np.eye(measured.size) * 0.5**2
+    cross_channel = np.eye(n_wavelength) * 0.15 * 0.5**2
+    covariance[:n_wavelength, n_wavelength:] = cross_channel
+    covariance[n_wavelength:, :n_wavelength] = cross_channel
+
+    result = analyze_thomson_spectra(
+        wavelength, measured, [0.1, 0.2],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(n_wavelength),
+        joint_spectral_covariance=covariance,
+    )
+
+    assert result["joint_inference"]["method"] == "joint generalized least squares across all channels"
+    np.testing.assert_allclose(
+        result["electron_temperature_profile_eV"], temperatures, rtol=0.04
+    )
+    assert all(channel["joint_fit_used"] for channel in result["channels"])
+    assert all(
+        channel["identifiability"]["scope"]
+        == "joint channel-major GLS with shared cross-channel spectral covariance"
+        for channel in result["channels"]
+    )
