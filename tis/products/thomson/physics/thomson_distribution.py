@@ -606,6 +606,85 @@ def _projected_evdf_physical_moments(
 
 
 
+
+def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_density_s_per_m):
+    """Quantify how projected-EVDF moments change when one edge cell is removed.
+
+    This is a deterministic model-domain sensitivity diagnostic, not a
+    measurement uncertainty or a confidence interval. The interior result is
+    independently renormalized after removing the first and last velocity
+    intervals. Piecewise-linear moments are integrated with the same exact
+    quadrature as the reported EVDF moments.
+    """
+    velocity = np.asarray(velocity_m_s, dtype=float)
+    density = np.asarray(probability_density_s_per_m, dtype=float)
+    if (velocity.ndim != 1 or density.shape != velocity.shape or velocity.size < 5
+            or not np.all(np.isfinite(velocity)) or not np.all(np.isfinite(density))
+            or np.any(np.diff(velocity) <= 0.0) or np.any(density < 0.0)):
+        raise ValueError(
+            "grid-truncation sensitivity requires matching finite non-negative "
+            "EVDF values on an increasing grid with at least five nodes"
+        )
+
+    def _moments(v, f):
+        norm_weights = _piecewise_linear_moment_weights(v, 0)
+        norm = float(norm_weights @ f)
+        if not np.isfinite(norm) or norm <= np.finfo(float).tiny:
+            raise ValueError("grid-truncation sensitivity encountered a non-positive EVDF integral")
+        mean_weights = _piecewise_linear_moment_weights(v, 1)
+        mean = float(mean_weights @ f) / norm
+        variance_weights = _piecewise_linear_moment_weights(v, 2, mean)
+        third_weights = _piecewise_linear_moment_weights(v, 3, mean)
+        fourth_weights = _piecewise_linear_moment_weights(v, 4, mean)
+        variance = float(variance_weights @ f) / norm
+        if not np.isfinite(variance) or variance <= 0.0:
+            raise ValueError("grid-truncation sensitivity requires positive velocity variance")
+        third = float(third_weights @ f) / norm
+        fourth = float(fourth_weights @ f) / norm
+        return {
+            "mean_velocity_parallel_m_s": mean,
+            "velocity_parallel_variance_m2_s2": variance,
+            "directional_equivalent_temperature_eV": (
+                9.1093837139e-31 / 1.602176634e-19 * variance
+            ),
+            "central_third_velocity_moment_m3_s3": third,
+            "central_fourth_velocity_moment_m4_s4": fourth,
+            "skewness": third / variance**1.5,
+            "excess_kurtosis": fourth / variance**2 - 3.0,
+        }, norm
+
+    full, full_norm = _moments(velocity, density)
+    interior, _ = _moments(velocity[1:-1], density[1:-1])
+    boundary_area = 0.5 * (
+        (velocity[1] - velocity[0]) * (density[0] + density[1])
+        + (velocity[-1] - velocity[-2]) * (density[-2] + density[-1])
+    )
+    peak = float(np.max(density))
+    deltas = {
+        name: float(interior[name] - full[name])
+        for name in full
+    }
+    return {
+        "status": "computed_one_edge_cell_truncation_sensitivity",
+        "scope": "remove_first_and_last_velocity_intervals_then_renormalize",
+        "boundary_interval_probability_fraction": float(
+            np.clip(boundary_area / full_norm, 0.0, 1.0)
+        ),
+        "boundary_node_density_fraction_of_peak": (
+            0.0 if peak <= 0.0 else float(max(density[0], density[-1]) / peak)
+        ),
+        "full_grid_moments": full,
+        "interior_grid_moments": interior,
+        "interior_minus_full_moments": deltas,
+        "interpretation": (
+            "The interior-minus-full differences quantify sensitivity to removing "
+            "one measured velocity interval at each grid edge. They are not a "
+            "statistical uncertainty, a tail correction, or proof that the true "
+            "EVDF vanishes outside the reconstructed velocity domain."
+        ),
+    }
+
+
 def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s_per_m, covariance=None):
     """Return exact 1-D relativistic lab-frame kinetic moments of a projected EVDF.
 
@@ -1947,6 +2026,14 @@ def analyze_thomson_spectral_distribution(
             electron_density_variance_cross_covariance_m_minus1_s_minus2=(
                 heat_flux_density_variance_cross_covariance
             ),
+        )
+        # Higher EVDF moments are especially sensitive to unresolved velocity
+        # tails. Report a separate deterministic grid-domain sensitivity; do
+        # not fold it into statistical covariance or call it a confidence band.
+        moment_summary["velocity_grid_truncation_sensitivity"] = (
+            _projected_evdf_grid_truncation_sensitivity(
+                velocity_grid, projected_pdf
+            )
         )
         if use_relativistic_inverse:
             # Do not interpret the non-relativistic variance/heat-flux closure
