@@ -105,6 +105,12 @@ def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
     return _run(88, *args, **kwargs)
 
 
+def fit_optical_thomson_poisson_counts(*args: Any, **kwargs: Any) -> Any:
+    """Fit calibrated optical Thomson photon/count spectra with an independent Poisson likelihood."""
+    kwargs["likelihood"] = "independent_Poisson"
+    return _run(1, *args, **kwargs)
+
+
 def fit_two_population_relativistic_spectrum(*args: Any, **kwargs: Any) -> Any:
     """Fit the explicitly parameterized two-population relativistic TS model."""
     from .physics.thomson_workflow import fit_two_population_relativistic_thomson_spectrum
@@ -141,6 +147,7 @@ __all__ = [
     "reconstruct_relativistic_evdf",
     "compare_temperature_tensor_models",
     "infer_path_averaged_density",
+    "fit_optical_thomson_poisson_counts",
     "fit_two_population_relativistic_spectrum",
     "fit_n_population_relativistic_spectrum",
     "fit_kinetic_spectrum_with_background",

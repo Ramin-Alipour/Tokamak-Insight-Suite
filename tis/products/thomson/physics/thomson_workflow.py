@@ -56,6 +56,39 @@ def analyze_thomson_spectra(*args, **kwargs):
     fitted Gaussian widths. Their rank/conditioning gates and covariance are
     returned unchanged by the native physical solver.
     """
+    likelihood = kwargs.pop("likelihood", None)
+    if likelihood == "independent_Poisson":
+        if len(args) == 2:
+            wavelength, counts = args
+        elif len(args) == 0:
+            wavelength = kwargs.pop("wavelength_nm", None)
+            counts = kwargs.pop("observed_counts", None)
+            if counts is None:
+                counts = kwargs.pop("spectra", None)
+        else:
+            raise TypeError("Poisson Analysis-1 accepts wavelength and counts as two positional arguments or named inputs")
+        if wavelength is None or counts is None:
+            raise ValueError("wavelength_nm and observed_counts are required for independent-Poisson inference")
+        laser_nm = kwargs.pop("laser_wavelength_nm", None)
+        angle = kwargs.pop("scattering_angle_rad", None)
+        response = kwargs.pop("instrument_response", None)
+        if "instrument_response_matrix" in kwargs:
+            if response is not None:
+                raise ValueError("Supply instrument_response or instrument_response_matrix once, not both")
+            response = kwargs.pop("instrument_response_matrix")
+        if kwargs:
+            raise TypeError("Unsupported Poisson Analysis-1 options: " + ", ".join(sorted(kwargs)))
+        from tis.physics.shared.thomson_inference import fit_optical_thomson_poisson_counts
+        result = fit_optical_thomson_poisson_counts(
+            wavelength, counts, laser_wavelength_nm=laser_nm,
+            scattering_angle_rad=angle, instrument_response=response,
+        )
+        result["analysis_id"] = 1
+        result["analysis_model"] = "noncollective_maxwellian_independent_Poisson"
+        result["canonical_entry_point"] = "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra"
+        return result
+    if likelihood is not None:
+        raise ValueError("likelihood must be omitted or set to 'independent_Poisson'")
     model = kwargs.get("model")
     advanced_models = {
         "gyrotropic_bi_maxwellian": "gyrotropic_bi_maxwellian_spectral_fit",

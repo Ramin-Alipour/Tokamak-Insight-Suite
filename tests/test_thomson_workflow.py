@@ -205,3 +205,25 @@ def test_spatial_profile_registry_exposes_full_psf_matrix_uncertainty_contract()
     assert "spectral_psf_cross_covariance" in inputs
     assert "systematic_covariance" in inputs
     assert "psf_matrix_calibration_parameter_covariance" in outputs
+
+
+def test_product_api_routes_optical_poisson_counts_to_the_physical_solver():
+    from tis.products.thomson.api import fit_optical_thomson_poisson_counts
+
+    wavelength = np.linspace(530.0, 532.0, 121)
+    expected = (
+        450.0 * np.exp(-0.5 * ((wavelength - 531.0) / 0.18) ** 2)
+        + 18.0 + 2.0 * (wavelength - 531.0)
+    )
+    counts = np.random.default_rng(21).poisson(np.maximum(expected, 1.0)).astype(int)
+    result = fit_optical_thomson_poisson_counts(
+        wavelength, counts, laser_wavelength_nm=531.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+    )
+    assert result["analysis_id"] == 1
+    assert result["likelihood"] == "independent_Poisson"
+    assert result["density_inference_available"] is False
+    assert result["reduced_chi_square"] is None
+    assert result["integrated_signal_counts"] > 0.0
+    assert np.isfinite(result["electron_temperature_eV"])
