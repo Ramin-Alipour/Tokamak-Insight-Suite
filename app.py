@@ -1612,6 +1612,35 @@ elif page=='Spectral Analysis':
                 if result.get('validity_screening'):
                     st.markdown('**Selected-model validity screening**')
                     st.json(result['validity_screening'])
+                channel_identifiability_rows = [
+                    {
+                        'channel_index': channel.get('channel_index'),
+                        'radius_m': channel.get('radius_m'),
+                        'status': (channel.get('identifiability') or {}).get('status'),
+                        'whitened_jacobian_rank': (channel.get('identifiability') or {}).get('whitened_jacobian_rank'),
+                        'fitted_parameter_count': (channel.get('identifiability') or {}).get('fitted_parameter_count'),
+                        'condition_number': (channel.get('identifiability') or {}).get('whitened_jacobian_condition_number'),
+                        'Te_vq_correlation': channel.get('physical_parameter_correlation_fit_only'),
+                    }
+                    for channel in result.get('channels', [])
+                    if channel.get('identifiability')
+                ]
+                if channel_identifiability_rows:
+                    st.markdown('**Maxwellian likelihood identifiability and physical covariance**')
+                    st.caption(
+                        'The reported Te–flow covariance is transformed from the joint '
+                        '[line-centre, intrinsic-width] fit covariance. It is fit-only; '
+                        'geometry, instrument-response, systematic and model-discrepancy '
+                        'uncertainties remain separately identified.'
+                    )
+                    st.dataframe(pd.DataFrame(channel_identifiability_rows), width="stretch")
+                    for channel in result.get('channels', []):
+                        if channel.get('physical_parameter_covariance_fit_only') is not None:
+                            st.caption(
+                                f"Channel {channel.get('channel_index')}: covariance order "
+                                "[electron_temperature_eV, electron_velocity_projection_m_s]"
+                            )
+                            st.json(channel['physical_parameter_covariance_fit_only'])
                 if result.get('path_integrated_density'):
                     st.markdown('**Conditional path-integrated density result**')
                     st.json(result['path_integrated_density'])
