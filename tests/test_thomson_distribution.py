@@ -2076,7 +2076,7 @@ def test_projected_evdf_moments_recover_analytic_two_population_velocity_moments
         / (np.sqrt(2.0 * np.pi) * sigma)
         for fraction, mean, sigma in zip(fractions, means, sigmas)
     )
-    pdf /= np.trapezoid(pdf, velocity)
+    pdf /= np.trapz(pdf, velocity)
 
     expected_mean = float(fractions @ means)
     offsets = means - expected_mean
@@ -2126,7 +2126,7 @@ def test_projected_evdf_joint_pressure_flux_covariance_is_psd_and_density_is_exp
     pdf = np.exp(-0.5 * (velocity / 1.2e5) ** 2) * (
         1.0 + 0.25 * np.tanh(velocity / 1.5e5)
     )
-    pdf /= np.trapezoid(pdf, velocity)
+    pdf /= np.trapz(pdf, velocity)
     evdf_covariance = np.diag((pdf * 0.01) ** 2)
     result = _projected_evdf_physical_moments(
         velocity, pdf, evdf_covariance,
