@@ -1131,7 +1131,27 @@ def fit_relativistic_maxwell_juttner(
         fit.x, return_parts=True, require_full_spectrum=True
     )
     dof = max(1, x.size-5)
-    covariance_fit = np.linalg.pinv(fit.jac.T@fit.jac)
+    # The scaled-Jacobian gate above establishes local identifiability.
+    # Form the covariance from an SVD of the actual whitened Jacobian instead
+    # of a pseudo-inverse of normal equations (which squares its condition).
+    _, covariance_singular_values, covariance_right_vectors = np.linalg.svd(
+        fit.jac, full_matrices=False
+    )
+    covariance_rank_tolerance = (
+        max(fit.jac.shape) * np.finfo(float).eps
+        * float(covariance_singular_values[0])
+    )
+    covariance_rank = int(np.count_nonzero(
+        covariance_singular_values > covariance_rank_tolerance
+    ))
+    if covariance_rank < 5:
+        raise ValueError(
+            "relativistic Maxwell-Juttner covariance is not identifiable: "
+            f"whitened Jacobian rank {covariance_rank}/5"
+        )
+    covariance_fit = (
+        covariance_right_vectors.T / np.square(covariance_singular_values)
+    ) @ covariance_right_vectors
     if unc is None and covariance_cholesky is None:
         covariance_fit *= float(2.0*fit.cost/dof)
     te = float(np.exp(np.clip(fit.x[0], -700.0, 700.0)))
@@ -1241,6 +1261,26 @@ def fit_relativistic_maxwell_juttner(
         "optimizer_success": bool(fit.success),
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
+        "parameter_identifiability": {
+            "status": "locally_identified",
+            "reportable_as_inferred_parameters": True,
+            "scaled_whitened_jacobian_rank": rank,
+            "parameter_count": 5,
+            "scaled_whitened_jacobian_condition_number": condition,
+            "singular_values": singular_values.copy(),
+            "covariance_rank": covariance_rank,
+            "covariance_rank_tolerance": float(covariance_rank_tolerance),
+        },
+        "physical_parameter_covariance_fit_only": covariance_physical[:2, :2].copy(),
+        "physical_parameter_covariance_order": [
+            "electron_temperature_eV", "electron_velocity_projection_m_s"
+        ],
+        "physical_parameter_correlation_fit_only": float(
+            covariance_physical[0, 1] / np.sqrt(
+                max(covariance_physical[0, 0] * covariance_physical[1, 1],
+                    np.finfo(float).tiny)
+            )
+        ),
         "model": "relativistic non-collective Thomson scattering with Lorentz-boosted Maxwell-Juttner electrons",
         "relativistic_kinematics": True,
         "recoil_included": bool(physical["recoil_included"]),
