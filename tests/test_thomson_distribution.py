@@ -2176,3 +2176,90 @@ def test_registered_product_api_executes_spectral_distribution_and_returns_physi
     assert np.isfinite(moments['central_fourth_velocity_moment_m4_s4'])
     assert moments['moment_covariance'] is not None
     assert inverse['spectral_moment_closure']['comparison_performed'] is True
+
+
+
+def test_relativistic_projected_moments_integrate_piecewise_linear_evdf_not_nodal_trapezoids():
+    from scipy.integrate import quad
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_relativistic_lab_moments,
+    )
+
+    c = 299792458.0
+    me = 9.1093837139e-31
+    e = 1.602176634e-19
+    velocity = c * np.array([-0.72, -0.51, -0.23, 0.04, 0.31, 0.58, 0.79])
+    density = np.array([0.03, 0.18, 0.62, 1.0, 0.74, 0.29, 0.06])
+    result = _projected_evdf_relativistic_lab_moments(velocity, density)
+    norm = np.trapezoid(density, velocity)
+
+    def f(v):
+        return float(np.interp(v, velocity, density))
+
+    def energy(v):
+        return (1.0 / np.sqrt(1.0 - (v / c) ** 2) - 1.0) * me * c**2
+
+    expected_mean = quad(lambda v: v * f(v), velocity[0], velocity[-1], points=velocity[1:-1], epsabs=1e-5)[0] / norm
+    expected_energy = quad(lambda v: energy(v) * f(v), velocity[0], velocity[-1], points=velocity[1:-1], epsabs=1e-12)[0] / norm
+    expected_flux = quad(lambda v: energy(v) * v * f(v), velocity[0], velocity[-1], points=velocity[1:-1], epsabs=1e-5)[0] / norm
+
+    assert result["integration_method"] == "piecewise_linear_evdf_interval_gauss_legendre_24_point"
+    assert result["mean_velocity_parallel_m_s"] == pytest.approx(expected_mean, rel=2e-10)
+    assert result["mean_kinetic_energy_eV"] == pytest.approx(expected_energy / e, rel=2e-10)
+    assert result["kinetic_energy_flux_per_density_W_m"] == pytest.approx(expected_flux, rel=2e-10)
+
+
+def test_relativistic_projected_moment_covariance_matches_normalized_functional_finite_difference():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_relativistic_lab_moments,
+    )
+
+    c = 299792458.0
+    velocity = c * np.array([-0.32, -0.21, -0.08, 0.03, 0.17, 0.29])
+    density = np.array([0.08, 0.31, 0.88, 1.0, 0.56, 0.12])
+    factor = np.diag(np.array([1e-6, 2e-6, 3e-6, 2e-6, 1e-6, 1e-6]))
+    covariance = factor @ factor.T
+    result = _projected_evdf_relativistic_lab_moments(
+        velocity, density, covariance
+    )
+    predicted = result["moment_covariance"]
+    numerical_jacobian = np.zeros((3, velocity.size))
+    for index in range(velocity.size):
+        step = 1e-5 * max(abs(density[index]), 0.1)
+        plus = density.copy()
+        minus = density.copy()
+        plus[index] += step
+        minus[index] -= step
+        if minus[index] < 0.0:
+            minus[index] = density[index]
+            derivative_denominator = step
+            rp = _projected_evdf_relativistic_lab_moments(velocity, plus)
+            rm = _projected_evdf_relativistic_lab_moments(velocity, minus)
+            vp = np.array([
+                rp["mean_velocity_parallel_m_s"],
+                rp["mean_kinetic_energy_eV"] * 1.602176634e-19,
+                rp["kinetic_energy_flux_per_density_W_m"],
+            ])
+            vm = np.array([
+                rm["mean_velocity_parallel_m_s"],
+                rm["mean_kinetic_energy_eV"] * 1.602176634e-19,
+                rm["kinetic_energy_flux_per_density_W_m"],
+            ])
+            numerical_jacobian[:, index] = (vp - vm) / derivative_denominator
+        else:
+            rp = _projected_evdf_relativistic_lab_moments(velocity, plus)
+            rm = _projected_evdf_relativistic_lab_moments(velocity, minus)
+            vp = np.array([
+                rp["mean_velocity_parallel_m_s"],
+                rp["mean_kinetic_energy_eV"] * 1.602176634e-19,
+                rp["kinetic_energy_flux_per_density_W_m"],
+            ])
+            vm = np.array([
+                rm["mean_velocity_parallel_m_s"],
+                rm["mean_kinetic_energy_eV"] * 1.602176634e-19,
+                rm["kinetic_energy_flux_per_density_W_m"],
+            ])
+            numerical_jacobian[:, index] = (vp - vm) / (2.0 * step)
+    numerical_covariance = numerical_jacobian @ covariance @ numerical_jacobian.T
+    assert predicted == pytest.approx(numerical_covariance, rel=2e-5, abs=1e-10)
+    assert np.linalg.eigvalsh(predicted).min() >= -1e-12
