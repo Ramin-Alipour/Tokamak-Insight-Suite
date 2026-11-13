@@ -680,6 +680,16 @@ def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_densit
         "full_grid_moments": full,
         "interior_grid_moments": interior,
         "interior_minus_full_moments": deltas,
+        "equations": {
+            "edge_probability_fraction": (
+                "P_edge = [integral(v0,v1,f(v)dv) + "
+                "integral(vN-1,vN,f(v)dv)] / integral(v0,vN,f(v)dv)"
+            ),
+            "moment_domain_sensitivity": (
+                "Delta M_k = M_k(v[1:-1], f[1:-1]) - M_k(v, f); "
+                "each distribution is independently normalized"
+            ),
+        },
         "interpretation": (
             "The interior-minus-full differences quantify sensitivity to removing "
             "one measured velocity interval at each grid edge. They are not a "
