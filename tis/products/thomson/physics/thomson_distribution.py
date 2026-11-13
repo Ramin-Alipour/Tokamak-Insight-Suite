@@ -811,6 +811,10 @@ def _projected_evdf_relativistic_lab_moments(velocity_m_s, probability_density_s
             None if uncertainty_out is None else {
                 "mean_velocity_parallel_m_s": float(uncertainty_out[0]),
                 "mean_kinetic_energy_J": float(uncertainty_out[1]),
+                "mean_kinetic_energy_eV": float(uncertainty_out[1] / elementary_charge),
+                "mean_lorentz_factor": float(
+                    uncertainty_out[1] / (electron_mass * c_light**2)
+                ),
                 "kinetic_energy_flux_per_density_W_m": float(uncertainty_out[2]),
             }
         ),
