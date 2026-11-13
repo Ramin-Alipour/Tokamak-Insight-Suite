@@ -4317,3 +4317,160 @@ def analyze_thomson_spectra(
         },
     }
     return output
+
+
+def fit_optical_thomson_poisson_counts(
+    wavelength_nm,
+    observed_counts,
+    *,
+    laser_wavelength_nm,
+    scattering_angle_rad,
+    instrument_response=None,
+):
+    """Fit a non-collective Maxwellian optical-TS spectrum using Poisson counts.
+
+    The Gaussian Maxwellian line is integrated over finite wavelength bins,
+    passed through the calibrated count-response operator, and combined with
+    a non-negative detector-space linear background.  The likelihood is the
+    independent Poisson likelihood; no Gaussian error model or absolute-power
+    calibration is assumed.  Consequently this fit cannot infer density or
+    report integrated scattered power in watts.
+    """
+    wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
+    counts = _finite_array(observed_counts, "observed_counts", 1)
+    if wavelength.size < 9 or counts.shape != wavelength.shape:
+        raise ValueError("wavelength_nm and observed_counts must be matching vectors with at least nine bins")
+    if np.any(np.diff(wavelength) <= 0.0):
+        raise ValueError("wavelength_nm must be strictly increasing")
+    if np.any(counts < 0.0) or np.any(np.abs(counts - np.rint(counts)) > 1e-8):
+        raise ValueError("observed_counts must contain non-negative integer-valued counts")
+    laser_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
+    angle = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
+    if angle >= np.pi:
+        raise ValueError("scattering_angle_rad must be strictly less than pi")
+
+    edges = _wavelength_bin_edges(wavelength)
+    widths = np.diff(edges)
+    response = (
+        np.eye(wavelength.size, dtype=float)
+        if instrument_response is None
+        else _response_for_channel(instrument_response, 0, 1, wavelength.size, wavelength)
+    )
+    span = float(wavelength[-1] - wavelength[0])
+    spacing = float(np.median(np.diff(wavelength)))
+    peak_index = int(np.argmax(counts))
+    center0 = float(wavelength[peak_index])
+    background0 = max(float(np.median(counts / widths)), np.finfo(float).eps)
+    amplitude0 = max(float(counts[peak_index] / widths[peak_index] - background0), 1.0)
+    sigma0 = max(span / 10.0, spacing)
+    initial = np.array([amplitude0, center0, sigma0, background0, background0], dtype=float)
+    lower = np.array([0.0, wavelength[0], max(spacing * 0.2, 1e-12), 0.0, 0.0])
+    upper = np.array([np.inf, wavelength[-1], span, np.inf, np.inf])
+    fraction = (wavelength - wavelength[0]) / span
+
+    def expected_counts(parameters):
+        amplitude, center, sigma, background_left, background_right = parameters
+        intrinsic_density, _ = _gaussian_bin_averaged_shape(
+            wavelength, amplitude, center, sigma
+        )
+        scattered_bin_counts = response @ (intrinsic_density * widths)
+        background_density = (
+            background_left * (1.0 - fraction) + background_right * fraction
+        )
+        prediction = scattered_bin_counts + background_density * widths
+        return np.maximum(prediction, np.finfo(float).tiny)
+
+    def poisson_deviance_residual(parameters):
+        expected = expected_counts(parameters)
+        positive = counts > 0.0
+        terms = np.empty_like(counts)
+        terms[positive] = (
+            counts[positive] * np.log(counts[positive] / expected[positive])
+            - (counts[positive] - expected[positive])
+        )
+        terms[~positive] = expected[~positive]
+        return np.sign(counts - expected) * np.sqrt(2.0 * np.maximum(terms, 0.0))
+
+    fit = least_squares(
+        poisson_deviance_residual,
+        initial,
+        bounds=(lower, upper),
+        x_scale="jac",
+        method="trf",
+        max_nfev=50000,
+    )
+    if not fit.success or not np.all(np.isfinite(fit.x)):
+        raise ValueError(f"Poisson Maxwellian Thomson fit failed: {fit.message}")
+
+    amplitude, center, sigma, background_left, background_right = map(float, fit.x)
+    if sigma <= 0.0:
+        raise ValueError("Fitted intrinsic Maxwellian spectral width must be positive")
+    if center - 3.0 * sigma < wavelength[0] or center + 3.0 * sigma > wavelength[-1]:
+        raise ValueError("Wavelength coverage must include at least +/-3 fitted intrinsic widths")
+    temperature = thomson_electron_temperature_from_spectral_width(
+        sigma, laser_nm, angle
+    )["electron_temperature_eV"]
+    velocity = thomson_velocity_projection(center, laser_nm, angle)[
+        "electron_velocity_projection_m_s"
+    ]
+    if temperature / ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
+        raise ValueError(
+            "Non-relativistic Maxwellian model rejected: fitted temperature is outside its declared validity range"
+        )
+    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
+        raise ValueError(
+            "Non-relativistic Maxwellian model rejected: fitted flow is outside its declared validity range"
+        )
+
+    fitted = expected_counts(fit.x)
+    covariance = np.linalg.pinv(fit.jac.T @ fit.jac)
+    dof = max(1, wavelength.size - fit.x.size)
+    probability = float(
+        ndtr((edges[-1] - center) / sigma)
+        - ndtr((edges[0] - center) / sigma)
+    )
+    integrated_counts = float(amplitude * np.sqrt(2.0 * np.pi) * sigma * probability)
+    temperature_uncertainty = float(
+        temperature * 2.0 * np.sqrt(max(float(covariance[2, 2]), 0.0)) / sigma
+    )
+    return {
+        "electron_temperature_eV": float(temperature),
+        "electron_temperature_uncertainty_eV": temperature_uncertainty,
+        "electron_velocity_projection_m_s": float(velocity),
+        "fitted_center_nm": center,
+        "intrinsic_sigma_nm": sigma,
+        "amplitude_counts_per_nm": amplitude,
+        "background_model": "nonnegative_detector_space_linear",
+        "background_endpoint_rates_counts_per_nm": [background_left, background_right],
+        "integrated_signal_counts": integrated_counts,
+        "expected_counts": fitted,
+        "fitted_spectrum": fitted,
+        "residual": counts - fitted,
+        "fit_covariance": covariance,
+        "fit_parameters": np.asarray(fit.x, dtype=float),
+        "fit_parameter_names": [
+            "amplitude_counts_per_nm", "center_nm", "intrinsic_sigma_nm",
+            "background_left_counts_per_nm", "background_right_counts_per_nm",
+        ],
+        "likelihood": "independent_Poisson",
+        "reduced_chi_square": None,
+        "density_inference_available": False,
+        "instrument_response_applied": True,
+        "spectral_bin_integration": "exact_Gaussian_CDF_finite_volume_bin_averages",
+        "optimizer": {
+            "success": bool(fit.success),
+            "message": str(fit.message),
+            "nfev": int(fit.nfev),
+            "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
+            "parameter_count": int(fit.x.size),
+        },
+        "model": "non-collective_non-relativistic_Maxwellian_optical_Thomson",
+        "assumptions": [
+            "independent Poisson-distributed detector counts",
+            "single-scattering non-collective regime",
+            "isotropic non-relativistic Maxwellian electrons",
+            "known laser wavelength and scattering angle",
+            "calibrated photon/count response operator",
+            "non-negative linear detector-space background",
+        ],
+    }
