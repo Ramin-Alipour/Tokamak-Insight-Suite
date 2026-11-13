@@ -1932,3 +1932,44 @@ def test_collective_kappa_population_mixture_is_reachable_through_analysis1_api(
     assert channel["electron_mixture_moments"]["between_population_drift_temperature_eV"] > 0.0
     assert channel["ion_populations"] == ion_populations
 
+
+
+def test_maxwellian_physical_covariance_preserves_center_width_correlation():
+    from tis.physics.shared.thomson_inference import _fit_noncollective
+
+    wavelength = np.linspace(492.0, 572.0, 801)
+    laser_nm = 532.0
+    angle = np.pi / 2.0
+    true_sigma = 2.0 * laser_nm * np.sqrt(120.0 / 510998.95069) * np.sin(angle / 2.0)
+    feature, _ = _gaussian_bin_averaged_shape(
+        wavelength, 1200.0, 532.015, true_sigma
+    )
+    response = _asymmetric_lsf(wavelength.size)
+    measured = response @ feature + 25.0 + 0.1 * (wavelength - 532.0)
+    fit = _fit_noncollective(
+        wavelength, measured, laser_nm, angle, response,
+        np.full(wavelength.size, 0.8),
+    )
+
+    covariance = np.asarray(fit["fit_covariance"], dtype=float)
+    physical_covariance = np.asarray(
+        fit["physical_parameter_covariance_fit_only"], dtype=float
+    )
+    assert physical_covariance.shape == (2, 2)
+    assert fit["physical_parameter_covariance_order"] == [
+        "electron_temperature_eV", "electron_velocity_projection_m_s"
+    ]
+    assert np.allclose(physical_covariance, physical_covariance.T, rtol=1e-12, atol=1e-18)
+    assert np.linalg.eigvalsh(physical_covariance).min() >= -1e-12
+    assert fit["electron_temperature_uncertainty_eV"] == pytest.approx(
+        np.sqrt(physical_covariance[0, 0])
+    )
+    assert fit["electron_velocity_projection_uncertainty_m_s"] == pytest.approx(
+        np.sqrt(physical_covariance[1, 1])
+    )
+    assert fit["identifiability"]["whitened_jacobian_rank"] == fit["identifiability"]["fitted_parameter_count"]
+    assert np.isfinite(fit["identifiability"]["whitened_jacobian_condition_number"])
+    assert fit["physical_parameter_correlation_fit_only"] == pytest.approx(
+        physical_covariance[0, 1] /
+        np.sqrt(physical_covariance[0, 0] * physical_covariance[1, 1])
+    )
