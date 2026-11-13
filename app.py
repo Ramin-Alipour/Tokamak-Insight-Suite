@@ -5394,7 +5394,7 @@ elif page=='Advanced Analysis':
                                 f"EVDF moment status: {physical_moments.get('status', 'not declared')}; "
                                 f"primary-result status: {physical_moments.get('primary_result_status', 'not declared')}."
                             )
-                            if physical_moments.get('moment_candidate_used'):
+                            if evdf_result.get('moment_candidate_used'):
                                 st.warning(
                                     'These moments describe a regularized conditional candidate; '
                                     'the inverse did not establish full data identifiability.'
@@ -5435,6 +5435,31 @@ elif page=='Advanced Analysis':
                                         {'Cumulative probability': probability},
                                         index=pd.Index(energy_axis, name='Parallel random energy (eV)'),
                                     ))
+                            moment_covariance = physical_moments.get('moment_covariance')
+                            moment_order = physical_moments.get('moment_covariance_order')
+                            if moment_covariance is not None and moment_order is not None:
+                                moment_covariance = np.asarray(moment_covariance, dtype=float)
+                                if moment_covariance.shape == (len(moment_order), len(moment_order)):
+                                    with st.expander('Full projected-EVDF physical-moment covariance'):
+                                        st.dataframe(
+                                            pd.DataFrame(moment_covariance, index=moment_order, columns=moment_order),
+                                            width='stretch',
+                                        )
+                            model_selection = evdf_result.get('parametric_model_selection_uncertainty')
+                            if isinstance(model_selection, dict) and isinstance(model_selection.get('weights'), dict):
+                                st.markdown('**Projected EVDF parametric-model support**')
+                                st.caption(
+                                    'Akaike-relative weights across converged candidate families; '
+                                    'these are not Bayesian posterior probabilities.'
+                                )
+                                st.dataframe(
+                                    pd.DataFrame([
+                                        {'Candidate model': name, 'Akaike-relative weight': float(weight)}
+                                        for name, weight in model_selection['weights'].items()
+                                    ]),
+                                    width='stretch',
+                                    hide_index=True,
+                                )
                             joint_covariance = physical_moments.get('parallel_pressure_heat_flux_joint_covariance')
                             joint_order = physical_moments.get('parallel_pressure_heat_flux_joint_covariance_order')
                             if joint_covariance is not None and joint_order is not None:
