@@ -2163,7 +2163,7 @@ def test_registered_product_api_executes_spectral_distribution_and_returns_physi
         projected_evdf_options={
             'velocity_limit_m_s': 1.0e6,
             'velocity_points': 81,
-            'regularization_strength': 1e-3,
+            'regularization_strength': None,
         },
     )
     inverse = result['projected_evdf_inference']
