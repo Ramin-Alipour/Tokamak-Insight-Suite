@@ -5490,6 +5490,32 @@ elif page=='Advanced Analysis':
                                 'parallel to q. They are not wavelength-space moments and do not '
                                 'constitute a full 3-D pressure tensor or heat flux.'
                             )
+                            grid_sensitivity = physical_moments.get('velocity_grid_truncation_sensitivity')
+                            if isinstance(grid_sensitivity, dict):
+                                st.markdown('**Velocity-grid truncation sensitivity**')
+                                st.caption(
+                                    'This deterministic comparison removes one velocity interval at each edge and renormalizes. '
+                                    'It is a model-domain sensitivity diagnostic, not a statistical uncertainty or tail correction.'
+                                )
+                                st.metric(
+                                    'Probability in the two edge intervals',
+                                    f"{float(grid_sensitivity.get('boundary_interval_probability_fraction', 0.0)):.4g}"
+                                )
+                                st.metric(
+                                    'Maximum edge-node density / peak density',
+                                    f"{float(grid_sensitivity.get('boundary_node_density_fraction_of_peak', 0.0)):.4g}"
+                                )
+                                full_moments = grid_sensitivity.get('full_grid_moments') or {}
+                                interior_moments = grid_sensitivity.get('interior_grid_moments') or {}
+                                delta_moments = grid_sensitivity.get('interior_minus_full_moments') or {}
+                                sensitivity_rows = [
+                                    {'Moment': key, 'Full grid': full_moments.get(key),
+                                     'Interior grid': interior_moments.get(key),
+                                     'Interior − full': delta_moments.get(key)}
+                                    for key in full_moments
+                                ]
+                                if sensitivity_rows:
+                                    st.dataframe(pd.DataFrame(sensitivity_rows), width='stretch', hide_index=True)
                             moment_rows = [
                                 ('Mean q-parallel velocity', 'mean_velocity_parallel_m_s', 'm/s'),
                                 ('q-parallel velocity variance', 'velocity_parallel_variance_m2_s2', 'm²/s²'),
