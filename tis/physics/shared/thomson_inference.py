@@ -961,11 +961,17 @@ def _fit_kappa(
     dof_fit = max(1, wavelength.size - p_scaled.size)
     # Retain the SVD rank information instead of allowing a pseudo-inverse
     # to make an unidentifiable Kappa/background decomposition look precise.
+    fit_column_norms = np.linalg.norm(fit.jac, axis=0)
+    fit_normalized_jacobian = np.divide(
+        fit.jac, fit_column_norms[None, :],
+        out=np.zeros_like(fit.jac),
+        where=fit_column_norms[None, :] > np.finfo(float).tiny,
+    )
     _, fit_singular_values, fit_right_vectors = np.linalg.svd(
-        fit.jac, full_matrices=False
+        fit_normalized_jacobian, full_matrices=False
     )
     fit_rank_tolerance = (
-        max(fit.jac.shape) * np.finfo(float).eps
+        max(fit_normalized_jacobian.shape) * np.finfo(float).eps
         * (float(fit_singular_values[0]) if fit_singular_values.size else 0.0)
     )
     fit_jacobian_rank = int(np.count_nonzero(
@@ -973,16 +979,22 @@ def _fit_kappa(
     ))
     fit_parameter_count = int(fit.x.size)
     if fit_jacobian_rank == fit_parameter_count:
-        covariance_scaled = (
+        normalized_covariance = (
             fit_right_vectors.T / np.square(fit_singular_values)
         ) @ fit_right_vectors
     else:
         # A diagnostic generalized inverse is retained only to support the
         # optimizer's profile-likelihood exploration. Its plasma uncertainties
         # are explicitly marked non-reportable below.
-        covariance_scaled = np.linalg.pinv(
-            fit.jac.T @ fit.jac, rcond=max(fit.jac.shape) * np.finfo(float).eps
+        normalized_covariance = np.linalg.pinv(
+            fit_normalized_jacobian.T @ fit_normalized_jacobian,
+            rcond=max(fit_normalized_jacobian.shape) * np.finfo(float).eps,
         )
+    covariance_scaled = (
+        normalized_covariance
+        / np.maximum(fit_column_norms[:, None], np.finfo(float).tiny)
+        / np.maximum(fit_column_norms[None, :], np.finfo(float).tiny)
+    )
     if uncertainty_scaled is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun @ fit.fun / dof_fit)
     parameter_scales = np.r_[signal_scale, 1.0, 1.0, 1.0,
