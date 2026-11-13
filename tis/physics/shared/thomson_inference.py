@@ -634,7 +634,8 @@ def _fit_noncollective(
         "fit_parameters": fit_parameters,
         "fit_parameter_names": fit_parameter_names,
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),
-                      "nfev": int(fit.nfev), "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
+                      "nfev": int(fit.nfev), "jacobian_rank": jacobian_rank,
+                      "jacobian_condition_number": jacobian_condition_number,
                       "parameter_count": int(fit.x.size)},
         "uncertainty_interpretation": (
             "local covariance from supplied full spectral covariance"
