@@ -146,11 +146,18 @@ def analyze_thomson_spectra(*args, **kwargs):
         result["analysis_model"] = model
         if radius is not None:
             result["view_radius_m"] = np.asarray(radius, dtype=float).copy()
-        result["canonical_entry_point"] = "tokamak_analysis.thomson_workflow.analyze_thomson_spectra"
+        result["canonical_entry_point"] = "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra"
         return result
 
     from tis.physics.shared.thomson_inference import analyze_thomson_spectra as _infer
-    return _infer(*args, **kwargs)
+    result = _infer(*args, **kwargs)
+    if isinstance(result, dict):
+        result = dict(result)
+        result["analysis_id"] = 1
+        result["canonical_entry_point"] = (
+            "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra"
+        )
+    return result
 
 
 
