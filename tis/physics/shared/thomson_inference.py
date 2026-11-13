@@ -485,12 +485,18 @@ def _fit_noncollective(
     # A pseudo-inverse can silently turn an underdetermined spectrum/background
     # decomposition into apparently precise plasma parameters. Require a
     # locally full-rank likelihood Jacobian before reporting Te or flow.
+    jacobian_column_norms = np.linalg.norm(fit.jac, axis=0)
+    normalized_jacobian = np.divide(
+        fit.jac, jacobian_column_norms[None, :],
+        out=np.zeros_like(fit.jac),
+        where=jacobian_column_norms[None, :] > np.finfo(float).tiny,
+    )
     _, singular_values, right_singular_vectors = np.linalg.svd(
-        fit.jac, full_matrices=False
+        normalized_jacobian, full_matrices=False
     )
     largest_singular_value = float(singular_values[0]) if singular_values.size else 0.0
     rank_tolerance = (
-        max(fit.jac.shape) * np.finfo(float).eps * largest_singular_value
+        max(normalized_jacobian.shape) * np.finfo(float).eps * largest_singular_value
     )
     jacobian_rank = int(np.count_nonzero(singular_values > rank_tolerance))
     parameter_count = int(fit.x.size)
@@ -507,9 +513,14 @@ def _fit_noncollective(
     )
     # Construct (J^T J)^-1 from the SVD without explicitly squaring
     # the Jacobian condition number in a normal-equation solve.
-    covariance_scaled = (
+    covariance_normalized = (
         right_singular_vectors.T / np.square(singular_values)
     ) @ right_singular_vectors
+    covariance_scaled = (
+        covariance_normalized
+        / jacobian_column_norms[:, None]
+        / jacobian_column_norms[None, :]
+    )
     if sigma_y is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun@fit.fun/dof)
     scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
@@ -3190,7 +3201,7 @@ def analyze_thomson_spectra(
         # the full cross-channel blocks are retained without normal-equation
         # condition-number squaring.
         _, joint_covariance_singular_values, joint_right_vectors = np.linalg.svd(
-            joint_fit.jac, full_matrices=False
+            joint_scaled_jacobian, full_matrices=False
         )
         joint_covariance_tolerance = (
             max(joint_fit.jac.shape) * np.finfo(float).eps
@@ -3204,9 +3215,14 @@ def analyze_thomson_spectra(
                 "Joint Thomson GLS covariance is not identifiable: "
                 f"whitened Jacobian rank {joint_covariance_rank}/{initial.size}"
             )
-        parameter_covariance = (
+        normalized_parameter_covariance = (
             joint_right_vectors.T / np.square(joint_covariance_singular_values)
         ) @ joint_right_vectors
+        parameter_covariance = (
+            normalized_parameter_covariance
+            / joint_column_norms[:, None]
+            / joint_column_norms[None, :]
+        )
         dof_joint = max(1, measured_flat.size-initial.size)
         standardized = joint_residual(joint_fit.x)
         reduced_chi2_joint = float(standardized @ standardized / dof_joint)
