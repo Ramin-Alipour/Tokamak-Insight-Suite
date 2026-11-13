@@ -2059,3 +2059,115 @@ def test_analysis_81_contract_exposes_the_physical_evdf_moment_covariance():
     assert "not a 3-D pressure tensor or heat flux" in inputs[
         "projected_evdf_options"
     ]["description"]
+
+
+
+def test_projected_evdf_moments_recover_analytic_two_population_velocity_moments_and_flux():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-8.0e5, 8.0e5, 4001)
+    fractions = np.array([0.65, 0.35])
+    means = np.array([-0.55e5, 1.10e5])
+    sigmas = np.array([0.72e5, 0.43e5])
+    pdf = sum(
+        fraction * np.exp(-0.5 * ((velocity - mean) / sigma) ** 2)
+        / (np.sqrt(2.0 * np.pi) * sigma)
+        for fraction, mean, sigma in zip(fractions, means, sigmas)
+    )
+    pdf /= np.trapezoid(pdf, velocity)
+
+    expected_mean = float(fractions @ means)
+    offsets = means - expected_mean
+    component_variances = sigmas**2
+    expected_variance = float(
+        fractions @ (component_variances + offsets**2)
+    )
+    expected_mu3 = float(
+        fractions @ (offsets**3 + 3.0 * offsets * component_variances)
+    )
+    expected_mu4 = float(
+        fractions @ (
+            offsets**4 + 6.0 * offsets**2 * component_variances
+            + 3.0 * component_variances**2
+        )
+    )
+    density = 4.0e18
+    result = _projected_evdf_physical_moments(
+        velocity, pdf, electron_density_m3=density,
+    )
+
+    electron_mass = 9.1093837139e-31
+    elementary_charge = 1.602176634e-19
+    assert result['mean_velocity_parallel_m_s'] == pytest.approx(expected_mean, rel=2e-5)
+    assert result['velocity_parallel_variance_m2_s2'] == pytest.approx(expected_variance, rel=2e-5)
+    assert result['central_third_velocity_moment_m3_s3'] == pytest.approx(expected_mu3, rel=2e-4)
+    assert result['central_fourth_velocity_moment_m4_s4'] == pytest.approx(expected_mu4, rel=2e-4)
+    assert result['directional_equivalent_temperature_eV'] == pytest.approx(
+        electron_mass * expected_variance / elementary_charge, rel=2e-5
+    )
+    assert result['parallel_projected_pressure_Pa'] == pytest.approx(
+        electron_mass * density * expected_variance, rel=2e-5
+    )
+    assert result['parallel_projected_heat_flux_W_m2'] == pytest.approx(
+        0.5 * electron_mass * density * expected_mu3, rel=2e-4
+    )
+    assert result['heat_flux_physical_scope'].startswith('one_dimensional_parallel_kinetic_energy_flux_component_only')
+    assert result['heat_flux_identifiability']['status'] == 'not_identified_from_single_projected_marginal'
+
+
+def test_projected_evdf_joint_pressure_flux_covariance_is_psd_and_density_is_explicit():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-5.0e5, 5.0e5, 301)
+    pdf = np.exp(-0.5 * (velocity / 1.2e5) ** 2) * (
+        1.0 + 0.25 * np.tanh(velocity / 1.5e5)
+    )
+    pdf /= np.trapezoid(pdf, velocity)
+    evdf_covariance = np.diag((pdf * 0.01) ** 2)
+    result = _projected_evdf_physical_moments(
+        velocity, pdf, evdf_covariance,
+        electron_density_m3=3.0e18,
+        electron_density_uncertainty_m3=1.5e17,
+    )
+
+    joint = result['parallel_pressure_heat_flux_joint_covariance']
+    assert joint.shape == (2, 2)
+    assert np.linalg.eigvalsh(joint).min() >= -1e-10 * max(np.max(np.abs(joint)), 1e-300)
+    assert result['parallel_pressure_heat_flux_joint_standard_uncertainty'].shape == (2,)
+    assert result['density_evdf_moment_joint_covariance'].shape == (3, 3)
+    assert result['parallel_pressure_density_input_m3'] == pytest.approx(3.0e18)
+
+
+def test_registered_product_api_executes_spectral_distribution_and_returns_physical_evdf_moments():
+    from tis.products.thomson.api import analyze_spectral_distribution
+
+    wavelength = np.linspace(520.0, 544.0, 241)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 1.0) ** 2) + 0.02
+    result = analyze_spectral_distribution(
+        wavelength,
+        signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=np.full_like(wavelength, 0.02),
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        signal_uncertainty=np.full_like(wavelength, 1e-3),
+        projected_evdf_options={
+            'velocity_limit_m_s': 1.0e6,
+            'velocity_points': 81,
+            'regularization_strength': 1e-3,
+        },
+    )
+    inverse = result['projected_evdf_inference']
+    moments = inverse['projected_evdf_physical_moments']
+    assert inverse['source_spectrum'] == 'same_calibrated_measured_spectrum_as_spectral_distribution'
+    assert inverse['inference_scope'] == 'one_dimensional_q_parallel_velocity_marginal_only'
+    assert moments['velocity_projection'] == 'q_parallel_one_dimensional_marginal'
+    assert moments['velocity_parallel_variance_m2_s2'] > 0.0
+    assert np.isfinite(moments['central_third_velocity_moment_m3_s3'])
+    assert np.isfinite(moments['central_fourth_velocity_moment_m4_s4'])
+    assert moments['moment_covariance'] is not None
+    assert inverse['spectral_moment_closure']['comparison_performed'] is True
