@@ -5410,6 +5410,8 @@ elif page=='Advanced Analysis':
                                 ('Fourth central velocity moment', 'central_fourth_velocity_moment_m4_s4', 'm⁴/s⁴'),
                                 ('Velocity skewness', 'skewness', '1'),
                                 ('Velocity excess kurtosis', 'excess_kurtosis', '1'),
+                                ('Mean q-parallel random kinetic energy', 'mean_random_kinetic_energy_parallel_eV', 'eV'),
+                                ('q-parallel random kinetic-energy variance', 'random_kinetic_energy_parallel_variance_eV2', 'eV²'),
                             ]
                             moment_table = []
                             standard_uncertainty = physical_moments.get('moment_standard_uncertainty') or {}
@@ -5478,6 +5480,18 @@ elif page=='Advanced Analysis':
                                         'Absolute projected pressure and kinetic-energy flux are withheld '
                                         'because independent density and/or EVDF covariance inputs were not supplied.'
                                     )
+                            relativistic_moments = physical_moments.get('relativistic_lab_frame_moments')
+                            if isinstance(relativistic_moments, dict):
+                                st.markdown('**Relativistic projected lab-frame kinetic moments**')
+                                st.caption(
+                                    'These are exact relativistic moments of the one-dimensional q-parallel marginal. '
+                                    'The energy flux is per density and is not the comoving 3-D heat flux.'
+                                )
+                                st.dataframe(pd.DataFrame([
+                                    {'Quantity': 'Mean kinetic energy', 'Value': relativistic_moments.get('mean_kinetic_energy_eV'), 'Unit': 'eV'},
+                                    {'Quantity': 'Mean Lorentz factor', 'Value': relativistic_moments.get('mean_lorentz_factor'), 'Unit': '1'},
+                                    {'Quantity': 'Lab-frame kinetic-energy flux per density', 'Value': relativistic_moments.get('kinetic_energy_flux_per_density_W_m'), 'Unit': 'W·m'},
+                                ]), width='stretch', hide_index=True)
                             energy_cdf = physical_moments.get('projected_parallel_kinetic_energy_cdf_eV')
                             if isinstance(energy_cdf, dict):
                                 energy_axis = np.asarray(energy_cdf.get('energy_grid_eV', []), dtype=float)
