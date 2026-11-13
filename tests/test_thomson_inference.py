@@ -414,6 +414,17 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert channel["relativistic_external_temperature_uncertainty_eV"] > 0.0
     assert channel["effective_differential_cross_section_m2_sr"] > 0.0
     assert channel["effective_differential_cross_section_uncertainty_m2_sr"] > 0.0
+    assert channel["parameter_identifiability"]["status"] == "locally_identified"
+    assert channel["parameter_identifiability"]["scaled_whitened_jacobian_rank"] == 5
+    relativistic_physical_covariance = np.asarray(
+        channel["physical_parameter_covariance_fit_only"], dtype=float
+    )
+    assert relativistic_physical_covariance.shape == (2, 2)
+    assert np.allclose(
+        relativistic_physical_covariance,
+        relativistic_physical_covariance.T,
+        rtol=1e-12, atol=1e-18,
+    )
     evdf = channel["electron_velocity_distribution"]
     assert evdf["analysis_status"] in {"completed", "conditional_regularized_candidate"}
     assert evdf["recoil_included"] is False
