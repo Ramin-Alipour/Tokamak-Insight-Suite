@@ -2060,6 +2060,14 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("projected_evdf_options.kinematics must be nonrelativistic, relativistic_thomson or compton")
         use_relativistic_inverse = kinematics in {"relativistic_thomson", "compton"} or include_compton_recoil is True
         use_compton_recoil = bool(include_compton_recoil) or kinematics == "compton"
+        if (
+            not use_relativistic_inverse
+            and heat_flux_density_relativistic_cross_covariance is not None
+        ):
+            raise ValueError(
+                "electron_density_flux_per_density_cross_covariance_W_m2 "
+                "is available only for relativistic Thomson/Compton kinematics"
+            )
         if use_relativistic_inverse:
             from tis.physics.shared.thomson_gap_closure import reconstruct_relativistic_projected_thomson_evdf
             velocity_grid = options.pop("velocity_grid_m_s", None)
