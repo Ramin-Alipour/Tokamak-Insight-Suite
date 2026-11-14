@@ -4873,6 +4873,29 @@ def analyze_thomson_spectra(
                     "status": "regularized_candidate_not_independently_identified",
                     "reason": "The projected EVDF is a conditional regularized candidate; higher moments are especially sensitive to finite velocity support and regularization.",
                 })
+        projected_closure = evdf.get("projected_moment_thermodynamic_closure", {})
+        for quantity, unit, output_key in (
+            ("directional_pressure_Pa", "Pa", "directional q-component of electron pressure"),
+            ("projected_kinetic_energy_flux_W_m2", "W m^-2", "one-dimensional projected kinetic-energy flux"),
+        ):
+            value = projected_closure.get(quantity)
+            item = {
+                "parameter": quantity,
+                "unit": unit,
+                "physical_interpretation": output_key,
+                "scope": "one_dimensional_scattering_vector_marginal_not_full_3d_tensor_or_heat_flux",
+            }
+            if value is not None and np.isfinite(float(value)):
+                primary.append({
+                    **item,
+                    "status": "derived_from_identified_absolute_density_and_projected_evdf",
+                })
+            elif projected_closure:
+                conditional.append({
+                    **item,
+                    "status": "requires_independent_absolute_electron_density",
+                    "reason": "A normalized projected EVDF does not identify absolute density; no density is inferred from spectral shape.",
+                })
         channel_classification.append({
             "channel_index": int(channel_index),
             "primary": primary,
