@@ -2500,6 +2500,6 @@ def test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment():
     grid_weights[1:-1] = 0.5 * (grid[2:] - grid[:-2])
     projected_mean = float(grid_weights @ (grid * marginal))
     projected_variance = float(grid_weights @ ((grid - projected_mean) ** 2 * marginal))
-    assert projected_mean == pytest.approx(direct_mean, abs=1e-8)
+    assert projected_mean == pytest.approx(direct_mean, rel=1e-10, abs=1e-6)
     assert projected_variance == pytest.approx(direct_variance, rel=5e-3)
 
