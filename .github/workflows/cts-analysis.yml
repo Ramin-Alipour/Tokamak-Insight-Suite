@@ -6,6 +6,7 @@ on:
     paths:
       - "tokamak_analysis/**"
       - "tis/products/thomson/**"
+      - "tis/physics/shared/**"
       - "tis/contracts.py"
       - "tis/data/ANALYSIS_FAMILIES.json"
       - "tis/data/DIAGNOSTIC_REGISTRY.json"
@@ -25,6 +26,7 @@ on:
     paths:
       - "tokamak_analysis/**"
       - "tis/products/thomson/**"
+      - "tis/physics/shared/**"
       - "tis/contracts.py"
       - "tis/data/ANALYSIS_FAMILIES.json"
       - "tis/data/DIAGNOSTIC_REGISTRY.json"
