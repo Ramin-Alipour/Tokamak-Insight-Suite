@@ -6263,6 +6263,10 @@
         {
           "name": "fast_ion_projection_diagnostics",
           "unit": "structured; projection direction, conservative deposition method and normalization"
+        },
+        {
+          "name": "fast_ion_flow_projection_m_s",
+          "unit": "m s^-1; fast-ion bulk-flow projection onto q; one value per frequency-resolved geometry sample"
         }
       ],
       "assumptions": [
@@ -6356,7 +6360,8 @@
             "residual",
             "fit_covariance",
             "optional fast-ion VDF and covariance diagnostics",
-            "fast_ion_projected_velocity_grid_m_s and fast_ion_projected_probability_density_s_per_m for externally supplied tabulated-3D fast ions; one marginal per frequency-resolved geometry sample"
+            "fast_ion_projected_velocity_grid_m_s and fast_ion_projected_probability_density_s_per_m for externally supplied tabulated-3D fast ions; one marginal per frequency-resolved geometry sample",
+            "fast_ion_flow_projection_m_s for supplied independent 3-D fast-ion bulk flow or the shared thermal-species projection"
           ],
           "scope": "Unmagnetized longitudinal multi-species dielectric forward model. The inversion method is selected explicitly; fast-ion Maxwellian/tabulated-VDF options are model components, not additional CTS physical model families."
         },
