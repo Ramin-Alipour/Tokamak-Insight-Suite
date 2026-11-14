@@ -4670,8 +4670,9 @@ elif page=='Advanced Analysis':
                 cts_fast_vdf_upload=st.file_uploader('Fast-ion VDF CSV (velocity_m_s, probability_density_m_s_inverse)',type=['csv','txt'],key='cts_fast_vdf')
             elif cts_fast_mode=='Fixed tabulated 3-D EVDF':
                 cts_fast_vdf_upload=st.file_uploader('3-D fast-ion EVDF CSV (vx, vy, vz, probability_density_s3_per_m3, velocity_cell_volume_m3_per_s3)',type=['csv','txt'],key='cts_fast_vdf_3d')
-                cts_fast_projection_grid=st.text_area('Projected q-velocity grid JSON (m/s; >=9 increasing nodes)',placeholder='[-2e6,-1.9e6,...,2e6]',key='cts_fast_projection_grid_3d')
+                cts_fast_projection_grid=st.text_area('Projected q-velocity grid JSON (m/s; >=9 increasing nodes)',placeholder='[-2e6,-1.5e6,-1e6,-5e5,0,5e5,1e6,1.5e6,2e6]',key='cts_fast_projection_grid_3d')
                 cts_fast_3d_flow_vector=st.text_input('Optional 3-D fast-ion bulk-flow vector JSON (m/s; overrides thermal-species projected flow)',value='',key='cts_fast_3d_flow_vector')
+                st.caption('CSV rows are voxel centers in the selected ion species rest frame: vx, vy, vz, f(v) [s³ m⁻³], ΔV [(m/s)³]. TIS normalizes Σ f ΔV and conservatively projects the supplied 3-D EVDF onto q. The supplied 3-D shape is fixed; only its population fraction is fitted. Supply the optional flow vector when the fast-ion bulk flow differs from the thermal species flow.')
             if cts_fast_mode!='None':
                 cts_fast_species=st.text_input('Fast-ion species index (required)',value='',key='cts_fast_species')
                 cts_fast_fraction=st.text_input('Initial fast-ion fraction (0–1; required)',value='',key='cts_fast_fraction')
