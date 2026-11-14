@@ -5283,6 +5283,10 @@ def fit_optical_thomson_poisson_counts(
         "residual": counts - fitted,
         "poisson_deviance": deviance,
         "reduced_poisson_deviance": deviance / dof,
+        # Retain the common fit-result schema without mislabelling a Poisson
+        # deviance as a Gaussian chi-square statistic.
+        "reduced_chi_square": None,
+        "fit_statistic": "Poisson_deviance",
         "poisson_log_likelihood": log_likelihood,
         "likelihood": "independent_Poisson",
         "density_inference_available": False,
