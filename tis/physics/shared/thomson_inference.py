@@ -3438,11 +3438,45 @@ def analyze_thomson_spectra(
             plus=joint_fit.x.copy(); minus=joint_fit.x.copy()
             plus[j]+=step; minus[j]-=step
             transform[:,j]=(physical_vector(plus)-physical_vector(minus))/(2.0*step)
-        physical_covariance=transform@parameter_covariance@transform.T
-        # Excess lack-of-fit is reported as a separate model-discrepancy component.
+        physical_covariance_fit_only=transform@parameter_covariance@transform.T
+        # The laser wavelength and scattering angle are common calibration
+        # variables shared by all channels. Their Jacobian therefore creates
+        # both per-channel variance and cross-channel physical covariance.
+        geometry_transform=np.zeros((2*nchan,2),dtype=float)
+        q_geometry=2.0*np.sin(float(scattering_angle_rad)/2.0)
+        cot_geometry=1.0/np.tan(float(scattering_angle_rad)/2.0)
+        for channel in range(nchan):
+            center_value=float(joint_fit.x[joint_parameter_count*channel+1])
+            te_value=float(base_physical[2*channel])
+            flow_value=float(base_physical[2*channel+1])
+            geometry_transform[2*channel,:]=[
+                -2.0*te_value/float(laser_wavelength_nm),
+                -te_value*cot_geometry,
+            ]
+            geometry_transform[2*channel+1,:]=[
+                C_M_S*center_value/(float(laser_wavelength_nm)**2*q_geometry),
+                -0.5*flow_value*cot_geometry,
+            ]
+        geometry_covariance=np.array([
+            [laser_wavelength_unc**2,laser_angle_covariance_nm_rad],
+            [laser_angle_covariance_nm_rad,scattering_angle_unc**2],
+        ],dtype=float)
+        geometry_physical_covariance=(
+            geometry_transform@geometry_covariance@geometry_transform.T
+        )
+        physical_covariance=physical_covariance_fit_only+geometry_physical_covariance
+        physical_covariance=0.5*(physical_covariance+physical_covariance.T)
+        # Excess lack-of-fit is a separate spectral model-discrepancy term;
+        # calibration geometry remains a distinct covariance component.
         discrepancy_scale=max(reduced_chi2_joint-1.0,0.0)
-        discrepancy_covariance=discrepancy_scale*physical_covariance
-        total_physical_covariance=physical_covariance+discrepancy_covariance
+        discrepancy_covariance=discrepancy_scale*physical_covariance_fit_only
+        total_physical_covariance=(
+            physical_covariance_fit_only+geometry_physical_covariance
+            +discrepancy_covariance
+        )
+        total_physical_covariance=0.5*(
+            total_physical_covariance+total_physical_covariance.T
+        )
         kappa_parameter_covariance = None
         total_kappa_parameter_covariance = None
         if model == "non_collective_kappa":
@@ -3509,6 +3543,13 @@ def analyze_thomson_spectra(
                 )))
                 fit["kappa_parameter_covariance"] = kappa_parameter_covariance.copy()
                 fit["total_kappa_parameter_covariance"] = total_kappa_parameter_covariance.copy()
+                fit["projected_evdf_moment_closure"] = _projected_kappa_moment_closure(
+                    float(sigma), float(kappa), float(laser_wavelength_nm),
+                    float(scattering_angle_rad), fit_covariance=block,
+                    laser_wavelength_uncertainty_nm=laser_wavelength_unc,
+                    scattering_angle_uncertainty_rad=scattering_angle_unc,
+                    laser_angle_covariance_nm_rad=laser_angle_covariance_nm_rad,
+                )
             channel_residual = fit["residual"]
             channel_slice = slice(channel * y.shape[1], (channel + 1) * y.shape[1])
             channel_spectral_covariance = joint_covariance[channel_slice, channel_slice]
@@ -3534,22 +3575,45 @@ def analyze_thomson_spectra(
                 else "marginal_reduced_chi_square_exceeds_ceiling_joint_fit_accepted"
             )
             physical_indices = [te_index, velocity_index]
-            fit["physical_parameter_covariance"] = physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
-            fit["physical_parameter_covariance_fit_only"] = physical_covariance[
+            fit["physical_parameter_covariance"] = physical_covariance[
                 np.ix_(physical_indices, physical_indices)
             ].copy()
+            fit["physical_parameter_covariance_fit_only"] = physical_covariance_fit_only[
+                np.ix_(physical_indices, physical_indices)
+            ].copy()
+            fit["physical_parameter_covariance_including_geometry"] = physical_covariance[
+                np.ix_(physical_indices, physical_indices)
+            ].copy()
+            fit["physical_parameter_covariance_components"] = {
+                "fit_parameter_covariance": "included",
+                "laser_wavelength_uncertainty_nm": laser_wavelength_unc,
+                "scattering_angle_uncertainty_rad": scattering_angle_unc,
+                "laser_angle_covariance_nm_rad": laser_angle_covariance_nm_rad,
+                "fit_geometry_cross_covariance": "assumed_zero_not_supplied",
+            }
             fit["physical_parameter_covariance_order"] = [
                 "electron_temperature_eV", "electron_velocity_projection_m_s"
+            ]
+            channel_physical_covariance_fit_only = physical_covariance_fit_only[
+                np.ix_(physical_indices, physical_indices)
             ]
             channel_physical_covariance = physical_covariance[
                 np.ix_(physical_indices, physical_indices)
             ]
             channel_variance_product = float(
-                channel_physical_covariance[0, 0] * channel_physical_covariance[1, 1]
+                channel_physical_covariance_fit_only[0, 0]
+                * channel_physical_covariance_fit_only[1, 1]
             )
             fit["physical_parameter_correlation_fit_only"] = (
-                float(channel_physical_covariance[0, 1] / np.sqrt(channel_variance_product))
+                float(channel_physical_covariance_fit_only[0, 1] / np.sqrt(channel_variance_product))
                 if channel_variance_product > 0.0 else None
+            )
+            total_variance_product = float(
+                channel_physical_covariance[0, 0] * channel_physical_covariance[1, 1]
+            )
+            fit["physical_parameter_correlation"] = (
+                float(channel_physical_covariance[0, 1] / np.sqrt(total_variance_product))
+                if total_variance_product > 0.0 else None
             )
             fit["identifiability"] = {
                 "status": "locally_identified",
