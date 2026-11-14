@@ -1493,6 +1493,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["fast_ion_vdf_provenance"]="externally supplied normalized finite-volume 3-D species-rest-frame EVDF; only its population fraction is inferred"
             out["fast_ion_vdf_projection_method"]="conservative_linear_finite_volume_deposition onto the geometry-specific CTS scattering-vector direction"
             out["fast_ion_vdf_shape_inferred"]=False
+            _, q_direction, _ = _geometry(scattering_geometry, f0)
+            projected_grid, projected_pdf, projection_diagnostics = _project_tabulated_3d_fast_ion_to_q_marginal(
+                d["fast_ion"], q_direction
+            )
+            out["fast_ion_projected_velocity_grid_m_s"] = projected_grid
+            out["fast_ion_projected_probability_density_s_per_m"] = projected_pdf
+            out["fast_ion_projection_diagnostics"] = projection_diagnostics
         else:
             names += [f"fast_ion_vdf_logit_{i}" for i in range(fast["vdf"]["velocity_m_s"].size-1)]
             out["fast_ion_vdf_provenance"]="non-negative tabulated 1-D fast-ion VDF inferred from the CTS spectrum with a second-difference smoothness penalty"
