@@ -5826,7 +5826,7 @@
         {
           "name": "fast_ion",
           "unit": "structured; optional electrostatic fast-ion component",
-          "description": "Decoded fast-ion component including kind, species index, inferred fraction and either fitted Maxwellian temperature or one-dimensional tabulated VDF."
+          "description": "Decoded fast-ion component including kind, species index, inferred fraction and either fitted Maxwellian temperature or one-dimensional tabulated VDF. For kind='tabulated_3d', the supplied 3-D EVDF is projected conservatively onto the geometry-specific q direction and returned as fast_ion_projected_velocity_grid_m_s and fast_ion_projected_probability_density_s_per_m; frequency-resolved geometry returns one marginal per geometry sample."
         },
         {
           "name": "parameter_provenance",
@@ -6251,6 +6251,18 @@
           "name": "population_relativistic_moment_status",
           "unit": "identifiability status",
           "available_when_model": "full_em_gyrotropic_vdf_shape"
+        },
+        {
+          "name": "fast_ion_projected_velocity_grid_m_s",
+          "unit": "m s^-1; q-parallel marginal velocity grid for externally supplied tabulated_3d fast-ion EVDF"
+        },
+        {
+          "name": "fast_ion_projected_probability_density_s_per_m",
+          "unit": "s m^-1; conservative geometry-specific q-parallel marginal; one row per frequency-resolved geometry sample"
+        },
+        {
+          "name": "fast_ion_projection_diagnostics",
+          "unit": "structured; projection direction, conservative deposition method and normalization"
         }
       ],
       "assumptions": [
@@ -6342,7 +6354,8 @@
             "fitted_spectrum",
             "residual",
             "fit_covariance",
-            "optional fast-ion VDF and covariance diagnostics"
+            "optional fast-ion VDF and covariance diagnostics",
+            "fast_ion_projected_velocity_grid_m_s and fast_ion_projected_probability_density_s_per_m for externally supplied tabulated-3D fast ions; one marginal per frequency-resolved geometry sample"
           ],
           "scope": "Unmagnetized longitudinal multi-species dielectric forward model. The inversion method is selected explicitly; fast-ion Maxwellian/tabulated-VDF options are model components, not additional CTS physical model families."
         },
