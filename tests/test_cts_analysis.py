@@ -2460,6 +2460,11 @@ def test_cts_3d_fast_ion_formula_and_dashboard_are_connected():
     assert "velocity_cell_volume_m3_per_s3" in dashboard
     assert "Geometry-projected 3-D fast-ion EVDF marginal" in dashboard
     assert "only the population fraction is fitted" in dashboard
+    assert "flow_velocity_vector_m_s" in dashboard
+    assert "flow_velocity_vector_m_s" in formula["execution_contract"]["note"] or any(
+        item["name"] == "flow_velocity_vector_m_s"
+        for item in formula["execution_contract"]["input_specs"]
+    )
 
 def test_cts_3d_fast_ion_identifiability_keeps_distribution_shape_external():
     from tis.physics.shared.thomson_identifiability import cts_electrostatic_identifiability
