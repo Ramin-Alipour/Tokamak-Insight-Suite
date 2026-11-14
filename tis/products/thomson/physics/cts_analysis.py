@@ -1493,13 +1493,31 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["fast_ion_vdf_provenance"]="externally supplied normalized finite-volume 3-D species-rest-frame EVDF; only its population fraction is inferred"
             out["fast_ion_vdf_projection_method"]="conservative_linear_finite_volume_deposition onto the geometry-specific CTS scattering-vector direction"
             out["fast_ion_vdf_shape_inferred"]=False
-            _, q_direction, _ = _geometry(scattering_geometry, f0)
-            projected_grid, projected_pdf, projection_diagnostics = _project_tabulated_3d_fast_ion_to_q_marginal(
-                d["fast_ion"], q_direction
-            )
-            out["fast_ion_projected_velocity_grid_m_s"] = projected_grid
-            out["fast_ion_projected_probability_density_s_per_m"] = projected_pdf
-            out["fast_ion_projection_diagnostics"] = projection_diagnostics
+            if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
+                geometry_entries = scattering_geometry["frequency_resolved_geometry"]
+                projected_results = [
+                    _project_tabulated_3d_fast_ion_to_q_marginal(
+                        d["fast_ion"], _geometry(entry, f0)[1]
+                    )
+                    for entry in geometry_entries
+                ]
+                out["fast_ion_projected_velocity_grid_m_s"] = projected_results[0][0]
+                out["fast_ion_projected_probability_density_s_per_m"] = np.stack(
+                    [item[1] for item in projected_results], axis=0
+                )
+                out["fast_ion_projection_diagnostics"] = [
+                    item[2] for item in projected_results
+                ]
+                out["fast_ion_projection_geometry_scope"] = "one_q_parallel_marginal_per_frequency_resolved_geometry_sample"
+            else:
+                _, q_direction, _ = _geometry(scattering_geometry, f0)
+                projected_grid, projected_pdf, projection_diagnostics = _project_tabulated_3d_fast_ion_to_q_marginal(
+                    d["fast_ion"], q_direction
+                )
+                out["fast_ion_projected_velocity_grid_m_s"] = projected_grid
+                out["fast_ion_projected_probability_density_s_per_m"] = projected_pdf
+                out["fast_ion_projection_diagnostics"] = projection_diagnostics
+                out["fast_ion_projection_geometry_scope"] = "single_geometry_q_parallel_marginal"
         else:
             names += [f"fast_ion_vdf_logit_{i}" for i in range(fast["vdf"]["velocity_m_s"].size-1)]
             out["fast_ion_vdf_provenance"]="non-negative tabulated 1-D fast-ion VDF inferred from the CTS spectrum with a second-difference smoothness penalty"
