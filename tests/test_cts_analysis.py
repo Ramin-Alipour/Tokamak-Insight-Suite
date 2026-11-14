@@ -2440,3 +2440,24 @@ def test_cts_registry_declares_finite_volume_3d_fast_ion_input():
     assert "probability_density_s3_per_m3" in spec["description"]
     assert "only its population fraction is fitted" in spec["description"]
 
+def test_cts_3d_fast_ion_formula_and_dashboard_are_connected():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    formula = next(
+        item for item in formulas
+        if item.get("execution_contract", {}).get("formula_key")
+        == "cts_tabulated_3d_fast_ion_q_projection"
+    )
+    assert formula["execution_contract"]["implementation_link_status"] == "mapped"
+    assert "delta" in formula["equation"]
+    assert "conservative" in formula["execution_contract"]["note"]
+
+    dashboard = (root / "app.py").read_text(encoding="utf-8")
+    assert "Fixed tabulated 3-D EVDF" in dashboard
+    assert "velocity_cell_volume_m3_per_s3" in dashboard
+    assert "Geometry-projected 3-D fast-ion EVDF marginal" in dashboard
+    assert "only the population fraction is fitted" in dashboard
+
