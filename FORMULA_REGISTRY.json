@@ -12502,6 +12502,10 @@
         {
           "name": "projection_probability_integral",
           "unit": "dimensionless; conservative discrete normalization"
+        },
+        {
+          "name": "fast_ion_flow_projection_m_s",
+          "unit": "m s^-1; q-parallel bulk-flow projection used in the Landau resonance"
         }
       ],
       "prerequisites": [
