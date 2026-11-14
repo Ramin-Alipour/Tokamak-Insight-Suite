@@ -12532,7 +12532,8 @@
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
         "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions",
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment",
-        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api"
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_geometry"
       ]
     },
     "references": [
@@ -12562,7 +12563,8 @@
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
         "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions",
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment",
-        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api"
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_geometry"
       ]
     }
   }
