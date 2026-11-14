@@ -975,6 +975,13 @@ elif page=='Spectral Analysis':
                     joint_covariance_upload=None
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
+            laser_angle_covariance_text=None
+            if model=='non_collective_kappa':
+                laser_angle_covariance_text=st.text_input(
+                    'Laser-wavelength / scattering-angle calibration covariance (nm·rad; optional)',
+                    value='0.0',key='ts_infer_kappa_laser_angle_cov',
+                    help='Used with both supplied marginal 1σ calibration uncertainties. The 2×2 calibration covariance must be positive semidefinite.',
+                )
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
             if collective_kappa_mode:
                 joint_spatial_spectral=False
@@ -1352,11 +1359,16 @@ elif page=='Spectral Analysis':
                     angle_rad=_parse_ts_scalar(angle_rad_text,'Scattering angle',minimum=1e-9,maximum=float(np.pi))
                     laser_unc_value=None if laser_unc_text is None else _parse_ts_scalar(laser_unc_text,'Laser-wavelength uncertainty',minimum=0.0)
                     angle_unc_value=None if angle_unc_text is None else _parse_ts_scalar(angle_unc_text,'Scattering-angle uncertainty',minimum=0.0)
+                    laser_angle_covariance_value=(
+                        0.0 if laser_angle_covariance_text is None or not laser_angle_covariance_text.strip()
+                        else _parse_ts_scalar(laser_angle_covariance_text,'Laser-angle calibration covariance')
+                    )
                     kwargs={
                         'laser_wavelength_nm':laser_nm,
                         'scattering_angle_rad':angle_rad,
                         'laser_wavelength_uncertainty_nm':laser_unc_value,
                         'scattering_angle_uncertainty_rad':angle_unc_value,
+                        'laser_angle_covariance_nm_rad':laser_angle_covariance_value,
                         'instrument_response':instrument_response,
                         'signal_uncertainty':signal_uncertainty,
                         'instrument_response_uncertainty':response_uncertainty,
