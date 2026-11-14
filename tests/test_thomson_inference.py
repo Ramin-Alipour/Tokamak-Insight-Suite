@@ -270,12 +270,14 @@ def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
     feature, _ = _kappa_bin_averaged_shape(x, 900.0, laser, sigma, kappa)
     laser_uncertainty = 0.015
     angle_uncertainty = 0.002
+    laser_angle_covariance = 1.0e-5
     out = analyze_thomson_spectra(
         x, (feature + 20.0)[None, :], [0.15],
         laser_wavelength_nm=laser,
         scattering_angle_rad=angle,
         laser_wavelength_uncertainty_nm=laser_uncertainty,
         scattering_angle_uncertainty_rad=angle_uncertainty,
+        laser_angle_covariance_nm_rad=laser_angle_covariance,
         instrument_response=np.eye(x.size),
         model="non_collective_kappa",
         enable_evdf_reconstruction=False,
@@ -294,13 +296,17 @@ def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
         [299792458.0 * fitted_center / (laser**2 * q),
          -0.5 * fitted_flow / np.tan(angle / 2.0)],
     ])
-    geometry_covariance = np.diag([laser_uncertainty**2, angle_uncertainty**2])
+    geometry_covariance = np.array([
+        [laser_uncertainty**2, laser_angle_covariance],
+        [laser_angle_covariance, angle_uncertainty**2],
+    ])
     expected_geometry = geometry_jacobian @ geometry_covariance @ geometry_jacobian.T
     np.testing.assert_allclose(total, fit_only + expected_geometry, rtol=2e-7, atol=1e-16)
     assert channel["physical_parameter_covariance_status"] == "identified_from_local_likelihood_plus_first_order_geometry_propagation"
     assert channel["electron_temperature_uncertainty_eV"] == pytest.approx(np.sqrt(total[0, 0]), rel=1e-10)
     closure = channel["projected_evdf_moment_closure"]
     assert closure["geometry_uncertainty"]["laser_wavelength_standard_uncertainty_nm"] == pytest.approx(laser_uncertainty)
+    assert closure["geometry_uncertainty"]["laser_angle_covariance_nm_rad"] == pytest.approx(laser_angle_covariance)
     assert closure["velocity_variance_standard_uncertainty_m2_s2"] > 0.0
     assert closure["central_fourth_moment_standard_uncertainty_m4_s4"] > 0.0
     assert closure["excess_kurtosis_standard_uncertainty"] > 0.0
