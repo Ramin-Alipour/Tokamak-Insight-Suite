@@ -767,19 +767,39 @@ def _kappa_profile_likelihood_diagnostic(
     }
 
 
-def _projected_kappa_moment_closure(sigma_nm, kappa, laser_nm, angle, fit_covariance=None):
+def _projected_kappa_moment_closure(
+    sigma_nm, kappa, laser_nm, angle, fit_covariance=None, *,
+    laser_wavelength_uncertainty_nm=0.0,
+    scattering_angle_uncertainty_rad=0.0,
+):
     """Analytic moments of the 1-D Student-t marginal of an isotropic 3-D Kappa EVDF.
 
     nu=2*kappa-1. Variance is finite for kappa>3/2, the absolute third
     moment for kappa>2, and the fourth moment for kappa>5/2. Divergent
     moments are returned as None, never estimated from a truncated grid.
+
+    The covariance includes the fitted (sigma,kappa) block and independent
+    laser-wavelength/scattering-angle calibration uncertainties. Geometry
+    cross-covariance with the fitted spectral parameters is not inferred.
     """
     sigma_nm = _finite_scalar(sigma_nm, "sigma_nm", minimum=np.finfo(float).tiny)
     kappa = _finite_scalar(kappa, "kappa", minimum=1.500000000001)
     laser_nm = _finite_scalar(laser_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
     angle = _finite_scalar(angle, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
+    laser_unc = _finite_scalar(
+        laser_wavelength_uncertainty_nm,
+        "laser_wavelength_uncertainty_nm", minimum=0.0,
+    )
+    angle_unc = _finite_scalar(
+        scattering_angle_uncertainty_rad,
+        "scattering_angle_uncertainty_rad", minimum=0.0,
+    )
     if angle >= np.pi:
         raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
+    if laser_unc > laser_nm / 3.0:
+        raise ValueError("laser_wavelength_uncertainty_nm is too large for local Gaussian Kappa-moment propagation")
+    if angle_unc > min(angle, np.pi-angle) / 3.0:
+        raise ValueError("scattering_angle_uncertainty_rad is too large for local Gaussian Kappa-moment propagation")
     q = 2.0*np.sin(angle/2.0)
     velocity_per_nm = C_M_S/(laser_nm*q)
     sigma_v = velocity_per_nm*sigma_nm
@@ -790,6 +810,7 @@ def _projected_kappa_moment_closure(sigma_nm, kappa, laser_nm, angle, fit_covari
         "student_t_degrees_of_freedom": float(nu),
         "projected_velocity_standard_deviation_m_s": float(sigma_v),
         "velocity_variance_m2_s2": float(sigma_v**2),
+        "velocity_variance_standard_uncertainty_m2_s2": None,
         "central_third_velocity_moment_m3_s3": 0.0 if kappa > 2.0 else None,
         "central_third_moment_status": (
             "finite_zero_by_symmetric_equilibrium_kappa_model" if kappa > 2.0
@@ -797,12 +818,19 @@ def _projected_kappa_moment_closure(sigma_nm, kappa, laser_nm, angle, fit_covari
         ),
         "central_fourth_velocity_moment_m4_s4": None,
         "excess_kurtosis": None,
+        "central_fourth_moment_standard_uncertainty_m4_s4": None,
+        "excess_kurtosis_standard_uncertainty": None,
+        "moment_covariance_order": [],
+        "moment_covariance": None,
+        "geometry_uncertainty": {
+            "laser_wavelength_standard_uncertainty_nm": laser_unc,
+            "scattering_angle_standard_uncertainty_rad": angle_unc,
+            "geometry_fit_cross_covariance": "assumed_zero_not_supplied",
+        },
         "fourth_moment_status": (
             "finite_for_kappa_greater_than_2p5" if kappa > 2.5
             else "divergent_fourth_moment_for_kappa_at_or_below_2p5"
         ),
-        "central_fourth_moment_standard_uncertainty_m4_s4": None,
-        "excess_kurtosis_standard_uncertainty": None,
         "physical_relations": {
             "projected_student_t_df": "nu=2*kappa-1",
             "variance": "mu2=sigma_v^2; finite for kappa>3/2",
@@ -818,40 +846,76 @@ def _projected_kappa_moment_closure(sigma_nm, kappa, laser_nm, angle, fit_covari
         "limitations": [
             "These are moments of the one-dimensional scattering-vector marginal, not an unrestricted 3-D EVDF.",
             "The symmetric-model third moment is not an independent measurement of non-equilibrium heat flux.",
+            "Geometry propagation is first-order and assumes zero covariance between calibration geometry and fitted spectral parameters.",
         ],
-        "moment_covariance_method": "delta_method_using_sigma_kappa_and_fit_covariance",
+        "moment_covariance_method": "delta_method_with_fitted_sigma_kappa_and_independent_laser_angle_calibration_covariance",
     }
+
+    fit_block = np.zeros((2, 2), dtype=float)
+    if fit_covariance is not None:
+        cov = np.asarray(fit_covariance, dtype=float)
+        if cov.ndim != 2 or cov.shape[0] < 4 or cov.shape[1] < 4 or not np.all(np.isfinite(cov)):
+            raise ValueError("Kappa fit covariance must be finite and include sigma and kappa parameters")
+        if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-14):
+            raise ValueError("Kappa fit covariance must be symmetric")
+        fit_block = cov[np.ix_([2, 3], [2, 3])]
+    input_covariance = np.zeros((4, 4), dtype=float)
+    input_covariance[:2, :2] = fit_block
+    input_covariance[2, 2] = laser_unc**2
+    input_covariance[3, 3] = angle_unc**2
+
+    variance = sigma_v**2
+    variance_gradient = np.array([
+        2.0*variance/sigma_nm,
+        0.0,
+        -2.0*variance/laser_nm,
+        -variance/np.tan(angle/2.0),
+    ])
+    moment_names = ["velocity_variance_m2_s2"]
+    gradients = [variance_gradient]
     if kappa > 2.5:
         denominator = 2.0*kappa-5.0
         mu4 = 3.0*sigma_v**4*(2.0*kappa-3.0)/denominator
+        kurtosis = 6.0/denominator
+        mu4_gradient = np.array([
+            4.0*mu4/sigma_nm,
+            -12.0*sigma_v**4/denominator**2,
+            -4.0*mu4/laser_nm,
+            -2.0*mu4/np.tan(angle/2.0),
+        ])
+        kurtosis_gradient = np.array([
+            0.0, -12.0/denominator**2, 0.0, 0.0
+        ])
         result["central_fourth_velocity_moment_m4_s4"] = float(mu4)
-        result["excess_kurtosis"] = float(6.0/denominator)
-        if fit_covariance is not None:
-            cov = np.asarray(fit_covariance, dtype=float)
-            if cov.ndim != 2 or cov.shape[0] < 4 or cov.shape[1] < 4 or not np.all(np.isfinite(cov)):
-                raise ValueError("Kappa fit covariance must be finite and include sigma and kappa parameters")
-            if not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-14):
-                raise ValueError("Kappa fit covariance must be symmetric")
-            ds = 4.0*mu4/sigma_nm
-            dk = -12.0*sigma_v**4/denominator**2
-            var_mu4 = ds**2*cov[2,2] + dk**2*cov[3,3] + 2.0*ds*dk*cov[2,3]
-            scale = max(abs(ds**2*cov[2,2])+abs(dk**2*cov[3,3])+abs(2.0*ds*dk*cov[2,3]), np.finfo(float).tiny)
-            if var_mu4 < -1e-10*scale:
-                raise ValueError("Kappa fit covariance gives a negative fourth-moment variance")
-            dkurt = -12.0/denominator**2
-            var_kurt = dkurt**2*cov[3,3]
-            if var_kurt < -1e-12*max(abs(var_kurt), np.finfo(float).tiny):
-                raise ValueError("Kappa fit covariance gives a negative excess-kurtosis variance")
-            result["central_fourth_moment_standard_uncertainty_m4_s4"] = float(np.sqrt(max(var_mu4,0.0)))
-            result["excess_kurtosis_standard_uncertainty"] = float(np.sqrt(max(var_kurt,0.0)))
+        result["excess_kurtosis"] = float(kurtosis)
+        moment_names.extend([
+            "central_fourth_velocity_moment_m4_s4",
+            "excess_kurtosis",
+        ])
+        gradients.extend([mu4_gradient, kurtosis_gradient])
+    jacobian = np.vstack(gradients)
+    moment_covariance = jacobian @ input_covariance @ jacobian.T
+    moment_covariance = 0.5*(moment_covariance+moment_covariance.T)
+    eigenvalues = np.linalg.eigvalsh(moment_covariance)
+    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+    if float(eigenvalues.min()) < -1e-10*scale:
+        raise ValueError("Kappa projected-moment covariance is not positive semidefinite")
+    standard = np.sqrt(np.maximum(np.diag(moment_covariance), 0.0))
+    result["moment_covariance_order"] = moment_names
+    result["moment_covariance"] = moment_covariance
+    result["velocity_variance_standard_uncertainty_m2_s2"] = float(standard[0])
+    if kappa > 2.5:
+        result["central_fourth_moment_standard_uncertainty_m4_s4"] = float(standard[1])
+        result["excess_kurtosis_standard_uncertainty"] = float(standard[2])
     return result
-
 
 def _fit_kappa(
     wavelength, signal, laser_nm, angle, response, uncertainty,
     spectral_covariance=None, *, background_model="linear",
     background_degree=2, background_interior_knots=3,
     background_templates=None,
+    laser_wavelength_uncertainty_nm=0.0,
+    scattering_angle_uncertainty_rad=0.0,
 ):
     """Fit isotropic finite-variance Kappa spectra with exact Student-t bin integrals.
 
@@ -1082,32 +1146,72 @@ def _fit_kappa(
         and jacobian_condition <= 1e12 and conditional_kappa_sensitivity > 1e-8
         and np.isfinite(kappa_standard_uncertainty)
     )
+    physical_parameter_covariance_fit_only = None
     physical_parameter_covariance = None
     physical_parameter_correlation = None
+    physical_parameter_correlation_fit_only = None
     physical_covariance_status = (
         "identified_from_local_likelihood"
         if fit_jacobian_rank == fit_parameter_count else
         "not_reportable_rank_deficient_likelihood"
     )
     if fit_jacobian_rank == fit_parameter_count:
+        # T_e = (m_e c^2/e) [sigma_lambda/(lambda_0 q)]^2,
+        # v_q = c (1-lambda_c/lambda_0)/q, q=2 sin(theta/2).
+        # Include the derivatives with respect to both calibration variables;
+        # the fitted-spectrum/geometry cross-covariance is not supplied here.
         physical_jacobian = np.array([
-            [0.0, 2.0 * te / sigma],
-            [-C_M_S / (laser_nm * q_projection), 0.0],
+            [0.0, 2.0 * te / sigma,
+             -2.0 * te / laser_nm, -te / np.tan(angle/2.0)],
+            [-C_M_S / (laser_nm * q_projection), 0.0,
+             C_M_S * center / (laser_nm**2 * q_projection),
+             -0.5 * velocity / np.tan(angle/2.0)],
         ], dtype=float)
-        center_width_covariance = cov[np.ix_([1, 2], [1, 2])]
+        input_covariance = np.zeros((4, 4), dtype=float)
+        input_covariance[:2, :2] = cov[np.ix_([1, 2], [1, 2])]
+        input_covariance[2, 2] = laser_unc**2
+        input_covariance[3, 3] = angle_unc**2
         physical_parameter_covariance = (
-            physical_jacobian @ center_width_covariance @ physical_jacobian.T
+            physical_jacobian @ input_covariance @ physical_jacobian.T
         )
         physical_parameter_covariance = 0.5 * (
             physical_parameter_covariance + physical_parameter_covariance.T
         )
-        variance_product = float(
+        fit_jacobian = physical_jacobian[:, :2]
+        physical_parameter_covariance_fit_only = (
+            fit_jacobian @ input_covariance[:2, :2] @ fit_jacobian.T
+        )
+        physical_parameter_covariance_fit_only = 0.5 * (
+            physical_parameter_covariance_fit_only
+            + physical_parameter_covariance_fit_only.T
+        )
+        for matrix, label in (
+            (physical_parameter_covariance, "total"),
+            (physical_parameter_covariance_fit_only, "fit-only"),
+        ):
+            eig = np.linalg.eigvalsh(matrix)
+            eig_scale = max(float(np.max(np.abs(eig))), np.finfo(float).tiny)
+            if float(eig.min()) < -1e-10 * eig_scale:
+                raise ValueError(f"Kappa {label} physical-parameter covariance is not positive semidefinite")
+        total_product = float(
             physical_parameter_covariance[0, 0]
             * physical_parameter_covariance[1, 1]
         )
-        if variance_product > 0.0:
+        fit_product = float(
+            physical_parameter_covariance_fit_only[0, 0]
+            * physical_parameter_covariance_fit_only[1, 1]
+        )
+        if total_product > 0.0:
             physical_parameter_correlation = float(
-                physical_parameter_covariance[0, 1] / np.sqrt(variance_product)
+                physical_parameter_covariance[0, 1] / np.sqrt(total_product)
+            )
+        if fit_product > 0.0:
+            physical_parameter_correlation_fit_only = float(
+                physical_parameter_covariance_fit_only[0, 1] / np.sqrt(fit_product)
+            )
+        if laser_unc > 0.0 or angle_unc > 0.0:
+            physical_covariance_status = (
+                "identified_from_local_likelihood_plus_first_order_geometry_propagation"
             )
     kappa_identifiability = {
         "status": "locally_identifiable" if kappa_identifiable else "weak_or_non_identifiable",
@@ -1159,18 +1263,31 @@ def _fit_kappa(
             float(np.sqrt(max(physical_parameter_covariance[1, 1], 0.0)))
             if physical_parameter_covariance is not None else None
         ),
-        "physical_parameter_covariance_fit_only": physical_parameter_covariance,
+        "physical_parameter_covariance_fit_only": physical_parameter_covariance_fit_only,
+        "physical_parameter_covariance": physical_parameter_covariance,
+        "physical_parameter_covariance_including_geometry": physical_parameter_covariance,
         "physical_parameter_covariance_order": [
             "electron_temperature_eV", "electron_velocity_projection_m_s"
         ],
-        "physical_parameter_correlation_fit_only": physical_parameter_correlation,
+        "physical_parameter_correlation_fit_only": physical_parameter_correlation_fit_only,
+        "physical_parameter_correlation": physical_parameter_correlation,
+        "physical_parameter_covariance_components": {
+            "fit_parameter_covariance": "included",
+            "laser_wavelength_uncertainty_nm": laser_unc,
+            "scattering_angle_uncertainty_rad": angle_unc,
+            "fit_geometry_cross_covariance": "assumed_zero_not_supplied",
+        },
         "physical_parameter_covariance_status": physical_covariance_status,
         "likelihood_jacobian_rank": fit_jacobian_rank,
         "likelihood_parameter_count": fit_parameter_count,
         "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
         "kappa_index": kappa, "kappa_index_identifiability": kappa_identifiability,
         "kappa_profile_likelihood": kappa_profile_likelihood,
-        "projected_evdf_moment_closure": _projected_kappa_moment_closure(sigma, kappa, laser_nm, angle, fit_covariance=cov),
+        "projected_evdf_moment_closure": _projected_kappa_moment_closure(
+            sigma, kappa, laser_nm, angle, fit_covariance=cov,
+            laser_wavelength_uncertainty_nm=laser_unc,
+            scattering_angle_uncertainty_rad=angle_unc,
+        ),
         "amplitude": amp, "background_intercept": background_intercept,
         "background_slope_per_nm": background_slope,
         "background_model": background_model,
@@ -1928,6 +2045,8 @@ def analyze_thomson_spectra(
                     if background_templates is not None and np.asarray(background_templates).ndim == 3
                     else background_templates
                 ),
+                laser_wavelength_uncertainty_nm=laser_wavelength_unc,
+                scattering_angle_uncertainty_rad=scattering_angle_unc,
             )
         elif model == "non_collective_relativistic_maxwell_juttner":
             # First obtain a deterministic physical seed with the established
@@ -4892,4 +5011,16 @@ def fit_optical_thomson_poisson_counts(
             "calibrated photon/count response operator",
             "non-negative linear detector-space background",
         ],
-    }
+    }    laser_unc = _finite_scalar(
+        laser_wavelength_uncertainty_nm,
+        "laser_wavelength_uncertainty_nm", minimum=0.0,
+    )
+    angle_unc = _finite_scalar(
+        scattering_angle_uncertainty_rad,
+        "scattering_angle_uncertainty_rad", minimum=0.0,
+    )
+    if laser_unc > laser_nm / 3.0:
+        raise ValueError("laser_wavelength_uncertainty_nm is too large for local Gaussian Kappa propagation")
+    if angle_unc > min(angle, np.pi-angle) / 3.0:
+        raise ValueError("scattering_angle_uncertainty_rad is too large for local Gaussian Kappa propagation")
+
