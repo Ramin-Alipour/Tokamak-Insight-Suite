@@ -4896,10 +4896,17 @@ def analyze_thomson_spectra(
                 "scope": "one_dimensional_scattering_vector_marginal_not_full_3d_tensor_or_heat_flux",
             }
             if value is not None and np.isfinite(float(value)):
-                primary.append({
-                    **item,
-                    "status": "derived_from_identified_absolute_density_and_projected_evdf",
-                })
+                if evdf.get("analysis_status") == "completed":
+                    primary.append({
+                        **item,
+                        "status": "derived_from_identified_absolute_density_and_projected_evdf",
+                    })
+                else:
+                    conditional.append({
+                        **item,
+                        "status": "derived_from_conditional_regularized_evdf_candidate",
+                        "reason": "The EVDF remains a regularized candidate rather than a primary measurement.",
+                    })
             elif projected_closure:
                 if (
                     quantity == "projected_kinetic_energy_flux_W_m2"
