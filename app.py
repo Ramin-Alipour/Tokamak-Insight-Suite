@@ -1793,6 +1793,30 @@ elif page=='Spectral Analysis':
                     st.markdown('**Kappa-index profile-likelihood identifiability**')
                     st.dataframe(pd.DataFrame(kappa_profile_rows),width="stretch")
                     st.caption('Intervals are conditional on the selected Kappa forward model. Grid-censored limits are not physical bounds; when no measurement uncertainty is supplied, the profile uses residual-scaled noise and is not measurement-noise calibrated.')
+                    if model=='non_collective_kappa':
+                        kappa_moment_rows=[]
+                        for channel in result['channels']:
+                            closure=channel.get('projected_evdf_moment_closure',{})
+                            geometry=closure.get('geometry_uncertainty',{})
+                            kappa_moment_rows.append({
+                                'channel_index':channel.get('channel_index'),
+                                'radius_m':channel.get('radius_m'),
+                                'Te_uncertainty_including_geometry_eV':channel.get('electron_temperature_uncertainty_eV'),
+                                'flow_uncertainty_including_geometry_m_s':channel.get('electron_velocity_projection_uncertainty_m_s'),
+                                'projected_variance_m2_s2':closure.get('velocity_variance_m2_s2'),
+                                'projected_variance_uncertainty_m2_s2':closure.get('velocity_variance_standard_uncertainty_m2_s2'),
+                                'projected_mu4_m4_s4':closure.get('central_fourth_velocity_moment_m4_s4'),
+                                'projected_mu4_uncertainty_m4_s4':closure.get('central_fourth_moment_standard_uncertainty_m4_s4'),
+                                'projected_excess_kurtosis':closure.get('excess_kurtosis'),
+                                'projected_excess_kurtosis_uncertainty':closure.get('excess_kurtosis_standard_uncertainty'),
+                                'laser_wavelength_uncertainty_nm':geometry.get('laser_wavelength_standard_uncertainty_nm'),
+                                'scattering_angle_uncertainty_rad':geometry.get('scattering_angle_standard_uncertainty_rad'),
+                                'covariance_status':channel.get('physical_parameter_covariance_status'),
+                            })
+                        st.markdown('**Kappa projected-EVDF analytic moments and geometry-propagated uncertainty**')
+                        st.dataframe(pd.DataFrame(kappa_moment_rows),width="stretch")
+                        st.caption('The Kappa closure uses the isotropic 3-D Kappa model projected onto the scattering vector: nu=2*kappa-1. The third absolute moment exists only for kappa>2 and the fourth moment only for kappa>2.5. Geometry uncertainty is propagated to first order; fitted-spectrum/geometry cross-covariance is assumed zero because it is not supplied.')
+
                 if is_joint_spatial:
                     if result.get('relative_spectral_amplitude_profile') is not None:
                         profile['relative_spectral_amplitude']=result['relative_spectral_amplitude_profile']
