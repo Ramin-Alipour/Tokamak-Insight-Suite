@@ -1523,6 +1523,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     item[2] for item in projected_results
                 ]
                 out["fast_ion_projection_geometry_scope"] = "one_q_parallel_marginal_per_frequency_resolved_geometry_sample"
+                fast_flow_vector = d["fast_ion"].get("flow_velocity_vector_m_s")
+                out["fast_ion_flow_projection_m_s"] = [
+                    float(np.dot(fast_flow_vector, _geometry(entry, f0)[1]))
+                    for entry in geometry_entries
+                ]
             else:
                 _, q_direction, _ = _geometry(scattering_geometry, f0)
                 projected_grid, projected_pdf, projection_diagnostics = _project_tabulated_3d_fast_ion_to_q_marginal(
@@ -1532,6 +1537,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 out["fast_ion_projected_probability_density_s_per_m"] = projected_pdf
                 out["fast_ion_projection_diagnostics"] = projection_diagnostics
                 out["fast_ion_projection_geometry_scope"] = "single_geometry_q_parallel_marginal"
+                fast_flow_vector = d["fast_ion"].get("flow_velocity_vector_m_s")
+                out["fast_ion_flow_projection_m_s"] = (
+                    float(np.dot(fast_flow_vector, q_direction))
+                    if fast_flow_vector is not None
+                    else float(d["ion_velocity_projection_m_s"])
+                )
         else:
             names += [f"fast_ion_vdf_logit_{i}" for i in range(fast["vdf"]["velocity_m_s"].size-1)]
             out["fast_ion_vdf_provenance"]="non-negative tabulated 1-D fast-ion VDF inferred from the CTS spectrum with a second-difference smoothness penalty"
