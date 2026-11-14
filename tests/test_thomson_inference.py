@@ -313,6 +313,21 @@ def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
     assert closure["moment_covariance"].shape == (3, 3)
     assert closure["moment_covariance_order"] == ["velocity_variance_m2_s2", "central_fourth_velocity_moment_m4_s4", "excess_kurtosis"]
 
+def test_kappa_rejects_non_psd_laser_angle_calibration_covariance():
+    x = np.linspace(528.0, 536.0, 41)
+    with pytest.raises(ValueError, match="calibration covariance must be positive semidefinite"):
+        analyze_thomson_spectra(
+            x, np.ones((1, x.size)), [0.1],
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2.0,
+            laser_wavelength_uncertainty_nm=0.01,
+            scattering_angle_uncertainty_rad=0.001,
+            laser_angle_covariance_nm_rad=1.0e-3,
+            instrument_response=np.eye(x.size),
+            model="non_collective_kappa",
+            enable_evdf_reconstruction=False,
+        )
+
 def test_channel_specific_wavelength_axes_are_supported():
     x1, y1, _ = _spectral_case(100.0)
     x2, y2, _ = _spectral_case(150.0, center_nm=532.02)
