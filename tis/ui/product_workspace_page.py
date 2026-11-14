@@ -150,6 +150,78 @@ def render_product_workspace_page(st: Any) -> None:
                 f"Workflow {selected_analysis_id} completed through "
                 f"{product['product_id']} public API."
             )
+            if selected_id == 1 and selected_analysis_id == 1:
+                st.markdown("### Optical Thomson physical inference")
+                st.json({
+                    "selected_model": result.get("model"),
+                    "model_validity": result.get("model_validity"),
+                    "parameter_identifiability": result.get("parameter_identifiability"),
+                    "result_classification": result.get("result_classification"),
+                })
+                channel_rows = []
+                for index, channel in enumerate(result.get("channels", [])):
+                    evdf = channel.get("electron_velocity_distribution") or {}
+                    closure = evdf.get("projected_moment_thermodynamic_closure") or {}
+                    channel_rows.append({
+                        "Channel": index,
+                        "Radius (m)": channel.get("radius_m"),
+                        "Te (eV)": channel.get("electron_temperature_eV"),
+                        "Flow projection (m/s)": channel.get("electron_velocity_projection_m_s"),
+                        "Density (m^-3)": channel.get("electron_density_m3"),
+                        "Primary fit": channel.get("fit_quality_status"),
+                        "EVDF": evdf.get("analysis_status"),
+                        "Projected pressure (Pa)": closure.get("directional_pressure_Pa"),
+                        "1-D projected energy flux (W/m²)": closure.get("projected_kinetic_energy_flux_W_m2"),
+                    })
+                if channel_rows:
+                    st.markdown("**Channel-resolved physical results**")
+                    st.dataframe(channel_rows, width="stretch", hide_index=True)
+                for index, channel in enumerate(result.get("channels", [])):
+                    with st.expander(f"Channel {index} · physical fit and projected EVDF"):
+                        st.markdown("**Primary physical fit**")
+                        st.json({
+                            key: channel.get(key) for key in (
+                                "electron_temperature_eV",
+                                "electron_temperature_uncertainty_eV",
+                                "electron_velocity_projection_m_s",
+                                "electron_velocity_projection_uncertainty_m_s",
+                                "electron_density_m3",
+                                "electron_density_uncertainty_m3",
+                                "fit_quality_status",
+                                "fit_quality_reasons",
+                                "physical_parameter_covariance",
+                            ) if key in channel
+                        })
+                        evdf = channel.get("electron_velocity_distribution") or {}
+                        st.markdown("**Projected EVDF inversion**")
+                        st.json({
+                            key: evdf.get(key) for key in (
+                                "analysis_status",
+                                "fit_quality",
+                                "regularization_selection",
+                                "regularization_sensitivity",
+                                "velocity_support_diagnostic",
+                                "higher_order_moment_validity",
+                                "mean_velocity_parallel_m_s",
+                                "velocity_parallel_standard_deviation_m_s",
+                                "directional_equivalent_temperature_eV",
+                                "central_third_velocity_moment_m3_s3",
+                                "central_fourth_velocity_moment_m4_s4",
+                                "skewness",
+                                "excess_kurtosis",
+                                "velocity_moment_covariance_order",
+                                "velocity_moment_covariance",
+                                "heat_flux_identifiability",
+                                "projected_moment_thermodynamic_closure",
+                            ) if key in evdf
+                        })
+                        st.markdown("**Same-spectrum spectral closure**")
+                        st.json(
+                            (channel.get("spectral_distribution") or {}).get(
+                                "projected_evdf_spectral_moment_closure",
+                                {"status": "not available for this channel/model"},
+                            )
+                        )
             if selected_id == 1 and selected_analysis_id == 81:
                 st.markdown("### Projected EVDF physical inference")
                 projected = result.get("projected_evdf_inference")
