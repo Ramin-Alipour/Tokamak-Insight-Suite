@@ -512,6 +512,38 @@ def _fit_noncollective(
     """
     from .thomson_background import _background_design
 
+    # Calibration uncertainty enters both the physical-parameter covariance
+    # and the projected-EVDF moment closure below. Validate it once in this
+    # solver's scope instead of relying on undeclared names.
+    laser_unc = _finite_scalar(
+        laser_wavelength_uncertainty_nm,
+        "laser_wavelength_uncertainty_nm",
+        minimum=0.0,
+    )
+    angle_unc = _finite_scalar(
+        scattering_angle_uncertainty_rad,
+        "scattering_angle_uncertainty_rad",
+        minimum=0.0,
+    )
+    geometry_cross = _finite_scalar(
+        laser_angle_covariance_nm_rad,
+        "laser_angle_covariance_nm_rad",
+    )
+    geometry_covariance = np.array([
+        [laser_unc**2, geometry_cross],
+        [geometry_cross, angle_unc**2],
+    ], dtype=float)
+    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+    geometry_scale = max(
+        float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny
+    )
+    if float(geometry_eigenvalues[0]) < -1e-12 * geometry_scale:
+        raise ValueError(
+            "Kappa laser-wavelength/scattering-angle covariance must be "
+            "positive semidefinite; require |covariance| <= "
+            "laser_uncertainty * angle_uncertainty"
+        )
+
     signal_scale = float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale <= 0:
         raise ValueError("signal must have a positive finite scale")
