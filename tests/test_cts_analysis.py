@@ -2503,3 +2503,61 @@ def test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment():
     assert projected_mean == pytest.approx(direct_mean, rel=1e-10, abs=1e-6)
     assert projected_variance == pytest.approx(direct_variance, rel=5e-3)
 
+def test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_geometry():
+    from tis.products.thomson.physics.cts_analysis import cts_spectral_density as product_cts_spectral_density
+
+    f0 = 140e9
+    shifts = np.linspace(-0.25e9, 0.25e9, 31)
+    fast = _anisotropic_tabulated_3d_fast_ion()
+    ions = [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}]
+    common = dict(
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=[1.0],
+        electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=0.0,
+    )
+    geometry = {
+        "incident_direction": [1.0, 0.0, 0.0],
+        "scattered_direction": [0.0, 1.0, 0.0],
+    }
+    co_moving = product_cts_spectral_density(
+        shifts, f0, geometry, fast_ion={**fast, "fraction": 0.12}, **common
+    )
+    drifting = product_cts_spectral_density(
+        shifts, f0, geometry,
+        fast_ion={
+            **fast, "fraction": 0.12,
+            "flow_velocity_vector_m_s": [1.0e5, 0.0, 0.0],
+        },
+        **common,
+    )
+    assert not np.allclose(co_moving, drifting, rtol=1e-6, atol=0.0)
+
+    ray_geometry = {
+        "frequency_resolved_geometry": [
+            geometry,
+            {
+                "incident_direction": [0.0, 0.0, 1.0],
+                "scattered_direction": [1.0, 0.0, 0.0],
+            },
+        ]
+    }
+    with pytest.raises(ValueError, match="requires fast_ion.flow_velocity_vector_m_s"):
+        product_cts_spectral_density(
+            np.array([-1.0e8, 1.0e8]), f0, ray_geometry,
+            fast_ion={**fast, "fraction": 0.12}, **common
+        )
+    ray_spectrum = product_cts_spectral_density(
+        np.array([-1.0e8, 1.0e8]), f0, ray_geometry,
+        fast_ion={
+            **fast, "fraction": 0.12,
+            "flow_velocity_vector_m_s": [1.0e5, 0.0, 0.0],
+        },
+        **common,
+    )
+    assert np.all(np.isfinite(ray_spectrum))
+    assert np.all(ray_spectrum >= 0.0)
+
