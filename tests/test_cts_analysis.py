@@ -2324,7 +2324,7 @@ def _anisotropic_tabulated_3d_fast_ion():
 
 
 def test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent():
-    from tokamak_analysis.cts_analysis import (
+    from tis.products.thomson.physics.cts_analysis import (
         _project_tabulated_3d_fast_ion_to_q_marginal,
     )
 
@@ -2372,18 +2372,71 @@ def test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions(
         "incident_direction": [0.0, 0.0, 1.0],
         "scattered_direction": [1.0, 0.0, 0.0],
     }
-    spectrum_x = cts_spectral_density(shifts, f0, geometry_x, **common)
-    spectrum_z = cts_spectral_density(shifts, f0, geometry_z, **common)
+    from tis.products.thomson.physics.cts_analysis import cts_spectral_density as product_cts_spectral_density
+
+    spectrum_x = product_cts_spectral_density(shifts, f0, geometry_x, **common)
+    spectrum_z = product_cts_spectral_density(shifts, f0, geometry_z, **common)
     assert np.all(np.isfinite(spectrum_x)) and np.all(spectrum_x >= 0.0)
     assert np.all(np.isfinite(spectrum_z)) and np.all(spectrum_z >= 0.0)
     assert not np.allclose(spectrum_x, spectrum_z, rtol=1e-5, atol=0.0)
 
 
 def test_cts_3d_fast_ion_projection_rejects_insufficient_velocity_support():
-    from tokamak_analysis.cts_analysis import _project_tabulated_3d_fast_ion_to_q_marginal
+    from tis.products.thomson.physics.cts_analysis import _project_tabulated_3d_fast_ion_to_q_marginal
 
     fast = _anisotropic_tabulated_3d_fast_ion()
     fast["projection_velocity_grid_m_s"] = np.linspace(-1.0e5, 1.0e5, 41)
     with pytest.raises(ValueError, match="must cover every projected"):
         _project_tabulated_3d_fast_ion_to_q_marginal(fast, [1.0, 0.0, 0.0])
+
+def test_cts_3d_fast_ion_is_reachable_through_registered_product_api(monkeypatch):
+    import tis.products.thomson.physics.cts_analysis as product_cts
+    from tis.products.thomson.api import analyze_cts
+
+    fast = _anisotropic_tabulated_3d_fast_ion()
+    fast["fraction_initial"] = 0.12
+    fast["fraction_bounds"] = [0.01, 0.4]
+    captured = {}
+
+    def fake_solver(**kwargs):
+        captured.update(kwargs)
+        return {"solver": "electrostatic_cts", "received_fast_ion": kwargs.get("fast_ion")}
+
+    monkeypatch.setattr(product_cts, "analyze_cts_spectrum", fake_solver)
+    result = analyze_cts(
+        model="electrostatic",
+        frequency_shift_Hz=np.linspace(-1.0e8, 1.0e8, 21),
+        spectrum=np.ones(21),
+        probe_frequency_Hz=140e9,
+        scattering_geometry={"scattering_angle_rad": np.deg2rad(110.0)},
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        instrument_response=np.eye(21),
+        fast_ion=fast,
+    )
+    assert result["solver"] == "electrostatic_cts"
+    assert captured["fast_ion"]["kind"] == "tabulated_3d"
+    assert captured["fast_ion"]["velocity_vectors_m_s"].shape[1] == 3
+
+
+def test_cts_registry_declares_finite_volume_3d_fast_ion_input():
+    import json
+    from pathlib import Path
+
+    rows = json.loads(
+        (Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    entry = next(
+        row for row in rows
+        if row["diagnostic"] == "Collective Thomson / coherent scattering (CTS)"
+    )
+    spec = next(
+        item for item in entry["execution_contract"]["input_specs"]
+        if item["name"] == "fast_ion"
+    )
+    assert "tabulated_3d" in spec["description"]
+    assert "probability_density_s3_per_m3" in spec["description"]
+    assert "only its population fraction is fitted" in spec["description"]
 
