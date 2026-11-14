@@ -25,10 +25,14 @@ def analyze_spectra(*args: Any, **kwargs: Any) -> Any:
     """Run the registered optical Thomson spectrum-to-physics pipeline (analysis 1).
 
     The canonical workflow returns model-specific plasma inference together
-    with a projected q-parallel EVDF when its inverse is enabled. Dimensional
-    third/fourth central velocity moments and their covariance are exposed as
-    projected-marginal quantities; a single view does not identify the full
-    three-dimensional heat flux or unrestricted EVDF.
+    with a projected q-parallel EVDF when its inverse is enabled. For the
+    non-collective isotropic-Kappa branch, supplied laser-wavelength and
+    scattering-angle calibration uncertainties (including their cross-covariance)
+    are propagated into the fitted temperature, q-parallel flow and analytic
+    projected-Kappa moment closure. Dimensional third/fourth central velocity
+    moments and their covariance remain projected-marginal quantities; a
+    single view does not identify the full three-dimensional heat flux or
+    unrestricted EVDF.
     """
     return _run(1, *args, **kwargs)
 
