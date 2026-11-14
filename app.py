@@ -1823,6 +1823,7 @@ elif page=='Spectral Analysis':
                                 'projected_excess_kurtosis_uncertainty':closure.get('excess_kurtosis_standard_uncertainty'),
                                 'laser_wavelength_uncertainty_nm':geometry.get('laser_wavelength_standard_uncertainty_nm'),
                                 'scattering_angle_uncertainty_rad':geometry.get('scattering_angle_standard_uncertainty_rad'),
+                                'laser_angle_covariance_nm_rad':geometry.get('laser_angle_covariance_nm_rad'),
                                 'covariance_status':channel.get('physical_parameter_covariance_status'),
                             })
                         st.markdown('**Kappa projected-EVDF analytic moments and geometry-propagated uncertainty**')
