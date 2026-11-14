@@ -274,6 +274,11 @@ def _validate_tabulated_3d_fast_ion(fast_ion):
         raise ValueError("projection_velocity_grid_m_s must contain at least nine strictly increasing nodes")
     if np.any(np.linalg.norm(velocity, axis=1) >= 0.1 * C):
         raise ValueError("the electrostatic CTS tabulated 3-D fast-ion model requires |v| < 0.1 c")
+    flow_vector = fast_ion.get("flow_velocity_vector_m_s")
+    if flow_vector is not None:
+        flow_vector = _array(flow_vector, "fast-ion flow_velocity_vector_m_s", 1)
+        if flow_vector.shape != (3,) or np.linalg.norm(flow_vector) >= 0.1 * C:
+            raise ValueError("fast-ion flow_velocity_vector_m_s must be a subluminal 3-vector within the electrostatic |v| < 0.1 c domain")
     total_probability = float(np.dot(density, volume))
     if not np.isfinite(total_probability) or total_probability <= np.finfo(float).tiny:
         raise ValueError("3-D fast-ion EVDF must have a positive finite velocity-space integral")
@@ -282,6 +287,7 @@ def _validate_tabulated_3d_fast_ion(fast_ion):
         "probability_density_s3_per_m3": density / total_probability,
         "velocity_cell_volume_m3_per_s3": volume,
         "projection_velocity_grid_m_s": projection_grid,
+        "flow_velocity_vector_m_s": flow_vector,
         "input_probability_integral": total_probability,
     }
 
@@ -344,6 +350,9 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
+        if (isinstance(fast_ion, Mapping) and fast_ion.get("kind") == "tabulated_3d"
+                and fast_ion.get("flow_velocity_vector_m_s") is None):
+            raise ValueError("frequency-resolved 3-D fast-ion CTS geometry requires fast_ion.flow_velocity_vector_m_s so the fast-ion Doppler shift is projected separately for each q direction")
         entries=scattering_geometry["frequency_resolved_geometry"]
         if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)) or len(entries) != f.size:
             raise ValueError("frequency_resolved_geometry must contain exactly one geometry mapping per frequency-shift sample")
@@ -435,8 +444,13 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
                 projected_grid, projected_pdf, _ = _project_tabulated_3d_fast_ion_to_q_marginal(
                     fast_ion, scattering_vector_unit
                 )
+                fast_flow = ui_i
+                if hot[3]["flow_velocity_vector_m_s"] is not None:
+                    fast_flow = float(np.dot(
+                        hot[3]["flow_velocity_vector_m_s"], scattering_vector_unit
+                    ))
                 ch,fh=_component_tabulated(
-                    om,k,ni*hf,s["mass"],s["Z"],ui_i,
+                    om,k,ni*hf,s["mass"],s["Z"],fast_flow,
                     projected_grid,projected_pdf
                 )
             else:
