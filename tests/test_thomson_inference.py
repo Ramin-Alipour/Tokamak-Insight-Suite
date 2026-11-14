@@ -539,6 +539,12 @@ def test_projected_evdf_spectral_closure_reapplies_measured_response_operator():
         scattering_angle_rad=np.pi / 2, instrument_response=response,
     )
     assert len(result["electron_velocity_distribution"]) == result["channel_count"] == 1
+    evdf = result["channels"][0]["electron_velocity_distribution"]
+    if evdf["analysis_status"] == "completed":
+        assert "projected_moment_thermodynamic_closure" in evdf
+        assert evdf["projected_moment_thermodynamic_closure"][
+            "directional_pressure_per_density_J"
+        ] > 0.0
     closure = result["channels"][0]["spectral_distribution"].get(
         "projected_evdf_spectral_moment_closure"
     )
