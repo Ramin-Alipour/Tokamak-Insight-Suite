@@ -76,10 +76,18 @@ def _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=None):
         raise ValueError("projected EVDF must contain finite positive width and finite third central moment")
     me = 9.1093837139e-31
     variance = sigma * sigma
+    higher_order_validity = evdf.get("higher_order_moment_validity") or {}
+    flux_quantitative_allowed = (
+        higher_order_validity.get("quantitative_reporting_allowed") is True
+    )
     result = {
         "status": "derived_from_projected_one_dimensional_evdf",
         "directional_pressure_per_density_J": float(me * variance),
         "projected_kinetic_energy_flux_per_density_W_m": float(0.5 * me * mu3),
+        "projected_flux_quantitative_reporting_allowed": flux_quantitative_allowed,
+        "projected_flux_support_status": higher_order_validity.get(
+            "status", "support_validity_not_reported"
+        ),
         "equations": {
             "directional_pressure": "P_qq = m_e n_e Var(v_q)",
             "projected_marginal_energy_flux": "F_q^(1D) = (m_e n_e/2) mu_3,q",
@@ -105,8 +113,9 @@ def _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=None):
         density = float(electron_density_m3)
         result["electron_density_m3"] = density
         result["directional_pressure_Pa"] = float(me * density * variance)
-        result["projected_kinetic_energy_flux_W_m2"] = float(
-            0.5 * me * density * mu3
+        result["projected_kinetic_energy_flux_W_m2"] = (
+            float(0.5 * me * density * mu3)
+            if flux_quantitative_allowed else None
         )
     else:
         result["electron_density_m3"] = None
@@ -141,8 +150,9 @@ def _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=None):
                     result["directional_pressure_fixed_density_standard_uncertainty_Pa"] = float(
                         me * density * np.sqrt(max(block[0, 0], 0.0))
                     )
-                    result["projected_flux_fixed_density_standard_uncertainty_W_m2"] = float(
-                        0.5 * me * density * np.sqrt(max(block[1, 1], 0.0))
+                    result["projected_flux_fixed_density_standard_uncertainty_W_m2"] = (
+                        float(0.5 * me * density * np.sqrt(max(block[1, 1], 0.0)))
+                        if flux_quantitative_allowed else None
                     )
                     result["fixed_density_uncertainty_scope"] = (
                         "conditional_EVDF_uncertainty_only_density_uncertainty_and_density_EVDF_cross_covariance_excluded"
