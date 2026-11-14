@@ -2304,3 +2304,86 @@ def test_cts_dispatcher_forwards_joint_multi_population_covariance(monkeypatch):
     )
     assert captured["population_mc_samples"] == 20
     assert captured["population_mc_seed"] == 123
+
+def _anisotropic_tabulated_3d_fast_ion():
+    axis = np.linspace(-1.2e6, 1.2e6, 9)
+    vx, vy, vz = np.meshgrid(axis, axis, axis, indexing="ij")
+    velocity = np.column_stack((vx.ravel(), vy.ravel(), vz.ravel()))
+    sigma = np.array([2.2e5, 5.0e5, 8.0e5])
+    pdf = np.exp(-0.5 * np.sum((velocity / sigma) ** 2, axis=1))
+    cell_volume = np.full(pdf.size, (axis[1] - axis[0]) ** 3)
+    return {
+        "species_index": 0,
+        "fraction": 0.12,
+        "kind": "tabulated_3d",
+        "velocity_vectors_m_s": velocity,
+        "probability_density_s3_per_m3": pdf,
+        "velocity_cell_volume_m3_per_s3": cell_volume,
+        "projection_velocity_grid_m_s": np.linspace(-2.0e6, 2.0e6, 241),
+    }
+
+
+def test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent():
+    from tokamak_analysis.cts_analysis import (
+        _project_tabulated_3d_fast_ion_to_q_marginal,
+    )
+
+    fast = _anisotropic_tabulated_3d_fast_ion()
+    grid_x, pdf_x, diag_x = _project_tabulated_3d_fast_ion_to_q_marginal(
+        fast, np.array([1.0, 0.0, 0.0])
+    )
+    grid_z, pdf_z, diag_z = _project_tabulated_3d_fast_ion_to_q_marginal(
+        fast, np.array([0.0, 0.0, 1.0])
+    )
+    np.testing.assert_array_equal(grid_x, grid_z)
+    weights = np.empty(grid_x.size)
+    weights[0] = 0.5 * (grid_x[1] - grid_x[0])
+    weights[-1] = 0.5 * (grid_x[-1] - grid_x[-2])
+    weights[1:-1] = 0.5 * (grid_x[2:] - grid_x[:-2])
+    assert weights @ pdf_x == pytest.approx(1.0, rel=1e-12)
+    assert weights @ pdf_z == pytest.approx(1.0, rel=1e-12)
+    variance_x = weights @ (pdf_x * grid_x**2)
+    variance_z = weights @ (pdf_z * grid_z**2)
+    assert variance_x < variance_z
+    assert diag_x["projection_method"] == "conservative_linear_finite_volume_deposition"
+    assert diag_z["input_distribution_scope"] == "externally_supplied_3d_species_rest_frame_evdf"
+
+
+def test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions():
+    f0 = 140e9
+    shifts = np.linspace(-0.3e9, 0.3e9, 41)
+    fast = _anisotropic_tabulated_3d_fast_ion()
+    ions = [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}]
+    common = dict(
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=[1.0],
+        electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=0.0,
+        fast_ion=fast,
+    )
+    geometry_x = {
+        "incident_direction": [1.0, 0.0, 0.0],
+        "scattered_direction": [0.0, 1.0, 0.0],
+    }
+    geometry_z = {
+        "incident_direction": [0.0, 0.0, 1.0],
+        "scattered_direction": [1.0, 0.0, 0.0],
+    }
+    spectrum_x = cts_spectral_density(shifts, f0, geometry_x, **common)
+    spectrum_z = cts_spectral_density(shifts, f0, geometry_z, **common)
+    assert np.all(np.isfinite(spectrum_x)) and np.all(spectrum_x >= 0.0)
+    assert np.all(np.isfinite(spectrum_z)) and np.all(spectrum_z >= 0.0)
+    assert not np.allclose(spectrum_x, spectrum_z, rtol=1e-5, atol=0.0)
+
+
+def test_cts_3d_fast_ion_projection_rejects_insufficient_velocity_support():
+    from tokamak_analysis.cts_analysis import _project_tabulated_3d_fast_ion_to_q_marginal
+
+    fast = _anisotropic_tabulated_3d_fast_ion()
+    fast["projection_velocity_grid_m_s"] = np.linspace(-1.0e5, 1.0e5, 41)
+    with pytest.raises(ValueError, match="must cover every projected"):
+        _project_tabulated_3d_fast_ion_to_q_marginal(fast, [1.0, 0.0, 0.0])
+
