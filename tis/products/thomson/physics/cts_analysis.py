@@ -1424,6 +1424,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         elif fast["kind"]=="tabulated_1d":
             out["fast_ion_vdf_provenance"]="externally supplied normalized tabulated 1-D velocity distribution; only its density fraction is inferred"
             out["fast_ion_vdf_regularization"]=fast["vdf"]
+        elif fast["kind"]=="tabulated_3d":
+            out["fast_ion_vdf_provenance"]="externally supplied normalized finite-volume 3-D species-rest-frame EVDF; only its population fraction is inferred"
+            out["fast_ion_vdf_projection_method"]="conservative_linear_finite_volume_deposition onto the geometry-specific CTS scattering-vector direction"
+            out["fast_ion_vdf_shape_inferred"]=False
         else:
             names += [f"fast_ion_vdf_logit_{i}" for i in range(fast["vdf"]["velocity_m_s"].size-1)]
             out["fast_ion_vdf_provenance"]="non-negative tabulated 1-D fast-ion VDF inferred from the CTS spectrum with a second-difference smoothness penalty"
@@ -1436,6 +1440,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["parameter_provenance"]["fast_ion_temperature_eV"]="inferred from CTS spectral shape under a two-Maxwellian population model"
         elif fast["kind"]=="tabulated_1d":
             out["parameter_provenance"]["fast_ion_fraction"]="inferred; tabulated 1-D fast-ion VDF shape supplied externally"
+        elif fast["kind"]=="tabulated_3d":
+            out["parameter_provenance"]["fast_ion_fraction"]="inferred; finite-volume 3-D fast-ion EVDF shape supplied externally"
         else:
             out["parameter_provenance"]["fast_ion_fraction"]="inferred jointly with a regularized tabulated 1-D fast-ion VDF shape"
             out["parameter_provenance"]["fast_ion_vdf"]="inferred from CTS spectrum with non-negative softmax representation and second-difference regularization"
