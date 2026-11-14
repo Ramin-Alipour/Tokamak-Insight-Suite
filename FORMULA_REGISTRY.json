@@ -12482,6 +12482,12 @@
           "name": "projection_velocity_grid_m_s",
           "unit": "strictly increasing 1-D grid; m s^-1; at least nine nodes",
           "required": true
+        },
+        {
+          "name": "flow_velocity_vector_m_s",
+          "unit": "optional 3-vector; m s^-1; independent fast-ion bulk flow in laboratory coordinates",
+          "required": false,
+          "description": "If supplied, its projection onto each geometry-specific q direction sets the fast-ion Doppler shift. If omitted for a single geometry, the selected thermal ion species flow projection is shared with the fast-ion component. Frequency-resolved geometry requires this vector so the fast-ion flow projection is recomputed for each q."
         }
       ],
       "output_specs": [
@@ -12506,7 +12512,8 @@
       "limitations": [
         "The supplied 3-D EVDF shape is not inferred; only its population fraction is fitted by the electrostatic CTS inversion.",
         "The projection grid and finite-volume voxel quadrature control numerical resolution; convergence must be assessed by refining both.",
-        "The electrostatic model rejects |v| >= 0.1c; relativistic fast-ion response requires the separate Full-EM kinetic model."
+        "The electrostatic model rejects |v| >= 0.1c; relativistic fast-ion response requires the separate Full-EM kinetic model.",
+        "For frequency-resolved geometry, an independent 3-D fast-ion bulk-flow vector is required; a single scalar projection cannot represent changing q directions."
       ],
       "function_links": [
         "tis.products.thomson.physics.cts_analysis._validate_tabulated_3d_fast_ion",
@@ -12520,7 +12527,7 @@
       "input_data_level": "model_parameters_and_supplied_3d_velocity_distribution",
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Microwave collective Thomson scattering",
-      "note": "For each geometry, the discrete probability f_a ΔV_a is deposited onto adjacent projection-grid nodes with linear hat functions φ_j. Division by trapezoidal nodal measure w_j preserves total probability. The resulting q-parallel marginal is used in the tabulated Landau susceptibility; a different scattering geometry produces a different marginal for an anisotropic 3-D EVDF.",
+      "note": "For each geometry, the discrete probability f_a ΔV_a is deposited onto adjacent projection-grid nodes with linear hat functions φ_j. Division by trapezoidal nodal measure w_j preserves total probability. The resulting q-parallel marginal is used in the tabulated Landau susceptibility; a different scattering geometry produces a different marginal for an anisotropic 3-D EVDF. An optional independent fast-ion bulk-flow vector is projected onto q for every geometry; if absent in a single-view fit, the selected thermal species flow projection is shared.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
         "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions",
