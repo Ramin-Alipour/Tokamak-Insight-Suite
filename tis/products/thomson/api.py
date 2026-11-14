@@ -30,9 +30,13 @@ def analyze_spectra(*args: Any, **kwargs: Any) -> Any:
     scattering-angle calibration uncertainties (including their cross-covariance)
     are propagated into the fitted temperature, q-parallel flow and analytic
     projected-Kappa moment closure. Dimensional third/fourth central velocity
-    moments and their covariance remain projected-marginal quantities; a
-    single view does not identify the full three-dimensional heat flux or
-    unrestricted EVDF.
+    moments and their covariance remain projected-marginal quantities. The
+    non-relativistic Maxwellian/Kappa branches additionally report the
+    identifiable q-direction pressure component and one-dimensional
+    projected kinetic-energy flux when the primary fit independently
+    identifies absolute density. Total absolute uncertainty is withheld
+    without the joint density/EVDF covariance; a single view does not identify
+    the full three-dimensional pressure tensor, heat flux or unrestricted EVDF.
     """
     return _run(1, *args, **kwargs)
 
