@@ -4901,11 +4901,21 @@ def analyze_thomson_spectra(
                     "status": "derived_from_identified_absolute_density_and_projected_evdf",
                 })
             elif projected_closure:
-                conditional.append({
-                    **item,
-                    "status": "requires_independent_absolute_electron_density",
-                    "reason": "A normalized projected EVDF does not identify absolute density; no density is inferred from spectral shape.",
-                })
+                if (
+                    quantity == "projected_kinetic_energy_flux_W_m2"
+                    and projected_closure.get("projected_flux_quantitative_reporting_allowed") is not True
+                ):
+                    conditional.append({
+                        **item,
+                        "status": "finite_velocity_support_diagnostic_only",
+                        "reason": "The projected third moment is withheld from quantitative reporting because the EVDF velocity-support screen is not passed or unavailable.",
+                    })
+                else:
+                    conditional.append({
+                        **item,
+                        "status": "requires_independent_absolute_electron_density",
+                        "reason": "A normalized projected EVDF does not identify absolute density; no density is inferred from spectral shape.",
+                    })
         channel_classification.append({
             "channel_index": int(channel_index),
             "primary": primary,
