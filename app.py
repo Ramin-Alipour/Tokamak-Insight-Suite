@@ -4807,6 +4807,20 @@ elif page=='Advanced Analysis':
                     st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
                     st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
                     st.metric('Ion temperature',f"{result_cts['ion_temperature_eV']:.5g} eV")
+                    if result_cts.get('fast_ion_vdf_shape_inferred') is False:
+                        st.markdown('**Geometry-projected 3-D fast-ion EVDF marginal**')
+                        projected_grid=np.asarray(result_cts['fast_ion_projected_velocity_grid_m_s'],dtype=float)
+                        projected_pdf=np.asarray(result_cts['fast_ion_projected_probability_density_s_per_m'],dtype=float)
+                        if projected_pdf.ndim==1:
+                            st.line_chart(pd.DataFrame({
+                                'velocity_parallel_m_s':projected_grid,
+                                'probability_density_s_per_m':projected_pdf,
+                            }),x='velocity_parallel_m_s')
+                        else:
+                            st.dataframe(pd.DataFrame(projected_pdf.T,columns=[
+                                f'geometry_sample_{index}' for index in range(projected_pdf.shape[0])
+                            ]).assign(velocity_parallel_m_s=projected_grid),width='stretch')
+                        st.caption('The supplied 3-D fast-ion EVDF shape is fixed external input. This curve is its conservative q-parallel projection for the supplied CTS geometry; only the population fraction is fitted.')
                     st.json(result_cts)
                     json_download('Export CTS inversion and uncertainty diagnostics',result_cts,'tis_cts_inversion.json')
                     add_report_section('Microwave CTS spectral inversion',result_cts)
