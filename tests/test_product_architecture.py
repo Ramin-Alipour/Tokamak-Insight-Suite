@@ -452,3 +452,28 @@ def test_analysis_one_reports_product_owned_canonical_entry_point(monkeypatch):
     )
     assert advanced_result["analysis_id"] == 1
     assert advanced_result["canonical_entry_point"] == expected_entry_point
+
+def test_thomson_product_solver_modules_do_not_shadow_top_level_definitions():
+    """Prevent later wrappers from silently replacing an earlier solver implementation."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "tis" / "products" / "thomson" / "physics"
+    modules = (
+        "thomson_workflow.py",
+        "thomson_distribution.py",
+        "cts_analysis.py",
+        "cts_full_physics.py",
+    )
+    for filename in modules:
+        source = (root / filename).read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=filename)
+        names = [
+            node.name for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        assert not duplicates, (
+            f"{filename} contains shadowed top-level solver definitions: {duplicates}"
+        )
+
