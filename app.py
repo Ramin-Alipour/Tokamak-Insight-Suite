@@ -4671,6 +4671,7 @@ elif page=='Advanced Analysis':
             elif cts_fast_mode=='Fixed tabulated 3-D EVDF':
                 cts_fast_vdf_upload=st.file_uploader('3-D fast-ion EVDF CSV (vx, vy, vz, probability_density_s3_per_m3, velocity_cell_volume_m3_per_s3)',type=['csv','txt'],key='cts_fast_vdf_3d')
                 cts_fast_projection_grid=st.text_area('Projected q-velocity grid JSON (m/s; >=9 increasing nodes)',placeholder='[-2e6,-1.9e6,...,2e6]',key='cts_fast_projection_grid_3d')
+                cts_fast_3d_flow_vector=st.text_input('Optional 3-D fast-ion bulk-flow vector JSON (m/s; overrides thermal-species projected flow)',value='',key='cts_fast_3d_flow_vector')
             if cts_fast_mode!='None':
                 cts_fast_species=st.text_input('Fast-ion species index (required)',value='',key='cts_fast_species')
                 cts_fast_fraction=st.text_input('Initial fast-ion fraction (0–1; required)',value='',key='cts_fast_fraction')
@@ -4752,6 +4753,11 @@ elif page=='Advanced Analysis':
                             'velocity_cell_volume_m3_per_s3':vdf3[:,4],
                             'projection_velocity_grid_m_s':projection_grid,
                         }
+                        if cts_fast_3d_flow_vector.strip():
+                            fast_flow_vector=np.asarray(json.loads(cts_fast_3d_flow_vector),dtype=float)
+                            if fast_flow_vector.shape!=(3,) or not np.all(np.isfinite(fast_flow_vector)):
+                                raise ValueError('The fast-ion bulk-flow vector must be a finite three-component JSON vector.')
+                            fast_ion['flow_velocity_vector_m_s']=fast_flow_vector
                     if cts_method is None:
                         raise ValueError('Select the CTS inversion method explicitly.')
                     parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
