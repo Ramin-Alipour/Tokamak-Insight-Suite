@@ -771,6 +771,7 @@ def _projected_kappa_moment_closure(
     sigma_nm, kappa, laser_nm, angle, fit_covariance=None, *,
     laser_wavelength_uncertainty_nm=0.0,
     scattering_angle_uncertainty_rad=0.0,
+    laser_angle_covariance_nm_rad=0.0,
 ):
     """Analytic moments of the 1-D Student-t marginal of an isotropic 3-D Kappa EVDF.
 
@@ -794,12 +795,24 @@ def _projected_kappa_moment_closure(
         scattering_angle_uncertainty_rad,
         "scattering_angle_uncertainty_rad", minimum=0.0,
     )
+    geometry_cross = _finite_scalar(
+        laser_angle_covariance_nm_rad,
+        "laser_angle_covariance_nm_rad",
+    )
     if angle >= np.pi:
         raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
     if laser_unc > laser_nm / 3.0:
         raise ValueError("laser_wavelength_uncertainty_nm is too large for local Gaussian Kappa-moment propagation")
     if angle_unc > min(angle, np.pi-angle) / 3.0:
         raise ValueError("scattering_angle_uncertainty_rad is too large for local Gaussian Kappa-moment propagation")
+    geometry_covariance = np.array([
+        [laser_unc**2, geometry_cross],
+        [geometry_cross, angle_unc**2],
+    ])
+    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+    geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
+    if float(geometry_eigenvalues.min()) < -1e-12*geometry_scale:
+        raise ValueError("Kappa laser-wavelength/scattering-angle covariance must be positive semidefinite")
     q = 2.0*np.sin(angle/2.0)
     velocity_per_nm = C_M_S/(laser_nm*q)
     sigma_v = velocity_per_nm*sigma_nm
@@ -825,6 +838,7 @@ def _projected_kappa_moment_closure(
         "geometry_uncertainty": {
             "laser_wavelength_standard_uncertainty_nm": laser_unc,
             "scattering_angle_standard_uncertainty_rad": angle_unc,
+            "laser_angle_covariance_nm_rad": geometry_cross,
             "geometry_fit_cross_covariance": "assumed_zero_not_supplied",
         },
         "fourth_moment_status": (
@@ -863,6 +877,8 @@ def _projected_kappa_moment_closure(
     input_covariance[:2, :2] = fit_block
     input_covariance[2, 2] = laser_unc**2
     input_covariance[3, 3] = angle_unc**2
+    input_covariance[2, 3] = geometry_cross
+    input_covariance[3, 2] = geometry_cross
 
     variance = sigma_v**2
     variance_gradient = np.array([
@@ -916,6 +932,7 @@ def _fit_kappa(
     background_templates=None,
     laser_wavelength_uncertainty_nm=0.0,
     scattering_angle_uncertainty_rad=0.0,
+    laser_angle_covariance_nm_rad=0.0,
 ):
     """Fit isotropic finite-variance Kappa spectra with exact Student-t bin integrals.
 
@@ -1171,6 +1188,8 @@ def _fit_kappa(
         input_covariance[:2, :2] = cov[np.ix_([1, 2], [1, 2])]
         input_covariance[2, 2] = laser_unc**2
         input_covariance[3, 3] = angle_unc**2
+        input_covariance[2, 3] = geometry_cross
+        input_covariance[3, 2] = geometry_cross
         physical_parameter_covariance = (
             physical_jacobian @ input_covariance @ physical_jacobian.T
         )
@@ -1266,6 +1285,7 @@ def _fit_kappa(
         "physical_parameter_covariance_fit_only": physical_parameter_covariance_fit_only,
         "physical_parameter_covariance": physical_parameter_covariance,
         "physical_parameter_covariance_including_geometry": physical_parameter_covariance,
+        "total_physical_parameter_covariance": physical_parameter_covariance,
         "physical_parameter_covariance_order": [
             "electron_temperature_eV", "electron_velocity_projection_m_s"
         ],
@@ -1275,6 +1295,7 @@ def _fit_kappa(
             "fit_parameter_covariance": "included",
             "laser_wavelength_uncertainty_nm": laser_unc,
             "scattering_angle_uncertainty_rad": angle_unc,
+            "laser_angle_covariance_nm_rad": geometry_cross,
             "fit_geometry_cross_covariance": "assumed_zero_not_supplied",
         },
         "physical_parameter_covariance_status": physical_covariance_status,
@@ -1287,6 +1308,7 @@ def _fit_kappa(
             sigma, kappa, laser_nm, angle, fit_covariance=cov,
             laser_wavelength_uncertainty_nm=laser_unc,
             scattering_angle_uncertainty_rad=angle_unc,
+            laser_angle_covariance_nm_rad=geometry_cross,
         ),
         "amplitude": amp, "background_intercept": background_intercept,
         "background_slope_per_nm": background_slope,
@@ -1362,6 +1384,7 @@ def _collective_external_parameter_indices(channel_index, ion_species_count):
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
     laser_wavelength_uncertainty_nm=None, scattering_angle_uncertainty_rad=None,
+    laser_angle_covariance_nm_rad=0.0,
     incident_direction_uncertainty=None, scattered_direction_uncertainty=None,
     instrument_response=None, signal_uncertainty=None,
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
@@ -1454,6 +1477,24 @@ def analyze_thomson_spectra(
             _finite_scalar(uncertainty_value, uncertainty_name, minimum=0.0)
     laser_wavelength_unc = 0.0 if laser_wavelength_uncertainty_nm is None else float(laser_wavelength_uncertainty_nm)
     scattering_angle_unc = 0.0 if scattering_angle_uncertainty_rad is None else float(scattering_angle_uncertainty_rad)
+    laser_angle_covariance_nm_rad = _finite_scalar(
+        laser_angle_covariance_nm_rad, "laser_angle_covariance_nm_rad"
+    )
+    geometry_calibration_covariance = np.array([
+        [laser_wavelength_unc**2, laser_angle_covariance_nm_rad],
+        [laser_angle_covariance_nm_rad, scattering_angle_unc**2],
+    ])
+    geometry_calibration_eigenvalues = np.linalg.eigvalsh(
+        geometry_calibration_covariance
+    )
+    geometry_calibration_scale = max(
+        float(np.max(np.abs(geometry_calibration_eigenvalues))),
+        np.finfo(float).tiny,
+    )
+    if float(geometry_calibration_eigenvalues.min()) < -1e-12*geometry_calibration_scale:
+        raise ValueError(
+            "laser-wavelength/scattering-angle calibration covariance must be positive semidefinite"
+        )
     incident_direction_unc = None if incident_direction_uncertainty is None else _finite_array(
         incident_direction_uncertainty, "incident_direction_uncertainty", 1)
     scattered_direction_unc = None if scattered_direction_uncertainty is None else _finite_array(
@@ -1483,6 +1524,11 @@ def analyze_thomson_spectra(
             "non_collective_kappa and non_collective_relativistic_maxwell_juttner. "
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
             "is implemented as a separate child subanalysis of primary Analysis 1."
+        )
+    if laser_angle_covariance_nm_rad != 0.0 and model != "non_collective_kappa":
+        raise ValueError(
+            "laser_angle_covariance_nm_rad is currently propagated by the non-collective "
+            "Kappa path only; it must not be silently ignored by another model."
         )
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
@@ -2047,6 +2093,7 @@ def analyze_thomson_spectra(
                 ),
                 laser_wavelength_uncertainty_nm=laser_wavelength_unc,
                 scattering_angle_uncertainty_rad=scattering_angle_unc,
+                laser_angle_covariance_nm_rad=laser_angle_covariance_nm_rad,
             )
         elif model == "non_collective_relativistic_maxwell_juttner":
             # First obtain a deterministic physical seed with the established
@@ -5019,8 +5066,20 @@ def fit_optical_thomson_poisson_counts(
         scattering_angle_uncertainty_rad,
         "scattering_angle_uncertainty_rad", minimum=0.0,
     )
+    geometry_cross = _finite_scalar(
+        laser_angle_covariance_nm_rad,
+        "laser_angle_covariance_nm_rad",
+    )
     if laser_unc > laser_nm / 3.0:
         raise ValueError("laser_wavelength_uncertainty_nm is too large for local Gaussian Kappa propagation")
     if angle_unc > min(angle, np.pi-angle) / 3.0:
         raise ValueError("scattering_angle_uncertainty_rad is too large for local Gaussian Kappa propagation")
+    geometry_covariance = np.array([
+        [laser_unc**2, geometry_cross],
+        [geometry_cross, angle_unc**2],
+    ])
+    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+    geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
+    if float(geometry_eigenvalues.min()) < -1e-12*geometry_scale:
+        raise ValueError("Kappa laser-wavelength/scattering-angle covariance must be positive semidefinite")
 
