@@ -2225,3 +2225,57 @@ def test_poisson_optical_thomson_rejects_inconsistent_joint_geometry_covariance(
             scattering_angle_uncertainty_rad=0.001,
             laser_angle_covariance_nm_rad=1.0,
         )
+
+def test_analysis1_projected_moment_closure_reports_only_identifiable_1d_pressure_and_flux():
+    from tis.physics.shared.thomson_inference import (
+        _projected_evdf_thermodynamic_closure,
+    )
+
+    me = 9.1093837139e-31
+    density = 2.0e19
+    sigma = 3.0e5
+    mu3 = 4.0e15
+    covariance_order = [
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+    ]
+    covariance = np.diag([1.0, 2.5e18, 1.0e8, 0.01, 9.0e29])
+    evdf = {
+        "velocity_parallel_standard_deviation_m_s": sigma,
+        "central_third_velocity_moment_m3_s3": mu3,
+        "velocity_moment_covariance_order": covariance_order,
+        "velocity_moment_covariance": covariance,
+    }
+
+    shape_only = _projected_evdf_thermodynamic_closure(evdf)
+    assert shape_only["directional_pressure_Pa"] is None
+    assert shape_only["projected_kinetic_energy_flux_W_m2"] is None
+    assert shape_only["directional_pressure_per_density_J"] == pytest.approx(
+        me * sigma**2
+    )
+    assert shape_only["projected_kinetic_energy_flux_per_density_W_m"] == pytest.approx(
+        0.5 * me * mu3
+    )
+
+    absolute = _projected_evdf_thermodynamic_closure(
+        evdf, electron_density_m3=density
+    )
+    assert absolute["directional_pressure_Pa"] == pytest.approx(
+        me * density * sigma**2
+    )
+    assert absolute["projected_kinetic_energy_flux_W_m2"] == pytest.approx(
+        0.5 * me * density * mu3
+    )
+    assert absolute["total_absolute_uncertainty_status"] == (
+        "unavailable_joint_density_evdf_covariance_not_supplied"
+    )
+    assert "not_the_complete_3d_parallel_heat_flux" in absolute["physical_scope"]
+    assert absolute["directional_pressure_fixed_density_standard_uncertainty_Pa"] == pytest.approx(
+        me * density * np.sqrt(covariance[1, 1])
+    )
+    with pytest.raises(ValueError, match="independently inferred"):
+        _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=0.0)
+
