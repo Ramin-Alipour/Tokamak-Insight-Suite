@@ -1154,6 +1154,13 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
         assert closure["total_absolute_uncertainty_status"] == (
             "unavailable_joint_density_evdf_covariance_not_supplied"
         )
+        classified_names = {
+            item["parameter"]
+            for item in out["result_classification"]["channels"][0]["primary"]
+            + out["result_classification"]["channels"][0]["conditional"]
+        }
+        assert "directional_pressure_Pa" in classified_names
+        assert "projected_kinetic_energy_flux_W_m2" in classified_names
 
 
 def test_rejected_primary_fit_withholds_dependent_thomson_subanalyses(monkeypatch):
