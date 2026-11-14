@@ -2461,3 +2461,17 @@ def test_cts_3d_fast_ion_formula_and_dashboard_are_connected():
     assert "Geometry-projected 3-D fast-ion EVDF marginal" in dashboard
     assert "only the population fraction is fitted" in dashboard
 
+def test_cts_3d_fast_ion_identifiability_keeps_distribution_shape_external():
+    from tis.physics.shared.thomson_identifiability import cts_electrostatic_identifiability
+
+    result = cts_electrostatic_identifiability(fast_ion_model="tabulated_3d")
+    fraction = next(
+        item for item in result["conditional"]
+        if item["parameter"] == "fast_ion_fraction"
+    )
+    assert fraction["status"] == "computed_for_externally_supplied_fixed_finite_volume_3d_EVDF_shape"
+    assert any(
+        item["parameter"] == "unknown_three_dimensional_fast_ion_EVDF_shape"
+        for item in result["non_identifiable"]
+    )
+
