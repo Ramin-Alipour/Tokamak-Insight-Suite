@@ -4646,6 +4646,20 @@ def analyze_thomson_spectra(
                     },
                 }
         channel_result["electron_velocity_distribution"] = evdf
+        if (
+            model in {"non_collective_maxwellian", "non_collective_kappa"}
+            and evdf.get("analysis_status") in {"completed", "conditional_regularized_candidate"}
+        ):
+            density_for_closure = channel_result.get("electron_density_m3")
+            evdf["projected_moment_thermodynamic_closure"] = (
+                _projected_evdf_thermodynamic_closure(
+                    evdf, electron_density_m3=density_for_closure
+                )
+            )
+            if evdf.get("analysis_status") != "completed":
+                evdf["projected_moment_thermodynamic_closure"]["status"] = (
+                    "conditional_regularized_candidate_not_primary_measurement"
+                )
         # Reuse the EVDF already reconstructed by the parent API and close its
         # first two velocity moments against the same-channel measured spectrum.
         # This avoids a duplicate inverse solve and keeps API/Dashboard output aligned.
