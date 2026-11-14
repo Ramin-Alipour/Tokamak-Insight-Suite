@@ -2263,6 +2263,10 @@ def test_analysis1_projected_moment_closure_reports_only_identifiable_1d_pressur
         "central_third_velocity_moment_m3_s3": mu3,
         "velocity_moment_covariance_order": covariance_order,
         "velocity_moment_covariance": covariance,
+        "higher_order_moment_validity": {
+            "status": "within_declared_support_screen",
+            "quantitative_reporting_allowed": True,
+        },
     }
 
     shape_only = _projected_evdf_thermodynamic_closure(evdf)
@@ -2293,6 +2297,18 @@ def test_analysis1_projected_moment_closure_reports_only_identifiable_1d_pressur
     )
     with pytest.raises(ValueError, match="independently inferred"):
         _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=0.0)
+
+    truncated = dict(evdf)
+    truncated["higher_order_moment_validity"] = {
+        "status": "support_truncation_suspected",
+        "quantitative_reporting_allowed": False,
+    }
+    truncated_flux = _projected_evdf_thermodynamic_closure(
+        truncated, electron_density_m3=density
+    )
+    assert truncated_flux["projected_kinetic_energy_flux_W_m2"] is None
+    assert truncated_flux["projected_kinetic_energy_flux_per_density_W_m"] != 0.0
+    assert truncated_flux["projected_flux_quantitative_reporting_allowed"] is False
 
 def test_analysis1_registry_declares_projected_moment_physics_outputs():
     import json
