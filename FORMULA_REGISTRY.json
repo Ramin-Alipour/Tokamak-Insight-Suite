@@ -3448,7 +3448,7 @@
           "name": "fast_ion",
           "unit": "optional hot Maxwellian or tabulated one-dimensional fast-ion component",
           "required": false,
-          "description": "Optional hot Maxwellian or normalized tabulated one-dimensional fast-ion VDF; shape inference and regularization are controlled by the separate analyze_cts_spectrum inversion entry point."
+          "description": "Optional hot Maxwellian, normalized tabulated one-dimensional fast-ion VDF, or finite-volume tabulated three-dimensional species-rest-frame EVDF. For tabulated_3d, supply velocity_vectors_m_s (n,3), probability_density_s3_per_m3 (n), velocity_cell_volume_m3_per_s3 (n), and projection_velocity_grid_m_s; the shape is fixed external input and only its population fraction is fitted."
         }
       ],
       "output_specs": [
@@ -3685,7 +3685,7 @@
     "equation": "χ_f(k,ω)=−ω_pf²/k² [PV∫ f′(v)/(v−(ω/k−u_f)) dv + iπ f′(ω/k−u_f)]",
     "inputs": "Frequency shift [Hz], scattering wave number [m^-1], fast-ion density [m^-3], ion charge [e], ion mass [kg], flow projection [m/s], normalized tabulated 1-D velocity distribution f(v)",
     "output": "Complex longitudinal susceptibility and resonant VDF value",
-    "assumptions": "Unmagnetized electrostatic longitudinal response, 1-D projected velocity distribution, Landau-contour prescription, PCHIP interpolation of supplied tabulated VDF.",
+    "assumptions": "Unmagnetized electrostatic longitudinal response, 1-D projected velocity distribution; a supplied 3-D EVDF is projected onto q before this susceptibility is evaluated, Landau-contour prescription, PCHIP interpolation of supplied tabulated VDF.",
     "status": "D",
     "category": "Microwave collective Thomson scattering",
     "execution_contract": {
@@ -3732,15 +3732,15 @@
       "uncertainty_model": "The susceptibility is deterministic for the supplied VDF. When VDF nodes are inferred by the CTS inverse routine, non-negative softmax parameterization and second-difference regularization are used; the resulting logit covariance is propagated to the VDF node covariance.",
       "limitations": [
         "Only longitudinal unmagnetized electrostatic susceptibility is represented.",
-        "The velocity distribution is a 1-D projection; anisotropic 3-D VDFs and magnetized electromagnetic response are not represented.",
-        "VDF inversion is ill-posed and depends on the chosen velocity grid and regularization strength."
+        "VDF inversion is ill-posed and depends on the chosen velocity grid and regularization strength.",
+        "The 3-D fast-ion shape is supplied externally and reduced to its geometry-specific q-parallel marginal; this formula does not infer an unknown 3-D EVDF."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis._component_tabulated",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
       "raw_data_to_physics": false,
-      "note": "Tabulated VDF shape can be inferred only when infer_tabulated_1d is selected with regularized inversion; fixed tabulated_1d mode treats the shape as an external input.",
+      "note": "A tabulated 3-D species-rest-frame EVDF is first conservatively projected onto the current scattering-vector direction by tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal; the projected marginal is then passed through this Landau-contour susceptibility. Only the fast-ion population fraction is fitted in this path.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_tabulated_non_maxwellian_fast_ion_forward_model",
         "tests/test_cts_analysis.py::test_cts_tabulated_fast_ion_uses_species_resolved_doppler_flow"
@@ -12442,6 +12442,117 @@
         "tests/test_thomson_distribution.py::test_relativistic_projected_lab_flux_rejects_density_cross_covariance_without_joint_inputs"
       ],
       "note": "Analytic and numerical software verification only; not experimental validation."
+    }
+  },
+  {
+    "name": "CTS finite-volume projection of a 3-D fast-ion EVDF onto the scattering vector",
+    "equation": "f_{i,q}(u)=\\int f_{i,3D}(\\mathbf v)\\,\\delta(u-\\hat{\\mathbf q}\\cdot\\mathbf v)\\,d^3v;\\quad m_j=\\sum_a f_a\\Delta V_a\\,\\phi_j(\\hat{\\mathbf q}\\cdot\\mathbf v_a);\\quad f_{i,q}(u_j)=m_j/w_j",
+    "inputs": "Species-rest-frame 3-D fast-ion EVDF samples f_a [s^3 m^-3], velocity-space cell volumes ΔV_a [(m/s)^3], voxel velocities v_a [m/s], unit scattering-vector direction q_hat, and strictly increasing 1-D projection velocity grid u_j [m/s].",
+    "output": "Normalized q-parallel fast-ion marginal f_i,q(u_j) [s m^-1] and projection diagnostics.",
+    "assumptions": "Unmagnetized electrostatic longitudinal CTS; supplied 3-D EVDF shape is fixed external input; finite-volume voxel quadrature; conservative linear deposition onto a user-supplied projection grid; species bulk flow is applied separately in the Landau resonance; non-relativistic velocity support |v|<0.1c.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+      "formula_key": "cts_tabulated_3d_fast_ion_q_projection",
+      "input_specs": [
+        {
+          "name": "velocity_vectors_m_s",
+          "unit": "n×3; m s^-1; species-rest-frame voxel velocities",
+          "required": true
+        },
+        {
+          "name": "probability_density_s3_per_m3",
+          "unit": "n; s^3 m^-3; non-negative 3-D EVDF samples",
+          "required": true
+        },
+        {
+          "name": "velocity_cell_volume_m3_per_s3",
+          "unit": "n; (m s^-1)^3; positive voxel quadrature volumes",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "3-vector; dimensionless unit q direction",
+          "required": true
+        },
+        {
+          "name": "projection_velocity_grid_m_s",
+          "unit": "strictly increasing 1-D grid; m s^-1; at least nine nodes",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "projected_velocity_grid_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "projected_probability_density_s_per_m",
+          "unit": "s m^-1; normalized q-parallel marginal"
+        },
+        {
+          "name": "projection_probability_integral",
+          "unit": "dimensionless; conservative discrete normalization"
+        }
+      ],
+      "prerequisites": [
+        "A normalized finite-volume 3-D EVDF with explicit voxel velocities and velocity-space cell volumes.",
+        "A measured or researcher-supplied scattering-vector direction and a projection grid covering all voxel projections."
+      ],
+      "uncertainty_model": "The projection is deterministic conditional on the supplied voxel values, cell volumes, geometry and projection grid. Uncertainty of the external 3-D EVDF and geometry is not inferred by this helper; CTS fit covariance covers fitted bulk parameters and the fast-ion fraction conditional on the fixed 3-D shape.",
+      "limitations": [
+        "The supplied 3-D EVDF shape is not inferred; only its population fraction is fitted by the electrostatic CTS inversion.",
+        "The projection grid and finite-volume voxel quadrature control numerical resolution; convergence must be assessed by refining both.",
+        "The electrostatic model rejects |v| >= 0.1c; relativistic fast-ion response requires the separate Full-EM kinetic model."
+      ],
+      "function_links": [
+        "tis.products.thomson.physics.cts_analysis._validate_tabulated_3d_fast_ion",
+        "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+        "tis.products.thomson.physics.cts_analysis.cts_spectral_density",
+        "tis.products.thomson.physics.cts_analysis.analyze_cts_spectrum"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "finite_volume_3d_fast_ion_evdf_to_geometry_specific_q_parallel_marginal",
+      "input_data_level": "model_parameters_and_supplied_3d_velocity_distribution",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering",
+      "note": "For each geometry, the discrete probability f_a ΔV_a is deposited onto adjacent projection-grid nodes with linear hat functions φ_j. Division by trapezoidal nodal measure w_j preserves total probability. The resulting q-parallel marginal is used in the tabulated Landau susceptibility; a different scattering geometry produces a different marginal for an anisotropic 3-D EVDF.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
+        "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions"
+      ]
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield et al.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "scope": "General collective-scattering and dielectric-response framework; the finite-volume projection is a numerical discretization of the q-parallel marginal."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "supplied_finite_volume_3d_velocity_distribution_and_measured_cts_geometry",
+    "execution_scope": "finite_volume_3d_fast_ion_evdf_projection_used_by_cts_landau_susceptibility",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+      "function_links": [
+        "tis.products.thomson.physics.cts_analysis._validate_tabulated_3d_fast_ion",
+        "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+        "tis.products.thomson.physics.cts_analysis.cts_spectral_density"
+      ],
+      "formula_key": "cts_tabulated_3d_fast_ion_q_projection",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
+        "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions"
+      ]
     }
   }
 ]
