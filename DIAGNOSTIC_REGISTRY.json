@@ -736,6 +736,11 @@
           "name": "higher_order_moment_validity",
           "unit": "structured; finite-velocity-support gate for projected third/fourth moments, skewness, excess kurtosis and projected parallel kinetic-energy flux",
           "description": "Per-channel projected-EVDF validity status derived from probability in the outer velocity cells. When the declared boundary-mass limit is exceeded, higher-order moment values remain available only as finite-window diagnostics and must not be reported quantitatively; no tail extrapolation or full 3-D heat-flux inference is performed."
+        },
+        {
+          "name": "projected_moment_thermodynamic_closure",
+          "unit": "per-channel q-direction pressure (Pa) and one-dimensional projected kinetic-energy flux (W m^-2)",
+          "description": "For non-relativistic Maxwellian/Kappa Analysis 1 fits, closes the reconstructed normalized q-parallel EVDF with P_qq=m_e n_e Var(v_q) and F_q^(1D)=(m_e n_e/2) mu_3,q. Absolute values are emitted only when the primary optical fit independently identifies density. Density/EVDF cross-covariance is not inferred; total absolute uncertainty is withheld without the joint covariance. This is not the complete 3-D parallel heat flux or pressure tensor."
         }
       ],
       "assumptions": [
@@ -753,7 +758,7 @@
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner single-particle model. Maxwellian and Kappa channel fits jointly estimate the selected detector-space background basis. Infer electron temperature and scattering-vector flow; infer absolute electron density only from calibrated W/nm spectra with complete optical geometry. For non-relativistic Maxwellian/Kappa fits, optionally reconstruct the identifiable one-dimensional projected electron-velocity marginal from the same measured spectra using the fitted background, measured response and supplied spectral uncertainty/covariance. The non-relativistic EVDF inverse is not run for the relativistic Maxwell-Juttner model. The projected-EVDF inverse also reports numerical sensitivity of distribution moments across its successful GCV regularization candidates; this is distinct from measurement uncertainty.",
+      "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner single-particle model. Maxwellian and Kappa channel fits jointly estimate the selected detector-space background basis. Infer electron temperature and scattering-vector flow; infer absolute electron density only from calibrated W/nm spectra with complete optical geometry. For non-relativistic Maxwellian/Kappa fits, optionally reconstruct the identifiable one-dimensional projected electron-velocity marginal from the same measured spectra using the fitted background, measured response and supplied spectral uncertainty/covariance. The non-relativistic EVDF inverse is not run for the relativistic Maxwell-Juttner model. The projected-EVDF inverse also reports numerical sensitivity of distribution moments across its successful GCV regularization candidates; this is distinct from measurement uncertainty. For non-relativistic Maxwellian/Kappa fits, the same reconstructed projected EVDF is additionally closed to the identifiable q-direction pressure component and one-dimensional projected kinetic-energy flux when absolute density is independently available; total absolute uncertainty is withheld unless joint density/EVDF covariance is supplied. These are not the complete 3-D pressure tensor or heat flux.",
       "uncertainty_model": "Non-collective Maxwellian and Kappa fits use local fit covariance and support full channel-major GLS when supplied. The relativistic Maxwell-Juttner fit uses local covariance, measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties; full channel-major spectral GLS remains outside its scope. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines the supplied optical-factor covariance with spectral GLS and response Monte Carlo when the scattered-power covariance rows/columns are zero; scalar angle uncertainty is propagated separately as a common geometry source.",
       "limitations": [
         "Relativistic Maxwell-Juttner model assumes isotropic rest-frame electrons and bulk flow parallel to the scattering vector; arbitrary anisotropic relativistic optical electron VDF inversion is not implemented.",
@@ -1390,7 +1395,11 @@
         "scope": "General symmetric positive-semidefinite 3-D second-moment temperature tensor; no gyrotropic magnetic-axis assumption. Does not infer higher EVDF moments, density or flow."
       }
     ],
-    "completion_scope": "undefined A parametric 2–6 component relativistic Maxwell-Juttner mixture inference path is available through the advanced Analysis-1 physics API and Dashboard, with a scaled-Jacobian identifiability gate."
+    "completion_scope": "undefined A parametric 2–6 component relativistic Maxwell-Juttner mixture inference path is available through the advanced Analysis-1 physics API and Dashboard, with a scaled-Jacobian identifiability gate.",
+    "formula_registry_keys": [
+      "thomson_projected_evdf_parallel_pressure",
+      "thomson_projected_evdf_parallel_heat_flux_1d"
+    ]
   },
   {
     "family": "Plasma parameters",
