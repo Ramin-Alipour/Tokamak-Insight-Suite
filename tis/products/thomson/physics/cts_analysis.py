@@ -347,6 +347,12 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     tabulated_1d fast-ion VDF, the supplied velocity grid is in the species
     rest frame and the selected species flow shifts the Landau resonance
     through omega/k-u_j in both the principal-value and resonant terms.
+    A tabulated_3d fast-ion EVDF is supplied as finite-volume velocity voxels
+    in the selected species rest frame. It is projected onto each geometry's
+    q direction before the same longitudinal Landau susceptibility is used.
+    An optional independent 3-D bulk-flow vector is projected onto q; for a
+    single geometry without that vector, the thermal species flow projection
+    is shared. Frequency-resolved geometry requires the 3-D flow vector.
     """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
@@ -1366,7 +1372,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "Ion composition is fixed externally.",
        "The electrostatic inversion independently infers one Maxwellian ion temperature per supplied species; projected ion flow remains a shared scalar because independent species flows are not generally identifiable from one spectrum without additional constraints.",
        "Only the electron-flow component projected along the scattering wavevector is inferred; transverse vector components are not identifiable from one scattering geometry.",
-       "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
+       "Fast-ion VDF support includes fixed tabulated 1-D marginals, fixed finite-volume 3-D EVDFs projected onto the geometry-specific q direction, and regularized 1-D shape inference. The 3-D shape remains external and is not inferred by this electrostatic branch.",
        "Reduced-chi-square overdispersion is retained only as a diagnostic when no independent discrepancy covariance is supplied; independent correlated discrepancy covariance is added directly to the GLS noise model.","Reference-PCA finite-sample uncertainty is propagated to base plasma parameters by bootstrap refits when reference PCA is selected.","Response-matrix uncertainty is propagated by Monte Carlo when supplied.",
        "The optional structured background uses PCA modes from explicitly supplied calibrated reference spectra; it is conditional on those references and does not infer or calibrate missing background measurements."]}
     if background_basis is not None and not _skip_reference_basis_mc:
