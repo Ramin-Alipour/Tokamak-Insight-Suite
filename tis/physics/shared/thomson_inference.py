@@ -3729,6 +3729,9 @@ def analyze_thomson_spectra(
             "physical_parameter_order":[name for i in range(nchan) for name in (f"channel_{i}_electron_temperature_eV",f"channel_{i}_electron_velocity_projection_m_s")],
             "joint_parameter_count_per_channel":joint_parameter_count,
             "physical_parameter_covariance":physical_covariance,
+            "physical_parameter_covariance_fit_only":physical_covariance_fit_only,
+            "geometry_physical_parameter_covariance":geometry_physical_covariance,
+            "geometry_calibration_covariance":geometry_covariance,
             "kappa_parameter_covariance":kappa_parameter_covariance,
             "total_kappa_parameter_covariance":total_kappa_parameter_covariance,
             "kappa_parameter_order": (
