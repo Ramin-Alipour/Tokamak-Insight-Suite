@@ -4664,10 +4664,13 @@ elif page=='Advanced Analysis':
             cts_fraction_unc_text=st.text_input('Ion-fraction 1σ uncertainties (comma-separated; optional)',key='cts_fraction_unc')
             cts_external_covariance_upload=st.file_uploader('Optional joint external-parameter covariance CSV (probe frequency, scattering angle, selected ion fractions)',type=['csv','txt'],key='cts_external_covariance_upload')
             cts_external_covariance_order_text=st.text_input('Covariance parameter order (comma-separated; e.g. probe_frequency_Hz,scattering_angle_rad,ion_fraction_0)',value='',key='cts_external_covariance_order')
-            cts_fast_mode=st.selectbox('Fast-ion model',['None','Hot Maxwellian component','Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'],key='cts_fast_mode')
+            cts_fast_mode=st.selectbox('Fast-ion model',['None','Hot Maxwellian component','Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF','Fixed tabulated 3-D EVDF'],key='cts_fast_mode')
             cts_fast_vdf_upload=None
             if cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
                 cts_fast_vdf_upload=st.file_uploader('Fast-ion VDF CSV (velocity_m_s, probability_density_m_s_inverse)',type=['csv','txt'],key='cts_fast_vdf')
+            elif cts_fast_mode=='Fixed tabulated 3-D EVDF':
+                cts_fast_vdf_upload=st.file_uploader('3-D fast-ion EVDF CSV (vx, vy, vz, probability_density_s3_per_m3, velocity_cell_volume_m3_per_s3)',type=['csv','txt'],key='cts_fast_vdf_3d')
+                cts_fast_projection_grid=st.text_area('Projected q-velocity grid JSON (m/s; >=9 increasing nodes)',placeholder='[-2e6,-1.9e6,...,2e6]',key='cts_fast_projection_grid_3d')
             if cts_fast_mode!='None':
                 cts_fast_species=st.text_input('Fast-ion species index (required)',value='',key='cts_fast_species')
                 cts_fast_fraction=st.text_input('Initial fast-ion fraction (0–1; required)',value='',key='cts_fast_fraction')
@@ -4731,6 +4734,24 @@ elif page=='Advanced Analysis':
                                 raise ValueError('Enter the VDF smoothness parameter explicitly.')
                             fast_ion['initial_probability_density_m_s_inverse']=vdf[:,1]
                             fast_ion['smoothness']=float(cts_fast_smoothness)
+                    elif cts_fast_mode=='Fixed tabulated 3-D EVDF':
+                        if cts_fast_vdf_upload is None or not cts_fast_projection_grid.strip():
+                            raise ValueError('Upload the 3-D fast-ion EVDF CSV and supply the projected q-velocity grid explicitly.')
+                        vdf3=pd.read_csv(cts_fast_vdf_upload,header=None).to_numpy(dtype=float)
+                        if vdf3.ndim!=2 or vdf3.shape[1]!=5 or vdf3.shape[0]<27:
+                            raise ValueError('3-D fast-ion EVDF CSV must contain at least 27 rows and exactly five columns: vx, vy, vz, probability density and velocity-cell volume.')
+                        projection_grid=np.asarray(json.loads(cts_fast_projection_grid),dtype=float)
+                        if projection_grid.ndim!=1 or projection_grid.size<9 or not np.all(np.isfinite(projection_grid)) or np.any(np.diff(projection_grid)<=0):
+                            raise ValueError('Projected q-velocity grid must contain at least nine finite strictly increasing values.')
+                        fast_ion={
+                            'kind':'tabulated_3d',
+                            'species_index':fast_species_index,
+                            'fraction_initial':fast_fraction_initial,
+                            'velocity_vectors_m_s':vdf3[:,:3],
+                            'probability_density_s3_per_m3':vdf3[:,3],
+                            'velocity_cell_volume_m3_per_s3':vdf3[:,4],
+                            'projection_velocity_grid_m_s':projection_grid,
+                        }
                     if cts_method is None:
                         raise ValueError('Select the CTS inversion method explicitly.')
                     parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
