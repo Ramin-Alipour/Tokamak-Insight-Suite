@@ -6522,7 +6522,9 @@
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
         "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions",
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api",
-        "tests/test_cts_analysis.py::test_cts_registry_declares_finite_volume_3d_fast_ion_input"
+        "tests/test_cts_analysis.py::test_cts_registry_declares_finite_volume_3d_fast_ion_input",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_formula_and_dashboard_are_connected"
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
