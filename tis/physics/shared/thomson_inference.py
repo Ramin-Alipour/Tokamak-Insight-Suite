@@ -98,7 +98,7 @@ def _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=None):
     }
     if electron_density_m3 is not None:
         if (isinstance(electron_density_m3, (bool, np.bool_))
-                or not np.isscalar(electron_density_m3)
+                or not isinstance(electron_density_m3, (int, float, np.integer, np.floating))
                 or not np.isfinite(electron_density_m3)
                 or float(electron_density_m3) <= 0.0):
             raise ValueError("electron_density_m3 must be a finite positive independently inferred scalar")
