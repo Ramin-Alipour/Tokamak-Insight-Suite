@@ -1285,11 +1285,3 @@ def fit_two_population_relativistic_thomson_spectrum(*args, **kwargs):
     )
     return _fit(*args, **kwargs)
 
-
-
-def fit_noncollective_kinetic_thomson_with_background(*args, **kwargs):
-    """Fit finite-bin Kappa or relativistic MJ Thomson spectra with a joint background covariance."""
-    from tis.physics.shared.thomson_kinetic_background import (
-        fit_noncollective_kinetic_thomson_with_background as _fit,
-    )
-    return _fit(*args, **kwargs)
