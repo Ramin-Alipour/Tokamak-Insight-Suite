@@ -259,6 +259,8 @@ def test_collective_kappa_is_executable_through_canonical_optical_analysis():
     assert channel["parameter_provenance"]["electron_distribution"].startswith("kappa")
 
 def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
+    from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
+
     x = np.linspace(492.0, 572.0, 801)
     te = 120.0
     laser = 532.0
@@ -271,7 +273,7 @@ def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
     laser_uncertainty = 0.015
     angle_uncertainty = 0.002
     laser_angle_covariance = 1.0e-5
-    out = analyze_thomson_spectra(
+    out = product_analyze_spectra(
         x, (feature + 20.0)[None, :], [0.15],
         laser_wavelength_nm=laser,
         scattering_angle_rad=angle,
