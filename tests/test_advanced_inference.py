@@ -182,6 +182,27 @@ def test_optical_maxwellian_fit_accepts_independent_poisson_count_likelihood():
     assert result["integrated_signal_counts"] > 0
     assert np.isfinite(result["electron_temperature_eV"])
     assert result["reduced_chi_square"] is None
+    assert result["fit_statistic"] == "Poisson_deviance"
+    assert result["reduced_poisson_deviance"] >= 0.0
+
+
+def test_optical_kappa_rejects_non_psd_calibration_geometry_covariance():
+    from tis.physics.shared.thomson_inference import _fit_kappa
+
+    wavelength = np.linspace(530.0, 532.0, 41)
+    signal = np.exp(-0.5 * ((wavelength - 531.0) / 0.18) ** 2) + 0.05
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        _fit_kappa(
+            wavelength,
+            signal,
+            531.0,
+            np.pi / 2.0,
+            np.eye(wavelength.size),
+            None,
+            laser_wavelength_uncertainty_nm=0.0,
+            scattering_angle_uncertainty_rad=0.0,
+            laser_angle_covariance_nm_rad=1e-6,
+        )
 
 
 def test_cts_accepts_independent_correlated_model_discrepancy_covariance():
