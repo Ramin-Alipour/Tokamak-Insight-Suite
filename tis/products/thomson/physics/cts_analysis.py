@@ -332,7 +332,7 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     if np.any(np.abs(ion_flows) >= C) or abs(ue) >= C:
         raise ValueError("flow projections must be subluminal")
     if np.any(f0+f<=0): raise ValueError("scattered frequencies must remain positive")
-    _,_,scattering_angle=_geometry(scattering_geometry,f0); k=_frequency_dependent_scattering_wave_number(f,f0,scattering_angle); om=2*np.pi*f
+    _,scattering_vector_unit,scattering_angle=_geometry(scattering_geometry,f0); k=_frequency_dependent_scattering_wave_number(f,f0,scattering_angle); om=2*np.pi*f
     ce,fe=_component(om,k,ne,te,ME,1.,ue); total=ce.copy(); terms=[]
     hot=None
     if fast_ion is not None:
@@ -345,12 +345,15 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         hf=_nonnegative_real(fast_ion["fraction"], "fast_ion.fraction")
         if hf >= 1.0: raise ValueError("fast-ion fraction must lie in [0,1)")
         kind=fast_ion.get("kind")
-        if kind not in {"maxwellian","tabulated_1d"}:
-            raise ValueError("cts_spectral_density requires explicit fast_ion.kind='maxwellian' or 'tabulated_1d'")
+        if kind not in {"maxwellian","tabulated_1d","tabulated_3d"}:
+            raise ValueError("cts_spectral_density requires fast_ion.kind='maxwellian', 'tabulated_1d' or 'tabulated_3d'")
         if kind=="tabulated_1d":
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",0.0))
-            hot=(idx,hf,"tabulated",vdf)
+            hot=(idx,hf,"tabulated_1d",vdf)
+        elif kind=="tabulated_3d":
+            vdf=_validate_tabulated_3d_fast_ion(fast_ion)
+            hot=(idx,hf,"tabulated_3d",vdf)
         else:
             ht=_positive(fast_ion.get("temperature_eV"),"fast_ion.temperature_eV")
             hot=(idx,hf,"maxwellian",ht)
@@ -360,9 +363,17 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         cb,fb=_component(om,k,ni*(1-hf),float(ti_values[i]),s["mass"],s["Z"],ui_i); total+=cb
         if ni*(1-hf)>0: terms.append((s["Z"]**2*ni*(1-hf)/ne,cb,fb))
         if hf:
-            if hot[2]=="tabulated":
+            if hot[2]=="tabulated_1d":
                 ch,fh=_component_tabulated(om,k,ni*hf,s["mass"],s["Z"],ui_i,
                     hot[3]["velocity_m_s"],hot[3]["probability_density_m_s_inverse"])
+            elif hot[2]=="tabulated_3d":
+                projected_grid, projected_pdf, _ = _project_tabulated_3d_fast_ion_to_q_marginal(
+                    fast_ion, scattering_vector_unit
+                )
+                ch,fh=_component_tabulated(
+                    om,k,ni*hf,s["mass"],s["Z"],ui_i,
+                    projected_grid,projected_pdf
+                )
             else:
                 ch,fh=_component(om,k,ni*hf,hot[3],s["mass"],s["Z"],ui_i)
             total+=ch
