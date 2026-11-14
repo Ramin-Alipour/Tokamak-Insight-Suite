@@ -56,6 +56,99 @@ def _finite_scalar(value, name, *, minimum=None, maximum=None):
     return result
 
 
+
+def _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=None):
+    """Close identifiable 1-D q-marginal pressure and kinetic-energy flux.
+
+    P_qq = m_e n_e Var(v_q) is the measured-direction pressure component.
+    F_q^(1D) = (m_e n_e / 2) mu_3,q is the kinetic-energy flux of the
+    one-dimensional projected marginal. The latter is not the complete
+    three-dimensional parallel heat flux, which also contains perpendicular
+    energy correlations. Absolute quantities require independently inferred
+    density; total uncertainties require the joint density/EVDF covariance.
+    """
+    if not isinstance(evdf, dict):
+        raise ValueError("evdf must be a mapping returned by the projected EVDF solver")
+    sigma = float(evdf.get("velocity_parallel_standard_deviation_m_s", np.nan))
+    mu3 = float(evdf.get("central_third_velocity_moment_m3_s3", np.nan))
+    if (not np.isfinite(sigma) or sigma <= 0.0
+            or not np.isfinite(mu3)):
+        raise ValueError("projected EVDF must contain finite positive width and finite third central moment")
+    me = 9.1093837139e-31
+    variance = sigma * sigma
+    result = {
+        "status": "derived_from_projected_one_dimensional_evdf",
+        "directional_pressure_per_density_J": float(me * variance),
+        "projected_kinetic_energy_flux_per_density_W_m": float(0.5 * me * mu3),
+        "equations": {
+            "directional_pressure": "P_qq = m_e n_e Var(v_q)",
+            "projected_marginal_energy_flux": "F_q^(1D) = (m_e n_e/2) mu_3,q",
+            "third_central_moment": "mu_3,q = integral[(v_q-u_q)^3 f_q(v_q) dv_q]",
+        },
+        "physical_scope": (
+            "one_dimensional_scattering_vector_marginal_only_not_the_complete_3d_parallel_heat_flux"
+        ),
+        "absolute_density_source": (
+            "independent_absolute_scattered_power_inference"
+            if electron_density_m3 is not None else "not_available_from_normalized_spectral_shape"
+        ),
+        "total_absolute_uncertainty_status": (
+            "unavailable_joint_density_evdf_covariance_not_supplied"
+        ),
+    }
+    if electron_density_m3 is not None:
+        if (isinstance(electron_density_m3, (bool, np.bool_))
+                or not np.isscalar(electron_density_m3)
+                or not np.isfinite(electron_density_m3)
+                or float(electron_density_m3) <= 0.0):
+            raise ValueError("electron_density_m3 must be a finite positive independently inferred scalar")
+        density = float(electron_density_m3)
+        result["electron_density_m3"] = density
+        result["directional_pressure_Pa"] = float(me * density * variance)
+        result["projected_kinetic_energy_flux_W_m2"] = float(
+            0.5 * me * density * mu3
+        )
+    else:
+        result["electron_density_m3"] = None
+        result["directional_pressure_Pa"] = None
+        result["projected_kinetic_energy_flux_W_m2"] = None
+
+    covariance = evdf.get("velocity_moment_covariance")
+    order = evdf.get("velocity_moment_covariance_order")
+    if covariance is not None and isinstance(order, (list, tuple)):
+        matrix = np.asarray(covariance, dtype=float)
+        required = (
+            "velocity_parallel_variance_m2_s2",
+            "central_third_velocity_moment_m3_s3",
+        )
+        if (matrix.ndim == 2 and matrix.shape == (len(order), len(order))
+                and all(name in order for name in required)
+                and np.all(np.isfinite(matrix))):
+            i_var, i_mu3 = (order.index(name) for name in required)
+            block = matrix[np.ix_([i_var, i_mu3], [i_var, i_mu3])]
+            scale = max(float(np.max(np.abs(block))), np.finfo(float).tiny)
+            if (np.allclose(block, block.T, rtol=1e-9, atol=1e-12*scale)
+                    and np.linalg.eigvalsh(0.5*(block+block.T))[0] >= -1e-10*scale):
+                result["projected_moment_covariance_order"] = list(required)
+                result["projected_moment_covariance"] = block.copy()
+                result["directional_pressure_per_density_standard_uncertainty_J"] = float(
+                    me * np.sqrt(max(block[0, 0], 0.0))
+                )
+                result["projected_kinetic_energy_flux_per_density_standard_uncertainty_W_m"] = float(
+                    0.5 * me * np.sqrt(max(block[1, 1], 0.0))
+                )
+                if electron_density_m3 is not None:
+                    result["directional_pressure_fixed_density_standard_uncertainty_Pa"] = float(
+                        me * density * np.sqrt(max(block[0, 0], 0.0))
+                    )
+                    result["projected_flux_fixed_density_standard_uncertainty_W_m2"] = float(
+                        0.5 * me * density * np.sqrt(max(block[1, 1], 0.0))
+                    )
+                    result["fixed_density_uncertainty_scope"] = (
+                        "conditional_EVDF_uncertainty_only_density_uncertainty_and_density_EVDF_cross_covariance_excluded"
+                    )
+    return result
+
 def _collective_spectral_whitener(signal, uncertainty=None, covariance=None):
     """Build a statistically correct residual whitener for collective Thomson fits.
 
