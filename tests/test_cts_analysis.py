@@ -2475,3 +2475,31 @@ def test_cts_3d_fast_ion_identifiability_keeps_distribution_shape_external():
         for item in result["non_identifiable"]
     )
 
+def test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment():
+    from tis.products.thomson.physics.cts_analysis import (
+        _project_tabulated_3d_fast_ion_to_q_marginal,
+    )
+
+    fast = _anisotropic_tabulated_3d_fast_ion()
+    direction = np.array([0.3, -0.4, 0.5])
+    direction /= np.linalg.norm(direction)
+    grid, marginal, _ = _project_tabulated_3d_fast_ion_to_q_marginal(
+        fast, direction
+    )
+    velocity = np.asarray(fast["velocity_vectors_m_s"])
+    density = np.asarray(fast["probability_density_s3_per_m3"])
+    volume = np.asarray(fast["velocity_cell_volume_m3_per_s3"])
+    probability = density * volume
+    probability /= probability.sum()
+    direct_projection = velocity @ direction
+    direct_mean = float(probability @ direct_projection)
+    direct_variance = float(probability @ (direct_projection - direct_mean) ** 2)
+    grid_weights = np.empty(grid.size)
+    grid_weights[0] = 0.5 * (grid[1] - grid[0])
+    grid_weights[-1] = 0.5 * (grid[-1] - grid[-2])
+    grid_weights[1:-1] = 0.5 * (grid[2:] - grid[:-2])
+    projected_mean = float(grid_weights @ (grid * marginal))
+    projected_variance = float(grid_weights @ ((grid - projected_mean) ** 2 * marginal))
+    assert projected_mean == pytest.approx(direct_mean, abs=1e-8)
+    assert projected_variance == pytest.approx(direct_variance, rel=5e-3)
+
