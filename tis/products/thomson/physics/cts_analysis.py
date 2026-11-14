@@ -895,8 +895,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if isinstance(idx,bool) or not isinstance(idx,(int,np.integer)) or not 0<=idx<len(ions): raise ValueError("invalid fast-ion species_index")
         idx=int(idx)
         kind=fast_ion.get("kind")
-        if kind not in {"maxwellian","tabulated_1d","infer_tabulated_1d"}:
-            raise ValueError("fast_ion.kind must be explicitly set to maxwellian, tabulated_1d or infer_tabulated_1d")
+        if kind not in {"maxwellian","tabulated_1d","infer_tabulated_1d","tabulated_3d"}:
+            raise ValueError("fast_ion.kind must be explicitly set to maxwellian, tabulated_1d, infer_tabulated_1d or tabulated_3d")
         flo,fhi=map(float,fast_ion.get("fraction_bounds",(0.0,1.0)))
         if fast_ion.get("fraction_initial") is None:
             raise ValueError("fast_ion.fraction_initial is required; no fast-ion fraction is assumed")
@@ -907,6 +907,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",0.0))
             fast={"species_index":idx,"kind":"tabulated_1d","vdf":vdf}
+            p0=np.r_[p0,fi]; lo=np.r_[lo,flo]; hi=np.r_[hi,fhi]
+        elif kind=="tabulated_3d":
+            vdf=_validate_tabulated_3d_fast_ion(fast_ion)
+            fast={"species_index":idx,"kind":"tabulated_3d","vdf":vdf}
             p0=np.r_[p0,fi]; lo=np.r_[lo,flo]; hi=np.r_[hi,fhi]
         elif kind=="infer_tabulated_1d":
             if fast_ion.get("smoothness") is None:
@@ -1048,6 +1052,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     "velocity_m_s":fast["vdf"]["velocity_m_s"],
                     "probability_density_m_s_inverse":pdf,
                     "smoothness":fast["vdf"]["smoothness_parameter"]}
+            elif fast["kind"]=="tabulated_3d":
+                d["fast_ion"]={
+                    "species_index":fast["species_index"],
+                    "fraction":p[fast_offset],
+                    "kind":"tabulated_3d",
+                    **fast["vdf"],
+                }
             else:
                 d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[fast_offset],"kind":"maxwellian","temperature_eV":10**p[fast_offset+1]}
         return d
