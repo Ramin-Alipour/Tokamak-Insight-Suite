@@ -5285,28 +5285,4 @@ def fit_optical_thomson_poisson_counts(
             "calibrated photon/count response operator",
             "non-negative linear detector-space background",
         ],
-    }    laser_unc = _finite_scalar(
-        laser_wavelength_uncertainty_nm,
-        "laser_wavelength_uncertainty_nm", minimum=0.0,
-    )
-    angle_unc = _finite_scalar(
-        scattering_angle_uncertainty_rad,
-        "scattering_angle_uncertainty_rad", minimum=0.0,
-    )
-    geometry_cross = _finite_scalar(
-        laser_angle_covariance_nm_rad,
-        "laser_angle_covariance_nm_rad",
-    )
-    if laser_unc > laser_nm / 3.0:
-        raise ValueError("laser_wavelength_uncertainty_nm is too large for local Gaussian Kappa propagation")
-    if angle_unc > min(angle, np.pi-angle) / 3.0:
-        raise ValueError("scattering_angle_uncertainty_rad is too large for local Gaussian Kappa propagation")
-    geometry_covariance = np.array([
-        [laser_unc**2, geometry_cross],
-        [geometry_cross, angle_unc**2],
-    ])
-    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
-    geometry_scale = max(float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny)
-    if float(geometry_eigenvalues.min()) < -1e-12*geometry_scale:
-        raise ValueError("Kappa laser-wavelength/scattering-angle covariance must be positive semidefinite")
-
+    }
