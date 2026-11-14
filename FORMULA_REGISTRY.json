@@ -7190,7 +7190,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
+      "function_link": "tis.physics.shared.thomson_inference._fit_kappa",
       "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
       "input_specs": [
         {
@@ -7247,6 +7247,21 @@
           "name": "systematic_covariance",
           "unit": "additive spectral covariance",
           "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma calibration uncertainty",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma calibration uncertainty",
+          "required": false
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm·rad; laser-wavelength/scattering-angle calibration covariance",
+          "required": false
         }
       ],
       "output_specs": [
@@ -7277,6 +7292,18 @@
         {
           "name": "kappa_profile_likelihood",
           "unit": "conditional profile likelihood with nuisance re-optimization"
+        },
+        {
+          "name": "physical_parameter_covariance_fit_only",
+          "unit": "2×2 covariance of electron temperature and q-parallel flow from fitted spectral parameters only"
+        },
+        {
+          "name": "physical_parameter_covariance_including_geometry",
+          "unit": "2×2 covariance including first-order laser-wavelength and scattering-angle calibration uncertainty"
+        },
+        {
+          "name": "projected_evdf_moment_closure",
+          "unit": "analytic q-parallel Kappa variance, finite third/fourth-moment conditions, and geometry-propagated moment covariance"
         }
       ],
       "prerequisites": [
@@ -7284,20 +7311,22 @@
         "Laser wavelength, scattering angle and a measured detector-response operator",
         "A measured wavelength grid with strictly increasing bin centres; finite-volume edges are midpoint-defined"
       ],
-      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. The finite-bin CDF integral is deterministic conditional on wavelength centres, laser wavelength, geometry and fitted parameters.",
+      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. Laser-wavelength and scattering-angle 1-sigma calibration errors, including their supplied cross-covariance, are propagated by first-order Jacobian linearization into electron temperature, q-parallel flow and analytic projected-Kappa moments. Cross-covariance between fitted spectral parameters and geometry is not supplied and is assumed zero.",
       "limitations": [
         "No relativistic or Compton correction; the canonical fitter rejects fits outside its theta_e and bulk-flow beta screens.",
         "Kappa is a fitted parametric closure, not a general measured EVDF.",
         "A finite wavelength window truncates heavy tails; captured probability is reported and missing tails are not silently renormalized.",
-        "Absolute density is not identifiable from normalized spectral shape alone."
+        "Absolute density is not identifiable from normalized spectral shape alone.",
+        "Geometry propagation is first-order; fitted-spectrum/geometry cross-covariance is not currently estimated and is assumed zero."
       ],
       "test_links": [
         "tests/test_thomson_inference.py::test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index",
         "tests/test_thomson_inference.py::test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model",
         "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
-        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
+        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls",
+        "tests/test_thomson_inference.py::test_kappa_physical_and_moment_covariances_include_geometry_uncertainty"
       ],
-      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges.",
+      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges. The Kappa physical-parameter and projected-moment covariance now includes supplied laser-wavelength/scattering-angle calibration covariance by analytic Jacobian propagation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
       "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
@@ -7340,10 +7369,11 @@
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Optical Thomson — finite-bin spectral inference",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
+      "function_link": "tis.physics.shared.thomson_inference._fit_kappa",
       "function_links": [
-        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_inference._fit_kappa"
+        "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra",
+        "tis.physics.shared.thomson_inference.analyze_thomson_spectra",
+        "tis.physics.shared.thomson_inference._fit_kappa"
       ],
       "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
       "implementation_link_status": "mapped",
@@ -7351,7 +7381,8 @@
         "tests/test_thomson_inference.py::test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index",
         "tests/test_thomson_inference.py::test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model",
         "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
-        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
+        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls",
+        "tests/test_thomson_inference.py::test_kappa_physical_and_moment_covariances_include_geometry_uncertainty"
       ]
     }
   },
