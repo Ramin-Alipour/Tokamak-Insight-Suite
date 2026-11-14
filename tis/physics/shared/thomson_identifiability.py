@@ -90,6 +90,12 @@ def cts_electrostatic_identifiability(*, fast_ion_model: str | None = None) -> d
             "unit": "dimensionless",
             "status": "computed_for_externally_supplied_fixed_1d_VDF_shape",
         })
+    elif fast_ion_model == "tabulated_3d":
+        conditional.append({
+            "parameter": "fast_ion_fraction",
+            "unit": "dimensionless",
+            "status": "computed_for_externally_supplied_fixed_finite_volume_3d_EVDF_shape",
+        })
     return {
         "classification_version": "1.0",
         "primary": primary,
@@ -99,6 +105,7 @@ def cts_electrostatic_identifiability(*, fast_ion_model: str | None = None) -> d
             {"parameter": "species_resolved_ion_temperatures_and_flows", "reason": "The electrostatic model uses one common ion temperature and one common ion-flow projection for all supplied species."},
             {"parameter": "ion_composition", "reason": "Ion species and charge-density fractions are fixed external inputs, not inferred by this inversion."},
             {"parameter": "absolute_transmitter_receiver_power_coupling", "reason": "The electrostatic model profiles a spectral amplitude and does not invert absolute coupling."},
+            {"parameter": "unknown_three_dimensional_fast_ion_EVDF_shape", "reason": "The tabulated_3d branch treats the supplied finite-volume 3-D fast-ion EVDF shape as fixed external input; only its population fraction is fitted."},
         ],
         "model": "unmagnetized_electrostatic_longitudinal_CTS",
         "external_inputs_are_not_measurements": ["ion_species", "ion_fractions_charge_density"],
