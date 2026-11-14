@@ -902,9 +902,23 @@ def test_joint_multi_channel_gls_supports_kappa_projected_spectra():
     out=analyze_thomson_spectra(
         x,y,[0.1,0.2],laser_wavelength_nm=532.0,scattering_angle_rad=np.pi/2,
         instrument_response=np.eye(n),model="non_collective_kappa",
+        laser_wavelength_uncertainty_nm=0.01,
+        scattering_angle_uncertainty_rad=0.001,
+        laser_angle_covariance_nm_rad=5.0e-6,
         joint_spectral_covariance=covariance,
     )
     assert out["joint_inference"]["joint_parameter_count_per_channel"]==6
+    joint_covariance = np.asarray(out["joint_inference"]["physical_parameter_covariance"])
+    fit_only_covariance = np.asarray(out["joint_inference"]["physical_parameter_covariance_fit_only"])
+    geometry_covariance = np.asarray(out["joint_inference"]["geometry_physical_parameter_covariance"])
+    np.testing.assert_allclose(
+        joint_covariance,
+        fit_only_covariance + geometry_covariance,
+        rtol=2e-8,
+        atol=1e-14,
+    )
+    assert geometry_covariance[0, 2] > 0.0
+    assert out["channels"][0]["projected_evdf_moment_closure"]["geometry_uncertainty"]["laser_angle_covariance_nm_rad"] == pytest.approx(5.0e-6)
     np.testing.assert_allclose(out["electron_temperature_profile_eV"],[100.0,150.0],rtol=0.08)
     assert all("kappa_index" in ch for ch in out["channels"])
 
