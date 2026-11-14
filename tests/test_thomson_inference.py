@@ -1146,6 +1146,14 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
         assert evdf["absolute_density_identified"] is False
         assert np.trapz(evdf["evdf_parallel_s_per_m"], evdf["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
         assert evdf["regularization_selection"] == "generalized_cross_validation_over_logarithmic_candidate_grid"
+        closure = evdf["projected_moment_thermodynamic_closure"]
+        assert closure["status"] == "derived_from_projected_one_dimensional_evdf"
+        assert closure["directional_pressure_Pa"] is None
+        assert closure["projected_kinetic_energy_flux_W_m2"] is None
+        assert closure["directional_pressure_per_density_J"] > 0.0
+        assert closure["total_absolute_uncertainty_status"] == (
+            "unavailable_joint_density_evdf_covariance_not_supplied"
+        )
 
 
 def test_rejected_primary_fit_withholds_dependent_thomson_subanalyses(monkeypatch):
@@ -2278,4 +2286,28 @@ def test_analysis1_projected_moment_closure_reports_only_identifiable_1d_pressur
     )
     with pytest.raises(ValueError, match="independently inferred"):
         _projected_evdf_thermodynamic_closure(evdf, electron_density_m3=0.0)
+
+def test_analysis1_registry_declares_projected_moment_physics_outputs():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    registries = [
+        json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")),
+        json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")),
+    ]
+    entries = [
+        next(item for item in registry if item["diagnostic"] == "Thomson scattering")
+        for registry in registries
+    ]
+    assert entries[0] == entries[1]
+    contract = entries[0]["execution_contract"]
+    output = next(
+        item for item in contract["output_specs"]
+        if item["name"] == "projected_moment_thermodynamic_closure"
+    )
+    assert "P_qq=m_e n_e Var(v_q)" in output["description"]
+    assert "not the complete" in output["description"]
+    assert "thomson_projected_evdf_parallel_pressure" in entries[0]["formula_registry_keys"]
+    assert "thomson_projected_evdf_parallel_heat_flux_1d" in entries[0]["formula_registry_keys"]
 
