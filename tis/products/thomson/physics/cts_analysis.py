@@ -257,6 +257,71 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
     return susceptibility,resonant_density
 
 
+
+def _validate_tabulated_3d_fast_ion(fast_ion):
+    """Validate a finite-volume 3-D fast-ion EVDF supplied in its species rest frame."""
+    if not isinstance(fast_ion, Mapping):
+        raise ValueError("fast_ion must be a mapping")
+    velocity = _array(fast_ion.get("velocity_vectors_m_s"), "fast-ion velocity_vectors_m_s", 2)
+    density = _array(fast_ion.get("probability_density_s3_per_m3"), "fast-ion probability_density_s3_per_m3", 1)
+    volume = _array(fast_ion.get("velocity_cell_volume_m3_per_s3"), "fast-ion velocity_cell_volume_m3_per_s3", 1)
+    projection_grid = _array(fast_ion.get("projection_velocity_grid_m_s"), "fast-ion projection_velocity_grid_m_s", 1)
+    if velocity.shape != (density.size, 3) or volume.shape != density.shape:
+        raise ValueError("3-D fast-ion velocity vectors, density and velocity-cell volumes must have shapes (n,3), (n,) and (n,)")
+    if density.size < 27 or np.any(density < 0.0) or np.any(volume <= 0.0):
+        raise ValueError("3-D fast-ion EVDF requires at least 27 voxels, non-negative density and positive velocity-cell volumes")
+    if projection_grid.size < 9 or np.any(np.diff(projection_grid) <= 0.0):
+        raise ValueError("projection_velocity_grid_m_s must contain at least nine strictly increasing nodes")
+    if np.any(np.linalg.norm(velocity, axis=1) >= 0.1 * C):
+        raise ValueError("the electrostatic CTS tabulated 3-D fast-ion model requires |v| < 0.1 c")
+    total_probability = float(np.dot(density, volume))
+    if not np.isfinite(total_probability) or total_probability <= np.finfo(float).tiny:
+        raise ValueError("3-D fast-ion EVDF must have a positive finite velocity-space integral")
+    return {
+        "velocity_vectors_m_s": velocity,
+        "probability_density_s3_per_m3": density / total_probability,
+        "velocity_cell_volume_m3_per_s3": volume,
+        "projection_velocity_grid_m_s": projection_grid,
+        "input_probability_integral": total_probability,
+    }
+
+
+def _project_tabulated_3d_fast_ion_to_q_marginal(fast_ion, scattering_vector_unit):
+    """Conservatively project a voxelized 3-D EVDF onto the CTS q direction."""
+    data = _validate_tabulated_3d_fast_ion(fast_ion)
+    direction = _array(scattering_vector_unit, "scattering_vector_unit", 1)
+    if direction.shape != (3,) or np.linalg.norm(direction) <= 0.0:
+        raise ValueError("scattering_vector_unit must be a nonzero 3-vector")
+    direction = direction / np.linalg.norm(direction)
+    projected_velocity = data["velocity_vectors_m_s"] @ direction
+    grid = data["projection_velocity_grid_m_s"]
+    tolerance = 1e-12 * max(float(np.max(np.abs(grid))), 1.0)
+    if np.any(projected_velocity < grid[0] - tolerance) or np.any(projected_velocity > grid[-1] + tolerance):
+        raise ValueError("projection_velocity_grid_m_s must cover every projected 3-D fast-ion velocity")
+    projected_velocity = np.clip(projected_velocity, grid[0], grid[-1])
+    voxel_probability = data["probability_density_s3_per_m3"] * data["velocity_cell_volume_m3_per_s3"]
+    nodal_probability = np.zeros(grid.size, dtype=float)
+    right = np.searchsorted(grid, projected_velocity, side="right")
+    right = np.clip(right, 1, grid.size - 1)
+    left = right - 1
+    fraction = (projected_velocity - grid[left]) / (grid[right] - grid[left])
+    np.add.at(nodal_probability, left, voxel_probability * (1.0 - fraction))
+    np.add.at(nodal_probability, right, voxel_probability * fraction)
+    measure = _trapezoid_node_weights(grid)
+    marginal = nodal_probability / measure
+    integral = float(measure @ marginal)
+    if not np.isfinite(integral) or integral <= 0.0:
+        raise ValueError("projected 3-D fast-ion marginal has no positive finite probability integral")
+    marginal /= integral
+    return grid, marginal, {
+        "projection_direction_unit": direction,
+        "projected_velocity_m_s": projected_velocity,
+        "projection_probability_integral": integral,
+        "projection_method": "conservative_linear_finite_volume_deposition",
+        "input_distribution_scope": "externally_supplied_3d_species_rest_frame_evdf",
+    }
+
+
 def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geometry,*,electron_density_m3,
     electron_temperature_eV,ion_temperature_eV,ion_species,ion_fractions,
     ion_velocity_projection_m_s=None,electron_velocity_projection_m_s=None,fast_ion=None):
