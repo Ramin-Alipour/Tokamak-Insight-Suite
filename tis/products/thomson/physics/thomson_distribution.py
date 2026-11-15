@@ -626,8 +626,16 @@ def _projected_evdf_physical_moments(
         "moment_standard_uncertainty": moment_standard_uncertainty,
         "random_energy_moment_covariance": (
             None if moment_covariance is None else moment_covariance[
-                [moment_order.index("mean_random_kinetic_energy_parallel_eV"),
-                 moment_order.index("random_kinetic_energy_parallel_variance_eV2")][:,]
+                np.ix_(
+                    [
+                        moment_order.index("mean_random_kinetic_energy_parallel_eV"),
+                        moment_order.index("random_kinetic_energy_parallel_variance_eV2"),
+                    ],
+                    [
+                        moment_order.index("mean_random_kinetic_energy_parallel_eV"),
+                        moment_order.index("random_kinetic_energy_parallel_variance_eV2"),
+                    ],
+                )
             ]
         ),
         "random_energy_moment_standard_uncertainty": (
