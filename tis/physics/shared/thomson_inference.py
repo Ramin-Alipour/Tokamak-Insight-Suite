@@ -3857,12 +3857,25 @@ def analyze_thomson_spectra(
             fit["total_fit_covariance_including_discrepancy"] = block + discrepancy_scale * block
             fit["total_physical_parameter_covariance"] = total_physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
             fit["model_discrepancy_scale"] = float(discrepancy_scale)
+            independent_discrepancy_included = independent_discrepancy_blocks is not None
+            residual_discrepancy_included = bool(discrepancy_scale > 0.0)
+            any_discrepancy_included = (
+                independent_discrepancy_included or residual_discrepancy_included
+            )
+            fit["model_discrepancy_uncertainty_available"] = any_discrepancy_included
+            fit["model_discrepancy_covariance_included"] = any_discrepancy_included
             fit["model_discrepancy_diagnostics"] = {
                 "residual_rms": fit["fit_residual_rms"],
                 "channel_marginal_reduced_chi_square": channel_reduced_chi_square,
                 "joint_reduced_chi_square": float(reduced_chi2_joint),
-                "covariance_included": bool(discrepancy_scale > 0.0),
-                "interpretation": "Joint-GLS residual-based model-adequacy covariance; it is not experimental validation.",
+                "covariance_included": any_discrepancy_included,
+                "independent_of_reduced_chi_square": independent_discrepancy_included,
+                "independent_spectral_covariance_included": independent_discrepancy_included,
+                "residual_based_parameter_covariance_included": residual_discrepancy_included,
+                "interpretation": (
+                    "The supplied spectral discrepancy covariance is included directly in the joint GLS measurement covariance; "
+                    "the optional residual-based parameter covariance is kept as a separate component. Neither component is experimental validation."
+                ),
             }
             if model=="non_collective_maxwellian":
                 area=float(amp*sigma*np.sqrt(2.0*np.pi))
