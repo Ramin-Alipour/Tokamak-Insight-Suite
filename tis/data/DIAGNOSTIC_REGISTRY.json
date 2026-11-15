@@ -878,6 +878,42 @@
             "data-only Jacobian rank and condition diagnostics"
           ],
           "scope": "Finite-dimensional N-component isotropic relativistic Maxwell-Juttner mixture with ordered temperatures, simplex-constrained number fractions and one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred."
+        },
+        {
+          "name": "physical_multiview_3d_evdf_inversion",
+          "function": "tis.products.thomson.physics.cts_full_physics.run_advanced_thomson_physics",
+          "solver_function": "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf",
+          "model_selector": "thomson_multiview_3d_evdf_physical",
+          "inputs": [
+            "wavelength_nm",
+            "measured_spectra (view × wavelength)",
+            "scattering_vector_unit (view × 3 unit vectors)",
+            "velocity_grid_m_s (3-D velocity voxel centres)",
+            "laser_wavelength_nm",
+            "instrument_response_matrix (shared measured 2-D or per-view 3-D column-stochastic response)",
+            "background_spectra (view × wavelength)",
+            "voxel_volume_m3_s3",
+            "regularization_matrix",
+            "regularization_strength",
+            "optional measurement_uncertainty or measurement_covariance",
+            "optional model_discrepancy_covariance",
+            "optional systematic_covariance",
+            "scattering_angle_rad (one angle per view, or shared scalar)",
+            "view_gain (one calibrated positive relative gain per view; required)"
+          ],
+          "outputs": [
+            "physical_spectral_kernels (view × wavelength × voxel)",
+            "mapped_line_centres_nm",
+            "background_subtracted_spectra",
+            "regularized_candidate_evdf_m3_s3",
+            "evdf_m3_s3 only if data-only rank and conditioning identify all voxels",
+            "mean_velocity_vector_m_s and velocity_covariance_tensor_m2_s2 only when identifiable",
+            "fitted_spectra",
+            "residual_spectra",
+            "full stacked covariance provenance",
+            "data_only_jacobian_rank and data_only_condition_number"
+          ],
+          "scope": "Internally constructs each view's non-relativistic elastic Thomson Doppler kernel and unpolarized differential-cross-section angular factor (1+cos²θ_j)/2; deposits unit line probability conservatively into finite wavelength bins; applies the measured response to bin-integrated power; then solves the non-negative 3-D inverse. Unpolarized shape-only inference; no absolute density, unknown view gains, Compton recoil or relativistic corrections. Insufficient angular information returns a conditional candidate and withholds the unique 3-D EVDF."
         }
       ],
       "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1. No detector calibration or independent experimental validation is performed.",
