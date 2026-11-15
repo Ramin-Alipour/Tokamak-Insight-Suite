@@ -11,6 +11,11 @@ from tokamak_analysis.advanced_inference import (
     reconstruct_optical_thomson_3d_evdf,
     assess_multiview_evdf_regularization_sensitivity,
 )
+from tis.products.thomson.physics.advanced_inference import (
+    _normalized_evdf_second_moment_jacobians,
+    derive_3d_evdf_third_moments,
+)
+
 from tokamak_analysis.cts_em_background import (
     planck_spectral_radiance,
     thermal_bremsstrahlung_emissivity_si,
@@ -738,3 +743,53 @@ def test_physical_optical_thomson_3d_withholds_distribution_for_one_projection_n
     assert result["regularized_candidate_evdf_m3_s3"] is not None
     assert result["null_space_dimension"] > 0
     assert result["mean_velocity_vector_m_s"] is None
+
+
+def test_normalized_3d_evdf_second_moment_jacobians_match_finite_differences():
+    velocity = np.array([
+        [-2.0, 0.5, 1.0],
+        [-0.5, -1.0, 0.2],
+        [1.0, 0.3, -0.8],
+        [2.5, 1.2, 0.4],
+    ])
+    volume = np.array([1.0, 1.0, 1.0, 1.0])
+    distribution = np.array([0.2, 0.3, 0.1, 0.4])
+    mean, covariance, mean_jacobian, covariance_jacobian = (
+        _normalized_evdf_second_moment_jacobians(
+            distribution, velocity, volume
+        )
+    )
+    # This perturbation lies in the tangent space of integral(f d3v) = 1.
+    direction = np.array([0.1, -0.1, 0.0, 0.0])
+    assert volume @ direction == pytest.approx(0.0)
+    step = 1e-5
+    plus = _normalized_evdf_second_moment_jacobians(
+        distribution + step * direction, velocity, volume
+    )
+    minus = _normalized_evdf_second_moment_jacobians(
+        distribution - step * direction, velocity, volume
+    )
+    numerical_mean = (plus[0] - minus[0]) / (2.0 * step)
+    numerical_covariance = (plus[1] - minus[1]) / (2.0 * step)
+    np.testing.assert_allclose(
+        mean_jacobian @ direction, numerical_mean, rtol=2e-8, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        (covariance_jacobian @ direction).reshape(3, 3),
+        numerical_covariance, rtol=2e-8, atol=1e-10,
+    )
+    assert np.linalg.eigvalsh(covariance).min() >= -1e-12
+
+
+def test_3d_evdf_moment_propagation_rejects_indefinite_distribution_covariance():
+    distribution = np.full(3, 1.0 / 3.0)
+    velocity = np.array([
+        [-1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 1.0],
+    ])
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        derive_3d_evdf_third_moments(
+            distribution, velocity, np.ones(3),
+            distribution_covariance=np.diag([1.0, -0.1, 1.0]),
+        )
