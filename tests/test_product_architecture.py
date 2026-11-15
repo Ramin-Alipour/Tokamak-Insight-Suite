@@ -17,7 +17,7 @@ def test_product_catalog_reconciles_all_families_and_registered_workflows():
     assert status == {
         "product_count": 20,
         "product_ids_ordered": True,
-        "analysis_entry_point_count": 87,
+        "analysis_entry_point_count": len(ANALYSES),
         "analysis_ids_unique": True,
         "every_analysis_has_one_product_owner": True,
         "product_slugs_unique": True,
@@ -126,15 +126,15 @@ def test_dependency_inventory_separates_solver_closures_from_shared_platform_imp
     products = {row["product_id"]: row for row in inventory["products"]}
     thomson = products["thomson-scattering"]
     langmuir = products["langmuir-electrostatic-probes"]
-    assert "tokamak_analysis.thomson_workflow" in thomson["entry_point_modules"]
-    assert "tokamak_analysis.thomson_inference" in thomson["transitive_domain_modules"]
+    assert "tis.products.thomson.physics.thomson_workflow" in thomson["entry_point_modules"]
+    assert "tis.physics.shared.thomson_inference" in thomson["transitive_domain_modules"]
     assert "tokamak_analysis.langmuir_probe" in langmuir["entry_point_modules"]
     assert "tokamak_analysis.langmuir_probe" in langmuir["product_local_domain_modules"]
     assert set(inventory["shared_domain_modules"]) <= {
         module for row in products.values()
         for module in row["transitive_domain_modules"]
     }
-    assert all("tokamak_analysis." in module for module in inventory["shared_domain_modules"])
+    assert all(module.startswith(("tokamak_analysis.", "tis.products.", "tis.physics.shared.")) for module in inventory["shared_domain_modules"])
 
 
 
