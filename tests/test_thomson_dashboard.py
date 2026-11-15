@@ -390,3 +390,12 @@ def test_dashboard_exposes_product_api_poisson_count_inference_for_kappa_and_max
     assert "Poisson_deviance" in source
     assert "kappa_uncertainty" in source
     assert "Remove the selected uncertainty column and Gaussian covariance uploads" in source
+
+
+
+def test_product_workspace_documents_and_renders_analysis1_poisson_count_route():
+    source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "product_workspace_page.py").read_text(encoding="utf-8")
+    assert "likelihood='independent_Poisson'" in source
+    assert "observed_counts" in source
+    assert 'result.get("likelihood") == "independent_Poisson"' in source
+    assert '"kappa_1sigma"' in source
