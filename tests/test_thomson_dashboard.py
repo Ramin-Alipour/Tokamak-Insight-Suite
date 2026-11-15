@@ -379,3 +379,14 @@ def test_registered_spectral_distribution_dashboard_exposes_projected_pressure_i
     assert "electron_density_variance_cross_covariance_m_minus1_s_minus2" in source
     assert "Projected q-direction electron pressure (Pa)" in source
     assert "Projected q-direction pressure 1σ uncertainty (Pa)" in source
+
+
+
+def test_dashboard_exposes_product_api_poisson_count_inference_for_kappa_and_maxwellian():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "Fit integer detector counts with the finite-bin independent-Poisson likelihood" in source
+    assert "product_api.fit_optical_thomson_poisson_counts(" in source
+    assert "distribution_model='kappa' if model=='non_collective_kappa' else 'maxwellian'" in source
+    assert "Poisson_deviance" in source
+    assert "kappa_uncertainty" in source
+    assert "Remove the selected uncertainty column and Gaussian covariance uploads" in source
