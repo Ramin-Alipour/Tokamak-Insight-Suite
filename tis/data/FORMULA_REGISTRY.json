@@ -3448,7 +3448,7 @@
           "name": "fast_ion",
           "unit": "optional hot Maxwellian or tabulated one-dimensional fast-ion component",
           "required": false,
-          "description": "Optional hot Maxwellian or normalized tabulated one-dimensional fast-ion VDF; shape inference and regularization are controlled by the separate analyze_cts_spectrum inversion entry point."
+          "description": "Optional hot Maxwellian, normalized tabulated one-dimensional fast-ion VDF, or finite-volume tabulated three-dimensional species-rest-frame EVDF. For tabulated_3d, supply velocity_vectors_m_s (n,3), probability_density_s3_per_m3 (n), velocity_cell_volume_m3_per_s3 (n), and projection_velocity_grid_m_s; the shape is fixed external input and only its population fraction is fitted."
         }
       ],
       "output_specs": [
@@ -3685,7 +3685,7 @@
     "equation": "χ_f(k,ω)=−ω_pf²/k² [PV∫ f′(v)/(v−(ω/k−u_f)) dv + iπ f′(ω/k−u_f)]",
     "inputs": "Frequency shift [Hz], scattering wave number [m^-1], fast-ion density [m^-3], ion charge [e], ion mass [kg], flow projection [m/s], normalized tabulated 1-D velocity distribution f(v)",
     "output": "Complex longitudinal susceptibility and resonant VDF value",
-    "assumptions": "Unmagnetized electrostatic longitudinal response, 1-D projected velocity distribution, Landau-contour prescription, PCHIP interpolation of supplied tabulated VDF.",
+    "assumptions": "Unmagnetized electrostatic longitudinal response, 1-D projected velocity distribution; a supplied 3-D EVDF is projected onto q before this susceptibility is evaluated, Landau-contour prescription, PCHIP interpolation of supplied tabulated VDF.",
     "status": "D",
     "category": "Microwave collective Thomson scattering",
     "execution_contract": {
@@ -3732,15 +3732,15 @@
       "uncertainty_model": "The susceptibility is deterministic for the supplied VDF. When VDF nodes are inferred by the CTS inverse routine, non-negative softmax parameterization and second-difference regularization are used; the resulting logit covariance is propagated to the VDF node covariance.",
       "limitations": [
         "Only longitudinal unmagnetized electrostatic susceptibility is represented.",
-        "The velocity distribution is a 1-D projection; anisotropic 3-D VDFs and magnetized electromagnetic response are not represented.",
-        "VDF inversion is ill-posed and depends on the chosen velocity grid and regularization strength."
+        "VDF inversion is ill-posed and depends on the chosen velocity grid and regularization strength.",
+        "The 3-D fast-ion shape is supplied externally and reduced to its geometry-specific q-parallel marginal; this formula does not infer an unknown 3-D EVDF."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis._component_tabulated",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
       "raw_data_to_physics": false,
-      "note": "Tabulated VDF shape can be inferred only when infer_tabulated_1d is selected with regularized inversion; fixed tabulated_1d mode treats the shape as an external input.",
+      "note": "A tabulated 3-D species-rest-frame EVDF is first conservatively projected onto the current scattering-vector direction by tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal; the projected marginal is then passed through this Landau-contour susceptibility. Only the fast-ion population fraction is fitted in this path.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_tabulated_non_maxwellian_fast_ion_forward_model",
         "tests/test_cts_analysis.py::test_cts_tabulated_fast_ion_uses_species_resolved_doppler_flow"
@@ -7182,15 +7182,15 @@
   {
     "name": "Finite-bin non-collective isotropic-Kappa optical Thomson inference",
     "equation": "S̄_i=A I_κ/Δλ_i [F_t(z_i^+;ν)−F_t(z_i^-;ν)]; ν=2κ−1; s=σ_λ√((ν−2)/ν); I_κ=s√(νπ)Γ(κ−1/2)/Γ(κ); z_i^±=(λ_i^±−λ_c)/s",
-    "inputs": "Canonical analyze_thomson_spectra API inputs: calibrated wavelength_nm bin centres, spectra, radius_m, laser_wavelength_nm, scattering_angle_rad, measured instrument_response and explicit model selection; optional pointwise or joint spectral covariance, model-discrepancy covariance and systematic covariance.",
-    "output": "electron_temperature_eV [eV; second-moment temperature]; kappa_index [dimensionless; only when response-convolved spectral Jacobian identifies it]; integrated_scattered_power_W [full fitted model area; shape normalization includes Gamma(kappa-1/2)/Gamma(kappa)]; captured_spectral_probability [dimensionless; exact Student-t probability inside recorded wavelength bins]; spectral_bin_integration [exact Student-t CDF finite-volume integration]; kappa_index_identifiability [structured response-convolved Jacobian and nuisance-projected sensitivity diagnostics]; kappa_profile_likelihood [conditional profile likelihood with nuisance re-optimization]",
-    "assumptions": "Isotropic finite-variance Kappa electron distribution with kappa > 3/2; non-collective single scattering; non-relativistic Doppler mapping; the projected wavelength shape is Student-t with nu=2kappa-1 and scale s=sigma_lambda*sqrt((nu-2)/nu). Bin probability is integrated exactly by the Student-t CDF; the measured response acts on bin-integrated power. The full shape integral is I_kappa=s*sqrt(nu*pi)*Gamma(kappa-1/2)/Gamma(kappa).",
+    "inputs": "Canonical analyze_thomson_spectra API inputs: calibrated wavelength_nm bin centres, spectra, radius_m, laser_wavelength_nm, scattering_angle_rad, measured instrument_response and explicit model selection; optional pointwise or joint spectral covariance, model-discrepancy covariance and systematic covariance. Optional laser_wavelength_uncertainty_nm, scattering_angle_uncertainty_rad and laser_angle_covariance_nm_rad provide a correlated 2×2 geometry-calibration covariance.",
+    "output": "electron_temperature_eV [eV; second-moment temperature]; kappa_index [dimensionless; only when response-convolved spectral Jacobian identifies it]; integrated_scattered_power_W [full fitted model area; shape normalization includes Gamma(kappa-1/2)/Gamma(kappa)]; captured_spectral_probability [dimensionless; exact Student-t probability inside recorded wavelength bins]; spectral_bin_integration [exact Student-t CDF finite-volume integration]; kappa_index_identifiability [structured response-convolved Jacobian and nuisance-projected sensitivity diagnostics]; kappa_profile_likelihood [conditional profile likelihood with nuisance re-optimization]; physical_parameter_covariance_including_geometry [2×2; first-order laser/angle propagation]; projected_evdf_moment_closure [analytic q-marginal moments with geometry-aware covariance]",
+    "assumptions": "Isotropic finite-variance Kappa electron distribution with kappa > 3/2; non-collective single scattering; non-relativistic Doppler mapping; the projected wavelength shape is Student-t with nu=2kappa-1 and scale s=sigma_lambda*sqrt((nu-2)/nu). Bin probability is integrated exactly by the Student-t CDF; the measured response acts on bin-integrated power. The full shape integral is I_kappa=s*sqrt(nu*pi)*Gamma(kappa-1/2)/Gamma(kappa). Supplied laser/angle calibration covariance is propagated by first-order Jacobian linearization; covariance between fitted spectral parameters and geometry is assumed zero unless a future joint calibration-fit covariance is provided.",
     "status": "D",
     "category": "Optical Thomson scattering",
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
+      "function_link": "tis.physics.shared.thomson_inference._fit_kappa",
       "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
       "input_specs": [
         {
@@ -7247,6 +7247,21 @@
           "name": "systematic_covariance",
           "unit": "additive spectral covariance",
           "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma calibration uncertainty",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma calibration uncertainty",
+          "required": false
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm·rad; laser-wavelength/scattering-angle calibration covariance",
+          "required": false
         }
       ],
       "output_specs": [
@@ -7277,6 +7292,18 @@
         {
           "name": "kappa_profile_likelihood",
           "unit": "conditional profile likelihood with nuisance re-optimization"
+        },
+        {
+          "name": "physical_parameter_covariance_fit_only",
+          "unit": "2×2 covariance of electron temperature and q-parallel flow from fitted spectral parameters only"
+        },
+        {
+          "name": "physical_parameter_covariance_including_geometry",
+          "unit": "2×2 covariance including first-order laser-wavelength and scattering-angle calibration uncertainty"
+        },
+        {
+          "name": "projected_evdf_moment_closure",
+          "unit": "analytic q-parallel Kappa variance, finite third/fourth-moment conditions, and geometry-propagated moment covariance"
         }
       ],
       "prerequisites": [
@@ -7284,20 +7311,22 @@
         "Laser wavelength, scattering angle and a measured detector-response operator",
         "A measured wavelength grid with strictly increasing bin centres; finite-volume edges are midpoint-defined"
       ],
-      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. The finite-bin CDF integral is deterministic conditional on wavelength centres, laser wavelength, geometry and fitted parameters.",
+      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. Laser-wavelength and scattering-angle 1-sigma calibration errors, including their supplied cross-covariance, are propagated by first-order Jacobian linearization into electron temperature, q-parallel flow and analytic projected-Kappa moments. Cross-covariance between fitted spectral parameters and geometry is not supplied and is assumed zero.",
       "limitations": [
         "No relativistic or Compton correction; the canonical fitter rejects fits outside its theta_e and bulk-flow beta screens.",
         "Kappa is a fitted parametric closure, not a general measured EVDF.",
         "A finite wavelength window truncates heavy tails; captured probability is reported and missing tails are not silently renormalized.",
-        "Absolute density is not identifiable from normalized spectral shape alone."
+        "Absolute density is not identifiable from normalized spectral shape alone.",
+        "Geometry propagation is first-order; fitted-spectrum/geometry cross-covariance is not currently estimated and is assumed zero."
       ],
       "test_links": [
         "tests/test_thomson_inference.py::test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index",
         "tests/test_thomson_inference.py::test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model",
         "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
-        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
+        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls",
+        "tests/test_thomson_inference.py::test_kappa_physical_and_moment_covariances_include_geometry_uncertainty"
       ],
-      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges.",
+      "note": "The primary isotropic-Kappa model now uses exact Student-t CDF finite-bin integration in both the optimizer and profile-likelihood diagnostic. The total spectral-area normalization now includes the required Gamma(kappa) denominator; captured probability is computed from finite-volume edges. The Kappa physical-parameter and projected-moment covariance now includes supplied laser-wavelength/scattering-angle calibration covariance by analytic Jacobian propagation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
       "execution_scope": "primary_non_collective_optical_thomson_physical_inference",
@@ -7340,10 +7369,11 @@
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Optical Thomson — finite-bin spectral inference",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.thomson_inference._fit_kappa",
+      "function_link": "tis.physics.shared.thomson_inference._fit_kappa",
       "function_links": [
-        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_inference._fit_kappa"
+        "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra",
+        "tis.physics.shared.thomson_inference.analyze_thomson_spectra",
+        "tis.physics.shared.thomson_inference._fit_kappa"
       ],
       "formula_key": "optical_thomson_noncollective_kappa_finite_bin",
       "implementation_link_status": "mapped",
@@ -7351,7 +7381,8 @@
         "tests/test_thomson_inference.py::test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index",
         "tests/test_thomson_inference.py::test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model",
         "tests/test_thomson_inference.py::test_primary_thomson_finite_bin_integrators_match_normal_and_student_t_cdfs",
-        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls"
+        "tests/test_thomson_inference.py::test_kappa_profile_likelihood_uses_full_spectral_covariance_gls",
+        "tests/test_thomson_inference.py::test_kappa_physical_and_moment_covariances_include_geometry_uncertainty"
       ]
     }
   },
@@ -9438,10 +9469,10 @@
   },
   {
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
-    "equation": "p_i=f_i/(Σ_j w_j f_j); u_q=Σ_i w_i v_i p_i; μ_n,q=Σ_i w_i(v_i−u_q)^n p_i (n=2,3,4); T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; ∂u_q/∂f_i=(w_i/N)(v_i−u_q); ∂μ_2,q/∂f_i=(w_i/N)[(v_i−u_q)²−μ_2,q]; ∂μ_3,q/∂f_i=(w_i/N)[(v_i−u_q)³−μ_3,q−3μ_2,q(v_i−u_q)]; ∂μ_4,q/∂f_i=(w_i/N)[(v_i−u_q)^4−μ_4,q−4μ_3,q(v_i−u_q)]; Cov(g)=J_g Cov(f_q) J_gᵀ",
+    "equation": "W_i^(k)=integral_hat_i(v)(v-u_q)^k dv (interval-wise exact 3-point Gauss-Legendre, k=0..4); N=Σ_i W_i^(0) f_i; u_q=Σ_i W_i^(1)(0) f_i/N; μ_k,q=Σ_i W_i^(k)(u_q) f_i/N (k=2,3,4); T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; ∂M_k/∂f_i=[W_i^(k)−M_k W_i^(0)]/N with central-moment chain rule; Cov(M)=J_M Cov(f_q) J_Mᵀ",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
-    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, directional variance, standard deviation and directional equivalent temperature; skewness and excess kurtosis; full covariance and standard uncertainties of all six physical moment quantities, propagated from the normalized-EVDF covariance. Separately, Akaike-weighted Maxwellian/Kappa/super-Gaussian model-family uncertainty is propagated into the model-averaged EVDF's six physical moments, with within- and between-family covariance reported separately from measurement and regularization-choice uncertainty.",
-    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is calculated from the projected kinetic-energy variance m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
+    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, variance, standard deviation and directional equivalent temperature; dimensional central third and fourth velocity moments, skewness and excess kurtosis; full 8 x 8 covariance and standard uncertainties of all eight physical moment quantities. Separately reported regularization-choice and parametric-family spreads remain distinct from measurement covariance.",
+    "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is represented as a piecewise-linear interpolant between strictly increasing, possibly nonuniform velocity nodes. Its normalization uses the composite trapezoidal measure, which is exactly the integral of that interpolant; moments through fourth order use interval-wise three-point Gauss-Legendre quadrature, exact for the polynomial integrands. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -9502,7 +9533,7 @@
         },
         {
           "name": "velocity_grid_m_s",
-          "unit": "m s^-1; strictly increasing uniform grid",
+          "unit": "m s^-1; strictly increasing uniform or nonuniform grid",
           "required": false
         },
         {
@@ -9534,7 +9565,7 @@
         },
         {
           "name": "velocity_moment_covariance",
-          "unit": "6 x 6 covariance in velocity_moment_covariance_order"
+          "unit": "8 x 8 covariance in velocity_moment_covariance_order: mean, variance, standard deviation, directional temperature, central third moment, central fourth moment, skewness, excess kurtosis"
         },
         {
           "name": "velocity_moment_standard_uncertainty",
@@ -9551,7 +9582,7 @@
         "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified.",
         "The directional second-moment temperature is T_eq,eV=m_e Var(v_q)/e. k_B is not included when converting kinetic energy in joules to electronvolts."
       ],
-      "uncertainty_model": "Exact trapezoidal moment functionals are differentiated with respect to the normalized sampled EVDF. The resulting 6 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation. Separately, Akaike-weighted Maxwellian, projected Student-t Kappa and super-Gaussian candidate marginals propagate between-family and available within-family covariance through the same six physical moment Jacobians; this model-selection covariance is kept distinct from measurement/background and regularization-choice uncertainty.",
+      "uncertainty_model": "The exact piecewise-linear moment functionals through fourth order are differentiated with the quotient rule, including the EVDF normalization denominator. Interval-wise three-point Gauss-Legendre quadrature is exact for the piecewise-linear interpolant multiplied by velocity polynomials through degree four. The resulting 8 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, central third and fourth moments, skewness and excess kurtosis. Regularization and active-set conditioning remain part of the covariance interpretation. Regularization-choice and parametric-family spreads are reported separately and are not added to the measurement covariance.",
       "limitations": [
         "Non-relativistic q·v Doppler approximation; use the separate relativistic projected-EVDF solver outside this domain.",
         "One scattering view cannot recover unrestricted 3-D anisotropy.",
@@ -9567,20 +9598,22 @@
         "tests/test_thomson_evdf.py::test_evdf_reports_akaike_model_selection_and_between_model_uncertainty",
         "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_matches_normalized_finite_difference",
         "tests/test_thomson_distribution.py::test_projected_evdf_physical_moment_covariance_rejects_indefinite_input",
-        "tests/test_thomson_distribution.py::test_thomson_spectral_distribution_executes_through_specialist_product_api"
+        "tests/test_thomson_distribution.py::test_thomson_spectral_distribution_executes_through_specialist_product_api",
+        "tests/test_thomson_evdf.py::test_piecewise_linear_evdf_moments_are_exact_on_nonuniform_velocity_grid",
+        "tests/test_thomson_evdf.py::test_piecewise_linear_evdf_physical_moment_jacobian_matches_finite_difference"
       ],
-      "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. Physical moment uncertainties are propagated from the full EVDF covariance, retaining cross-correlations. Public API and Advanced Thomson Dashboard route: run_advanced_thomson_physics('thomson_projected_evdf').",
+      "note": "The normalized q-projected EVDF is reconstructed from the measured spectrum through the measured response and explicit background. The same exact piecewise-linear quadrature defines its reported physical moments and the Jacobian used for full covariance propagation. Public API and Dashboard route: analysis 81 through the Thomson specialist product API.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
       "function_links": [
-        "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
+        "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf"
       ],
       "execution_scope": "calibrated_optical_thomson_spectrum_to_projected_velocity_distribution_and_moment_covariance",
       "input_data_level": "calibrated_measured_spectrum_and_measured_response",
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Optical Thomson / projected EVDF"
     },
-    "description": "Physical central moments and their correlated uncertainty are derived from the response-aware reconstructed normalized q-parallel EVDF using the same nonuniform velocity quadrature as the inverse. A single projected marginal does not identify the unrestricted 3-D EVDF or full parallel heat flux."
+    "description": "Physical central moments and their correlated uncertainty are derived from the response-aware reconstructed normalized q-parallel EVDF. The piecewise-linear velocity interpolant is integrated exactly through fourth order on nonuniform grids; covariance uses the matching normalization-aware Jacobian. A single projected marginal does not identify an unrestricted 3-D EVDF or full parallel heat flux."
   },
   {
     "name": "Three-dimensional Bloch-periodic full-vector Maxwell energy closure",
@@ -12341,6 +12374,204 @@
         "tests/test_thomson_multiview_product_api.py::test_registered_entry_and_product_api_contract_are_consistent"
       ],
       "function_link": "tis.products.thomson.physics.advanced_inference.reconstruct_optical_thomson_3d_evdf"
+    }
+  },
+  {
+    "name": "Relativistic projected Thomson lab-frame kinetic-energy flux",
+    "equation": "E_k(v_parallel)=(gamma-1)m_e c^2; gamma=(1-v_parallel^2/c^2)^(-1/2); F_E,q=n_e integral[E_k(v_parallel)*v_parallel*f_q(v_parallel) dv_parallel]",
+    "inputs": "Normalized one-dimensional q-parallel projected EVDF f_q(v_parallel); independently measured/inferred electron density n_e",
+    "output": "W m^-2",
+    "assumptions": "Exact relativistic single-electron kinetic energy in the laboratory frame; one-dimensional q-parallel marginal; normalized EVDF; independent density for absolute flux. This is not the comoving three-dimensional electron heat flux.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.api.analyze_spectral_distribution",
+      "formula_key": "thomson_relativistic_projected_lab_energy_flux",
+      "input_specs": [
+        {
+          "name": "projected_evdf_options.kinematics",
+          "unit": "relativistic_thomson or compton",
+          "required": true,
+          "description": "Select exact relativistic Thomson kinematics or Compton recoil explicitly."
+        },
+        {
+          "name": "projected_evdf_options.electron_density_m3",
+          "unit": "m^-3",
+          "required": true,
+          "description": "Independent measured/inferred density; normalized projected EVDF does not identify density."
+        },
+        {
+          "name": "projected_evdf_options.electron_density_uncertainty_m3",
+          "unit": "m^-3; 1-sigma",
+          "required": false,
+          "description": "Independent density uncertainty for first-order absolute-flux uncertainty propagation."
+        },
+        {
+          "name": "projected_evdf_options.electron_density_flux_per_density_cross_covariance_W_m2",
+          "unit": "W m^-2",
+          "required": false,
+          "description": "Covariance between independent density and relativistic EVDF flux-per-density; requires density uncertainty and EVDF covariance."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "kinetic_energy_flux_per_density_W_m",
+          "unit": "W m",
+          "description": "Relativistic lab-frame projected energy flux per electron density."
+        },
+        {
+          "name": "kinetic_energy_flux_W_m2",
+          "unit": "W m^-2",
+          "description": "Absolute q-parallel laboratory-frame kinetic-energy flux; withheld without independent density."
+        },
+        {
+          "name": "kinetic_energy_flux_standard_uncertainty_W_m2",
+          "unit": "W m^-2",
+          "description": "First-order uncertainty including density/EVDF covariance when supplied."
+        }
+      ],
+      "prerequisites": [
+        "A measured Thomson spectrum and response-aware projected EVDF inverse.",
+        "Independent electron density for absolute flux."
+      ],
+      "uncertainty_model": "The normalized EVDF functional covariance is propagated through the piecewise-linear interval Gauss-Legendre moment operator. Absolute flux F=n_e*g uses Var(F)=n_e^2 Var(g)+g^2 Var(n_e)+2 n_e g Cov(n_e,g); missing cross-covariance is treated as zero only when explicitly declared by the solver contract, and the supplied 2x2 covariance must be positive semidefinite.",
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_relativistic_projected_moments_integrate_piecewise_linear_evdf_not_nodal_trapezoids",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_moment_covariance_matches_normalized_functional_finite_difference",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_lab_energy_flux_uses_only_explicit_density_and_joint_uncertainty",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_lab_flux_rejects_density_cross_covariance_without_joint_inputs"
+      ],
+      "note": "Analytic and numerical software verification only; not experimental validation."
+    }
+  },
+  {
+    "name": "CTS finite-volume projection of a 3-D fast-ion EVDF onto the scattering vector",
+    "equation": "f_{i,q}(u)=\\int f_{i,3D}(\\mathbf v)\\,\\delta(u-\\hat{\\mathbf q}\\cdot\\mathbf v)\\,d^3v;\\quad m_j=\\sum_a f_a\\Delta V_a\\,\\phi_j(\\hat{\\mathbf q}\\cdot\\mathbf v_a);\\quad f_{i,q}(u_j)=m_j/w_j",
+    "inputs": "Species-rest-frame 3-D fast-ion EVDF samples f_a [s^3 m^-3], velocity-space cell volumes ΔV_a [(m/s)^3], voxel velocities v_a [m/s], unit scattering-vector direction q_hat, and strictly increasing 1-D projection velocity grid u_j [m/s].",
+    "output": "Normalized q-parallel fast-ion marginal f_i,q(u_j) [s m^-1] and projection diagnostics.",
+    "assumptions": "Unmagnetized electrostatic longitudinal CTS; supplied 3-D EVDF shape is fixed external input; finite-volume voxel quadrature; conservative linear deposition onto a user-supplied projection grid; species bulk flow is applied separately in the Landau resonance; non-relativistic velocity support |v|<0.1c.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+      "formula_key": "cts_tabulated_3d_fast_ion_q_projection",
+      "input_specs": [
+        {
+          "name": "velocity_vectors_m_s",
+          "unit": "n×3; m s^-1; species-rest-frame voxel velocities",
+          "required": true
+        },
+        {
+          "name": "probability_density_s3_per_m3",
+          "unit": "n; s^3 m^-3; non-negative 3-D EVDF samples",
+          "required": true
+        },
+        {
+          "name": "velocity_cell_volume_m3_per_s3",
+          "unit": "n; (m s^-1)^3; positive voxel quadrature volumes",
+          "required": true
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "3-vector; dimensionless unit q direction",
+          "required": true
+        },
+        {
+          "name": "projection_velocity_grid_m_s",
+          "unit": "strictly increasing 1-D grid; m s^-1; at least nine nodes",
+          "required": true
+        },
+        {
+          "name": "flow_velocity_vector_m_s",
+          "unit": "optional 3-vector; m s^-1; independent fast-ion bulk flow in laboratory coordinates",
+          "required": false,
+          "description": "If supplied, its projection onto each geometry-specific q direction sets the fast-ion Doppler shift. If omitted for a single geometry, the selected thermal ion species flow projection is shared with the fast-ion component. Frequency-resolved geometry requires this vector so the fast-ion flow projection is recomputed for each q."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "projected_velocity_grid_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "projected_probability_density_s_per_m",
+          "unit": "s m^-1; normalized q-parallel marginal"
+        },
+        {
+          "name": "projection_probability_integral",
+          "unit": "dimensionless; conservative discrete normalization"
+        },
+        {
+          "name": "fast_ion_flow_projection_m_s",
+          "unit": "m s^-1; q-parallel bulk-flow projection used in the Landau resonance"
+        }
+      ],
+      "prerequisites": [
+        "A normalized finite-volume 3-D EVDF with explicit voxel velocities and velocity-space cell volumes.",
+        "A measured or researcher-supplied scattering-vector direction and a projection grid covering all voxel projections."
+      ],
+      "uncertainty_model": "The projection is deterministic conditional on the supplied voxel values, cell volumes, geometry and projection grid. Uncertainty of the external 3-D EVDF and geometry is not inferred by this helper; CTS fit covariance covers fitted bulk parameters and the fast-ion fraction conditional on the fixed 3-D shape.",
+      "limitations": [
+        "The supplied 3-D EVDF shape is not inferred; only its population fraction is fitted by the electrostatic CTS inversion.",
+        "The projection grid and finite-volume voxel quadrature control numerical resolution; convergence must be assessed by refining both.",
+        "The electrostatic model rejects |v| >= 0.1c; relativistic fast-ion response requires the separate Full-EM kinetic model.",
+        "For frequency-resolved geometry, an independent 3-D fast-ion bulk-flow vector is required; a single scalar projection cannot represent changing q directions."
+      ],
+      "function_links": [
+        "tis.products.thomson.physics.cts_analysis._validate_tabulated_3d_fast_ion",
+        "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+        "tis.products.thomson.physics.cts_analysis.cts_spectral_density",
+        "tis.products.thomson.physics.cts_analysis.analyze_cts_spectrum"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "finite_volume_3d_fast_ion_evdf_to_geometry_specific_q_parallel_marginal",
+      "input_data_level": "model_parameters_and_supplied_3d_velocity_distribution",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering",
+      "note": "For each geometry, the discrete probability f_a ΔV_a is deposited onto adjacent projection-grid nodes with linear hat functions φ_j. Division by trapezoidal nodal measure w_j preserves total probability. The resulting q-parallel marginal is used in the tabulated Landau susceptibility; a different scattering geometry produces a different marginal for an anisotropic 3-D EVDF. An optional independent fast-ion bulk-flow vector is projected onto q for every geometry; if absent in a single-view fit, the selected thermal species flow projection is shared.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
+        "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_geometry"
+      ]
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield et al.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "scope": "General collective-scattering and dielectric-response framework; the finite-volume projection is a numerical discretization of the q-parallel marginal."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "supplied_finite_volume_3d_velocity_distribution_and_measured_cts_geometry",
+    "execution_scope": "finite_volume_3d_fast_ion_evdf_projection_used_by_cts_landau_susceptibility",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+      "function_links": [
+        "tis.products.thomson.physics.cts_analysis._validate_tabulated_3d_fast_ion",
+        "tis.products.thomson.physics.cts_analysis._project_tabulated_3d_fast_ion_to_q_marginal",
+        "tis.products.thomson.physics.cts_analysis.cts_spectral_density"
+      ],
+      "formula_key": "cts_tabulated_3d_fast_ion_q_projection",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_is_conservative_and_geometry_dependent",
+        "tests/test_cts_analysis.py::test_cts_forward_spectrum_uses_geometry_specific_projection_of_3d_fast_ions",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_projection_recovers_direct_q_parallel_second_moment",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_is_reachable_through_registered_product_api",
+        "tests/test_cts_analysis.py::test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_geometry"
+      ]
     }
   }
 ]
