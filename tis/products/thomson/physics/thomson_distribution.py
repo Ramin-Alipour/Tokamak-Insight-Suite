@@ -700,12 +700,55 @@ def _model_averaged_projected_evdf_moments(velocity_grid_m_s, model_selection):
     between_covariance = model_selection.get(
         "between_model_projected_evdf_covariance_s2_per_m2"
     )
-    selected_covariance = total_covariance if total_covariance is not None else between_covariance
-    if selected_covariance is not None:
-        selected_covariance = np.asarray(selected_covariance, dtype=float)
-        if (selected_covariance.shape != (velocity.size, velocity.size)
-                or not np.all(np.isfinite(selected_covariance))):
-            raise ValueError("model-selection EVDF covariance must be finite and square on the common velocity grid")
+
+    def validate_model_covariance(value, name):
+        if value is None:
+            return None
+        matrix = np.asarray(value, dtype=float)
+        if (matrix.shape != (velocity.size, velocity.size)
+                or not np.all(np.isfinite(matrix))):
+            raise ValueError(
+                f"{name} must be finite and square on the common velocity grid"
+            )
+        scale = max(float(np.max(np.abs(matrix))), np.finfo(float).tiny)
+        if not np.allclose(matrix, matrix.T, rtol=1.0e-9, atol=1.0e-12 * scale):
+            raise ValueError(f"{name} must be symmetric")
+        matrix = 0.5 * (matrix + matrix.T)
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        eigen_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if float(eigenvalues.min()) < -1.0e-10 * eigen_scale:
+            raise ValueError(f"{name} must be positive semidefinite")
+        return matrix
+
+    total_covariance = validate_model_covariance(
+        total_covariance, "model_averaged_projected_evdf_covariance_s2_per_m2"
+    )
+    between_covariance = validate_model_covariance(
+        between_covariance, "between_model_projected_evdf_covariance_s2_per_m2"
+    )
+    if total_covariance is not None and between_covariance is None:
+        raise ValueError(
+            "total model-averaged EVDF covariance requires its between-model component"
+        )
+    if total_covariance is not None:
+        within_covariance = 0.5 * (
+            total_covariance - between_covariance
+            + (total_covariance - between_covariance).T
+        )
+        within_eigenvalues = np.linalg.eigvalsh(within_covariance)
+        within_scale = max(
+            float(np.max(np.abs(np.linalg.eigvalsh(total_covariance)))),
+            float(np.max(np.abs(np.linalg.eigvalsh(between_covariance)))),
+            np.finfo(float).tiny,
+        )
+        if float(within_eigenvalues.min()) < -1.0e-9 * within_scale:
+            raise ValueError(
+                "total model-averaged EVDF covariance is inconsistent with its "
+                "between-model component; inferred within-model covariance is not positive semidefinite"
+            )
+    selected_covariance = (
+        total_covariance if total_covariance is not None else between_covariance
+    )
     physical_moments = _projected_evdf_physical_moments(
         velocity, averaged, selected_covariance
     )
