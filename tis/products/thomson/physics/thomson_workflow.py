@@ -58,6 +58,7 @@ def analyze_thomson_spectra(*args, **kwargs):
     """
     likelihood = kwargs.pop("likelihood", None)
     if likelihood == "independent_Poisson":
+        radius_metadata = None
         if len(args) == 2:
             wavelength, counts = args
         elif len(args) == 0:
@@ -65,6 +66,7 @@ def analyze_thomson_spectra(*args, **kwargs):
             counts = kwargs.pop("observed_counts", None)
             if counts is None:
                 counts = kwargs.pop("spectra", None)
+            radius_metadata = kwargs.pop("radius_m", None)
         else:
             raise TypeError("Poisson Analysis-1 accepts wavelength and counts as two positional arguments or named inputs")
         if wavelength is None or counts is None:
@@ -72,6 +74,18 @@ def analyze_thomson_spectra(*args, **kwargs):
         laser_nm = kwargs.pop("laser_wavelength_nm", None)
         angle = kwargs.pop("scattering_angle_rad", None)
         distribution_model = kwargs.pop("distribution_model", "maxwellian")
+        selected_model = kwargs.pop("model", None)
+        if selected_model is not None:
+            model_to_distribution = {
+                "non_collective_maxwellian": "maxwellian",
+                "non_collective_kappa": "kappa",
+            }
+            if selected_model not in model_to_distribution:
+                raise ValueError("Poisson Analysis-1 model must be non_collective_maxwellian or non_collective_kappa")
+            implied_distribution = model_to_distribution[selected_model]
+            if "distribution_model" in kwargs and distribution_model != implied_distribution:
+                raise ValueError("model and distribution_model select different Poisson spectral families")
+            distribution_model = implied_distribution
         kappa_initial = kwargs.pop("kappa_initial", 4.0)
         kappa_bounds = kwargs.pop("kappa_bounds", (1.5001, 50.0))
         response = kwargs.pop("instrument_response", None)
@@ -102,6 +116,11 @@ def analyze_thomson_spectra(*args, **kwargs):
         )
         result["analysis_id"] = 1
         result["analysis_model"] = f"noncollective_{distribution_model}_independent_Poisson"
+        if radius_metadata is not None:
+            radius_values = np.asarray(radius_metadata, dtype=float)
+            if radius_values.ndim != 0 or not np.isfinite(radius_values):
+                raise ValueError("radius_m for a single-spectrum Poisson call must be one finite scalar")
+            result["radius_m"] = float(radius_values)
         result["canonical_entry_point"] = "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra"
         return result
     if likelihood is not None:
