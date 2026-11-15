@@ -504,6 +504,9 @@ def _fit_noncollective(
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     spectral_covariance=None,
+    laser_wavelength_uncertainty_nm=0.0,
+    scattering_angle_uncertainty_rad=0.0,
+    laser_angle_covariance_nm_rad=0.0,
 ):
     """Fit Maxwellian Thomson spectra with exact finite-bin Gaussian probabilities.
 
@@ -511,6 +514,35 @@ def _fit_noncollective(
     spectral-power space; the background remains a detector-space nuisance.
     """
     from .thomson_background import _background_design
+
+    laser_unc = _finite_scalar(
+        laser_wavelength_uncertainty_nm,
+        "laser_wavelength_uncertainty_nm", minimum=0.0,
+    )
+    angle_unc = _finite_scalar(
+        scattering_angle_uncertainty_rad,
+        "scattering_angle_uncertainty_rad", minimum=0.0,
+    )
+    geometry_cross = _finite_scalar(
+        laser_angle_covariance_nm_rad,
+        "laser_angle_covariance_nm_rad",
+    )
+    if laser_unc > laser_nm / 3.0:
+        raise ValueError("laser_wavelength_uncertainty_nm is too large for local Maxwellian covariance propagation")
+    if angle_unc > min(angle, np.pi - angle) / 3.0:
+        raise ValueError("scattering_angle_uncertainty_rad is too large for local Maxwellian covariance propagation")
+    geometry_covariance = np.array([
+        [laser_unc**2, geometry_cross],
+        [geometry_cross, angle_unc**2],
+    ], dtype=float)
+    geometry_eigenvalues = np.linalg.eigvalsh(geometry_covariance)
+    geometry_scale = max(
+        float(np.max(np.abs(geometry_eigenvalues))), np.finfo(float).tiny
+    )
+    if float(geometry_eigenvalues.min()) < -1e-12 * geometry_scale:
+        raise ValueError(
+            "Maxwellian laser-wavelength/scattering-angle covariance must be positive semidefinite"
+        )
 
     signal_scale = float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale <= 0:
@@ -666,25 +698,60 @@ def _fit_noncollective(
     # physical [Te, v_q] covariance. Keeping the off-diagonal term matters:
     # line-center/width correlations otherwise disappear from the reported
     # physical uncertainty budget.
+    # Propagate the fitted centre/width covariance and the supplied laser/angle
+    # calibration covariance through T_e and the q-parallel Doppler flow.
+    # Fit/geometry cross-covariance is not inferred and is explicitly zero here.
     physical_jacobian = np.array([
-        [0.0, 2.0 * te / width],
-        [-C_M_S / (laser_nm * q_projection), 0.0],
+        [0.0, 2.0 * te / width,
+         -2.0 * te / laser_nm, -te / np.tan(angle / 2.0)],
+        [-C_M_S / (laser_nm * q_projection), 0.0,
+         C_M_S * center / (laser_nm**2 * q_projection),
+         -0.5 * velocity / np.tan(angle / 2.0)],
     ], dtype=float)
     center_width_covariance = covariance[np.ix_([1, 2], [1, 2])]
+    fit_jacobian = physical_jacobian[:, :2]
     physical_covariance_fit_only = (
-        physical_jacobian @ center_width_covariance @ physical_jacobian.T
+        fit_jacobian @ center_width_covariance @ fit_jacobian.T
     )
     physical_covariance_fit_only = 0.5 * (
         physical_covariance_fit_only + physical_covariance_fit_only.T
     )
-    te_unc = float(np.sqrt(max(physical_covariance_fit_only[0, 0], 0.0)))
-    velocity_unc = float(np.sqrt(max(physical_covariance_fit_only[1, 1], 0.0)))
+    input_covariance = np.zeros((4, 4), dtype=float)
+    input_covariance[:2, :2] = center_width_covariance
+    input_covariance[2:, 2:] = geometry_covariance
+    physical_covariance = (
+        physical_jacobian @ input_covariance @ physical_jacobian.T
+    )
+    physical_covariance = 0.5 * (
+        physical_covariance + physical_covariance.T
+    )
+    for matrix, label in (
+        (physical_covariance_fit_only, "fit-only"),
+        (physical_covariance, "total"),
+    ):
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if float(eigenvalues.min()) < -1e-10 * scale:
+            raise ValueError(
+                f"Maxwellian {label} physical-parameter covariance is not positive semidefinite"
+            )
+    te_unc = float(np.sqrt(max(physical_covariance[0, 0], 0.0)))
+    velocity_unc = float(np.sqrt(max(physical_covariance[1, 1], 0.0)))
     physical_variance_product = float(
-        physical_covariance_fit_only[0, 0] * physical_covariance_fit_only[1, 1]
+        physical_covariance[0, 0] * physical_covariance[1, 1]
     )
     physical_correlation = (
-        float(physical_covariance_fit_only[0, 1] / np.sqrt(physical_variance_product))
+        float(physical_covariance[0, 1] / np.sqrt(physical_variance_product))
         if physical_variance_product > 0.0 else None
+    )
+    fit_variance_product = float(
+        physical_covariance_fit_only[0, 0] * physical_covariance_fit_only[1, 1]
+    )
+    physical_correlation_fit_only = (
+        float(
+            physical_covariance_fit_only[0, 1] / np.sqrt(fit_variance_product)
+        )
+        if fit_variance_product > 0.0 else None
     )
     area = float(amp*width*np.sqrt(2.0*np.pi))
     area_gradient = np.zeros(fit_parameters.size)
@@ -696,10 +763,25 @@ def _fit_noncollective(
         "electron_velocity_projection_m_s": float(velocity),
         "electron_velocity_projection_uncertainty_m_s": velocity_unc,
         "physical_parameter_covariance_fit_only": physical_covariance_fit_only,
+        "physical_parameter_covariance": physical_covariance,
+        "physical_parameter_covariance_including_geometry": physical_covariance,
         "physical_parameter_covariance_order": [
             "electron_temperature_eV", "electron_velocity_projection_m_s"
         ],
-        "physical_parameter_correlation_fit_only": physical_correlation,
+        "physical_parameter_correlation_fit_only": physical_correlation_fit_only,
+        "physical_parameter_correlation": physical_correlation,
+        "physical_parameter_covariance_components": {
+            "fit_parameter_covariance": "included",
+            "laser_wavelength_uncertainty_nm": laser_unc,
+            "scattering_angle_uncertainty_rad": angle_unc,
+            "laser_angle_covariance_nm_rad": geometry_cross,
+            "fit_geometry_cross_covariance": "assumed_zero_not_supplied",
+        },
+        "physical_parameter_covariance_status": (
+            "identified_from_local_likelihood_plus_first_order_geometry_propagation"
+            if laser_unc > 0.0 or angle_unc > 0.0 or geometry_cross != 0.0
+            else "identified_from_local_likelihood"
+        ),
         "identifiability": {
             "status": (
                 "locally_identified"
@@ -1664,11 +1746,6 @@ def analyze_thomson_spectra(
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
             "is implemented as a separate child subanalysis of primary Analysis 1."
         )
-    if laser_angle_covariance_nm_rad != 0.0 and model != "non_collective_kappa":
-        raise ValueError(
-            "laser_angle_covariance_nm_rad is currently propagated by the non-collective "
-            "Kappa path only; it must not be silently ignored by another model."
-        )
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
             "Beam-direction component uncertainty is supported only by the relativistic "
@@ -2214,11 +2291,23 @@ def analyze_thomson_spectra(
                 channel_covariance = systematic_block
             ui = None
         if model == "non_collective_maxwellian":
-            fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,
-                                background_model=background_model, background_degree=background_degree,
-                                background_interior_knots=background_interior_knots,
-                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
-                                spectral_covariance=channel_covariance)
+            fit = _fit_noncollective(
+                xi, y[i], float(laser_wavelength_nm),
+                float(scattering_angle_rad), response, ui,
+                background_model=background_model,
+                background_degree=background_degree,
+                background_interior_knots=background_interior_knots,
+                background_templates=(
+                    background_templates[i]
+                    if background_templates is not None
+                    and np.asarray(background_templates).ndim == 3
+                    else background_templates
+                ),
+                spectral_covariance=channel_covariance,
+                laser_wavelength_uncertainty_nm=laser_wavelength_unc,
+                scattering_angle_uncertainty_rad=scattering_angle_unc,
+                laser_angle_covariance_nm_rad=laser_angle_covariance_nm_rad,
+            )
         elif model == "non_collective_kappa":
             fit = _fit_kappa(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
