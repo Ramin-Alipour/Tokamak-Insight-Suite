@@ -81,6 +81,7 @@ MODEL_LABELS = {
     "cts_non_gyrotropic_gaussian_tensor_spectrum": "CTS — non-gyrotropic 3-D Gaussian temperature tensor projected exactly onto q and evaluated with the tabulated Landau response",
     "cts_multi_ion_flow_inference": "CTS — conditional inference of independent ion-species flow projections",
     "cts_electrostatic_measured_spectrum_inference": "CTS — measured-spectrum electrostatic inversion with thermal and tabulated fast-ion populations",
+    "cts_full_em_spatial_profiles": "CTS — spatially varying magnetized Full-EM inference from frequency-resolved scattering-volume geometry",
     "thomson_projected_evdf": "Optical Thomson — response-aware 1-D projected electron velocity distribution inversion",
     "thomson_relativistic_exact_flow_projection": "Optical Thomson — exact relativistic Doppler inversion of a single q-parallel flow projection",
     "thomson_relativistic_projected_evdf": "Optical Thomson — relativistic projected EVDF (Thomson or Compton/Klein–Nishina)",
@@ -389,6 +390,15 @@ MODEL_PHYSICS_NOTES = {
         "Optional scattering-vector covariance and projection/geometry cross-covariance are propagated by "
         "iterative tangent-plane errors-in-variables GLS. This is a shared-flow multi-view model, not a local flow map."
     ),
+    "cts_full_em_spatial_profiles": (
+        "Fits node-wise relative electron-density and temperature profiles by repeatedly evaluating "
+        "the local magnetized Full-EM CTS forward model over the supplied frequency-resolved "
+        "scattering-volume geometry. Requires explicit reference plasma state, species, fractions, "
+        "magnetic field, polarizations, spectral covariance or pointwise uncertainty, profile bounds, "
+        "regularization strength, and a declared zero or measured background. The data-only Jacobian "
+        "determines identifiability; regularization cannot make an unidentifiable profile reportable."
+    ),
+
 }
 
 MODEL_PHYSICS_NOTES["thomson_relativistic_3d_evdf"] = (
