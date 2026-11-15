@@ -266,6 +266,20 @@ def render_product_workspace_page(st: Any) -> None:
                     st.json(projected.get("projected_evdf_physical_moments", {
                         "status": "physical-moment summary unavailable"
                     }))
+                    model_averaged = projected.get(
+                        "model_averaged_projected_evdf_physical_moments"
+                    )
+                    if model_averaged is not None:
+                        st.markdown("**Model-averaged projected EVDF moments**")
+                        st.json({
+                            "status": model_averaged.get("status"),
+                            "candidate_weights": model_averaged.get("candidate_weights"),
+                            "moment_covariance_scope": model_averaged.get(
+                                "moment_covariance_scope"
+                            ),
+                            "physical_moments": model_averaged.get("physical_moments"),
+                            "interpretation": model_averaged.get("interpretation"),
+                        })
                     physical_moments = projected.get("projected_evdf_physical_moments", {})
                     moment_order = physical_moments.get("moment_covariance_order", [])
                     moment_uncertainty = physical_moments.get("moment_standard_uncertainty") or {}
@@ -281,9 +295,10 @@ def render_product_workspace_page(st: Any) -> None:
                         ]
                         st.dataframe(moment_rows, use_container_width=True, hide_index=True)
                         st.caption(
-                            "Moments are integrated exactly through fourth order for the "
-                            "piecewise-linear EVDF on the declared velocity grid. The 10×10 "
-                            "covariance also includes the two projected random-energy moments."
+                            "Central velocity moments through sixth order are integrated "
+                            "exactly for the piecewise-linear EVDF on the declared velocity "
+                            "grid. The covariance retains correlations among the reported "
+                            "moments and the projected random-energy moments."
                         )
                     st.markdown("**EVDF inverse numerical contract**")
                     st.write({
