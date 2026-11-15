@@ -2396,3 +2396,39 @@ def test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_ind
     assert routed["analysis_id"] == 1
     assert routed["analysis_model"] == "noncollective_kappa_independent_Poisson"
     assert routed["distribution_model"] == "kappa"
+
+
+
+def test_analysis1_registry_api_dispatches_kappa_poisson_counts_from_declared_model():
+    from scipy.special import gammaln
+    from tis.physics.shared.thomson_inference import _kappa_bin_averaged_shape, _wavelength_bin_edges
+    from tis.products.thomson.api import run_analysis
+
+    wavelength = np.linspace(520.0, 544.0, 301)
+    edges = _wavelength_bin_edges(wavelength)
+    widths = np.diff(edges)
+    laser, angle = 532.0, np.pi / 2.0
+    true_te, true_kappa = 110.0, 4.1
+    sigma = laser * 2.0 * np.sin(angle / 2.0) * np.sqrt(true_te / 510998.95069)
+    shape, _ = _kappa_bin_averaged_shape(wavelength, 1.0, laser, sigma, true_kappa)
+    expected = 8.0e5 * shape * widths + 45.0 * widths
+    counts = np.rint(expected).astype(int)
+
+    result = run_analysis(
+        1,
+        wavelength_nm=wavelength,
+        observed_counts=counts,
+        radius_m=0.15,
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        likelihood="independent_Poisson",
+        model="non_collective_kappa",
+        kappa_initial=4.0,
+        kappa_bounds=(1.6, 12.0),
+    )
+    assert result["analysis_id"] == 1
+    assert result["analysis_model"] == "noncollective_kappa_independent_Poisson"
+    assert result["distribution_model"] == "kappa"
+    assert result["radius_m"] == pytest.approx(0.15)
+    assert result["fit_covariance"].shape == (6, 6)
