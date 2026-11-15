@@ -124,6 +124,13 @@ def render_product_workspace_page(st: Any) -> None:
         "passes these values unchanged to the registered product solver; it "
         "does not invent calibration, geometry, uncertainty, or plasma parameters."
     )
+    if selected_id == 1 and selected_analysis_id == 1:
+        st.caption(
+            "Analysis 1 also accepts likelihood='independent_Poisson' for one calibrated "
+            "integer-count spectrum: provide wavelength_nm, observed_counts, laser_wavelength_nm, "
+            "scattering_angle_rad and the measured instrument_response. Select model='non_collective_kappa' "
+            "or 'non_collective_maxwellian'; the Kappa branch requires kappa>3/2."
+        )
     required_inputs = [
         spec["name"] for spec in contract.get("input_specs", [])
         if spec.get("required", False)
@@ -150,6 +157,22 @@ def render_product_workspace_page(st: Any) -> None:
                 f"Workflow {selected_analysis_id} completed through "
                 f"{product['product_id']} public API."
             )
+            if selected_id == 1 and selected_analysis_id == 1 and result.get("likelihood") == "independent_Poisson":
+                st.markdown("### Optical Thomson Poisson count-space inference")
+                st.json({
+                    "model": result.get("model"),
+                    "distribution_model": result.get("distribution_model"),
+                    "Te_eV": result.get("electron_temperature_eV"),
+                    "Te_1sigma_eV": result.get("electron_temperature_uncertainty_eV"),
+                    "q_parallel_flow_m_s": result.get("electron_velocity_projection_m_s"),
+                    "q_parallel_flow_1sigma_m_s": result.get("electron_velocity_projection_uncertainty_m_s"),
+                    "kappa": result.get("kappa"),
+                    "kappa_1sigma": result.get("kappa_uncertainty"),
+                    "Poisson_deviance": result.get("poisson_deviance"),
+                    "reduced_Poisson_deviance": result.get("reduced_poisson_deviance"),
+                    "identifiability": result.get("identifiability"),
+                    "absolute_density_inference": result.get("density_inference_available"),
+                })
             if selected_id == 1 and selected_analysis_id == 1:
                 st.markdown("### Optical Thomson physical inference")
                 st.json({
