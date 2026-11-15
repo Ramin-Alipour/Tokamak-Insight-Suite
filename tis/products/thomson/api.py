@@ -73,8 +73,14 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     electron_density_flux_per_density_cross_covariance_W_m2 when its
     covariance with the EVDF flux-per-density estimate is known.
     The physical-moment result also returns exact piecewise-linear EVDF
-    moments through sixth order, their full first-order covariance, a separate
-    one-edge-cell velocity-grid truncation sensitivity diagnostic (not folded
+    moments through sixth order, their full first-order covariance, and,
+    when the inverse solver supplies candidate-family model averaging, the
+    exact physical moments of the Akaike-weighted EVDF mixture with its
+    within/between-family covariance scope explicitly distinguished. The
+    mixture is computed as f_bar(v)=sum_m w_m f_m(v), and its moment covariance
+    uses C_M=J_M C_bar J_M.T; relative Akaike weights are not posterior
+    probabilities. A separate one-edge-cell velocity-grid truncation
+    sensitivity diagnostic (not folded
     into statistical uncertainty), and the cumulative q-parallel random-energy
     distribution with covariance. With an
     independent density and uncertainty, it returns P_qq and q_q^(1D) plus
