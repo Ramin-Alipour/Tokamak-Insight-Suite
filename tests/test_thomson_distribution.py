@@ -1603,7 +1603,7 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
     assert result["observed_sigma_nm"] == pytest.approx(0.16, rel=0.04)
     assert result["instrument_response_model"] == "measured_response_matrix_forward_operator"
     inverse = result["projected_evdf_inference"]
-    physical = result["projected_evdf_physical_moments"]
+    physical = inverse["projected_evdf_physical_moments"]
     assert inverse["velocity_moment_covariance"].shape == (8, 8)
     assert len(inverse["velocity_moment_covariance_order"]) == 8
     assert physical["moment_covariance"].shape == (10, 10)
