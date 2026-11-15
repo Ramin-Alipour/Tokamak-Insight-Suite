@@ -205,6 +205,53 @@ def test_optical_kappa_rejects_non_psd_calibration_geometry_covariance():
         )
 
 
+def test_optical_maxwellian_propagates_laser_geometry_covariance():
+    from tis.physics.shared.thomson_inference import _fit_noncollective
+
+    wavelength = np.linspace(530.0, 532.0, 81)
+    signal = 1.2e-3 * np.exp(-0.5 * ((wavelength - 531.0) / 0.18) ** 2) + 3.0e-5
+    laser_nm = 531.0
+    angle = np.pi / 2.0
+    laser_uncertainty = 0.03
+    angle_uncertainty = 0.01
+    geometry_cross_covariance = 1.0e-4
+    result = _fit_noncollective(
+        wavelength,
+        signal,
+        laser_nm,
+        angle,
+        np.eye(wavelength.size),
+        np.full(wavelength.size, 1.0e-5),
+        laser_wavelength_uncertainty_nm=laser_uncertainty,
+        scattering_angle_uncertainty_rad=angle_uncertainty,
+        laser_angle_covariance_nm_rad=geometry_cross_covariance,
+    )
+
+    fit_only = result["physical_parameter_covariance_fit_only"]
+    total = result["physical_parameter_covariance"]
+    q = 2.0 * np.sin(angle / 2.0)
+    temperature = result["electron_temperature_eV"]
+    velocity = result["electron_velocity_projection_m_s"]
+    center = result["fitted_center_nm"]
+    width = result["intrinsic_sigma_nm"]
+    geometry_jacobian = np.array([
+        [-2.0 * temperature / laser_nm, -temperature / np.tan(angle / 2.0)],
+        [
+            299792458.0 * center / (laser_nm**2 * q),
+            -0.5 * velocity / np.tan(angle / 2.0),
+        ],
+    ])
+    geometry_covariance = np.array([
+        [laser_uncertainty**2, geometry_cross_covariance],
+        [geometry_cross_covariance, angle_uncertainty**2],
+    ])
+    expected = fit_only + geometry_jacobian @ geometry_covariance @ geometry_jacobian.T
+    np.testing.assert_allclose(total, expected, rtol=1e-9, atol=1e-12)
+    assert result["physical_parameter_covariance_components"]["fit_geometry_cross_covariance"] == "assumed_zero_not_supplied"
+    assert result["electron_temperature_uncertainty_eV"] == pytest.approx(np.sqrt(total[0, 0]))
+    assert result["electron_velocity_projection_uncertainty_m_s"] == pytest.approx(np.sqrt(total[1, 1]))
+
+
 def test_cts_accepts_independent_correlated_model_discrepancy_covariance():
     from tokamak_analysis.cts_analysis import analyze_cts_spectrum, cts_spectral_density
     frequency = np.linspace(-5.0e9, 5.0e9, 81)
