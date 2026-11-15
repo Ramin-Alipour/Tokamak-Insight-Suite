@@ -278,6 +278,7 @@ def render_product_workspace_page(st: Any) -> None:
                                 "moment_covariance_scope"
                             ),
                             "physical_moments": model_averaged.get("physical_moments"),
+                            "equations": model_averaged.get("equations"),
                             "interpretation": model_averaged.get("interpretation"),
                         })
                     physical_moments = projected.get("projected_evdf_physical_moments", {})
