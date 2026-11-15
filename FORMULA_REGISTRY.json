@@ -12773,8 +12773,10 @@
         "tests/test_advanced_inference.py::test_3d_evdf_moment_propagation_rejects_indefinite_distribution_covariance",
         "tests/test_advanced_inference.py::test_product_3d_evdf_exposes_temperature_tensor_covariance"
       ],
-      "note": "The Jacobians are tested against finite differences along normalization-preserving perturbations."
+      "note": "The Jacobians are tested against finite differences along normalization-preserving perturbations.",
+      "formula_key": "thomson_normalized_3d_evdf_temperature_covariance"
     },
-    "description": "Analytic uncertainty propagation for mean flow and the full Cartesian 3-D EVDF temperature tensor."
+    "description": "Analytic uncertainty propagation for mean flow and the full Cartesian 3-D EVDF temperature tensor.",
+    "formula_key": "thomson_normalized_3d_evdf_temperature_covariance"
   }
 ]
