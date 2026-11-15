@@ -876,7 +876,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - cts_multi_ion_flow_inference: conditional fit of independent projected ion
         species flows from a calibrated electrostatic CTS spectrum with fixed
         plasma/composition inputs; the species-flow Jacobian rank gates reporting.
-      - cts_full_em_spatial_profiles: node-wise relative electron-density and temperature inference using repeated local magnetized Full-EM CTS forward solves, supplied frequency-resolved scattering-volume geometry, full spectral covariance, explicit regularization and data-only identifiability gates.\n      - cts_non_gyrotropic_gaussian_tensor_spectrum: exact q-marginal of a general 3-D Gaussian temperature tensor, passed to the tabulated Landau CTS forward solver; a single view identifies only the q-projected temperature.
+      - cts_full_em_spatial_profiles: node-wise relative electron-density and temperature inference using repeated local magnetized Full-EM CTS forward solves, supplied frequency-resolved scattering-volume geometry, full spectral covariance, explicit regularization and data-only identifiability gates.
+      - cts_non_gyrotropic_gaussian_tensor_spectrum: exact q-marginal of a general 3-D Gaussian temperature tensor, passed to the tabulated Landau CTS forward solver; a single view identifies only the q-projected temperature.
       - cts_tabulated_evdf_landau: electrostatic CTS dynamic structure spectrum using
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
