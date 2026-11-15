@@ -646,11 +646,13 @@ def test_evdf_reports_akaike_model_selection_and_between_model_uncertainty():
         "velocity_parallel_variance_m2_s2",
         "velocity_parallel_standard_deviation_m_s",
         "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
         "skewness",
         "excess_kurtosis",
     ]
     moment_covariance = selection["model_averaged_physical_moment_covariance"]
-    assert moment_covariance.shape == (6, 6)
+    assert moment_covariance.shape == (8, 8)
     np.testing.assert_allclose(moment_covariance, moment_covariance.T, rtol=1e-9, atol=1e-12)
     assert np.linalg.eigvalsh(moment_covariance).min() >= -1e-8 * max(
         np.linalg.norm(moment_covariance, ord=2), 1.0
@@ -664,7 +666,7 @@ def test_evdf_reports_akaike_model_selection_and_between_model_uncertainty():
     assert selection["model_averaged_physical_moment_values"][
         "directional_equivalent_temperature_eV"
     ] == pytest.approx(expected_temperature, rel=2e-12)
-    assert selection["model_averaged_physical_moment_standard_uncertainty"].shape == (6,)
+    assert selection["model_averaged_physical_moment_standard_uncertainty"].shape == (8,)
 
 
 def test_evdf_model_selection_excludes_nonconverged_candidates(monkeypatch):
