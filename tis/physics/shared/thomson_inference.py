@@ -815,7 +815,7 @@ def _fit_noncollective(
         "likelihood": "Gaussian_or_GLS",
         "fitted_spectrum": fitted,
         "captured_spectral_probability": captured_spectral_probability,
-        "spectral_bin_integration": "exact_Gaussian_CDF_finite_volume_bin_averages",
+        "spectral_bin_integration": ("exact_Student_t_CDF_finite_volume_bin_averages" if distribution_model == "kappa" else "exact_Gaussian_CDF_finite_volume_bin_averages"),
         "fit_parameters": fit_parameters,
         "fit_parameter_names": fit_parameter_names,
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),
@@ -5108,17 +5108,32 @@ def fit_optical_thomson_poisson_counts(
     scattering_angle_uncertainty_rad=0.0,
     laser_angle_covariance_nm_rad=0.0,
     fit_geometry_cross_covariance_nm2_rad=None,
+    distribution_model="maxwellian",
+    kappa_initial=4.0,
+    kappa_bounds=(1.5001, 50.0),
 ):
-    """Infer Maxwellian optical-TS temperature and q-flow from integer counts.
+    """Infer non-collective optical-TS temperature and q-flow from photon counts.
 
-    The finite-bin Gaussian probability is convolved in count space with the
-    calibrated response operator. Independent Poisson deviance is minimized;
-    local parameter covariance is obtained from the whitened deviance
-    Jacobian, with an explicit rank/conditioning gate. Geometry and
-    fit-geometry cross-covariance are propagated through the physical
-    (Te, v_q) transformation. Count data alone do not identify absolute
-    density or calibrated scattered power in watts.
+    Supports isotropic Maxwellian and finite-variance isotropic Kappa spectral
+    marginals. For Kappa, sigma is the standard deviation (not Student-t scale):
+    nu=2*kappa-1 and s=sigma*sqrt((nu-2)/nu), requiring kappa>3/2.
+    Expected-Fisher covariance includes the fitted Kappa index. This is a
+    one-dimensional non-collective line-shape model, not a generalized
+    three-dimensional Kappa dielectric or arbitrary EVDF inversion.
     """
+
+    if distribution_model not in {"maxwellian", "kappa"}:
+        raise ValueError("distribution_model must be 'maxwellian' or 'kappa'")
+    if distribution_model == "kappa":
+        kappa_initial = _finite_scalar(kappa_initial, "kappa_initial", minimum=1.500000000001)
+        if not isinstance(kappa_bounds, (tuple, list)) or len(kappa_bounds) != 2:
+            raise ValueError("kappa_bounds must contain lower and upper values")
+        kappa_lower = _finite_scalar(kappa_bounds[0], "kappa_bounds[0]", minimum=1.500000000001)
+        kappa_upper = _finite_scalar(kappa_bounds[1], "kappa_bounds[1]", minimum=kappa_lower)
+        if not kappa_lower < kappa_upper or not kappa_lower <= kappa_initial <= kappa_upper:
+            raise ValueError("kappa_bounds must be increasing and contain kappa_initial")
+    else:
+        kappa_initial = kappa_lower = kappa_upper = None
     wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
     counts = _finite_array(observed_counts, "observed_counts", 1)
     if wavelength.size < 9 or counts.shape != wavelength.shape:
@@ -5182,16 +5197,28 @@ def fit_optical_thomson_poisson_counts(
     background0 = max(float(np.median(counts / widths)), np.finfo(float).eps)
     amplitude0 = max(float(counts[peak_index] / widths[peak_index] - background0), 1.0)
     sigma0 = max(span / 10.0, spacing)
-    initial = np.array([amplitude0, center0, sigma0, background0, background0], dtype=float)
-    lower = np.array([0.0, wavelength[0], max(spacing * 0.2, 1e-12), 0.0, 0.0])
-    upper = np.array([np.inf, wavelength[-1], span, np.inf, np.inf])
+    initial_values = [amplitude0, center0, sigma0, background0, background0]
+    lower_values = [0.0, wavelength[0], max(spacing * 0.2, 1e-12), 0.0, 0.0]
+    upper_values = [np.inf, wavelength[-1], span, np.inf, np.inf]
+    if distribution_model == "kappa":
+        initial_values.append(kappa_initial)
+        lower_values.append(kappa_lower)
+        upper_values.append(kappa_upper)
+    initial = np.asarray(initial_values, dtype=float)
+    lower = np.asarray(lower_values, dtype=float)
+    upper = np.asarray(upper_values, dtype=float)
     fraction = (wavelength - wavelength[0]) / span
 
     def expected_counts(parameters):
-        amplitude, center, sigma, background_left, background_right = parameters
-        intrinsic_density, _ = _gaussian_bin_averaged_shape(
-            wavelength, amplitude, center, sigma
-        )
+        amplitude, center, sigma, background_left, background_right = parameters[:5]
+        if distribution_model == "kappa":
+            intrinsic_density, _ = _kappa_bin_averaged_shape(
+                wavelength, amplitude, center, sigma, parameters[5]
+            )
+        else:
+            intrinsic_density, _ = _gaussian_bin_averaged_shape(
+                wavelength, amplitude, center, sigma
+            )
         scattered_bin_counts = response @ (intrinsic_density * widths)
         background_density = (
             background_left * (1.0 - fraction) + background_right * fraction
@@ -5219,13 +5246,16 @@ def fit_optical_thomson_poisson_counts(
         max_nfev=50000,
     )
     if not fit.success or not np.all(np.isfinite(fit.x)):
-        raise ValueError(f"Poisson Maxwellian Thomson fit failed: {fit.message}")
+        raise ValueError(f"Poisson {distribution_model} Thomson fit failed: {fit.message}")
 
-    amplitude, center, sigma, background_left, background_right = map(float, fit.x)
+    amplitude, center, sigma, background_left, background_right = map(float, fit.x[:5])
     if amplitude <= 0.0 or sigma <= 0.0:
-        raise ValueError("The fitted Maxwellian signal amplitude and intrinsic width must be positive")
-    if center - 3.0 * sigma < wavelength[0] or center + 3.0 * sigma > wavelength[-1]:
-        raise ValueError("Wavelength coverage must include at least +/-3 fitted intrinsic widths")
+        raise ValueError("The fitted signal amplitude and intrinsic width must be positive")
+    required_half_width = (5.0 if distribution_model == "kappa" else 3.0) * sigma
+    if center - required_half_width < wavelength[0] or center + required_half_width > wavelength[-1]:
+        raise ValueError(
+            f"Wavelength coverage must include at least +/-{required_half_width / sigma:.0f} fitted standard deviations"
+        )
     temperature = thomson_electron_temperature_from_spectral_width(
         sigma, laser_nm, angle
     )["electron_temperature_eV"]
@@ -5234,11 +5264,11 @@ def fit_optical_thomson_poisson_counts(
     ]
     if temperature / ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
         raise ValueError(
-            "Non-relativistic Maxwellian model rejected: fitted temperature is outside its declared validity range"
+            f"Non-relativistic {distribution_model} model rejected: fitted temperature is outside its declared validity range"
         )
     if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
         raise ValueError(
-            "Non-relativistic Maxwellian model rejected: fitted flow is outside its declared validity range"
+            f"Non-relativistic {distribution_model} model rejected: fitted flow is outside its declared validity range"
         )
 
     fitted = expected_counts(fit.x)
@@ -5248,13 +5278,13 @@ def fit_optical_thomson_poisson_counts(
     # information for bins with n_i=0, because their signed-deviance residual
     # is -sqrt(2 mu_i). Central finite differences are applied to the exact
     # finite-bin + response-convolved expected-count operator.
-    parameter_scales = np.array([
-        max(abs(amplitude), 1.0),
-        max(span, spacing),
-        max(sigma, spacing),
-        max(abs(background_left), 1.0),
-        max(abs(background_right), 1.0),
-    ], dtype=float)
+    parameter_scale_values = [
+        max(abs(amplitude), 1.0), max(span, spacing), max(sigma, spacing),
+        max(abs(background_left), 1.0), max(abs(background_right), 1.0),
+    ]
+    if distribution_model == "kappa":
+        parameter_scale_values.append(max(abs(float(fit.x[5])), 1.0))
+    parameter_scales = np.asarray(parameter_scale_values, dtype=float)
     expected_jacobian = np.empty((wavelength.size, fit.x.size), dtype=float)
     for parameter_index, parameter_scale in enumerate(parameter_scales):
         step = np.cbrt(np.finfo(float).eps) * parameter_scale
@@ -5306,20 +5336,10 @@ def fit_optical_thomson_poisson_counts(
 
     q = 2.0 * np.sin(angle / 2.0)
     cot_half = 1.0 / np.tan(angle / 2.0)
-    temperature_gradient = np.array([
-        0.0,
-        0.0,
-        2.0 * temperature / sigma,
-        0.0,
-        0.0,
-    ])
-    velocity_gradient = np.array([
-        0.0,
-        -C_M_S / (laser_nm * q),
-        0.0,
-        0.0,
-        0.0,
-    ])
+    temperature_gradient = np.zeros(fit.x.size, dtype=float)
+    temperature_gradient[2] = 2.0 * temperature / sigma
+    velocity_gradient = np.zeros(fit.x.size, dtype=float)
+    velocity_gradient[1] = -C_M_S / (laser_nm * q)
     fit_physical_jacobian = np.vstack((temperature_gradient, velocity_gradient))
     physical_covariance_fit_only = (
         fit_physical_jacobian @ covariance @ fit_physical_jacobian.T
@@ -5350,11 +5370,24 @@ def fit_optical_thomson_poisson_counts(
         "electron_temperature_eV": float(np.sqrt(max(physical_covariance[0, 0], 0.0))),
         "electron_velocity_projection_m_s": float(np.sqrt(max(physical_covariance[1, 1], 0.0))),
     }
-    probability = float(
-        ndtr((edges[-1] - center) / sigma)
-        - ndtr((edges[0] - center) / sigma)
-    )
-    integrated_counts = float(amplitude * np.sqrt(2.0 * np.pi) * sigma * probability)
+    if distribution_model == "kappa":
+        degrees = 2.0 * float(fit.x[5]) - 1.0
+        kappa_scale = sigma * np.sqrt((degrees - 2.0) / degrees)
+        probability = float(
+            stdtr(degrees, (edges[-1] - center) / kappa_scale)
+            - stdtr(degrees, (edges[0] - center) / kappa_scale)
+        )
+        shape_integral = (
+            kappa_scale * np.sqrt(degrees * np.pi)
+            * np.exp(gammaln(float(fit.x[5]) - 0.5) - gammaln(float(fit.x[5])))
+        )
+        integrated_counts = float(amplitude * shape_integral * probability)
+    else:
+        probability = float(
+            ndtr((edges[-1] - center) / sigma)
+            - ndtr((edges[0] - center) / sigma)
+        )
+        integrated_counts = float(amplitude * np.sqrt(2.0 * np.pi) * sigma * probability)
     deviance = float(np.sum(poisson_deviance_residual(fit.x)**2))
     dof = max(1, wavelength.size - parameter_count)
     log_likelihood = float(np.sum(
@@ -5383,7 +5416,10 @@ def fit_optical_thomson_poisson_counts(
         "fit_parameter_names": [
             "amplitude_counts_per_nm", "center_nm", "intrinsic_sigma_nm",
             "background_left_counts_per_nm", "background_right_counts_per_nm",
-        ],
+        ] + (["kappa"] if distribution_model == "kappa" else []),
+        "distribution_model": distribution_model,
+        "kappa": float(fit.x[5]) if distribution_model == "kappa" else None,
+        "kappa_uncertainty": float(np.sqrt(max(covariance[5, 5], 0.0))) if distribution_model == "kappa" else None,
         "identifiability": {
             "status": "locally_identified" if condition_number <= 1e8 else "weakly_identified",
             "whitened_jacobian_rank": jacobian_rank,
@@ -5426,18 +5462,19 @@ def fit_optical_thomson_poisson_counts(
         "uncertainty_method": (
             "Poisson_deviance_likelihood_local_covariance_with_joint_laser_angle_geometry_propagation"
         ),
-        "model": "non-collective_non-relativistic_Maxwellian_optical_Thomson",
+        "model": ("non-collective_non-relativistic_Kappa_optical_Thomson" if distribution_model == "kappa" else "non-collective_non-relativistic_Maxwellian_optical_Thomson"),
         "formulae": {
             "expected_bin_counts": "mu_i = sum_j R_ij A_j + integral_bin_i b(lambda) d_lambda",
             "poisson_deviance": "D = 2 sum_i [mu_i - n_i + n_i log(n_i/mu_i)]",
-            "electron_temperature": "T_e = (m_e c^2/e) [sigma_lambda/(lambda_0 2 sin(theta/2))]^2",
+            "electron_temperature": "T_e = (m_e c^2/e) [sigma_lambda/(lambda_0 2 sin(theta/2))]^2; Kappa sigma_lambda is the standard deviation",
+            "kappa_shape": "p(lambda) proportional to [1+(lambda-center)^2/(nu*s^2)]^(-kappa), nu=2*kappa-1, s=sigma_lambda*sqrt((nu-2)/nu), kappa>3/2",
             "q_parallel_flow": "v_q = c (1 - lambda_c/lambda_0)/(2 sin(theta/2))",
             "physical_covariance": "C_(Te,vq) = J C_(center,sigma,lambda0,theta) J^T",
         },
         "assumptions": [
             "independent Poisson-distributed detector counts",
             "single-scattering non-collective regime",
-            "isotropic non-relativistic Maxwellian electrons",
+            ("isotropic non-relativistic finite-variance Kappa electrons" if distribution_model == "kappa" else "isotropic non-relativistic Maxwellian electrons"),
             "known scattering geometry with optional calibration covariance",
             "calibrated photon/count response operator",
             "non-negative linear detector-space background",
