@@ -12,7 +12,7 @@ def test_full_em_landau_response_is_reachable_through_public_dispatch(monkeypatc
         calls.update(kwargs)
         return sentinel
 
-    monkeypatch.setattr(physics, "landau_full_em_current_response", fake_solver)
+    monkeypatch.setattr(physics, "analyze_landau_fdt_full_em_constitutive", fake_solver)
     result = physics.run_advanced_thomson_physics(
         "landau_fdt_full_em_response",
         system="landau-system",
