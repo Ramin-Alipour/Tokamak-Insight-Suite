@@ -12573,5 +12573,81 @@
         "tests/test_cts_analysis.py::test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_geometry"
       ]
     }
+  },
+  {
+    "name": "Normalized 3-D EVDF velocity and temperature-tensor covariance propagation",
+    "equation": "u=Σ_a f_a ΔV_a v_a; C=Σ_a f_a ΔV_a(v_a−u)(v_a−u)^T; ∂u/∂f_a=ΔV_a(v_a−u); ∂C/∂f_a=ΔV_a[(v_a−u)(v_a−u)^T−C]; T_eV=(m_e/e)C; Cov(vec(T_eV))=(m_e/e)^2 J_C Cov(f) J_C^T",
+    "inputs": "Normalized 3-D EVDF nodal density f_a, Cartesian velocity voxels v_a, voxel-volume quadrature ΔV_a, and optional full covariance of normalized EVDF nodal densities.",
+    "output": "Mean-flow covariance, central velocity-covariance tensor covariance, and full 9×9 covariance of the Cartesian electron kinetic-temperature tensor in eV².",
+    "assumptions": "The EVDF integrates to unity using the supplied voxel-volume quadrature. Covariance is the covariance of normalized EVDF densities. First-order delta-method propagation is used; primary moments are exposed only when the stacked multi-view data-only operator identifies the 3-D EVDF.",
+    "status": "D",
+    "category": "Thomson scattering — multi-view EVDF",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.advanced_inference._normalized_evdf_second_moment_jacobians",
+      "function_links": [
+        "tis.products.thomson.physics.advanced_inference._normalized_evdf_second_moment_jacobians",
+        "tis.products.thomson.physics.advanced_inference.reconstruct_multiview_3d_evdf"
+      ],
+      "input_specs": [
+        {
+          "name": "normalized_evdf_m3_s3",
+          "unit": "m^-3 s^3; non-negative and unit-integral under voxel quadrature",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1; Cartesian velocity vector per voxel",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "m^3 s^-3; positive quadrature volume per voxel",
+          "required": true
+        },
+        {
+          "name": "distribution_covariance",
+          "unit": "(m^-3 s^3)^2; covariance of normalized EVDF voxel densities",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "mean_velocity_covariance_m2_s2",
+          "unit": "(m s^-1)^2; 3×3 covariance of the mean-flow vector",
+          "required": false
+        },
+        {
+          "name": "velocity_covariance_tensor_covariance_m4_s4",
+          "unit": "(m² s^-2)^2; 9×9 covariance in row-major tensor-component order",
+          "required": false
+        },
+        {
+          "name": "temperature_tensor_covariance_eV2",
+          "unit": "eV²; 9×9 covariance in row-major [xx,xy,xz,yx,yy,yz,zx,zy,zz] order",
+          "required": false
+        }
+      ],
+      "assumptions": [
+        "Normalization is imposed with the same voxel-volume quadrature used by the inverse.",
+        "The normalized-EVDF Jacobian includes the derivative of the inferred mean and the normalization quotient.",
+        "Covariance propagation is first-order and is withheld for non-identifiable 3-D EVDF solutions."
+      ],
+      "algorithm": "Compute u=Σ f_a ΔV_a v_a and C=Σ f_a ΔV_a(v_a−u)(v_a−u)^T. The exact normalized-density Jacobians are J_u[:,a]=ΔV_a(v_a−u) and J_C[:,a]=ΔV_a[(v_a−u)(v_a−u)^T−C]. Propagate Cov(u)=J_u Cov(f) J_uᵀ and Cov(vec(C))=J_C Cov(f) J_Cᵀ. Convert to the electron kinetic-temperature tensor with T_eV=(m_e/e)C and scale its covariance by (m_e/e)². The EVDF covariance must be symmetric positive semidefinite.",
+      "uncertainty_model": "Full covariance of normalized EVDF nodal densities propagated by the analytic delta-method Jacobians; no diagonal or independent-voxel approximation is introduced.",
+      "limitations": [
+        "The covariance is conditional on the supplied velocity grid, kernels, measurement covariance, regularization and active set.",
+        "A regularized candidate in the data-only null space is not promoted to an identified temperature tensor.",
+        "The tensor is a second central moment; it does not imply Maxwellian equilibrium."
+      ],
+      "test_links": [
+        "tests/test_advanced_inference.py::test_normalized_3d_evdf_second_moment_jacobians_match_finite_differences",
+        "tests/test_advanced_inference.py::test_3d_evdf_moment_propagation_rejects_indefinite_distribution_covariance",
+        "tests/test_advanced_inference.py::test_product_3d_evdf_exposes_temperature_tensor_covariance"
+      ],
+      "note": "The Jacobians are tested against finite differences along normalization-preserving perturbations."
+    },
+    "description": "Analytic uncertainty propagation for mean flow and the full Cartesian 3-D EVDF temperature tensor."
   }
 ]
