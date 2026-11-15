@@ -3852,13 +3852,28 @@ def analyze_thomson_spectra(
                 "rank_tolerance": float(joint_rank_tolerance),
                 "scope": "joint channel-major GLS with shared cross-channel spectral covariance",
             }
-            fit["model_discrepancy_covariance"] = (discrepancy_scale * block).copy()
-            fit["model_discrepancy_physical_parameter_covariance"] = discrepancy_covariance[np.ix_(physical_indices, physical_indices)].copy()
-            fit["total_fit_covariance_including_discrepancy"] = block + discrepancy_scale * block
-            fit["total_physical_parameter_covariance"] = total_physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
-            fit["model_discrepancy_scale"] = float(discrepancy_scale)
             independent_discrepancy_included = independent_discrepancy_blocks is not None
             residual_discrepancy_included = bool(discrepancy_scale > 0.0)
+            if residual_discrepancy_included:
+                fit["model_discrepancy_covariance"] = (discrepancy_scale * block).copy()
+                fit["model_discrepancy_physical_parameter_covariance"] = discrepancy_covariance[
+                    np.ix_(physical_indices, physical_indices)
+                ].copy()
+                fit["total_fit_covariance_including_discrepancy"] = (
+                    block + discrepancy_scale * block
+                )
+                fit["model_discrepancy_scale"] = float(discrepancy_scale)
+            else:
+                # A researcher-supplied spectral covariance is already in
+                # the GLS weighting. Do not manufacture a reduced-chi-square
+                # scale (including a misleading zero-valued scale) for it.
+                fit.pop("model_discrepancy_covariance", None)
+                fit.pop("model_discrepancy_physical_parameter_covariance", None)
+                fit.pop("model_discrepancy_scale", None)
+                fit["total_fit_covariance_including_discrepancy"] = block.copy()
+            fit["total_physical_parameter_covariance"] = total_physical_covariance[
+                np.ix_(physical_indices, physical_indices)
+            ].copy()
             any_discrepancy_included = (
                 independent_discrepancy_included or residual_discrepancy_included
             )
