@@ -66,7 +66,7 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     electron_density_flux_per_density_cross_covariance_W_m2 when its
     covariance with the EVDF flux-per-density estimate is known.
     The physical-moment result also returns exact piecewise-linear EVDF
-    moments through fourth order, their full first-order covariance, a separate
+    moments through sixth order, their full first-order covariance, a separate
     one-edge-cell velocity-grid truncation sensitivity diagnostic (not folded
     into statistical uncertainty), and the cumulative q-parallel random-energy
     distribution with covariance. With an
