@@ -5292,9 +5292,20 @@ def fit_optical_thomson_poisson_counts(
         minus = np.asarray(fit.x, dtype=float).copy()
         plus[parameter_index] += step
         minus[parameter_index] -= step
-        expected_jacobian[:, parameter_index] = (
-            expected_counts(plus) - expected_counts(minus)
-        ) / (2.0 * step)
+        if (
+            distribution_model == "kappa"
+            and parameter_index == 5
+            and minus[5] <= 1.500000000001
+        ):
+            # Keep the numerical derivative inside the finite-variance Kappa
+            # domain even when the optimum approaches the kappa -> 3/2 edge.
+            expected_jacobian[:, parameter_index] = (
+                expected_counts(plus) - fitted
+            ) / step
+        else:
+            expected_jacobian[:, parameter_index] = (
+                expected_counts(plus) - expected_counts(minus)
+            ) / (2.0 * step)
     fisher_sqrt_jacobian = expected_jacobian / np.sqrt(fitted)[:, None]
     column_norms = np.linalg.norm(fisher_sqrt_jacobian, axis=0)
     if np.any(~np.isfinite(column_norms)) or np.any(column_norms <= np.finfo(float).tiny):
