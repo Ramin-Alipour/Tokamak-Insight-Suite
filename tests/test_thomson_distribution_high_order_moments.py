@@ -4,6 +4,7 @@ import pytest
 
 from tis.products.thomson.physics.thomson_distribution import (
     _piecewise_linear_moment_weights,
+    _projected_evdf_grid_truncation_sensitivity,
     _projected_evdf_physical_moments,
 )
 
@@ -61,3 +62,7 @@ def test_gaussian_projected_evdf_has_expected_fifth_and_sixth_moments():
         atol=1e-30,
     )
     assert result["random_energy_moment_covariance"].shape == (2, 2)
+    sensitivity = _projected_evdf_grid_truncation_sensitivity(velocity, density)
+    assert "central_fifth_velocity_moment_m5_s5" in sensitivity["full_grid_moments"]
+    assert "central_sixth_velocity_moment_m6_s6" in sensitivity["full_grid_moments"]
+    assert "excess_sixth_standardized_central_moment" in sensitivity["interior_minus_full_moments"]
