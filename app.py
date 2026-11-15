@@ -938,6 +938,8 @@ elif page=='Spectral Analysis':
                 value=False,key='ts_infer_poisson_count_mode',
                 help='Runs each channel through the registered Thomson product API. Supports Maxwellian and finite-variance Kappa models; count data do not identify absolute density.'
             )
+            if poisson_count_mode:
+                st.info('In this mode the selected spectral column must contain non-negative integer photon/count observations, not background-subtracted or arbitrary calibrated floating-point intensity. The current count likelihood uses a non-negative linear detector background and independent Poisson statistics.')
             collective_kappa_mode=st.checkbox(
                 'Use optical collective-Kappa dielectric inference (multi-population)',
                 value=False,key='ts_infer_collective_kappa_mode',disabled=poisson_count_mode,
@@ -1215,6 +1217,7 @@ elif page=='Spectral Analysis':
                 'channel_col': channel_col, 'radius_col': radius_col,
                 'wavelength_col': wavelength_col, 'signal_col': signal_col,
                 'uncertainty_col': uncertainty_col, 'model': model,
+                'poisson_count_mode': poisson_count_mode,
                 'collective_kappa_mode': collective_kappa_mode,
                 'collective_kappa_inputs': collective_kappa_inputs_text,
                 'laser_wavelength_nm': laser_nm_text,
@@ -1551,8 +1554,8 @@ elif page=='Spectral Analysis':
                             raise ValueError('The Poisson count-space likelihood currently supports only non-collective Maxwellian and finite-variance Kappa models.')
                         if joint_spatial_spectral or collective_kappa_mode or absolute_density:
                             raise ValueError('Poisson count-space inference is a per-channel shape/temperature/flow fit; joint spatial inversion, collective CTS and absolute-density inference are not part of this likelihood.')
-                        if response_uncertainty is not None or model_discrepancy_covariance is not None or systematic_covariance is not None or joint_spectral_covariance is not None:
-                            raise ValueError('The current independent-Poisson route does not accept Gaussian spectral covariance, response uncertainty or additive Gaussian discrepancy/systematic covariance.')
+                        if signal_uncertainty is not None or response_uncertainty is not None or model_discrepancy_covariance is not None or systematic_covariance is not None or joint_spectral_covariance is not None:
+                            raise ValueError('The current independent-Poisson route does not accept Gaussian pointwise uncertainty, spectral covariance, response uncertainty or additive Gaussian discrepancy/systematic covariance. Remove the selected uncertainty column and Gaussian covariance uploads.')
                         product_api=load_product_api('thomson-scattering')
                         distribution_model='kappa' if model=='non_collective_kappa' else 'maxwellian'
                         poisson_channels=[]
