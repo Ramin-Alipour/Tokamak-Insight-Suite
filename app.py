@@ -974,7 +974,7 @@ elif page=='Spectral Analysis':
                 response_channel_upload=st.file_uploader('Alternative: channel-specific measured response matrices JSON (Nchannel × Nλ × Nλ)',type=['json'],key='ts_infer_channel_response')
                 response_unc_upload=st.file_uploader('Optional shared response-kernel or response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
                 response_channel_unc_upload=st.file_uploader('Optional channel-specific response-matrix 1σ JSON',type=['json'],key='ts_infer_channel_response_unc')
-                if model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
+                if model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'} and not poisson_count_mode:
                     joint_covariance_upload=st.file_uploader('Optional full cross-channel spectral covariance CSV (channel-major order)',type=['csv','txt'],key='ts_infer_joint_covariance')
                     if model=='non_collective_relativistic_maxwell_juttner':
                         st.caption('For relativistic Maxwell-Juttner, non-zero cross-channel covariance is used by a joint fit with shared electron temperature and scattering-vector flow; channels must share the same wavelength grid, scattering geometry and measured response. Per-channel marginal fits are retained separately.')
@@ -993,7 +993,7 @@ elif page=='Spectral Analysis':
             if collective_kappa_mode:
                 joint_spatial_spectral=False
             channel_laser_profile_upload=None
-            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
+            if not joint_spatial_spectral and not poisson_count_mode and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                 channel_laser_profile_upload=st.file_uploader(
                     'Optional measured incident laser spectrum CSV (incident_wavelength_nm, spectral_power_density_per_nm)',
                     type=['csv','txt'],key='ts_infer_laser_profile',
@@ -1005,7 +1005,7 @@ elif page=='Spectral Analysis':
                 help='Supply the complete calibrated spectral model-discrepancy covariance, including cross-channel blocks. It is added once to measurement covariance before GLS; for joint spatial-spectral inference this matrix covers all measured channel-wavelength samples.',
             )
             systematic_covariance_upload=None
-            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
+            if not joint_spatial_spectral and not poisson_count_mode and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                 systematic_covariance_upload=st.file_uploader(
                     'Optional additive systematic spectral covariance CSV (shared wavelength block, channel blocks, or full channel-major matrix)',
                     type=['csv','txt'],key='ts_infer_systematic_covariance',
@@ -1021,7 +1021,7 @@ elif page=='Spectral Analysis':
             channel_background_degree=2
             channel_background_interior_knots=3
             channel_background_templates_upload=None
-            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
+            if not joint_spatial_spectral and not poisson_count_mode and model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                 st.markdown('**Channel-wise physical-fit detector background**')
                 channel_background_model=st.selectbox(
                     'Channel-wise detector-background basis',
@@ -1555,7 +1555,7 @@ elif page=='Spectral Analysis':
                         if joint_spatial_spectral or collective_kappa_mode or absolute_density:
                             raise ValueError('Poisson count-space inference is a per-channel shape/temperature/flow fit; joint spatial inversion, collective CTS and absolute-density inference are not part of this likelihood.')
                         if signal_uncertainty is not None or response_uncertainty is not None or model_discrepancy_covariance is not None or systematic_covariance is not None or joint_spectral_covariance is not None:
-                            raise ValueError('The current independent-Poisson route does not accept Gaussian pointwise uncertainty, spectral covariance, response uncertainty or additive Gaussian discrepancy/systematic covariance. Remove the selected uncertainty column and Gaussian covariance uploads.')
+                            raise ValueError('The current independent-Poisson route does not accept Gaussian pointwise uncertainty/covariance, response uncertainty, laser-profile convolution, path-density inputs or additive Gaussian discrepancy/systematic covariance. Remove those uploads and the selected uncertainty column.')
                         product_api=load_product_api('thomson-scattering')
                         distribution_model='kappa' if model=='non_collective_kappa' else 'maxwellian'
                         poisson_channels=[]
