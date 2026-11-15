@@ -407,3 +407,12 @@ def test_product_workspace_renders_fifth_and_sixth_projected_evdf_moments():
     assert '"central_sixth_velocity_moment_m6_s6"' in source
     assert '"standardized_fifth_central_moment"' in source
     assert '"excess_sixth_standardized_central_moment"' in source
+
+def test_3d_evdf_dashboard_renders_third_and_fourth_velocity_moments_for_both_registered_routes():
+    source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "advanced_thomson_physics_page.py").read_text(encoding="utf-8")
+    assert 'model in {"thomson_relativistic_3d_evdf", "thomson_multiview_3d_evdf_physical"}' in source
+    assert 'result.get("fourth_central_velocity_moment_tensor_m4_s4")' in source
+    assert 'result.get("fourth_central_velocity_moment_covariance_m8_s8")' in source
+    assert 'result.get("radial_fourth_central_velocity_moment_m4_s4")' in source
+    assert "M_{ijkl}" in source
+
