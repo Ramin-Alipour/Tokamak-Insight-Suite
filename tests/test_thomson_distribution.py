@@ -2480,5 +2480,5 @@ def test_relativistic_projected_evdf_geometry_covariance_is_registered():
     )
     assert entry["execution_contract"]["implementation_link_status"] == "mapped"
     assert entry["execution_contract"]["calibrated_measurements_to_physics"] is True
-    assert "C_f,total=C_f,spectral+J_g C_g J_gᵀ" in entry["equation"]
+    assert "J_g[:,0]=∂f_q/∂λ0" in entry["equation"] and "J_g[:,1]=∂f_q/∂θ" in entry["equation"]
     assert "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance" in entry["execution_contract"]["test_links"]
