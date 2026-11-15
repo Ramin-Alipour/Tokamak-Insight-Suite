@@ -119,9 +119,19 @@ def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
     return _run(88, *args, **kwargs)
 
 
-def fit_optical_thomson_poisson_counts(*args: Any, **kwargs: Any) -> Any:
-    """Run the Analysis-1 finite-bin Poisson count likelihood with joint geometry covariance."""
+def fit_optical_thomson_poisson_counts(
+    *args: Any, distribution_model: str = "maxwellian", **kwargs: Any
+) -> Any:
+    """Run Analysis-1 finite-bin Poisson inference for Maxwellian or Kappa EVDFs.
+
+    Kappa fits estimate kappa jointly with the spectral centroid, standard
+    deviation, amplitude and detector-background coefficients. The Kappa
+    branch requires kappa > 3/2 for a finite second-moment temperature.
+    """
+    if distribution_model not in {"maxwellian", "kappa"}:
+        raise ValueError("distribution_model must be 'maxwellian' or 'kappa'")
     kwargs["likelihood"] = "independent_Poisson"
+    kwargs["distribution_model"] = distribution_model
     return _run(1, *args, **kwargs)
 
 
