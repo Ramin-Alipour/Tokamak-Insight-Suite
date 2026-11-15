@@ -796,7 +796,9 @@ def _model_averaged_projected_evdf_moments(velocity_grid_m_s, model_selection):
             "Physical moments are computed from the Akaike-weighted EVDF mixture. "
             "The covariance is a local delta-method propagation conditional on the "
             "candidate families, common velocity grid, likelihood and regularization; "
-            "Akaike weights are relative model support, not posterior probabilities."
+            "separately reported scattering-geometry and regularization-selection "
+            "sensitivities are not silently folded into this matrix. Akaike weights "
+            "are relative model support, not posterior probabilities."
         ),
     }
 
