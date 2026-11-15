@@ -2388,6 +2388,7 @@ def test_analysis_81_registry_and_formula_registry_expose_relativistic_lab_flux_
 
 def test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance(monkeypatch):
     import tis.physics.shared.thomson_gap_closure as relativistic
+    from tis.products.thomson.api import analyze_spectral_distribution as run_product_analysis
 
     wavelength = np.linspace(499.7, 500.3, 61)
     velocity = np.linspace(-1.0e6, 1.0e6, 41)
@@ -2419,7 +2420,7 @@ def test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covar
     sigma_laser = 2.0e-4
     sigma_angle = 3.0e-4
     cross = 0.2 * sigma_laser * sigma_angle
-    result = analyze_thomson_spectral_distribution(
+    result = run_product_analysis(
         wavelength, signal,
         instrument_response_matrix=np.eye(wavelength.size),
         background_signal=background,
@@ -2446,10 +2447,11 @@ def test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covar
 
 
 def test_relativistic_projected_evdf_rejects_non_psd_joint_geometry_covariance():
+    from tis.products.thomson.api import analyze_spectral_distribution as run_product_analysis
     wavelength = np.linspace(499.7, 500.3, 61)
     signal = np.exp(-0.5 * ((wavelength - 500.0) / 0.06) ** 2) + 0.02
     with pytest.raises(ValueError, match="positive semidefinite"):
-        analyze_thomson_spectral_distribution(
+        run_product_analysis(
             wavelength, signal,
             instrument_response_matrix=np.eye(wavelength.size),
             background_signal=np.full_like(wavelength, 0.02),
