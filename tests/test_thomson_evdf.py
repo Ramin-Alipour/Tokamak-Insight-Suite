@@ -1068,7 +1068,7 @@ def test_projected_evdf_formula_registry_matches_eight_moment_covariance_contrac
         if item["name"] == "velocity_moment_covariance"
     )
     assert covariance_spec["unit"].startswith("8 x 8 covariance")
-    assert "exact_intervalwise_three_point_Gauss_Legendre" in formula["execution_contract"]["uncertainty_model"]
+    assert "three-point Gauss-Legendre" in formula["execution_contract"]["uncertainty_model"]
     assert "nonuniform" in formula["execution_contract"]["input_specs"][-2]["unit"]
 
 
