@@ -368,3 +368,34 @@ def test_spatial_regularization_strength_rejects_non_numeric_or_invalid_values(s
             signal_uncertainty=np.ones(8), background_mode="zero",
             regularization_strength=strength, profile_bounds_relative=(0.05, 20.0),
         )
+
+
+def test_spatial_full_em_cts_inverse_is_exposed_through_product_dispatcher(monkeypatch):
+    import tis.products.thomson.physics.cts_full_physics as product_physics
+
+    captured = {}
+    sentinel = {"profiles_relative_to_reference": {"electron_density_relative": np.ones(3)}}
+
+    def fake_solver(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return sentinel
+
+    monkeypatch.setattr(
+        product_physics, "analyze_full_em_cts_spatial_profiles", fake_solver
+    )
+    assert "cts_full_em_spatial_profiles" in product_physics.ADVANCED_THOMSON_PHYSICS_MODELS
+    frequency = np.linspace(-3e6, 3e6, 8)
+    spectrum = np.ones(8)
+    result = product_physics.run_advanced_thomson_physics(
+        "cts_full_em_spatial_profiles",
+        frequency,
+        spectrum,
+        probe_frequency_Hz=140e9,
+        profile_bounds_relative=(0.1, 10.0),
+    )
+    assert result["profiles_relative_to_reference"] is sentinel["profiles_relative_to_reference"]
+    assert result["public_physics_entrypoint"] == "cts_full_em_spatial_profiles"
+    np.testing.assert_array_equal(captured["args"][0], frequency)
+    np.testing.assert_array_equal(captured["args"][1], spectrum)
+    assert captured["kwargs"]["profile_bounds_relative"] == (0.1, 10.0)
