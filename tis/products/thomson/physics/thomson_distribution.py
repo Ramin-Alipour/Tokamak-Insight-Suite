@@ -743,6 +743,12 @@ def _model_averaged_projected_evdf_moments(velocity_grid_m_s, model_selection):
         "total_model_averaged_covariance_s2_per_m2": (
             None if total_covariance is None else np.asarray(total_covariance, dtype=float)
         ),
+        "equations": {
+            "evdf_model_average": "f_bar(v)=sum_m w_m f_m(v), with sum_m w_m=1",
+            "evdf_total_covariance": "C_bar(v,v')=sum_m w_m[C_m(v,v')+(f_m(v)-f_bar(v))(f_m(v')-f_bar(v'))]",
+            "physical_moment": "M_k=integral (v-u_bar)^k f_bar(v) dv",
+            "moment_covariance": "C_M=J_M C_bar J_M^T, where J_M is the exact piecewise-linear EVDF moment Jacobian",
+        },
         "interpretation": (
             "Physical moments are computed from the Akaike-weighted EVDF mixture. "
             "The covariance is a local delta-method propagation conditional on the "
