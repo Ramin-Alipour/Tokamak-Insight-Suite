@@ -79,10 +79,10 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     within/between-family covariance scope explicitly distinguished. The
     mixture is computed as f_bar(v)=sum_m w_m f_m(v), and its moment covariance
     uses C_M=J_M C_bar J_M.T; relative Akaike weights are not posterior
-    probabilities. A separate one-edge-cell velocity-grid truncation
-    sensitivity diagnostic (not folded
-    into statistical uncertainty), and the cumulative q-parallel random-energy
-    distribution with covariance. With an
+    probabilities. The solver also reports a one-edge-cell velocity-grid
+    truncation sensitivity diagnostic (not folded into statistical
+    uncertainty) and the cumulative q-parallel random-energy distribution
+    with covariance. With an
     independent density and uncertainty, it returns P_qq and q_q^(1D) plus
     their joint covariance, retaining Cov(sigma_q^2, mu_3,q) and only
     caller-supplied density cross-covariances. These are one-dimensional
