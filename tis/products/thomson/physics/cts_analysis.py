@@ -625,75 +625,12 @@ def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness
 
 
 
-def estimate_cts_optimizer_initial_parameters(
-    frequency_shift_Hz, spectrum, *, probe_frequency_Hz, scattering_geometry,
-    ion_species, ion_fractions,
-):
-    """Create numerical CTS optimizer seeds from the calibrated spectral shape.
-
-    These are starting values only. Density uses alpha=1 as a dimensionless
-    numerical seed; Te uses the full-spectrum RMS width and Ti uses the
-    central 68%-weight core width. No seed is reported as a measurement.
-    """
-    frequency = _array(frequency_shift_Hz, "frequency_shift_Hz", 1)
-    power = _array(spectrum, "spectrum", 1)
-    if frequency.size != power.size or frequency.size < 12 or np.any(np.diff(frequency) <= 0):
-        raise ValueError("CTS seed estimation requires matching, increasing frequency and spectrum arrays with >=12 samples")
-    if np.any(power < 0):
-        raise ValueError("calibrated CTS spectrum must be non-negative")
-    baseline = float(np.quantile(power, 0.05))
-    weights = np.maximum(power - baseline, 0.0)
-    total = float(np.sum(weights))
-    if not np.isfinite(total) or total <= np.finfo(float).tiny:
-        raise ValueError("CTS spectral-shape seed estimation failed: spectrum has no positive contrast above its baseline")
-    centroid = float(np.sum(weights * frequency) / total)
-    offsets = frequency - centroid
-    variance = float(np.sum(weights * offsets**2) / total)
-    if not np.isfinite(variance) or variance <= 0:
-        raise ValueError("CTS spectral-shape seed estimation failed: spectrum has no resolvable frequency width")
-    if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
-        raise ValueError(
-            "Automatic width-based optimizer seeds require one fixed scattering vector. "
-            "For frequency_resolved_geometry, supply electron_density_initial_m3, "
-            "electron_temperature_initial_eV and ion_temperature_initial_eV explicitly."
-        )
-    q, _, _ = _geometry(scattering_geometry, _positive(probe_frequency_Hz, "probe_frequency_Hz"))
-    electron_velocity_rms = 2.0 * np.pi * np.sqrt(variance) / q
-    te_seed = ME * electron_velocity_rms**2 / E
-    # The central 68% of spectral weight supplies a robust ion-feature width.
-    order = np.argsort(np.abs(offsets))
-    cumulative = np.cumsum(weights[order]) / total
-    selected = order[cumulative <= 0.68]
-    if selected.size < 3:
-        selected = order[:min(max(3, int(np.ceil(0.25 * frequency.size))), frequency.size)]
-    core_weights = weights[selected]
-    core_total = float(np.sum(core_weights))
-    core_variance = float(np.sum(core_weights * offsets[selected]**2) / core_total)
-    ions = _species(ion_species, ion_fractions)
-    ion_spectral_weights = np.asarray([item["Z"] * item["fraction"] for item in ions], dtype=float)
-    effective_ion_mass = float(np.sum(ion_spectral_weights * np.asarray([item["mass"] for item in ions])) / np.sum(ion_spectral_weights))
-    ion_velocity_rms = 2.0 * np.pi * np.sqrt(max(core_variance, variance * 1e-6)) / q
-    ti_seed = effective_ion_mass * ion_velocity_rms**2 / E
-    # alpha=1 is an explicitly labelled dimensionless optimizer seed, not an
-    # inferred density. The fit subsequently determines density from the full spectrum.
-    density_seed = EPS0 * (te_seed * E) * q**2 / E**2
-    floor = np.finfo(float).tiny ** 0.25
-    values = {
-        "electron_density_m3": max(float(density_seed), floor),
-        "electron_temperature_eV": max(float(te_seed), floor),
-        "ion_temperature_eV": max(float(ti_seed), floor),
-    }
-    if not all(np.isfinite(value) and value > 0 for value in values.values()):
-        raise ValueError("CTS spectral-shape seed estimation produced non-finite or non-positive optimizer seeds")
-    return {
-        **values,
-        "method": "calibrated_spectrum_RMS_and_central_68_percent_width; alpha=1 density seed",
-        "role": "optimizer_initial_estimates_only",
-        "density_seed_assumption": "dimensionless collective parameter alpha=1 used only to construct a numerical starting value",
-        "spectral_centroid_Hz": centroid,
-        "spectral_rms_width_Hz": float(np.sqrt(variance)),
-        "spectral_core_rms_width_Hz": float(np.sqrt(core_variance)),
-    }
+def estimate_cts_optimizer_initial_parameters(*args, **kwargs):
+    """Product-local API for the shared CTS optimizer-seed calculation."""
+    from tis.physics.shared.cts_initialization import (
+        estimate_cts_optimizer_initial_parameters as estimate,
+    )
+    return estimate(*args, **kwargs)
 
 
 
