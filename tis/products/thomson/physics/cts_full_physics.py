@@ -42,6 +42,7 @@ from tis.physics.shared.thomson_generalized_dispersion import (
 from .cts_analysis import analyze_cts_spectrum, fit_cts_ion_species_flows
 from tis.physics.shared.cts_collisions import multispecies_thermal_coulomb_collision_matrix
 from tis.physics.shared.cts_bgk_fdt import analyze_conserving_bgk_cts
+from tis.physics.shared.cts_spatial_inference import analyze_full_em_cts_spatial_profiles
 from tis.physics.shared.cts_stokes_transfer import (
     propagate_polarized_lte_stokes,
     propagate_stratified_polarized_lte_stokes,
@@ -826,6 +827,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_non_gyrotropic_gaussian_tensor_spectrum",
     "cts_multi_ion_flow_inference",
     "cts_electrostatic_measured_spectrum_inference",
+    "cts_full_em_spatial_profiles",
     "thomson_projected_evdf",
     "thomson_projected_bi_kappa_evdf",
     "thomson_temperature_from_spectral_width",
@@ -874,7 +876,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - cts_multi_ion_flow_inference: conditional fit of independent projected ion
         species flows from a calibrated electrostatic CTS spectrum with fixed
         plasma/composition inputs; the species-flow Jacobian rank gates reporting.
-      - cts_non_gyrotropic_gaussian_tensor_spectrum: exact q-marginal of a general 3-D Gaussian temperature tensor, passed to the tabulated Landau CTS forward solver; a single view identifies only the q-projected temperature.
+      - cts_full_em_spatial_profiles: node-wise relative electron-density and temperature inference using repeated local magnetized Full-EM CTS forward solves, supplied frequency-resolved scattering-volume geometry, full spectral covariance, explicit regularization and data-only identifiability gates.\n      - cts_non_gyrotropic_gaussian_tensor_spectrum: exact q-marginal of a general 3-D Gaussian temperature tensor, passed to the tabulated Landau CTS forward solver; a single view identifies only the q-projected temperature.
       - cts_tabulated_evdf_landau: electrostatic CTS dynamic structure spectrum using
         a supplied normalized 1-D projected electron EVDF, analytic piecewise-linear
         Landau-pole integration (including finite-support endpoint jumps), and
@@ -1004,6 +1006,8 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = collective_multi_population_tabulated_electron_spectral_density
     elif model == "cts_non_gyrotropic_gaussian_tensor_spectrum":
         solver = collective_non_gyrotropic_gaussian_electron_spectrum
+    elif model == "cts_full_em_spatial_profiles":
+        solver = analyze_full_em_cts_spatial_profiles
     elif model == "cts_electrostatic_measured_spectrum_inference":
         # Dashboard/API contract names the calibrated observation
         # measured_spectrum; the electrostatic fitter's internal keyword is
