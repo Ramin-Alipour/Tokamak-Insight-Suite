@@ -2453,5 +2453,5 @@ def test_analysis1_kappa_poisson_formula_registry_and_product_contract_are_synch
     assert formula["execution_contract"]["function_link"] == (
         "tis.physics.shared.thomson_inference.fit_optical_thomson_poisson_counts"
     )
-    assert "kappa>3/2" in formula["equation"]
+    assert "κ>3/2" in formula["equation"]
     assert any(item["name"] == "observed_counts" for item in entry["execution_contract"]["input_specs"])
