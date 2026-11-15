@@ -64,12 +64,14 @@ def _piecewise_linear_moment_weights(velocity_m_s, power, center_m_s=0.0):
             or not np.all(np.isfinite(velocity))
             or np.any(np.diff(velocity) <= 0.0)):
         raise ValueError("velocity grid must be finite, strictly increasing and contain at least two nodes")
-    if isinstance(power, (bool, np.bool_)) or not isinstance(power, (int, np.integer)) or not 0 <= int(power) <= 4:
-        raise ValueError("piecewise-linear EVDF moment power must be an integer from zero to four")
+    if isinstance(power, (bool, np.bool_)) or not isinstance(power, (int, np.integer)) or not 0 <= int(power) <= 6:
+        raise ValueError("piecewise-linear EVDF moment power must be an integer from zero to six")
     center = float(center_m_s)
     if not np.isfinite(center):
         raise ValueError("moment center must be finite")
-    nodes, quadrature = np.polynomial.legendre.leggauss(3)
+    # The interval integrand is a polynomial of degree power+1.  Four
+    # Gauss-Legendre nodes integrate it exactly through degree seven (power 6).
+    nodes, quadrature = np.polynomial.legendre.leggauss(4)
     result = np.zeros(velocity.size, dtype=float)
     for index, (left, right) in enumerate(zip(velocity[:-1], velocity[1:])):
         half_width = 0.5 * (right - left)
@@ -94,8 +96,8 @@ def _projected_evdf_physical_moments(
     The reported moments are one-dimensional scattering-vector marginal
     moments. They are not the full 3-D electron heat flux or a 3-D EVDF.
     The EVDF is treated as piecewise linear between nodes; polynomial moments
-    through fourth order are integrated exactly on each segment with
-    three-point Gauss-Legendre quadrature. Normalization remains the same
+    through sixth order are integrated exactly on each segment with
+    four-point Gauss-Legendre quadrature. Normalization remains the same
     composite trapezoidal integral used by the inverse solver.
     """
     velocity = np.asarray(velocity_m_s, dtype=float)
@@ -122,14 +124,20 @@ def _projected_evdf_physical_moments(
     variance_weights = _piecewise_linear_moment_weights(velocity, 2, m1)
     third_weights = _piecewise_linear_moment_weights(velocity, 3, m1)
     fourth_weights = _piecewise_linear_moment_weights(velocity, 4, m1)
+    fifth_weights = _piecewise_linear_moment_weights(velocity, 5, m1)
+    sixth_weights = _piecewise_linear_moment_weights(velocity, 6, m1)
     variance = float(variance_weights @ density) / normalization
     if not np.isfinite(variance) or variance <= 0.0:
         raise ValueError("projected EVDF has non-positive velocity variance")
     sigma = float(np.sqrt(variance))
     mu3 = float(third_weights @ density) / normalization
     mu4 = float(fourth_weights @ density) / normalization
+    mu5 = float(fifth_weights @ density) / normalization
+    mu6 = float(sixth_weights @ density) / normalization
     skewness = mu3 / sigma**3
     excess_kurtosis = mu4 / variance**2 - 3.0
+    standardized_fifth = mu5 / variance**2.5
+    excess_sixth = mu6 / variance**3 - 15.0
     electron_mass = 9.1093837139e-31
     elementary_charge = 1.602176634e-19
     moment_order = (
@@ -139,8 +147,12 @@ def _projected_evdf_physical_moments(
         "directional_equivalent_temperature_eV",
         "central_third_velocity_moment_m3_s3",
         "central_fourth_velocity_moment_m4_s4",
+        "central_fifth_velocity_moment_m5_s5",
+        "central_sixth_velocity_moment_m6_s6",
         "skewness",
         "excess_kurtosis",
+        "standardized_fifth_central_moment",
+        "excess_sixth_standardized_central_moment",
         "mean_random_kinetic_energy_parallel_eV",
         "random_kinetic_energy_parallel_variance_eV2",
     )
@@ -174,6 +186,12 @@ def _projected_evdf_physical_moments(
         mu4_gradient = (
             fourth_weights - mu4 * weights
         ) * inverse_normalization - 4.0 * mu3 * mean_gradient
+        mu5_gradient = (
+            fifth_weights - mu5 * weights
+        ) * inverse_normalization - 5.0 * mu4 * mean_gradient
+        mu6_gradient = (
+            sixth_weights - mu6 * weights
+        ) * inverse_normalization - 6.0 * mu5 * mean_gradient
         skewness_gradient = (
             mu3_gradient / variance**1.5
             - 1.5 * mu3 * variance_gradient / variance**2.5
@@ -181,6 +199,14 @@ def _projected_evdf_physical_moments(
         kurtosis_gradient = (
             mu4_gradient / variance**2
             - 2.0 * mu4 * variance_gradient / variance**3
+        )
+        standardized_fifth_gradient = (
+            mu5_gradient / variance**2.5
+            - 2.5 * mu5 * variance_gradient / variance**3.5
+        )
+        excess_sixth_gradient = (
+            mu6_gradient / variance**3
+            - 3.0 * mu6 * variance_gradient / variance**4
         )
         # E_q = m_e (v_q-u_q)^2/(2e).  These are random-energy
         # moments of the projected marginal, not 3-D electron moments.
@@ -191,7 +217,9 @@ def _projected_evdf_physical_moments(
         )
         jacobian = np.vstack((
             mean_gradient, variance_gradient, sigma_gradient, temperature_gradient,
-            mu3_gradient, mu4_gradient, skewness_gradient, kurtosis_gradient,
+            mu3_gradient, mu4_gradient, mu5_gradient, mu6_gradient,
+            skewness_gradient, kurtosis_gradient,
+            standardized_fifth_gradient, excess_sixth_gradient,
             mean_energy_gradient, energy_variance_gradient,
         ))
         moment_covariance = jacobian @ cov @ jacobian.T
@@ -519,8 +547,12 @@ def _projected_evdf_physical_moments(
         "directional_equivalent_temperature_eV": electron_mass*variance/elementary_charge,
         "central_third_velocity_moment_m3_s3": mu3,
         "central_fourth_velocity_moment_m4_s4": mu4,
+        "central_fifth_velocity_moment_m5_s5": mu5,
+        "central_sixth_velocity_moment_m6_s6": mu6,
         "skewness": float(skewness),
         "excess_kurtosis": float(excess_kurtosis),
+        "standardized_fifth_central_moment": float(standardized_fifth),
+        "excess_sixth_standardized_central_moment": float(excess_sixth),
         "parallel_projected_heat_flux_per_density_W_m": float(heat_flux_per_density),
         "parallel_projected_heat_flux_per_density_standard_uncertainty_W_m": heat_flux_per_density_uncertainty,
         "parallel_projected_heat_flux_W_m2": (
@@ -577,6 +609,10 @@ def _projected_evdf_physical_moments(
             "joint_pressure_heat_flux_covariance": "Cov([P_qq,q_q^(1D)]) = J Cov([n_e,sigma_q^2,mu_3,q]) J^T; J = [[m_e sigma_q^2,m_e n_e,0],[m_e mu_3,q/2,0,m_e n_e/2]] with the final row interpreted over [n_e,sigma_q^2,mu_3,q]",
             "third_central": "mu_3,q = integral((v_q-u_q)^3 f_q(v_q) dv_q)",
             "fourth_central": "mu_4,q = integral((v_q-u_q)^4 f_q(v_q) dv_q)",
+            "fifth_central": "mu_5,q = integral((v_q-u_q)^5 f_q(v_q) dv_q)",
+            "sixth_central": "mu_6,q = integral((v_q-u_q)^6 f_q(v_q) dv_q)",
+            "standardized_fifth": "lambda_5,q = mu_5,q / sigma_q^5",
+            "excess_sixth": "lambda_6,q = mu_6,q / sigma_q^6 - 15",
             "skewness": "gamma_1,q = mu_3,q/sigma_q^3",
             "excess_kurtosis": "gamma_2,q = mu_4,q/sigma_q^4 - 3",
             "mean_random_energy": "mean(E_q) = (m_e/(2e)) sigma_q^2 = T_eq,q/2",
@@ -589,12 +625,18 @@ def _projected_evdf_physical_moments(
         "moment_covariance": moment_covariance,
         "moment_standard_uncertainty": moment_standard_uncertainty,
         "random_energy_moment_covariance": (
-            None if moment_covariance is None else moment_covariance[-2:, -2:]
+            None if moment_covariance is None else moment_covariance[
+                [moment_order.index("mean_random_kinetic_energy_parallel_eV"),
+                 moment_order.index("random_kinetic_energy_parallel_variance_eV2")][:,]
+            ]
         ),
         "random_energy_moment_standard_uncertainty": (
             None if moment_standard_uncertainty is None else {
                 name: moment_standard_uncertainty[name]
-                for name in moment_order[-2:]
+                for name in (
+                    "mean_random_kinetic_energy_parallel_eV",
+                    "random_kinetic_energy_parallel_variance_eV2",
+                )
             }
         ),
         "heat_flux_identifiability": {
