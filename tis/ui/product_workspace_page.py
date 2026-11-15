@@ -240,6 +240,34 @@ def render_product_workspace_page(st: Any) -> None:
                         "status": "physical-moment summary unavailable"
                     }))
                     physical_moments = projected.get("projected_evdf_physical_moments", {})
+                    moment_order = physical_moments.get("moment_covariance_order", [])
+                    moment_uncertainty = physical_moments.get("moment_standard_uncertainty") or {}
+                    if moment_order:
+                        st.markdown("**Physical EVDF moment values and uncertainties**")
+                        moment_rows = [
+                            {
+                                "moment": name,
+                                "value": physical_moments.get(name),
+                                "1σ uncertainty": moment_uncertainty.get(name),
+                            }
+                            for name in moment_order
+                        ]
+                        st.dataframe(moment_rows, use_container_width=True, hide_index=True)
+                        st.caption(
+                            "Moments are integrated exactly through fourth order for the "
+                            "piecewise-linear EVDF on the declared velocity grid. The 10×10 "
+                            "covariance also includes the two projected random-energy moments."
+                        )
+                    st.markdown("**EVDF inverse numerical contract**")
+                    st.write({
+                        "velocity_moment_quadrature": projected.get("velocity_moment_quadrature"),
+                        "velocity_moment_covariance_shape": (
+                            None if projected.get("velocity_moment_covariance") is None
+                            else projected["velocity_moment_covariance"].shape
+                        ),
+                        "moment_covariance_order": projected.get("velocity_moment_covariance_order"),
+                        "moment_uncertainty_status": projected.get("velocity_moment_uncertainty_status"),
+                    })
                     relativistic_moments = physical_moments.get("relativistic_lab_frame_moments")
                     if relativistic_moments is not None:
                         st.markdown("**Relativistic laboratory-frame kinetic moments**")
