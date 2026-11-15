@@ -214,6 +214,37 @@ def _piecewise_linear_evdf_moments(velocity, distribution):
     if not np.isfinite(variance) or variance <= 0.0:
         raise ValueError("EVDF has non-positive or non-finite velocity variance")
     sigma = float(np.sqrt(variance))
+    raw_gradients = [
+        (weights[index] - raw[index] * weights[0]) / normalization
+        for index in range(1, 5)
+    ]
+    g1, g2, g3, g4 = raw_gradients
+    variance_gradient = g2 - 2.0 * mean * g1
+    third_gradient = g3 - 3.0 * mean * g2 + (-3.0 * raw[2] + 6.0 * mean**2) * g1
+    fourth_gradient = (
+        g4 - 4.0 * mean * g3 + 6.0 * mean**2 * g2
+        + (-4.0 * raw[3] + 12.0 * mean * raw[2] - 12.0 * mean**3) * g1
+    )
+    skewness_gradient = (
+        third_gradient / variance**1.5
+        - 1.5 * third * variance_gradient / variance**2.5
+    )
+    kurtosis_gradient = (
+        fourth_gradient / variance**2
+        - 2.0 * fourth * variance_gradient / variance**3
+    )
+    electron_mass = 9.1093837139e-31
+    elementary_charge = 1.602176634e-19
+    moment_jacobian = np.vstack((
+        g1,
+        variance_gradient,
+        variance_gradient / (2.0 * sigma),
+        (electron_mass / elementary_charge) * variance_gradient,
+        third_gradient,
+        fourth_gradient,
+        skewness_gradient,
+        kurtosis_gradient,
+    ))
     return {
         "normalization": normalization,
         "raw_moments": raw,
@@ -226,6 +257,7 @@ def _piecewise_linear_evdf_moments(velocity, distribution):
         "excess_kurtosis": float(fourth / variance**2 - 3.0),
         "normalization_weights": weights[0],
         "raw_moment_weights": weights[1:],
+        "moment_jacobian": moment_jacobian,
     }
 
 
@@ -898,52 +930,8 @@ def reconstruct_thomson_evdf(
         "excess_kurtosis",
     ]
     if evdf_covariance_available:
-        # Differentiate the exact piecewise-linear moment functionals. The
-        # EVDF covariance is on normalized nodal densities, so each raw-moment
-        # derivative includes the normalization constraint (w_k - m_k*w_0).
-        norm_weights = selected_moments["normalization_weights"]
-        raw_weights = selected_moments["raw_moment_weights"]
-        raw_values = selected_moments["raw_moments"]
-        m1, m2, m3, m4 = raw_values[1:5]
-        raw_gradients = [
-            (raw_weights[index] - raw_values[index + 1] * norm_weights)
-            / selected_moments["normalization"]
-            for index in range(4)
-        ]
-        raw_m1, raw_m2, raw_m3, raw_m4 = raw_gradients
-        variance_gradient = raw_m2 - 2.0*m1*raw_m1
-        sigma_gradient = variance_gradient / (2.0*sigma_v)
-        temperature_gradient = (
-            electron_mass / elementary_charge
-        ) * variance_gradient
-        central_m3 = central_third_moment
-        central_m3_gradient = (
-            raw_m3 - 3.0*m1*raw_m2
-            + (-3.0*m2 + 6.0*m1**2)*raw_m1
-        )
-        skewness_gradient = (
-            central_m3_gradient / variance**1.5
-            - 1.5*central_m3*variance_gradient / variance**2.5
-        )
-        central_m4 = central_fourth_moment
-        central_m4_gradient = (
-            raw_m4 - 4.0*m1*raw_m3 + 6.0*m1**2*raw_m2
-            + (-4.0*m3 + 12.0*m1*m2 - 12.0*m1**3)*raw_m1
-        )
-        kurtosis_gradient = (
-            central_m4_gradient / variance**2
-            - 2.0*central_m4*variance_gradient / variance**3
-        )
-        moment_jacobian = np.vstack((
-            raw_m1,
-            variance_gradient,
-            sigma_gradient,
-            temperature_gradient,
-            central_m3_gradient,
-            central_m4_gradient,
-            skewness_gradient,
-            kurtosis_gradient,
-        ))
+        # The exact piecewise-linear quadrature defines both moments and errors.
+        moment_jacobian = selected_moments["moment_jacobian"]
         moment_covariance = moment_jacobian @ evdf_covariance @ moment_jacobian.T
         moment_covariance = 0.5 * (moment_covariance + moment_covariance.T)
         if not np.all(np.isfinite(moment_covariance)):
@@ -1639,6 +1627,10 @@ def reconstruct_thomson_evdf(
             "for a general non-Maxwellian EVDF it is not a complete thermodynamic state."
         ),
         "velocity_moment_covariance_order": moment_covariance_order,
+        "velocity_moment_quadrature": "exact_intervalwise_three_point_Gauss_Legendre_for_piecewise_linear_EVDF_through_fourth_order",
+        "velocity_moment_jacobian": (
+            moment_jacobian if evdf_covariance_available else None
+        ),
         "velocity_moment_covariance": moment_covariance,
         "velocity_moment_covariance_including_scattering_geometry": moment_covariance_including_geometry,
         "scattering_geometry_velocity_moment_covariance": geometry_moment_covariance,
