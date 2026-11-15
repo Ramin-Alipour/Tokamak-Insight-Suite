@@ -1590,10 +1590,25 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
         signal,
         instrument_response_matrix=np.eye(wavelength.size),
         background_signal=background,
+        signal_uncertainty=np.full(wavelength.size, 0.5),
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2,
+        projected_evdf_options={
+            "velocity_limit_m_s": 8.0e4,
+            "velocity_points": 81,
+            "regularization_strength": 1.0e-3,
+        },
     )
     assert result["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.01)
     assert result["observed_sigma_nm"] == pytest.approx(0.16, rel=0.04)
     assert result["instrument_response_model"] == "measured_response_matrix_forward_operator"
+    inverse = result["projected_evdf_inference"]
+    physical = result["projected_evdf_physical_moments"]
+    assert inverse["velocity_moment_covariance"].shape == (8, 8)
+    assert len(inverse["velocity_moment_covariance_order"]) == 8
+    assert physical["moment_covariance"].shape == (10, 10)
+    assert physical["moment_covariance_order"]
+    assert inverse["velocity_moment_quadrature"].startswith("exact_intervalwise_three_point_Gauss_Legendre")
 
 
 def test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian():
