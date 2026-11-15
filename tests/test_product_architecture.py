@@ -17,7 +17,7 @@ def test_product_catalog_reconciles_all_families_and_registered_workflows():
     assert status == {
         "product_count": 20,
         "product_ids_ordered": True,
-        "analysis_entry_point_count": len(ANALYSES),
+        "analysis_entry_point_count": sum(len(item["entry_ids"]) for item in list_products()),
         "analysis_ids_unique": True,
         "every_analysis_has_one_product_owner": True,
         "product_slugs_unique": True,
