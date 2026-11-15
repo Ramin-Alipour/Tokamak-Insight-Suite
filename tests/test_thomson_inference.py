@@ -2340,3 +2340,59 @@ def test_analysis1_registry_declares_projected_moment_physics_outputs():
     assert "thomson_projected_evdf_parallel_pressure" in entries[0]["formula_registry_keys"]
     assert "thomson_projected_evdf_parallel_heat_flux_1d" in entries[0]["formula_registry_keys"]
 
+
+
+
+def test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index():
+    from tis.physics.shared.thomson_inference import (
+        _wavelength_bin_edges, _kappa_bin_averaged_shape,
+        fit_optical_thomson_poisson_counts,
+    )
+    from tis.products.thomson.api import (
+        fit_optical_thomson_poisson_counts as product_poisson_fit,
+    )
+
+    rng = np.random.default_rng(20261115)
+    wavelength = np.linspace(520.0, 544.0, 601)
+    edges = _wavelength_bin_edges(wavelength)
+    widths = np.diff(edges)
+    laser, angle = 532.0, np.pi / 2.0
+    true_te, true_flow, true_kappa = 140.0, 3.5e4, 3.8
+    q = 2.0 * np.sin(angle / 2.0)
+    center = laser * (1.0 - q * true_flow / 299792458.0)
+    sigma = laser * q * np.sqrt(true_te / 510998.95069)
+    shape, _ = _kappa_bin_averaged_shape(
+        wavelength, 1.0, center, sigma, true_kappa
+    )
+    expected = 1.2e6 * shape * widths + (
+        90.0 + 12.0 * (wavelength - wavelength.mean())
+    ) * widths
+    counts = rng.poisson(expected)
+
+    result = fit_optical_thomson_poisson_counts(
+        wavelength, counts, laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        distribution_model="kappa", kappa_initial=4.5,
+        kappa_bounds=(1.6, 15.0),
+    )
+    assert result["distribution_model"] == "kappa"
+    assert result["electron_temperature_eV"] == pytest.approx(true_te, rel=0.10)
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(true_flow, abs=1.8e4)
+    assert result["kappa"] == pytest.approx(true_kappa, rel=0.25)
+    assert result["kappa_uncertainty"] > 0.0
+    assert result["fit_covariance"].shape == (6, 6)
+    assert result["fit_parameter_names"][-1] == "kappa"
+    assert result["identifiability"]["whitened_jacobian_rank"] == 6
+    assert result["spectral_bin_integration"] == "exact_Student_t_CDF_finite_volume_bin_averages"
+    assert result["density_inference_available"] is False
+
+    routed = product_poisson_fit(
+        wavelength, counts, laser_wavelength_nm=laser,
+        scattering_angle_rad=angle, instrument_response=np.eye(wavelength.size),
+        distribution_model="kappa", kappa_initial=4.5,
+        kappa_bounds=(1.6, 15.0),
+    )
+    assert routed["analysis_id"] == 1
+    assert routed["analysis_model"] == "noncollective_kappa_independent_Poisson"
+    assert routed["distribution_model"] == "kappa"
