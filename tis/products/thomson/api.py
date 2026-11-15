@@ -54,6 +54,13 @@ def reconstruct_profiles(*args: Any, **kwargs: Any) -> Any:
 def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     """Analyze measured Thomson spectral distribution (entry 81).
 
+    For relativistic Thomson/Compton projected-EVDF inversion, top-level
+    laser_wavelength_uncertainty_nm, scattering_angle_uncertainty_rad and
+    laser_angle_covariance_nm_rad are propagated through the exact inverse
+    using a central finite-difference geometry Jacobian at fixed selected
+    regularization. The resulting first-order geometry covariance is added
+    to the spectral EVDF covariance when the inverse returns a covariance.
+
     Set projected_evdf_options to reconstruct the q-parallel EVDF from the
     same calibrated spectrum. Optional electron_density_m3 and
     electron_density_uncertainty_m3 inside that mapping enable the
