@@ -589,6 +589,13 @@ def test_projected_evdf_reconstruction_accepts_nonuniform_velocity_grid():
     assert np.all(reconstructed >= 0.0)
     assert np.trapz(reconstructed, velocity) == pytest.approx(1.0, rel=2e-5)
     assert out["velocity_parallel_m_s"].shape == velocity.shape
+    from tis.physics.shared.thomson_evdf import _piecewise_linear_evdf_moments
+    expected = _piecewise_linear_evdf_moments(velocity, reconstructed)
+    assert out["mean_velocity_parallel_m_s"] == pytest.approx(expected["mean"], rel=2e-12)
+    assert out["velocity_parallel_standard_deviation_m_s"] == pytest.approx(expected["sigma"], rel=2e-12)
+    assert out["central_third_velocity_moment_m3_s3"] == pytest.approx(expected["third"], rel=2e-12)
+    assert out["central_fourth_velocity_moment_m4_s4"] == pytest.approx(expected["fourth"], rel=2e-12)
+    assert out["velocity_moment_covariance"].shape == (8, 8)
 
 
 def test_nonuniform_velocity_curvature_operator_is_exact_for_quadratics():
