@@ -1388,7 +1388,7 @@ def test_spectral_distribution_propagates_joint_laser_angle_calibration_into_pro
     assert inverse["laser_wavelength_uncertainty_nm"] == pytest.approx(sigma_laser)
     assert inverse["laser_angle_covariance_nm_rad"] == pytest.approx(cross)
     assert inverse["evdf_standard_uncertainty_including_geometry_s_per_m"].shape == (81,)
-    assert inverse["velocity_moment_covariance_including_geometry"].shape == (6, 6)
+    assert inverse["velocity_moment_covariance_including_geometry"].shape == (8, 8)
 
 
 def test_selected_maxwellian_model_executes_canonical_fit_with_top_level_radius(monkeypatch):
