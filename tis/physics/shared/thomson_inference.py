@@ -5373,10 +5373,17 @@ def fit_optical_thomson_poisson_counts(
     if distribution_model == "kappa":
         degrees = 2.0 * float(fit.x[5]) - 1.0
         kappa_scale = sigma * np.sqrt((degrees - 2.0) / degrees)
-        probability = float(
-            stdtr(degrees, (edges[-1] - center) / kappa_scale)
-            - stdtr(degrees, (edges[0] - center) / kappa_scale)
+        standardized_edges = (edges - center) / kappa_scale
+        probability_bins = (
+            stdtr(degrees, standardized_edges[1:])
+            - stdtr(degrees, standardized_edges[:-1])
         )
+        positive_tail = standardized_edges[:-1] > 0.0
+        probability_bins[positive_tail] = (
+            stdtr(degrees, -standardized_edges[:-1][positive_tail])
+            - stdtr(degrees, -standardized_edges[1:][positive_tail])
+        )
+        probability = float(np.sum(probability_bins))
         shape_integral = (
             kappa_scale * np.sqrt(degrees * np.pi)
             * np.exp(gammaln(float(fit.x[5]) - 0.5) - gammaln(float(fit.x[5])))
@@ -5450,7 +5457,11 @@ def fit_optical_thomson_poisson_counts(
         "absolute_power_inference_available": False,
         "instrument_response_applied": True,
         "instrument_response_supplied": instrument_response is not None,
-        "spectral_bin_integration": "exact_Gaussian_CDF_finite_volume_bin_averages",
+        "spectral_bin_integration": (
+            "exact_Student_t_CDF_finite_volume_bin_averages"
+            if distribution_model == "kappa"
+            else "exact_Gaussian_CDF_finite_volume_bin_averages"
+        ),
         "optimizer": {
             "success": bool(fit.success),
             "message": str(fit.message),
