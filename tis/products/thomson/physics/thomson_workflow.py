@@ -73,6 +73,7 @@ def analyze_thomson_spectra(*args, **kwargs):
             raise ValueError("wavelength_nm and observed_counts are required for independent-Poisson inference")
         laser_nm = kwargs.pop("laser_wavelength_nm", None)
         angle = kwargs.pop("scattering_angle_rad", None)
+        distribution_model_was_supplied = "distribution_model" in kwargs
         distribution_model = kwargs.pop("distribution_model", "maxwellian")
         selected_model = kwargs.pop("model", None)
         if selected_model is not None:
@@ -83,7 +84,7 @@ def analyze_thomson_spectra(*args, **kwargs):
             if selected_model not in model_to_distribution:
                 raise ValueError("Poisson Analysis-1 model must be non_collective_maxwellian or non_collective_kappa")
             implied_distribution = model_to_distribution[selected_model]
-            if "distribution_model" in kwargs and distribution_model != implied_distribution:
+            if distribution_model_was_supplied and distribution_model != implied_distribution:
                 raise ValueError("model and distribution_model select different Poisson spectral families")
             distribution_model = implied_distribution
         kappa_initial = kwargs.pop("kappa_initial", 4.0)
