@@ -372,6 +372,7 @@ def test_spatial_regularization_strength_rejects_non_numeric_or_invalid_values(s
 
 def test_spatial_full_em_cts_inverse_is_exposed_through_product_dispatcher(monkeypatch):
     import tis.products.thomson.physics.cts_full_physics as product_physics
+    from tis.products.thomson.api import run_advanced_physics
 
     captured = {}
     sentinel = {"profiles_relative_to_reference": {"electron_density_relative": np.ones(3)}}
@@ -387,7 +388,7 @@ def test_spatial_full_em_cts_inverse_is_exposed_through_product_dispatcher(monke
     assert "cts_full_em_spatial_profiles" in product_physics.ADVANCED_THOMSON_PHYSICS_MODELS
     frequency = np.linspace(-3e6, 3e6, 8)
     spectrum = np.ones(8)
-    result = product_physics.run_advanced_thomson_physics(
+    result = run_advanced_physics(
         "cts_full_em_spatial_profiles",
         frequency,
         spectrum,
