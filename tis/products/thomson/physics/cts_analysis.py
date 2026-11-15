@@ -1263,7 +1263,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out=np.zeros_like(jacobian),
         where=column_norms[None, :] > np.finfo(float).tiny,
     )
-    singular_values = np.linalg.svd(scaled_jacobian, compute_uv=False)
+    _, singular_values, right_vectors = np.linalg.svd(
+        scaled_jacobian, full_matrices=True
+    )
     rank_tolerance = (
         np.finfo(float).eps * max(scaled_jacobian.shape)
         * (singular_values[0] if singular_values.size else 0.0)
@@ -1273,11 +1275,49 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         float(singular_values[0] / singular_values[-1])
         if singular_values.size and singular_values[-1] > 0.0 else float("inf")
     )
-    if not fit.success: raise ValueError(f"CTS refinement failed: {fit.message}")
-    if rank<len(fit.x) or not np.isfinite(cond) or cond>1e12:
+    if not fit.success:
+        raise ValueError(f"CTS refinement failed: {fit.message}")
+    null_parameter_basis = np.empty((0, len(fit.x)), dtype=float)
+    null_parameter_loadings = np.zeros(len(fit.x), dtype=float)
+    fast_component_null_fraction = 0.0
+    regularized_vdf_conditional_fit = False
+    if rank < len(fit.x):
+        # A regularized tabulated fast-ion inverse can still identify the
+        # VDF subspace when a separate plasma nuisance-parameter combination
+        # is unresolved. Do not reject the VDF merely because (for example)
+        # two bulk-plasma parameters are degenerate in a single CTS view.
+        safe_column_norms = np.where(
+            column_norms > np.finfo(float).tiny, column_norms, 1.0
+        )
+        null_parameter_basis = right_vectors[rank:] / safe_column_norms[None, :]
+        null_norms = np.linalg.norm(null_parameter_basis, axis=1)
+        null_parameter_basis = np.divide(
+            null_parameter_basis, null_norms[:, None],
+            out=np.zeros_like(null_parameter_basis),
+            where=null_norms[:, None] > np.finfo(float).tiny,
+        )
+        null_parameter_loadings = (
+            np.max(np.abs(null_parameter_basis), axis=0)
+            if null_parameter_basis.size else np.zeros(len(fit.x))
+        )
+        if fast is not None and fast["kind"] == "infer_tabulated_1d" and inversion_method == "regularized":
+            fast_component_null_fraction = float(
+                np.linalg.norm(null_parameter_basis[:, fast_offset:])
+                / max(np.linalg.norm(null_parameter_basis), np.finfo(float).tiny)
+            )
+            regularized_vdf_conditional_fit = fast_component_null_fraction <= 1e-6
+        if not regularized_vdf_conditional_fit:
+            raise ValueError(
+                "CTS fit rejected: the fitted physical parameter space is not jointly identifiable "
+                f"(scaled Jacobian rank {rank}/{len(fit.x)}, condition number {cond:.6g}; "
+                f"fast-ion component null-space fraction {fast_component_null_fraction:.6g}). "
+                "A regularized VDF candidate is permitted only when the unresolved null space "
+                "is confined to non-VDF plasma nuisance parameters."
+            )
+    elif not np.isfinite(cond) or cond > 1e12:
         raise ValueError(
-            "CTS fit rejected: plasma parameters are not jointly identifiable "
-            f"(scaled Jacobian rank {rank}/{len(fit.x)}, condition number {cond:.6g})"
+            "CTS fit rejected: scaled Jacobian is too ill-conditioned "
+            f"(rank {rank}/{len(fit.x)}, condition number {cond:.6g})"
         )
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
     if not effective_covariance_supplied: cov0*=float(data_fit_residual@data_fit_residual/dof)
@@ -1303,15 +1343,56 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     names = ["electron_density_m3", "electron_temperature_eV"] + ion_names + [
         "electron_velocity_projection_m_s", "ion_velocity_projection_m_s"
     ]
+    if fast is not None:
+        names.append("fast_ion_fraction")
+        if fast["kind"] == "maxwellian":
+            names.append("fast_ion_temperature_eV")
+        elif fast["kind"] == "infer_tabulated_1d":
+            names.extend(
+                f"fast_ion_vdf_logit_{i}"
+                for i in range(fast["vdf"]["velocity_m_s"].size - 1)
+            )
+    unidentified_parameter_indices = set(
+        np.flatnonzero(null_parameter_loadings > 0.05).tolist()
+    )
+    unidentified_parameter_names = [
+        names[index] for index in sorted(unidentified_parameter_indices)
+        if index < len(names)
+    ]
     out={**d,"optimizer_initial_estimates":initialization_record,
-      "electron_velocity_projection_is_fitted":True,"electron_velocity_projection_uncertainty_m_s":float(su[2+n_species]),
-      "electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
-      "ion_temperature_uncertainty_eV":(float(su[2]) if n_species == 1 else su[2:2+n_species].copy()),
+      "electron_velocity_projection_is_fitted":True,
+      "electron_velocity_projection_uncertainty_m_s":(
+          None if 2+n_species in unidentified_parameter_indices else float(su[2+n_species])
+      ),
+      "electron_density_uncertainty_m3":(
+          None if 0 in unidentified_parameter_indices else float(su[0])
+      ),
+      "electron_temperature_uncertainty_eV":(
+          None if 1 in unidentified_parameter_indices else float(su[1])
+      ),
+      "ion_temperature_uncertainty_eV":(
+          None if 2 in unidentified_parameter_indices else float(su[2])
+      ) if n_species == 1 else su[2:2+n_species].copy(),
       "ion_temperature_species_uncertainties_eV":su[2:2+n_species].copy(),
-      "ion_velocity_projection_uncertainty_m_s":float(su[3+n_species]),
+      "ion_velocity_projection_uncertainty_m_s":(
+          None if 3+n_species in unidentified_parameter_indices else float(su[3+n_species])
+      ),
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
       "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if effective_covariance_supplied else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
       "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"spectral_weighting_status":weighting_status,"spectral_uncertainty_supplied":bool(unc is not None or spectral_covariance is not None),"regularization_scope":"fast-ion VDF curvature and supplied reference-shape regularization only; no plasma-parameter prior","jacobian_rank":rank,"jacobian_condition_number":cond,
+      "identifiability_status":(
+          "regularized_fast_ion_vdf_identified_conditional_on_unidentified_plasma_parameters"
+          if regularized_vdf_conditional_fit else "locally_identified"
+      ),
+      "unidentified_optimizer_parameter_indices":sorted(unidentified_parameter_indices),
+      "unidentified_optimizer_parameter_names":unidentified_parameter_names,
+      "optimizer_parameter_nullspace_loadings":null_parameter_loadings.copy(),
+      "fast_ion_component_nullspace_fraction":fast_component_null_fraction,
+      "fit_covariance_interpretation":(
+          "Conditional pseudoinverse covariance on the identifiable subspace. The regularized fast-ion VDF null-space projection is negligible, but the listed plasma nuisance-parameter combinations remain unidentified and are not assigned finite standard uncertainties."
+          if regularized_vdf_conditional_fit else
+          "Local scaled-Jacobian covariance for the jointly identifiable optimizer parameter vector."
+      ),
       "degrees_of_freedom":int(dof),"scattering_wave_number_m-1":q,
       "scattering_wave_number_spectral_m-1":q_spectral.copy(),
       "scattering_wavevector_direction":qhat,
@@ -1550,7 +1631,6 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     else float(d["ion_velocity_projection_m_s"])
                 )
         else:
-            names += [f"fast_ion_vdf_logit_{i}" for i in range(fast["vdf"]["velocity_m_s"].size-1)]
             out["fast_ion_vdf_provenance"]="non-negative tabulated 1-D fast-ion VDF inferred from the CTS spectrum with a second-difference smoothness penalty"
             out["fast_ion_vdf_velocity_m_s"]=fast["vdf"]["velocity_m_s"]
             out["fast_ion_vdf_probability_density_m_s_inverse"]=d["fast_ion"]["probability_density_m_s_inverse"]
@@ -1566,7 +1646,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         else:
             out["parameter_provenance"]["fast_ion_fraction"]="inferred jointly with a regularized tabulated 1-D fast-ion VDF shape"
             out["parameter_provenance"]["fast_ion_vdf"]="inferred from CTS spectrum with non-negative softmax representation and second-difference regularization"
-        out["fast_ion_fraction_uncertainty"]=float(total_sigma[fast_offset] if out.get("model_discrepancy_scale") is not None else su[fast_offset])
+        out["fast_ion_fraction_uncertainty"]=(
+            None if fast_offset in unidentified_parameter_indices else
+            float(total_sigma[fast_offset] if out.get("model_discrepancy_scale") is not None else su[fast_offset])
+        )
         if fast["kind"]=="maxwellian":
             out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[fast_offset+1] if out.get("model_discrepancy_scale") is not None else su[fast_offset+1])
         elif fast["kind"]=="infer_tabulated_1d":
@@ -1585,6 +1668,15 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             vdf_covariance=pdf_jac@vdf_parameter_covariance@pdf_jac.T
             out["fast_ion_vdf_covariance"]=vdf_covariance
             out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(vdf_covariance),0.0))
+            out["fast_ion_vdf_identifiability_status"]=(
+                "identified_conditional_on_unidentified_plasma_parameter_subspace"
+                if regularized_vdf_conditional_fit else "locally_identified"
+            )
+            out["fast_ion_vdf_covariance_interpretation"]=(
+                "Conditional on the fitted plasma nuisance parameters; the optimizer null space has negligible projection onto fast-ion fraction and VDF-shape logits."
+                if regularized_vdf_conditional_fit else
+                "Local covariance propagated from the fitted optimizer Jacobian."
+            )
     if response_sigma is not None or ext_unc or external_covariance is not None:
         rng=np.random.default_rng(int(random_seed)+991); draws=[]
         out["external_parameter_covariance_supplied"] = external_covariance is not None
