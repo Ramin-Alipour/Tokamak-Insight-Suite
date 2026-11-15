@@ -386,6 +386,7 @@ def test_spatial_full_em_cts_inverse_is_exposed_through_product_dispatcher(monke
         product_physics, "analyze_full_em_cts_spatial_profiles", fake_solver
     )
     assert "cts_full_em_spatial_profiles" in product_physics.ADVANCED_THOMSON_PHYSICS_MODELS
+    assert "analyze_full_em_cts_spatial_profiles" in product_physics.__all__
     frequency = np.linspace(-3e6, 3e6, 8)
     spectrum = np.ones(8)
     result = run_advanced_physics(
