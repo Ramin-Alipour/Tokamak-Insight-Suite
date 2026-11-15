@@ -55,8 +55,8 @@ def _piecewise_linear_moment_weights(velocity_m_s, power, center_m_s=0.0):
     """Integrate each nodal hat basis times (v-center)**power exactly.
 
     The reconstructed EVDF is piecewise linear between velocity nodes. A
-    three-point Gauss-Legendre rule integrates its product with powers through
-    fourth order exactly (the highest polynomial degree is five). The
+    four-point Gauss-Legendre rule integrates its product with powers through
+    sixth order exactly (the highest polynomial degree is seven). The
     zeroth-order weights reduce to the trapezoidal normalization weights.
     """
     velocity = np.asarray(velocity_m_s, dtype=float)
