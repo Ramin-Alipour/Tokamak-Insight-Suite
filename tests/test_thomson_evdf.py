@@ -944,6 +944,8 @@ def test_evdf_higher_central_moment_uncertainties_are_in_joint_covariance():
     i3 = order.index("central_third_velocity_moment_m3_s3")
     i4 = order.index("central_fourth_velocity_moment_m4_s4")
     assert covariance.shape == (8, 8)
+    assert out["velocity_moment_quadrature"] == "exact_intervalwise_three_point_Gauss_Legendre_for_piecewise_linear_EVDF_through_fourth_order"
+    assert out["velocity_moment_jacobian"].shape == (8, out["velocity_parallel_m_s"].size)
     assert np.isfinite(covariance[i3, i3]) and covariance[i3, i3] >= 0.0
     assert np.isfinite(covariance[i4, i4]) and covariance[i4, i4] >= 0.0
     assert "central_third_velocity_moment_m3_s3" in out["velocity_moment_standard_uncertainty"]
@@ -1027,7 +1029,6 @@ def test_piecewise_linear_evdf_physical_moment_jacobian_matches_finite_differenc
     coefficients = np.array([0.12, 0.35, 0.8, 1.0, 0.52, 0.09])
     result = _piecewise_linear_evdf_moments(velocity, coefficients)
     analytic = result["moment_jacobian"]
-    names = ("mean", "variance", "sigma", "temperature", "third", "fourth", "skewness", "excess_kurtosis")
 
     def vector(values):
         moments = _piecewise_linear_evdf_moments(velocity, values)
@@ -1046,6 +1047,29 @@ def test_piecewise_linear_evdf_physical_moment_jacobian_matches_finite_differenc
         minus[index] -= step
         numerical[:, index] = (vector(plus) - vector(minus)) / (2.0 * step)
     np.testing.assert_allclose(analytic, numerical, rtol=3e-6, atol=3e-8)
+
+
+
+
+def test_projected_evdf_formula_registry_matches_eight_moment_covariance_contract():
+    import json
+    from pathlib import Path
+
+    formulas = json.loads(
+        (Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json").read_text()
+    )
+    formula = next(
+        item for item in formulas
+        if item["execution_contract"]["formula_key"]
+        == "optical_thomson_projected_evdf_velocity_moment_covariance"
+    )
+    covariance_spec = next(
+        item for item in formula["execution_contract"]["output_specs"]
+        if item["name"] == "velocity_moment_covariance"
+    )
+    assert covariance_spec["unit"].startswith("8 x 8 covariance")
+    assert "exact_intervalwise_three_point_Gauss_Legendre" in formula["execution_contract"]["uncertainty_model"]
+    assert "nonuniform" in formula["execution_contract"]["input_specs"][-2]["unit"]
 
 
 
