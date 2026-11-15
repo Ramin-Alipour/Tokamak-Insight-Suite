@@ -2384,3 +2384,84 @@ def test_analysis_81_registry_and_formula_registry_expose_relativistic_lab_flux_
     )
     assert formula["execution_contract"]["implementation_link_status"] == "mapped"
     assert formula["execution_contract"]["test_links"]
+
+
+def test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance(monkeypatch):
+    import tis.physics.shared.thomson_gap_closure as relativistic
+
+    wavelength = np.linspace(499.7, 500.3, 61)
+    velocity = np.linspace(-1.0e6, 1.0e6, 41)
+    background = np.full_like(wavelength, 0.02)
+    signal = np.exp(-0.5 * ((wavelength - 500.0) / 0.06) ** 2) + background
+    calls = []
+
+    def fake_relativistic(**kwargs):
+        laser = kwargs["laser_wavelength_nm"]
+        angle = kwargs["scattering_angle_rad"]
+        calls.append((laser, angle, kwargs.get("regularization_strength")))
+        centre = 0.2 * (laser - 500.0) * 1.0e5 + 0.3 * (angle - np.pi / 2.0) * 1.0e5
+        pdf = np.exp(-0.5 * ((velocity - centre) / 2.0e5) ** 2)
+        pdf /= np.trapz(pdf, velocity)
+        covariance = np.eye(velocity.size) * 1.0e-18
+        scattered = np.exp(-0.5 * ((wavelength - 500.0) / 0.06) ** 2)
+        return {
+            "velocity_parallel_m_s": velocity.copy(),
+            "projected_evdf_s_m": pdf,
+            "regularized_candidate_evdf_s_m": pdf,
+            "projected_evdf_covariance": covariance.copy(),
+            "regularized_candidate_covariance": covariance.copy(),
+            "fitted_scattered_spectrum": scattered,
+            "fitted_spectrum": scattered + background,
+            "regularization_strength": 1.0e-3,
+        }
+
+    monkeypatch.setattr(relativistic, "reconstruct_relativistic_projected_thomson_evdf", fake_relativistic)
+    sigma_laser = 2.0e-4
+    sigma_angle = 3.0e-4
+    cross = 0.2 * sigma_laser * sigma_angle
+    result = analyze_thomson_spectral_distribution(
+        wavelength, signal,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2.0,
+        laser_wavelength_uncertainty_nm=sigma_laser,
+        scattering_angle_uncertainty_rad=sigma_angle,
+        laser_angle_covariance_nm_rad=cross,
+        projected_evdf_options={
+            "kinematics": "relativistic_thomson",
+            "velocity_grid_m_s": velocity,
+            "regularization_strength": 1.0e-3,
+        },
+    )
+    inverse = result["projected_evdf_inference"]
+    assert inverse["geometry_uncertainty_covariance_included"] is True
+    assert inverse["scattering_geometry_covariance_status"] == "first_order_central_finite_difference_fixed_regularization"
+    assert inverse["evdf_geometry_sensitivity_jacobian"].shape == (velocity.size, 2)
+    assert inverse["evdf_geometry_covariance"].shape == (velocity.size, velocity.size)
+    assert inverse["evdf_covariance_including_geometry"].shape == (velocity.size, velocity.size)
+    assert len(calls) == 5
+    assert all(call[2] == pytest.approx(1.0e-3) for call in calls[1:])
+    assert inverse["projected_evdf_physical_moments"]["moment_covariance"] is not None
+
+
+def test_relativistic_projected_evdf_rejects_non_psd_joint_geometry_covariance():
+    wavelength = np.linspace(499.7, 500.3, 61)
+    signal = np.exp(-0.5 * ((wavelength - 500.0) / 0.06) ** 2) + 0.02
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=np.eye(wavelength.size),
+            background_signal=np.full_like(wavelength, 0.02),
+            laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi / 2.0,
+            laser_wavelength_uncertainty_nm=1.0e-4,
+            scattering_angle_uncertainty_rad=1.0e-4,
+            laser_angle_covariance_nm_rad=2.0e-8,
+            projected_evdf_options={
+                "kinematics": "relativistic_thomson",
+                "velocity_points": 41,
+                "velocity_limit_m_s": 1.0e6,
+                "regularization_strength": 1.0e-3,
+            },
+        )
