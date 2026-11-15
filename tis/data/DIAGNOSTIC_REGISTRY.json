@@ -40,7 +40,9 @@
       "tokamak_analysis.thomson_joint_spatial_spectral.gaussian_spatial_psf_matrix",
       "tokamak_analysis.thomson_temperature_tensor.infer_full_temperature_tensor_from_thomson_projections",
       "tokamak_analysis.advanced_inference.build_relativistic_3d_thomson_kernels",
-      "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"
+      "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf",
+      "tis.physics.shared.thomson_inference.fit_optical_thomson_poisson_counts",
+      "tis.products.thomson.api.fit_optical_thomson_poisson_counts"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags. A multi-view 3-D EVDF inverse is available when per-view physical spectral kernels are supplied; rank-deficient systems return conditional candidates only. A separate calibrated forward-model comparison helper evaluates two or more completed predictions on identical measured wavelength bins under a common Gaussian likelihood and reports AIC/AICc/BIC; it does not refit parameters or automatically select physical truth. No raw-count Poisson likelihood is part of the Analysis 1 public input contract. Joint covariance/reference-ensemble utility functions are exported from the package and covered by dedicated unit tests; they are not silently injected into existing fitters. A public Analysis-1 advanced-physics dispatch route `cts_tabulated_evdf_landau` now exposes the tabulated projected-EVDF electrostatic CTS forward spectrum. It evaluates the first-order Landau susceptibility by analytic piecewise-linear interval integration with distributional endpoint jumps for the explicit zero-extension boundary; multispecies ions remain Maxwellian and externally supplied. This is a forward solver, not an EVDF inverse or full-EM CTS model. The public Analysis 1 registry entry for gyrotropic anisotropy dispatches explicitly to either the bi-Maxwellian or bi-Kappa fitter; model identity is retained in the returned result. The canonical channel-wise relativistic Maxwell-Juttner Compton fit now accepts measured incident-laser spectral profiles and performs wavelength-resolved recoil/Klein-Nishina convolution with photon-flux and scattered-photon-energy weighting before detector response; the joint spatial-spectral Compton profile route remains explicitly unavailable. The joint raw-spectrum spatial-spectral inverse now accepts a measured spatial PSF probability matrix or a finite-volume Gaussian PSF generated from an externally supplied sigma, composes H_eff=H P before the physical spectral fit, and retains finite-domain edge loss without renormalization. The PSF is fixed and its calibration covariance is not yet propagated. A separate non-gyrotropic 3-D temperature-tensor inverse is available through the advanced Analysis-1 dispatcher and Dashboard; it requires six independent directional-temperature dyads, preserves supplied covariance, enforces tensor positive semidefiniteness, and withholds chi-square consistency probabilities when absolute measurement covariance is absent. Finite-bin independent-Poisson count-space inference is exposed through the Thomson product API and primary Dashboard for per-channel Maxwellian and finite-variance Kappa fits. The Kappa branch integrates the exact Student-t CDF over finite detector bins, fits κ>3/2 jointly, applies the measured response to bin-integrated expected counts, and derives temperature from the second-moment standard deviation. Expected-Fisher covariance includes κ and is rank/conditioning gated. This count likelihood does not infer absolute density and does not claim generalized Kappa dispersion or unrestricted EVDF recovery.",
     "execution_contract": {
@@ -56,12 +58,14 @@
         {
           "name": "spectra",
           "unit": "calibrated spectral intensity; channel x wavelength",
-          "required": true
+          "required": false,
+          "description": "Required for calibrated Gaussian/GLS multi-channel inference; omitted for independent-Poisson mode, which uses observed_counts instead."
         },
         {
           "name": "radius_m",
           "unit": "m; one per channel",
-          "required": true
+          "required": false,
+          "description": "One calibrated coordinate per channel for Gaussian/GLS profile reporting; not required by the single-spectrum Poisson count-space branch."
         },
         {
           "name": "laser_wavelength_nm",
@@ -394,6 +398,12 @@
           "unit": "dimensionless; κ>3/2",
           "required": false,
           "description": "Initial Kappa tail index for the Poisson Kappa branch."
+        },
+        {
+          "name": "observed_counts",
+          "unit": "non-negative integer detector counts; 1-D single channel; used only when likelihood=independent_Poisson",
+          "required": false,
+          "description": "Count-space input for the finite-bin Poisson route. Mutually exclusive with Gaussian spectral uncertainty/covariance inputs; each channel is fitted independently by the Dashboard."
         }
       ],
       "output_specs": [
