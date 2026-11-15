@@ -112,3 +112,19 @@ def test_model_averaged_evdf_is_owned_by_the_registered_analysis_81_route():
         "thomson_distribution",
         "analyze_thomson_spectral_distribution",
     )
+
+def test_model_average_rejects_total_covariance_smaller_than_between_model_component():
+    velocity = np.linspace(-5.0, 5.0, 101)
+    pdf = _normal_pdf(velocity, 0.0, 1.0)
+    between = np.eye(velocity.size) * 1.0e-5
+    total = np.eye(velocity.size) * 1.0e-6
+
+    with pytest.raises(ValueError, match="within-model covariance is not positive semidefinite"):
+        _model_averaged_projected_evdf_moments(
+            velocity,
+            {
+                "model_averaged_projected_evdf_s_per_m": pdf,
+                "between_model_projected_evdf_covariance_s2_per_m2": between,
+                "model_averaged_projected_evdf_covariance_s2_per_m2": total,
+            },
+        )
