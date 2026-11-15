@@ -505,7 +505,6 @@ def reconstruct_multiview_3d_evdf(
     # reconstructed EVDF using the same voxel-volume measure as normalization.
     # These are distribution moments, not a claim that every velocity-space
     # degree of freedom is independently identifiable.
-    probability_mass = distribution * volume
     (
         candidate_mean_velocity,
         candidate_velocity_covariance,
