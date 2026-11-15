@@ -71,6 +71,9 @@ def analyze_thomson_spectra(*args, **kwargs):
             raise ValueError("wavelength_nm and observed_counts are required for independent-Poisson inference")
         laser_nm = kwargs.pop("laser_wavelength_nm", None)
         angle = kwargs.pop("scattering_angle_rad", None)
+        distribution_model = kwargs.pop("distribution_model", "maxwellian")
+        kappa_initial = kwargs.pop("kappa_initial", 4.0)
+        kappa_bounds = kwargs.pop("kappa_bounds", (1.5001, 50.0))
         response = kwargs.pop("instrument_response", None)
         if "instrument_response_matrix" in kwargs:
             if response is not None:
@@ -92,10 +95,13 @@ def analyze_thomson_spectra(*args, **kwargs):
         result = fit_optical_thomson_poisson_counts(
             wavelength, counts, laser_wavelength_nm=laser_nm,
             scattering_angle_rad=angle, instrument_response=response,
+            distribution_model=distribution_model,
+            kappa_initial=kappa_initial,
+            kappa_bounds=kappa_bounds,
             **geometry_options,
         )
         result["analysis_id"] = 1
-        result["analysis_model"] = "noncollective_maxwellian_independent_Poisson"
+        result["analysis_model"] = f"noncollective_{distribution_model}_independent_Poisson"
         result["canonical_entry_point"] = "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra"
         return result
     if likelihood is not None:
