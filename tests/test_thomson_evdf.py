@@ -983,6 +983,72 @@ def test_evdf_does_not_call_unweighted_residual_a_chi_square():
     assert quality["residual_metric"] == "signal_scale_normalized_residual_sum_squares"
 
 
+
+def test_piecewise_linear_evdf_moments_are_exact_on_nonuniform_velocity_grid():
+    from tis.physics.shared.thomson_evdf import _piecewise_linear_evdf_moments
+
+    velocity = np.array([-5.0, -3.2, -1.1, -0.2, 1.7, 4.9, 8.0])
+    density = np.array([0.03, 0.18, 0.62, 0.91, 0.55, 0.12, 0.015])
+    result = _piecewise_linear_evdf_moments(velocity, density)
+
+    nodes, weights = np.polynomial.legendre.leggauss(16)
+    integrals = np.zeros(5)
+    for left, right, f_left, f_right in zip(
+        velocity[:-1], velocity[1:], density[:-1], density[1:]
+    ):
+        half = 0.5 * (right - left)
+        midpoint = 0.5 * (right + left)
+        points = midpoint + half * nodes
+        interpolated = (
+            (right - points) / (right - left) * f_left
+            + (points - left) / (right - left) * f_right
+        )
+        for power in range(5):
+            integrals[power] += half * np.sum(weights * points**power * interpolated)
+    raw = integrals / integrals[0]
+    mean = raw[1]
+    variance = raw[2] - mean**2
+    third = raw[3] - 3.0 * mean * raw[2] + 2.0 * mean**3
+    fourth = (
+        raw[4] - 4.0 * mean * raw[3] + 6.0 * mean**2 * raw[2]
+        - 3.0 * mean**4
+    )
+    assert result["normalization"] == pytest.approx(integrals[0], rel=2e-13)
+    assert result["mean"] == pytest.approx(mean, rel=2e-13)
+    assert result["variance"] == pytest.approx(variance, rel=2e-13)
+    assert result["third"] == pytest.approx(third, rel=2e-13)
+    assert result["fourth"] == pytest.approx(fourth, rel=2e-13)
+
+
+def test_piecewise_linear_evdf_physical_moment_jacobian_matches_finite_difference():
+    from tis.physics.shared.thomson_evdf import _piecewise_linear_evdf_moments
+
+    velocity = np.array([-4.0, -2.7, -0.8, 0.4, 2.6, 5.0])
+    coefficients = np.array([0.12, 0.35, 0.8, 1.0, 0.52, 0.09])
+    result = _piecewise_linear_evdf_moments(velocity, coefficients)
+    analytic = result["moment_jacobian"]
+    names = ("mean", "variance", "sigma", "temperature", "third", "fourth", "skewness", "excess_kurtosis")
+
+    def vector(values):
+        moments = _piecewise_linear_evdf_moments(velocity, values)
+        return np.array([
+            moments["mean"], moments["variance"], moments["sigma"],
+            9.1093837139e-31 / 1.602176634e-19 * moments["variance"],
+            moments["third"], moments["fourth"], moments["skewness"],
+            moments["excess_kurtosis"],
+        ])
+
+    numerical = np.empty_like(analytic)
+    for index in range(coefficients.size):
+        step = 1e-6 * max(abs(coefficients[index]), 1.0)
+        plus, minus = coefficients.copy(), coefficients.copy()
+        plus[index] += step
+        minus[index] -= step
+        numerical[:, index] = (vector(plus) - vector(minus)) / (2.0 * step)
+    np.testing.assert_allclose(analytic, numerical, rtol=3e-6, atol=3e-8)
+
+
+
 def test_projected_evdf_fit_quality_equation_is_linked_from_analysis_and_formula_registries():
     import json
     from pathlib import Path
