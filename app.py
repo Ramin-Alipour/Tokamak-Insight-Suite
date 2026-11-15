@@ -4263,6 +4263,18 @@ elif page=='Advanced Analysis':
                 with api_right:
                     laser_81=st.text_input('Incident laser wavelength (nm)',value='532.0',key='ts81_laser_wavelength')
                     angle_81=st.text_input('Scattering angle (rad)',value='1.5707963267948966',key='ts81_scattering_angle')
+                    laser_uncertainty_81=st.text_input(
+                        'Laser wavelength standard uncertainty (nm; optional)',
+                        value='',key='ts81_laser_wavelength_uncertainty',
+                    )
+                    angle_uncertainty_81=st.text_input(
+                        'Scattering-angle standard uncertainty (rad; optional)',
+                        value='',key='ts81_scattering_angle_uncertainty',
+                    )
+                    laser_angle_covariance_81=st.text_input(
+                        'Laser wavelength–angle covariance (nm·rad; optional)',
+                        value='0',key='ts81_laser_angle_covariance',
+                    )
                     kinematics_81=st.selectbox(
                         'Projected-EVDF kinematics',
                         ['nonrelativistic','relativistic_thomson','compton'],
@@ -4312,6 +4324,18 @@ elif page=='Advanced Analysis':
                                 'velocity_points':int(velocity_points_81),
                             },
                         }
+                        if laser_uncertainty_81.strip():
+                            api_kwargs['laser_wavelength_uncertainty_nm']=_parse_ts_scalar(
+                                laser_uncertainty_81,'Laser wavelength standard uncertainty',minimum=0.0
+                            )
+                        if angle_uncertainty_81.strip():
+                            api_kwargs['scattering_angle_uncertainty_rad']=_parse_ts_scalar(
+                                angle_uncertainty_81,'Scattering-angle standard uncertainty',minimum=0.0
+                            )
+                        if laser_angle_covariance_81.strip():
+                            api_kwargs['laser_angle_covariance_nm_rad']=_parse_ts_scalar(
+                                laser_angle_covariance_81,'Laser wavelength–angle covariance'
+                            )
                         if background_mode_81=='Explicit fitted-background column':
                             api_kwargs['background_signal']=df[background_col_81].to_numpy(dtype=float)
                         else:
