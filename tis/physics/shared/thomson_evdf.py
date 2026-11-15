@@ -1631,6 +1631,10 @@ def reconstruct_thomson_evdf(
         "velocity_moment_jacobian": (
             moment_jacobian if evdf_covariance_available else None
         ),
+        "velocity_moment_quadrature": "exact_intervalwise_three_point_Gauss_Legendre_for_piecewise_linear_EVDF_through_fourth_order",
+        "velocity_moment_jacobian": (
+            moment_jacobian if evdf_covariance_available else None
+        ),
         "velocity_moment_covariance": moment_covariance,
         "velocity_moment_covariance_including_scattering_geometry": moment_covariance_including_geometry,
         "scattering_geometry_velocity_moment_covariance": geometry_moment_covariance,
