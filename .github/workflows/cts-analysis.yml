@@ -16,6 +16,7 @@ on:
       - "DIAGNOSTIC_REGISTRY.json"
       - "FORMULA_REGISTRY.json"
       - "tests/test_analysis_registry.py"
+      - "tests/test_product_architecture.py"
       - "tests/test_formula_*.py"
       - "tests/test_advanced_thomson_physics_page.py"
       - "tests/test_cts_*.py"
@@ -36,6 +37,7 @@ on:
       - "DIAGNOSTIC_REGISTRY.json"
       - "FORMULA_REGISTRY.json"
       - "tests/test_analysis_registry.py"
+      - "tests/test_product_architecture.py"
       - "tests/test_formula_*.py"
       - "tests/test_advanced_thomson_physics_page.py"
       - "tests/test_cts_*.py"
@@ -74,5 +76,6 @@ jobs:
           tests/test_ece_*.py
           tests/test_thomson_*.py
           tests/test_analysis_registry.py
+          tests/test_product_architecture.py
           tests/test_formula_*.py
           tests/test_advanced_thomson_physics_page.py
