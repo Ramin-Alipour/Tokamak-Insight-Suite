@@ -255,6 +255,7 @@ def test_thomson_shared_physics_dependencies_import_from_canonical_shared_packag
         "cts_stokes_transfer",
         "cts_magnetoionic",
         "cts_spatial_inference",
+        "cts_initialization",
         "thomson_kinetic_models",
         "ece_kinetic",
         "ece_kinetic_modes",
