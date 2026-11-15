@@ -309,8 +309,8 @@ def test_evdf_reports_regularization_selection_spread_separately_from_measuremen
     moment_spread = np.asarray(
         selection["physical_moment_standard_spread_from_regularization_choice"]
     )
-    assert moment_covariance.shape == (6, 6)
-    assert moment_spread.shape == (6,)
+    assert moment_covariance.shape == (8, 8)
+    assert moment_spread.shape == (8,)
     moment_order = selection["physical_moment_order"]
     temperature_index = moment_order.index("directional_equivalent_temperature_eV")
     candidate_moments = np.asarray(selection["physical_moment_candidate_values"])
@@ -915,7 +915,7 @@ def test_evdf_propagates_joint_laser_wavelength_angle_covariance_with_cross_term
     conditional = np.asarray(result["evdf_covariance"])
     np.testing.assert_allclose(total, conditional + expected_geometry, rtol=2e-8, atol=1e-16)
     assert result["evdf_standard_uncertainty_including_geometry_s_per_m"].shape == sensitivity.shape[:1]
-    assert result["velocity_moment_covariance_including_geometry"].shape == (6, 6)
+    assert result["velocity_moment_covariance_including_geometry"].shape == (8, 8)
     assert result["velocity_moment_standard_uncertainty_including_geometry"] is not None
 
 
