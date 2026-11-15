@@ -1372,8 +1372,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       ),
       "ion_temperature_uncertainty_eV":(
           None if 2 in unidentified_parameter_indices else float(su[2])
-      ) if n_species == 1 else su[2:2+n_species].copy(),
-      "ion_temperature_species_uncertainties_eV":su[2:2+n_species].copy(),
+      ) if n_species == 1 else [
+          None if 2+i in unidentified_parameter_indices else float(su[2+i])
+          for i in range(n_species)
+      ],
+      "ion_temperature_species_uncertainties_eV":[
+          None if 2+i in unidentified_parameter_indices else float(su[2+i])
+          for i in range(n_species)
+      ],
       "ion_velocity_projection_uncertainty_m_s":(
           None if 3+n_species in unidentified_parameter_indices else float(su[3+n_species])
       ),
