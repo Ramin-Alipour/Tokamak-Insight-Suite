@@ -115,7 +115,17 @@ def infer_path_averaged_density(*args: Any, **kwargs: Any) -> Any:
     return _run(87, *args, **kwargs)
 
 def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
-    """Reconstruct a physical non-relativistic 3-D EVDF from multi-view optical spectra (entry 88)."""
+    """Reconstruct a non-negative 3-D EVDF and its identifiable velocity moments (entry 88).
+
+    The registered solver returns the mean-flow vector, full central velocity
+    covariance, principal kinetic-temperature tensor, third central-moment
+    tensor and (inside the declared classical domain) heat flux per density.
+    When the data-only multi-view operator identifies the EVDF, covariance
+    propagation includes the normalized-distribution Jacobian; the returned
+    temperature-tensor covariance is in row-major [xx,xy,xz,yx,yy,yz,zz]
+    component order. Regularization-only candidates are never promoted to
+    primary physical measurements.
+    """
     return _run(88, *args, **kwargs)
 
 
