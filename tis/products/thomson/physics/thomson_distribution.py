@@ -686,11 +686,15 @@ def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_densit
         variance_weights = _piecewise_linear_moment_weights(v, 2, mean)
         third_weights = _piecewise_linear_moment_weights(v, 3, mean)
         fourth_weights = _piecewise_linear_moment_weights(v, 4, mean)
+        fifth_weights = _piecewise_linear_moment_weights(v, 5, mean)
+        sixth_weights = _piecewise_linear_moment_weights(v, 6, mean)
         variance = float(variance_weights @ f) / norm
         if not np.isfinite(variance) or variance <= 0.0:
             raise ValueError("grid-truncation sensitivity requires positive velocity variance")
         third = float(third_weights @ f) / norm
         fourth = float(fourth_weights @ f) / norm
+        fifth = float(fifth_weights @ f) / norm
+        sixth = float(sixth_weights @ f) / norm
         return {
             "mean_velocity_parallel_m_s": mean,
             "velocity_parallel_variance_m2_s2": variance,
@@ -699,8 +703,12 @@ def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_densit
             ),
             "central_third_velocity_moment_m3_s3": third,
             "central_fourth_velocity_moment_m4_s4": fourth,
+            "central_fifth_velocity_moment_m5_s5": fifth,
+            "central_sixth_velocity_moment_m6_s6": sixth,
             "skewness": third / variance**1.5,
             "excess_kurtosis": fourth / variance**2 - 3.0,
+            "standardized_fifth_central_moment": fifth / variance**2.5,
+            "excess_sixth_standardized_central_moment": sixth / variance**3 - 15.0,
         }, norm
 
     full, full_norm = _moments(velocity, density)
