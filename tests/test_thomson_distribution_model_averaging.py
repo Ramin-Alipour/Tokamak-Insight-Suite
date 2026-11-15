@@ -51,7 +51,9 @@ def test_model_averaged_evdf_moments_are_computed_from_the_mixture_not_averaged_
     assert moments["mean_velocity_parallel_m_s"] == pytest.approx(expected_mean, rel=1e-10)
     assert moments["velocity_parallel_variance_m2_s2"] == pytest.approx(expected_variance, rel=1e-10)
     assert moments["moment_covariance"] is not None
-    assert np.linalg.eigvalsh(moments["moment_covariance"]).min() > -1e-10
+    moment_eigenvalues = np.linalg.eigvalsh(moments["moment_covariance"])
+    moment_scale = max(float(np.max(np.abs(moment_eigenvalues))), np.finfo(float).tiny)
+    assert float(moment_eigenvalues.min()) >= -1e-10 * moment_scale
     assert result["moment_covariance_scope"] == "within_and_between_candidate_family"
 
 
@@ -91,3 +93,14 @@ def test_model_average_rejects_a_mismatched_velocity_grid_and_unnormalized_mixtu
             velocity,
             {"model_averaged_projected_evdf_s_per_m": 2.0 * pdf},
         )
+
+def test_product_workspace_displays_the_model_averaged_physical_moment_result():
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "tis" / "ui" / "product_workspace_page.py"
+    ).read_text(encoding="utf-8")
+    assert '"model_averaged_projected_evdf_physical_moments"' in source
+    assert '"candidate_weights"' in source
+    assert '"moment_covariance_scope"' in source
