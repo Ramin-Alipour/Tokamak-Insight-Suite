@@ -1385,6 +1385,7 @@ def test_spectral_distribution_propagates_joint_laser_angle_calibration_into_pro
     )
     inverse = result["projected_evdf_inference"]
     assert inverse["geometry_uncertainty_covariance_included"] is True
+    assert inverse["geometry_covariance_independent_of_spectral_noise_assumed"] is True
     assert inverse["laser_wavelength_uncertainty_nm"] == pytest.approx(sigma_laser)
     assert inverse["laser_angle_covariance_nm_rad"] == pytest.approx(cross)
     assert inverse["evdf_standard_uncertainty_including_geometry_s_per_m"].shape == (81,)
