@@ -813,7 +813,7 @@
       "workflow_modes": [
         {
           "name": "multi_channel_spectral_inference",
-          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
+          "function": "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra",
           "inputs": [
             "wavelength_nm",
             "spectra (channel × wavelength)",
@@ -822,8 +822,7 @@
             "scattering_angle_rad",
             "instrument_response",
             "model (non-collective Maxwellian/Kappa/relativistic Maxwell-Juttner)",
-            "model-specific external geometry and ion inputs",
-            "optional model_discrepancy_covariance (non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner; independent of reduced-chi-square scaling)"
+            "model-specific external geometry and ion inputs"
           ],
           "outputs": [
             "electron_temperature_profile_eV",
@@ -833,7 +832,8 @@
             "per-channel fit diagnostics and covariance",
             "shared instrument-response cross-channel parameter covariance where available"
           ],
-          "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input."
+          "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input.",
+          "product_api_entrypoint": "tis.products.thomson.api.analyze_spectra"
         },
         {
           "name": "multi_view_3d_evdf_reconstruction",
@@ -858,26 +858,43 @@
         },
         {
           "name": "n_population_relativistic_optical_thomson",
-          "function": "tokamak_analysis.thomson_workflow.fit_n_population_relativistic_thomson_spectrum",
+          "function": "tis.products.thomson.physics.thomson_workflow.fit_n_population_relativistic_thomson_spectrum",
           "inputs": [
-            "wavelength_nm and measured_spectrum: calibrated one-dimensional spectrum",
-            "laser_wavelength_nm, scattering_angle_rad, measured instrument_response and incident_polarization",
-            "population_count: integer 2–8",
-            "initial_temperatures_eV: one positive, strictly increasing optimizer seed per population",
-            "initial_fractions: one strictly positive number-fraction seed per population, summing to one",
-            "initial_flow_projection_m_s: subluminal optimizer seed",
+            "wavelength_nm",
+            "measured_spectrum",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "instrument_response",
+            "population_count (2–8)",
+            "strictly increasing initial_temperatures_eV",
+            "initial_fractions on the open simplex",
+            "initial_flow_projection_m_s",
+            "optional initial_population_flow_projections_m_s (one finite subluminal q-parallel flow per population; enables independent population drifts)",
+            "incident_polarization",
             "optional signal_uncertainty or full spectral_covariance",
-            "optional model_discrepancy_covariance independent of measurement noise",
-            "optional constant, linear, polynomial, cubic-spline or supplied-template detector background"
+            "optional model_discrepancy_covariance",
+            "background_model, background_degree, background_interior_knots and/or background_templates",
+            "include_compton_recoil and maximum_recoil_correction_fraction"
           ],
           "outputs": [
-            "population_temperatures_eV and population_number_fractions",
-            "electron_flow_projection_m_s",
-            "fitted_thomson_spectrum, fitted_background, fitted_spectrum and residual",
-            "full joint_parameter_covariance including physical/amplitude/background cross terms",
-            "data-only Jacobian rank and condition diagnostics"
+            "population_temperatures_eV",
+            "population_number_fractions",
+            "population_count",
+            "electron_velocity_projection_m_s (shared-flow mode only)",
+            "population_flow_projections_m_s",
+            "joint_parameter_covariance (including all population-flow, amplitude and background nuisance cross terms)",
+            "parameter_order",
+            "fit_jacobian_rank",
+            "fit_jacobian_condition_number",
+            "fitted_spectrum",
+            "fitted_plasma_spectrum",
+            "fitted_background",
+            "residual",
+            "noise_model",
+            "recoil and cross-section provenance"
           ],
-          "scope": "Finite-dimensional N-component isotropic relativistic Maxwell-Juttner mixture with ordered temperatures, simplex-constrained number fractions and one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred."
+          "scope": "Single-channel measured-spectrum fit of a finite N-component isotropic relativistic Maxwell-Juttner mixture (2–8 components). Ordered positive temperatures remove label switching; softmax fractions lie on the simplex; the default closure shares one scattering-vector flow projection, while an explicit per-population initialization enables independently fitted subluminal population drifts; all use one measured response. Background and amplitude are jointly inferred and their covariance is retained with physical parameters. This is a constrained parametric mixture, not an unrestricted or anisotropic EVDF reconstruction; absolute density is not inferred.",
+          "product_api_entrypoint": "tis.products.thomson.api.fit_n_population_relativistic_spectrum"
         },
         {
           "name": "physical_multiview_3d_evdf_inversion",
@@ -913,7 +930,121 @@
             "full stacked covariance provenance",
             "data_only_jacobian_rank and data_only_condition_number"
           ],
-          "scope": "Internally constructs each view's non-relativistic elastic Thomson Doppler kernel and unpolarized differential-cross-section angular factor (1+cos²θ_j)/2; deposits unit line probability conservatively into finite wavelength bins; applies the measured response to bin-integrated power; then solves the non-negative 3-D inverse. Unpolarized shape-only inference; no absolute density, unknown view gains, Compton recoil or relativistic corrections. Insufficient angular information returns a conditional candidate and withholds the unique 3-D EVDF."
+          "scope": "Internally constructs each view's non-relativistic elastic Thomson Doppler kernel and unpolarized differential-cross-section angular factor (1+cos²θ_j)/2 lambda_ja=lambda_L[1-2 sin(theta/2)(qhat_j dot v_a)/c], deposits unit line probability conservatively into finite wavelength bins, applies the measured response to bin-integrated power, then solves the non-negative 3-D inverse. Unpolarized shape-only inference; no absolute density, unknown view gains, Compton recoil or relativistic corrections. Insufficient angular information returns a conditional candidate and withholds the unique 3-D EVDF.",
+          "product_api_entrypoint": "tis.products.thomson.api.run_advanced_physics"
+        },
+        {
+          "name": "optical_collective_kappa_multi_population_inference",
+          "function": "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra",
+          "solver_function": "tis.physics.shared.thomson_kinetic_models.fit_collective_kappa",
+          "forward_model_function": "tis.physics.shared.thomson_kinetic_models.collective_kappa_spectral_density",
+          "model_selector": "collective_kappa",
+          "inputs": [
+            "wavelength_nm",
+            "spectra (channel × wavelength)",
+            "radius_m",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "measured instrument_response",
+            "explicit incident_direction and scattered_direction",
+            "ion_species, ion_fractions, ion_temperature_eV, ion_velocity_m_s",
+            "electron_velocity_m_s",
+            "collective_initial_density_m3, collective_initial_temperature_eV, collective_kappa_initial",
+            "optional collective_electron_populations and collective_ion_populations",
+            "optional collective_electron_population_parameter_covariance and deterministic population Monte Carlo controls"
+          ],
+          "outputs": [
+            "electron_density_m3",
+            "electron_temperature_eV",
+            "kappa_index",
+            "electron_mixture_moments",
+            "electron_populations",
+            "ion_populations",
+            "fit_covariance conditional on fixed population inputs",
+            "population_joint_fit_input_covariance when population covariance is supplied",
+            "Landau susceptibility and collective spectral fit diagnostics"
+          ],
+          "scope": "Measured-spectrum optical collective-Kappa Landau–FDT inference. Each electron and ion population contributes its own projected Landau susceptibility and fluctuation source before common dielectric screening. Population fractions and physical domains are explicit; the 1-D projected model does not claim an unrestricted 3-D EVDF or Full-EM response.",
+          "product_api_entrypoint": "tis.products.thomson.api.analyze_spectra"
+        },
+        {
+          "name": "two_population_relativistic_optical_thomson",
+          "function": "tis.products.thomson.physics.thomson_workflow.fit_two_population_relativistic_thomson_spectrum",
+          "inputs": [
+            "wavelength_nm",
+            "measured_spectrum",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "instrument_response",
+            "incident_polarization",
+            "optional all-or-none optimizer seeds: cold_temperature_initial_eV, hot_temperature_initial_eV, hot_population_fraction_initial, flow_projection_initial_m_s (omitted for automatic deterministic multistart)",
+            "optional signal_uncertainty or spectral_covariance"
+          ],
+          "outputs": [
+            "cold_electron_temperature_eV",
+            "hot_electron_temperature_eV",
+            "hot_population_fraction",
+            "electron_velocity_projection_m_s",
+            "fit_covariance",
+            "fit_jacobian_rank",
+            "fit_jacobian_condition_number",
+            "fitted_spectrum",
+            "residual"
+          ],
+          "scope": "Single-channel shape-only fit of a two-component isotropic relativistic Maxwell-Juttner mixture. Four optimizer seeds are estimated deterministically from the measured spectral moments with three starts when omitted; user-supplied seeds are all-or-none and are never reported as inferred measurements. The two populations share one scattering-vector flow projection; absolute density and unrestricted 3-D EVDF are not inferred.",
+          "product_api_entrypoint": "tis.products.thomson.api.fit_two_population_relativistic_spectrum"
+        },
+        {
+          "name": "gyrotropic_anisotropic_multi_view_raw_spectrum",
+          "function": "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra",
+          "model_selector": [
+            "gyrotropic_bi_maxwellian",
+            "gyrotropic_bi_kappa"
+          ],
+          "solver_function": "tis.physics.shared.thomson_anisotropic_inference.fit_gyrotropic_bi_maxwellian_thomson / fit_gyrotropic_bi_kappa_thomson",
+          "inputs": [
+            "wavelength_nm",
+            "spectra (view × wavelength)",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "magnetic_field_unit",
+            "scattering_vector_unit",
+            "instrument_response_matrix",
+            "optional full measurement/model-discrepancy/systematic covariance"
+          ],
+          "outputs": [
+            "T_parallel and T_perpendicular only when pitch-angle design and whitened spectral Jacobian identify them",
+            "per-view q-flow projections and shared 3-D flow only when rank 3",
+            "full fit covariance, residuals, fit diagnostics and validity gates"
+          ],
+          "scope": "Raw measured-spectrum gyrotropic anisotropic inference. Uses T_q=T_perp+(T_parallel-T_perp)(b_hat·q_hat)^2 and the exact projected bi-Maxwellian or finite-variance bi-Kappa marginal. A single view never identifies anisotropy.",
+          "product_api_entrypoint": "tis.products.thomson.api.fit_gyrotropic"
+        },
+        {
+          "name": "general_non_gyrotropic_temperature_tensor_raw_spectrum",
+          "function": "tis.products.thomson.physics.thomson_workflow.analyze_thomson_spectra",
+          "model_selector": [
+            "general_temperature_tensor_maxwellian",
+            "general_temperature_tensor_kappa"
+          ],
+          "solver_function": "tis.products.thomson.physics.thomson_temperature_tensor.fit_general_temperature_tensor_thomson_spectra",
+          "inputs": [
+            "wavelength_nm",
+            "spectra (view × wavelength)",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "scattering_vector_unit",
+            "instrument_response_matrix",
+            "optional measurement/model-discrepancy/systematic and geometry covariance"
+          ],
+          "outputs": [
+            "symmetric positive-semidefinite 3-D temperature tensor",
+            "principal temperatures and axes",
+            "shared 3-D flow vector when rank 3",
+            "joint temperature-flow covariance and spectral residuals"
+          ],
+          "scope": "Raw measured-spectrum non-gyrotropic tensor inversion. Uses T_q=q_hat^T T q_hat and finite-bin Gaussian or ellipsoidal Student-t projected spectra. At least six independent q-vector dyads are required; rank-deficient geometries withhold the tensor.",
+          "product_api_entrypoint": "tis.products.thomson.api.fit_temperature_tensor"
         }
       ],
       "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1. No detector calibration or independent experimental validation is performed.",
