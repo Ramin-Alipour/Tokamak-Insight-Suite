@@ -104,3 +104,11 @@ def test_product_workspace_displays_the_model_averaged_physical_moment_result():
     assert '"model_averaged_projected_evdf_physical_moments"' in source
     assert '"candidate_weights"' in source
     assert '"moment_covariance_scope"' in source
+
+def test_model_averaged_evdf_is_owned_by_the_registered_analysis_81_route():
+    from tis.products.thomson.registry import THOMSON_ENTRY_POINTS
+
+    assert THOMSON_ENTRY_POINTS[81] == (
+        "thomson_distribution",
+        "analyze_thomson_spectral_distribution",
+    )
