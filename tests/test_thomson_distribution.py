@@ -2465,3 +2465,20 @@ def test_relativistic_projected_evdf_rejects_non_psd_joint_geometry_covariance()
                 "regularization_strength": 1.0e-3,
             },
         )
+
+
+def test_relativistic_projected_evdf_geometry_covariance_is_registered():
+    import json
+    from pathlib import Path
+
+    registry_path = Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    entry = next(
+        item for item in registry
+        if item.get("execution_contract", {}).get("formula_key")
+        == "optical_thomson_relativistic_projected_evdf_geometry_covariance"
+    )
+    assert entry["execution_contract"]["implementation_link_status"] == "mapped"
+    assert entry["execution_contract"]["calibrated_measurements_to_physics"] is True
+    assert "C_f,total=C_f,spectral+J_g C_g J_gᵀ" in entry["equation"]
+    assert "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance" in entry["execution_contract"]["test_links"]
