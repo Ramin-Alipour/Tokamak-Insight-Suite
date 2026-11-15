@@ -102,7 +102,23 @@ def build_dependency_inventory() -> dict:
     direct_modules: dict[str, set[str]] = {}
     for product in products:
         slug = product["product_id"]
-        roots = {entry["module"] for entry in product["entry_points"]}
+        # Thomson modules live behind the specialist package boundary.
+        # Other products still expose legacy-domain entry modules; qualify
+        # those explicitly so the AST walk starts at real source files.
+        if product["id"] == 1:
+            roots = {
+                f"{product['api_module']}.physics.{entry['module']}"
+                for entry in product["entry_points"]
+            }
+        else:
+            roots = {
+                entry["module"]
+                if entry["module"].startswith(
+                    ("tokamak_analysis.", "tis.products.", "tis.physics.shared.")
+                )
+                else f"tokamak_analysis.{entry['module']}"
+                for entry in product["entry_points"]
+            }
         direct_modules[slug] = roots
         closure, platform = _closure(roots)
         closures[slug] = closure
