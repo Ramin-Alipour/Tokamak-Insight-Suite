@@ -399,3 +399,11 @@ def test_product_workspace_documents_and_renders_analysis1_poisson_count_route()
     assert "observed_counts" in source
     assert 'result.get("likelihood") == "independent_Poisson"' in source
     assert '"kappa_1sigma"' in source
+
+
+def test_product_workspace_renders_fifth_and_sixth_projected_evdf_moments():
+    source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "product_workspace_page.py").read_text(encoding="utf-8")
+    assert '"central_fifth_velocity_moment_m5_s5"' in source
+    assert '"central_sixth_velocity_moment_m6_s6"' in source
+    assert '"standardized_fifth_central_moment"' in source
+    assert '"excess_sixth_standardized_central_moment"' in source
