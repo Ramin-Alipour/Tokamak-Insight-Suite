@@ -14,6 +14,7 @@ from tokamak_analysis.advanced_inference import (
 from tis.products.thomson.physics.advanced_inference import (
     _normalized_evdf_second_moment_jacobians,
     derive_3d_evdf_third_moments,
+    reconstruct_multiview_3d_evdf as reconstruct_product_multiview_3d_evdf,
 )
 
 from tokamak_analysis.cts_em_background import (
@@ -793,3 +794,27 @@ def test_3d_evdf_moment_propagation_rejects_indefinite_distribution_covariance()
             distribution, velocity, np.ones(3),
             distribution_covariance=np.diag([1.0, -0.1, 1.0]),
         )
+
+
+def test_product_3d_evdf_exposes_temperature_tensor_covariance():
+    velocity = np.array([[-1.0e4, 0.0, 0.0], [1.0e4, 0.0, 0.0]])
+    kernels = np.array([
+        [[1.0, 0.0], [0.0, 1.0]],
+        [[1.0, 1.0], [1.0, 2.0]],
+    ])
+    truth = np.array([0.4, 0.6])
+    measured = np.einsum("vfj,j->vf", kernels, truth)
+    result = reconstruct_product_multiview_3d_evdf(
+        kernels, measured, velocity,
+        voxel_volume_m3_s3=np.ones(2),
+        regularization_matrix=np.eye(2),
+        regularization_strength=1e-8,
+    )
+    assert result["status"] == "identified_from_multi_view_measurements"
+    assert result["temperature_tensor_covariance_eV2"].shape == (9, 9)
+    scale = 9.1093837139e-31 / 1.602176634e-19
+    np.testing.assert_allclose(
+        result["temperature_tensor_covariance_eV2"],
+        scale**2 * result["velocity_covariance_tensor_covariance_m4_s4"],
+        rtol=1e-12, atol=0.0,
+    )
