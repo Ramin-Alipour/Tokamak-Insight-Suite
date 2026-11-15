@@ -1,7 +1,7 @@
 """Regression tests for public advanced Thomson/Full-EM solver dispatch."""
 from __future__ import annotations
 
-import tokamak_analysis.cts_full_physics as physics
+import tis.products.thomson.physics.cts_full_physics as physics
 
 
 def test_full_em_landau_response_is_reachable_through_public_dispatch(monkeypatch):
