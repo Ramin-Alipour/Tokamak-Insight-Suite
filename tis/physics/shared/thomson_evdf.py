@@ -1440,48 +1440,48 @@ def reconstruct_thomson_evdf(
                 model_moments_exact["skewness"],
                 model_moments_exact["excess_kurtosis"],
             ])
-                between_moment_covariance = (
-                    model_moment_jacobian @ between_model_covariance
+            between_moment_covariance = (
+                model_moment_jacobian @ between_model_covariance
+                @ model_moment_jacobian.T
+            )
+            between_moment_covariance = 0.5*(
+                between_moment_covariance+between_moment_covariance.T
+            )
+            model_selection_uncertainty.update({
+                "model_averaged_physical_moment_order": moment_order,
+                "model_averaged_physical_moment_values": {
+                    name: float(value)
+                    for name, value in zip(moment_order, model_moments)
+                },
+                "between_model_physical_moment_covariance": between_moment_covariance,
+                "between_model_physical_moment_standard_uncertainty": np.sqrt(
+                    np.maximum(np.diag(between_moment_covariance), 0.0)
+                ),
+                "physical_moment_model_selection_status": (
+                    "between_candidate_family_covariance_propagated_by_moment_jacobian"
+                ),
+            })
+            if within_pdf_covariance_complete and all(
+                name in candidate_pdf_covariances for name in active_pdf_names
+            ):
+                total_moment_covariance = (
+                    model_moment_jacobian @ total_model_averaged_covariance
                     @ model_moment_jacobian.T
                 )
-                between_moment_covariance = 0.5*(
-                    between_moment_covariance+between_moment_covariance.T
+                total_moment_covariance = 0.5*(
+                    total_moment_covariance+total_moment_covariance.T
                 )
-                model_selection_uncertainty.update({
-                    "model_averaged_physical_moment_order": moment_order,
-                    "model_averaged_physical_moment_values": {
-                        name: float(value)
-                        for name, value in zip(moment_order, model_moments)
-                    },
-                    "between_model_physical_moment_covariance": between_moment_covariance,
-                    "between_model_physical_moment_standard_uncertainty": np.sqrt(
-                        np.maximum(np.diag(between_moment_covariance), 0.0)
-                    ),
-                    "physical_moment_model_selection_status": (
-                        "between_candidate_family_covariance_propagated_by_moment_jacobian"
-                    ),
-                })
-                if within_pdf_covariance_complete and all(
-                    name in candidate_pdf_covariances for name in active_pdf_names
-                ):
-                    total_moment_covariance = (
-                        model_moment_jacobian @ total_model_averaged_covariance
-                        @ model_moment_jacobian.T
-                    )
-                    total_moment_covariance = 0.5*(
-                        total_moment_covariance+total_moment_covariance.T
-                    )
-                    model_selection_uncertainty[
-                        "model_averaged_physical_moment_covariance"
-                    ] = total_moment_covariance
-                    model_selection_uncertainty[
-                        "model_averaged_physical_moment_standard_uncertainty"
-                    ] = np.sqrt(np.maximum(np.diag(total_moment_covariance), 0.0))
-                    model_selection_uncertainty[
-                        "physical_moment_model_selection_status"
-                    ] = (
-                        "within_and_between_candidate_family_covariance_propagated_by_moment_jacobian"
-                    )
+                model_selection_uncertainty[
+                    "model_averaged_physical_moment_covariance"
+                ] = total_moment_covariance
+                model_selection_uncertainty[
+                    "model_averaged_physical_moment_standard_uncertainty"
+                ] = np.sqrt(np.maximum(np.diag(total_moment_covariance), 0.0))
+                model_selection_uncertainty[
+                    "physical_moment_model_selection_status"
+                ] = (
+                    "within_and_between_candidate_family_covariance_propagated_by_moment_jacobian"
+                )
             model_selection_uncertainty[
                 "projected_evdf_uncertainty_interpretation"
             ] += (
@@ -1496,7 +1496,7 @@ def reconstruct_thomson_evdf(
 
     # A finite velocity grid can silently truncate a real high-energy tail.
     # Quantify probability in the two boundary cells at each end using the
-    # same nonuniform trapezoidal measure as normalization and moments.
+    # same nonuniform trapezoidal measure as EVDF normalization.
     support_quadrature_weights = np.empty_like(velocity)
     support_quadrature_weights[0] = 0.5 * (velocity[1] - velocity[0])
     support_quadrature_weights[-1] = 0.5 * (velocity[-1] - velocity[-2])
