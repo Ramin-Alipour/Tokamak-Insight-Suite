@@ -12781,7 +12781,7 @@
   },
   {
     "name": "Relativistic projected optical Thomson EVDF calibration-geometry covariance",
-    "equation": "C_g=[[σ_λ0²,Cov(λ0,θ)],[Cov(λ0,θ),σ_θ²]]; J_g[:,1]=∂f_q/∂λ0; J_g[:,2]=∂f_q/∂θ; C_f,total=C_f,spectral+J_g C_g J_gᵀ",
+    "equation": "C_g=[[σ_λ0²,Cov(λ0,θ)],[Cov(λ0,θ),σ_θ²]]; J_g[:,0]=∂f_q/∂λ0; J_g[:,1]=∂f_q/∂θ; C_f,total=C_f,spectral+J_g C_g J_gᵀ",
     "inputs": "Calibrated optical Thomson spectrum, measured wavelength response and background, exact relativistic Thomson or polarized Compton single-electron kernel, projected velocity grid, laser-wavelength standard uncertainty, scattering-angle standard uncertainty, and their cross-covariance.",
     "output": "First-order calibration-geometry contribution to the normalized one-dimensional q-parallel EVDF covariance, combined with the spectral inverse covariance when the inverse supplies a covariance.",
     "assumptions": "The calibration covariance is a finite positive-semidefinite 2×2 matrix. The geometry Jacobian is evaluated by central finite differences of the exact relativistic inverse while holding the nominally selected Tikhonov regularization strength fixed. The spectral covariance, measured response, background, incident polarization and velocity grid are held fixed in the geometry perturbations. The result is local first-order uncertainty, not a nonlinear posterior or experimental calibration.",
