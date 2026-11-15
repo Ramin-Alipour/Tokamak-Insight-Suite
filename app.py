@@ -933,9 +933,14 @@ elif page=='Spectral Analysis':
                 'non_collective_kappa',
                 'non_collective_relativistic_maxwell_juttner',
             ],index=None,placeholder='Select a physical model',key='ts_infer_model')
+            poisson_count_mode=st.checkbox(
+                'Fit integer detector counts with the finite-bin independent-Poisson likelihood',
+                value=False,key='ts_infer_poisson_count_mode',
+                help='Runs each channel through the registered Thomson product API. Supports Maxwellian and finite-variance Kappa models; count data do not identify absolute density.'
+            )
             collective_kappa_mode=st.checkbox(
                 'Use optical collective-Kappa dielectric inference (multi-population)',
-                value=False,key='ts_infer_collective_kappa_mode',
+                value=False,key='ts_infer_collective_kappa_mode',disabled=poisson_count_mode,
                 help='Activates the Landau–FDT collective dielectric solver. Supply explicit ion composition, ion/electron flows, geometry and optional population mixtures below.'
             )
             collective_kappa_inputs_text=''
@@ -982,7 +987,7 @@ elif page=='Spectral Analysis':
                     value='0.0',key='ts_infer_kappa_laser_angle_cov',
                     help='Used with both supplied marginal 1σ calibration uncertainties. The 2×2 calibration covariance must be positive semidefinite.',
                 )
-            joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
+            joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=poisson_count_mode or model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
             if collective_kappa_mode:
                 joint_spatial_spectral=False
             channel_laser_profile_upload=None
@@ -1541,7 +1546,45 @@ elif page=='Spectral Analysis':
                             'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
                         })
-                    if joint_spatial_spectral:
+                    if poisson_count_mode:
+                        if model not in {'non_collective_maxwellian','non_collective_kappa'}:
+                            raise ValueError('The Poisson count-space likelihood currently supports only non-collective Maxwellian and finite-variance Kappa models.')
+                        if joint_spatial_spectral or collective_kappa_mode or absolute_density:
+                            raise ValueError('Poisson count-space inference is a per-channel shape/temperature/flow fit; joint spatial inversion, collective CTS and absolute-density inference are not part of this likelihood.')
+                        if response_uncertainty is not None or model_discrepancy_covariance is not None or systematic_covariance is not None or joint_spectral_covariance is not None:
+                            raise ValueError('The current independent-Poisson route does not accept Gaussian spectral covariance, response uncertainty or additive Gaussian discrepancy/systematic covariance.')
+                        product_api=load_product_api('thomson-scattering')
+                        distribution_model='kappa' if model=='non_collective_kappa' else 'maxwellian'
+                        poisson_channels=[]
+                        for channel_index in range(spectra.shape[0]):
+                            channel_response=instrument_response
+                            if np.asarray(channel_response).ndim==3:
+                                channel_response=np.asarray(channel_response)[channel_index]
+                            channel_result=product_api.fit_optical_thomson_poisson_counts(
+                                wavelengths[channel_index],spectra[channel_index],
+                                laser_wavelength_nm=laser_nm,
+                                scattering_angle_rad=angle_rad,
+                                instrument_response=channel_response,
+                                distribution_model=distribution_model,
+                                laser_wavelength_uncertainty_nm=0.0 if laser_unc_value is None else laser_unc_value,
+                                scattering_angle_uncertainty_rad=0.0 if angle_unc_value is None else angle_unc_value,
+                                laser_angle_covariance_nm_rad=laser_angle_covariance_value,
+                            )
+                            channel_result['channel_index']=channel_index
+                            channel_result['radius_m']=float(radii[channel_index])
+                            poisson_channels.append(channel_result)
+                        result={
+                            'analysis_id':1,
+                            'analysis_model':f'noncollective_{distribution_model}_independent_Poisson',
+                            'model':model,
+                            'likelihood':'independent_Poisson',
+                            'fit_statistic':'Poisson_deviance',
+                            'channels':poisson_channels,
+                            'density_inference_available':False,
+                            'absolute_power_inference_available':False,
+                            'dashboard_execution_path':'tis.products.thomson.api.fit_optical_thomson_poisson_counts',
+                        }
+                    elif joint_spatial_spectral:
                         if laser_unc_value is not None or angle_unc_value is not None or response_uncertainty is not None:
                             raise ValueError('The current joint spatial-spectral inverse treats laser geometry and the supplied response operator as fixed; omit their uncertainty inputs rather than having them silently ignored.')
                         for unsupported_key in ('laser_wavelength_uncertainty_nm','scattering_angle_uncertainty_rad','instrument_response_uncertainty'):
@@ -1621,6 +1664,27 @@ elif page=='Spectral Analysis':
                     ]
                     if coverage_rows:
                         st.dataframe(pd.DataFrame(coverage_rows),width="stretch")
+                if result.get('likelihood')=='independent_Poisson':
+                    st.markdown('**Finite-bin independent-Poisson count inference**')
+                    st.caption('Each channel was executed through the Thomson product API. The fitted Kappa parameter is jointly estimated with line centre, standard deviation, signal amplitude and detector-background coefficients; no Gaussian chi-square is reported for Poisson data.')
+                    st.json({
+                        'analysis_model':result.get('analysis_model'),
+                        'fit_statistic':result.get('fit_statistic'),
+                        'absolute_density_inference':result.get('density_inference_available'),
+                        'absolute_power_inference':result.get('absolute_power_inference_available'),
+                        'execution_path':result.get('dashboard_execution_path'),
+                    })
+                    st.dataframe(pd.DataFrame([{
+                        'channel_index':channel.get('channel_index'),
+                        'radius_m':channel.get('radius_m'),
+                        'Te_eV':channel.get('electron_temperature_eV'),
+                        'flow_q_m_s':channel.get('electron_velocity_projection_m_s'),
+                        'kappa':channel.get('kappa'),
+                        'kappa_1sigma':channel.get('kappa_uncertainty'),
+                        'Poisson_deviance':channel.get('poisson_deviance'),
+                        'reduced_deviance':channel.get('reduced_poisson_deviance'),
+                        'identifiability':(channel.get('identifiability') or {}).get('status'),
+                    } for channel in result.get('channels',[])]),width="stretch",hide_index=True)
                 if result.get('validity_screening'):
                     st.markdown('**Selected-model validity screening**')
                     st.json(result['validity_screening'])
