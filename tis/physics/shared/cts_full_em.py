@@ -1373,7 +1373,7 @@ def analyze_full_em_cts_spectrum(
     from a single CTS geometry. Each species temperature is also fitted.
     """
     from scipy.optimize import least_squares
-    from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
+    from .cts_initialization import estimate_cts_optimizer_initial_parameters
 
     external_order = None
     external_covariance = None
