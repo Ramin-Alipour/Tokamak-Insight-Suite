@@ -122,7 +122,7 @@ def reconstruct_nonrelativistic_3d_evdf(*args: Any, **kwargs: Any) -> Any:
     tensor and (inside the declared classical domain) heat flux per density.
     When the data-only multi-view operator identifies the EVDF, covariance
     propagation includes the normalized-distribution Jacobian; the returned
-    temperature-tensor covariance is in row-major [xx,xy,xz,yx,yy,yz,zz]
+    temperature-tensor covariance is in row-major [xx,xy,xz,yx,yy,yz,zx,zy,zz]
     component order. Regularization-only candidates are never promoted to
     primary physical measurements.
     """
