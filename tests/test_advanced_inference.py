@@ -316,6 +316,9 @@ def test_optical_thomson_uses_independent_model_discrepancy_covariance():
     assert channel["independent_model_discrepancy_supplied"] is True
     assert channel["model_discrepancy_diagnostics"]["covariance_included"] is True
     assert channel["model_discrepancy_diagnostics"]["independent_of_reduced_chi_square"] is True
+    assert channel["model_discrepancy_diagnostics"]["independent_spectral_covariance_included"] is True
+    assert channel["model_discrepancy_covariance_included"] is True
+    assert channel["independent_model_discrepancy_covariance"].shape == discrepancy.shape
     assert "model_discrepancy_scale" not in channel
 
 
