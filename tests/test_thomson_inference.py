@@ -2432,3 +2432,26 @@ def test_analysis1_registry_api_dispatches_kappa_poisson_counts_from_declared_mo
     assert result["distribution_model"] == "kappa"
     assert result["radius_m"] == pytest.approx(0.15)
     assert result["fit_covariance"].shape == (6, 6)
+
+
+
+def test_analysis1_kappa_poisson_formula_registry_and_product_contract_are_synchronized():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    primary = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    entry = next(item for item in primary if item["diagnostic"] == "Thomson scattering")
+    packaged_entry = next(item for item in packaged if item["diagnostic"] == "Thomson scattering")
+    assert entry == packaged_entry
+    key = "thomson_kappa_finite_bin_poisson_inference"
+    assert key in entry["formula_registry_keys"]
+    formula = next(item for item in formulas if item["execution_contract"]["formula_key"] == key)
+    assert formula["execution_contract"]["implementation_link_status"] == "mapped"
+    assert formula["execution_contract"]["function_link"] == (
+        "tis.physics.shared.thomson_inference.fit_optical_thomson_poisson_counts"
+    )
+    assert "kappa>3/2" in formula["equation"]
+    assert any(item["name"] == "observed_counts" for item in entry["execution_contract"]["input_specs"])
