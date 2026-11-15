@@ -12884,5 +12884,86 @@
       ]
     },
     "description": "Propagates correlated incident-laser wavelength and scattering-angle calibration uncertainty through the exact relativistic Thomson/Compton projected-EVDF inverse and combines it with the spectral inverse covariance without changing the primary-versus-conditional identifiability gate."
+  },
+  {
+    "name": "Fourth central velocity-moment tensor and radial kurtosis of a 3-D Thomson EVDF",
+    "equation": "M_ijkl = ∫ f(v)(v_i-u_i)(v_j-u_j)(v_k-u_k)(v_l-u_l) d³v; M_iijj = ∫ f(v)|v-u|⁴ d³v",
+    "inputs": "Normalized 3-D electron EVDF f(v) [s³ m⁻³], mean velocity u [m s⁻¹], velocity-space voxel volumes [m³ s⁻³]",
+    "output": "M_ijkl [m⁴ s⁻⁴]; radial fourth central moment M_iijj [m⁴ s⁻⁴]; covariance [m⁸ s⁻⁸]",
+    "assumptions": "The EVDF is normalized with the supplied voxel-volume quadrature. Primary moments and covariance are reported only when the stacked multi-view measurement operator identifies the EVDF. The covariance is first-order delta-method propagation conditional on the fixed inverse active set.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.advanced_inference.derive_3d_evdf_third_moments",
+      "formula_key": "thomson_evdf_fourth_central_moment_tensor",
+      "input_specs": [
+        {
+          "name": "normalized_evdf_m3_s3",
+          "unit": "s³ m⁻³",
+          "description": "Normalized reconstructed 3-D EVDF on the supplied velocity-space voxels.",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s⁻¹; n_voxel x 3",
+          "description": "Cartesian velocity vector at each voxel.",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "m³ s⁻³",
+          "description": "Positive velocity-space quadrature volume for each voxel.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "fourth_central_velocity_moment_tensor_m4_s4",
+          "unit": "m⁴ s⁻⁴; 3x3x3x3",
+          "description": "Fourth central Cartesian velocity moment tensor, primary only for data-identifiable EVDF."
+        },
+        {
+          "name": "candidate_fourth_central_velocity_moment_tensor_m4_s4",
+          "unit": "m⁴ s⁻⁴; 3x3x3x3",
+          "description": "Fourth central moment tensor of the regularized candidate."
+        },
+        {
+          "name": "fourth_central_velocity_moment_covariance_m8_s8",
+          "unit": "m⁸ s⁻⁸; 81x81",
+          "description": "First-order delta-method covariance propagated from normalized EVDF covariance."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_m4_s4",
+          "unit": "m⁴ s⁻⁴",
+          "description": "Trace-pair contraction M_iijj, equal to the EVDF average of |v-u|⁴."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_variance_m8_s8",
+          "unit": "m⁸ s⁻⁸",
+          "description": "Propagated variance of the radial fourth central moment."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_standard_uncertainty_m4_s4",
+          "unit": "m⁴ s⁻⁴",
+          "description": "One-sigma uncertainty of the radial fourth central moment."
+        }
+      ],
+      "prerequisites": [
+        "A normalized 3-D EVDF identified by the stacked multi-view measurement operator.",
+        "Velocity-space quadrature volumes consistent with the forward model."
+      ],
+      "uncertainty_model": "Exact normalized-EVDF first-order Jacobian for the fourth central tensor, including all four mean-velocity derivative terms; covariance is J C_f J^T.",
+      "limitations": [
+        "The fourth moment is conditional on the supplied finite velocity grid and its quadrature; grid truncation is not folded into the statistical covariance.",
+        "Regularization does not promote data-null-space modes to identified EVDF structure.",
+        "No relativistic interpretation of fourth velocity moments is implied when velocities approach c."
+      ],
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_fourth_central_moment_tensor_and_covariance_match_quadrature_and_finite_difference"
+      ],
+      "note": "Executable fourth-order 3-D EVDF moment and covariance closure; verified against direct discrete quadrature and finite-difference Jacobians, not experimental validation."
+    }
   }
 ]

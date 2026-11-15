@@ -265,3 +265,67 @@ def test_3d_evdf_third_moment_and_heat_flux_covariance_match_finite_difference()
         result["heat_flux_per_density_covariance_W2_m2"],
         expected_heat_flux_covariance, rtol=2e-5, atol=1e-70,
     )
+
+def test_3d_evdf_fourth_central_moment_tensor_and_covariance_match_quadrature_and_finite_difference():
+    from tis.products.thomson.physics.advanced_inference import derive_3d_evdf_third_moments
+
+    scale = 2.0e4
+    velocity = np.array([
+        [sx * scale, sy * scale, sz * scale]
+        for sx in (-1.0, 1.0)
+        for sy in (-1.0, 1.0)
+        for sz in (-1.0, 1.0)
+    ])
+    volume = np.ones(velocity.shape[0])
+    distribution = np.full(velocity.shape[0], 1.0 / velocity.shape[0])
+    covariance = np.diag(np.linspace(1.0e-12, 2.0e-12, velocity.shape[0]))
+    result = derive_3d_evdf_third_moments(
+        distribution, velocity, volume, distribution_covariance=covariance,
+    )
+
+    centered = velocity - distribution @ velocity
+    expected_fourth = np.einsum(
+        "a,ai,aj,ak,al->ijkl",
+        distribution, centered, centered, centered, centered,
+    )
+    np.testing.assert_allclose(
+        result["fourth_central_velocity_moment_tensor_m4_s4"],
+        expected_fourth, rtol=1e-12, atol=1e-12,
+    )
+    expected_radial = float(np.einsum("iijj", expected_fourth))
+    assert result["radial_fourth_central_velocity_moment_m4_s4"] == pytest.approx(
+        expected_radial, rel=1e-12
+    )
+    assert result["fourth_central_velocity_moment_covariance_m8_s8"].shape == (81, 81)
+
+    numerical_jacobian = np.empty((81, distribution.size))
+    step = 1.0e-6
+    for index in range(distribution.size):
+        plus = distribution.copy()
+        minus = distribution.copy()
+        plus[index] += step
+        minus[index] -= step
+        plus /= volume @ plus
+        minus /= volume @ minus
+        plus_result = derive_3d_evdf_third_moments(plus, velocity, volume)
+        minus_result = derive_3d_evdf_third_moments(minus, velocity, volume)
+        numerical_jacobian[:, index] = (
+            plus_result["fourth_central_velocity_moment_tensor_m4_s4"]
+            - minus_result["fourth_central_velocity_moment_tensor_m4_s4"]
+        ).reshape(81) / (2.0 * step)
+
+    expected_covariance = numerical_jacobian @ covariance @ numerical_jacobian.T
+    np.testing.assert_allclose(
+        result["fourth_central_velocity_moment_covariance_m8_s8"],
+        expected_covariance, rtol=3e-5, atol=1e-12,
+    )
+    radial_weights = np.zeros(81)
+    for i in range(3):
+        for j in range(3):
+            radial_weights[np.ravel_multi_index((i, i, j, j), (3, 3, 3, 3))] = 1.0
+    radial_jacobian = radial_weights @ numerical_jacobian
+    expected_radial_variance = float(radial_jacobian @ covariance @ radial_jacobian)
+    assert result["radial_fourth_central_velocity_moment_variance_m8_s8"] == pytest.approx(
+        expected_radial_variance, rel=3e-5
+    )
+

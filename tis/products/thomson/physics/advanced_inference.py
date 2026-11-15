@@ -288,12 +288,18 @@ def derive_3d_evdf_third_moments(
     centered = velocity - mean_velocity[None, :]
     covariance_velocity = np.einsum("a,ai,aj->ij", probability_mass, centered, centered)
     third = np.einsum("a,ai,aj,ak->ijk", probability_mass, centered, centered, centered)
+    fourth = np.einsum("a,ai,aj,ak,al->ijkl", probability_mass, centered, centered, centered, centered)
     third_covariance = None
+    fourth_covariance = None
     heat_flux_covariance = None
+    radial_fourth_variance = None
+    radial_fourth_standard_uncertainty = None
     third_covariance_status = "not_supplied"
+    fourth_covariance_status = "not_supplied"
     heat_flux_standard_uncertainty = None
     covariance = None
     third_jacobian = None
+    fourth_jacobian = None
     if distribution_covariance is not None:
         covariance = _real_array(distribution_covariance, "distribution_covariance", 2)
         if covariance.shape != (distribution.size, distribution.size):
@@ -325,6 +331,37 @@ def derive_3d_evdf_third_moments(
         third_covariance = third_jacobian @ covariance @ third_jacobian.T
         third_covariance = 0.5 * (third_covariance + third_covariance.T)
         third_covariance_status = "first_order_delta_method_from_normalized_evdf_covariance"
+
+        # M_ijkl=<c_i c_j c_k c_l>, c=v-u. Include all four terms
+        # from differentiating the central moment through the moving mean.
+        fourth_jacobian = np.empty((81, distribution.size), dtype=float)
+        for voxel, vector in enumerate(centered):
+            derivative = volume[voxel] * (
+                np.einsum("i,j,k,l->ijkl", vector, vector, vector, vector)
+                - fourth
+                - np.einsum("i,jkl->ijkl", vector, third)
+                - np.einsum("j,ikl->ijkl", vector, third)
+                - np.einsum("k,ijl->ijkl", vector, third)
+                - np.einsum("l,ijk->ijkl", vector, third)
+            )
+            fourth_jacobian[:, voxel] = derivative.reshape(81)
+        fourth_covariance = fourth_jacobian @ covariance @ fourth_jacobian.T
+        fourth_covariance = 0.5 * (fourth_covariance + fourth_covariance.T)
+        fourth_covariance_status = "first_order_delta_method_from_normalized_evdf_covariance"
+        radial_contraction = np.zeros(81, dtype=float)
+        for first_axis in range(3):
+            for second_axis in range(3):
+                index = np.ravel_multi_index((first_axis, first_axis, second_axis, second_axis), (3, 3, 3, 3))
+                radial_contraction[index] = 1.0
+        radial_fourth_jacobian = radial_contraction @ fourth_jacobian
+        radial_fourth_variance = float(radial_fourth_jacobian @ covariance @ radial_fourth_jacobian)
+        radial_fourth_scale = max(
+            float(np.max(np.abs(covariance))) * float(radial_fourth_jacobian @ radial_fourth_jacobian),
+            np.finfo(float).tiny,
+        )
+        if radial_fourth_variance < -1e-10 * radial_fourth_scale:
+            raise ValueError("normalized EVDF covariance produced a negative radial fourth-moment variance")
+        radial_fourth_standard_uncertainty = float(np.sqrt(max(radial_fourth_variance, 0.0)))
     maximum_beta = float(np.max(speed) / 299792458.0)
     candidate_heat_flux = None
     heat_flux = None
@@ -346,11 +383,25 @@ def derive_3d_evdf_third_moments(
             heat_flux_status = "identified_classical_heat_flux_per_density"
     else:
         heat_flux_status = "withheld_relativistic_domain_classical_expression_not_validated"
+    radial_fourth_moment = float(np.einsum("iijj", fourth))
     return {
         "third_central_velocity_moment_tensor_m3_s3": third.copy() if data_identifiable else None,
         "candidate_third_central_velocity_moment_tensor_m3_s3": third.copy(),
         "third_central_velocity_moment_covariance_m6_s6": third_covariance if data_identifiable else None,
         "third_central_velocity_moment_covariance_status": third_covariance_status,
+        "fourth_central_velocity_moment_tensor_m4_s4": fourth.copy() if data_identifiable else None,
+        "candidate_fourth_central_velocity_moment_tensor_m4_s4": fourth.copy(),
+        "fourth_central_velocity_moment_covariance_m8_s8": fourth_covariance if data_identifiable else None,
+        "fourth_central_velocity_moment_covariance_status": fourth_covariance_status,
+        "radial_fourth_central_velocity_moment_m4_s4": radial_fourth_moment if data_identifiable else None,
+        "candidate_radial_fourth_central_velocity_moment_m4_s4": radial_fourth_moment,
+        "radial_fourth_central_velocity_moment_variance_m8_s8": radial_fourth_variance if data_identifiable else None,
+        "radial_fourth_central_velocity_moment_standard_uncertainty_m4_s4": radial_fourth_standard_uncertainty if data_identifiable else None,
+        "fourth_central_velocity_moment_definition": (
+            "M_ijkl=integral(f*(v_i-u_i)*(v_j-u_j)*(v_k-u_k)*(v_l-u_l)*d3v); "
+            "normalized EVDF and supplied voxel-volume quadrature"
+        ),
+        "radial_fourth_moment_definition": "M_iijj=integral(f*|v-u|^4*d3v), the trace-pair contraction of the fourth central velocity-moment tensor",
         "candidate_heat_flux_per_density_W_m": None if candidate_heat_flux is None else candidate_heat_flux.copy(),
         "heat_flux_per_density_W_m": heat_flux,
         "heat_flux_per_density_covariance_W2_m2": heat_flux_covariance if data_identifiable else None,
