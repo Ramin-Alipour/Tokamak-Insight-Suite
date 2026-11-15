@@ -525,6 +525,10 @@ def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normal
     assert out["fast_ion_vdf_covariance"].shape==(velocity.size,velocity.size)
     assert out["fast_ion_vdf_uncertainty_m_s_inverse"].shape==velocity.shape
     assert "fast_ion_vdf_logit_0" in out["parameter_names"]
+    assert len(out["parameter_names"]) == out["fit_covariance"].shape[0]
+    assert out["identifiability_status"] == "regularized_fast_ion_vdf_identified_conditional_on_unidentified_plasma_parameters"
+    assert out["fast_ion_vdf_identifiability_status"] == "identified_conditional_on_unidentified_plasma_parameter_subspace"
+    assert out["unidentified_optimizer_parameter_names"]
     assert out["regularization_scope"] == "fast-ion VDF curvature and supplied reference-shape regularization only; no plasma-parameter prior"
 
 
