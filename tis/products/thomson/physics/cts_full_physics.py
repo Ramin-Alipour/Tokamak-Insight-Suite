@@ -1185,6 +1185,7 @@ __all__ = [
     "quantum_unsymmetrized_dynamic_structure_factor",
     "analyze_cts_microwave_background",
     "analyze_landau_fdt_cts",
+    "analyze_full_em_cts_spatial_profiles",
     "fit_cts_ion_species_flows",
     "analyze_landau_fdt_full_em_constitutive",
     "analyze_landau_fdt_full_em_spectrum",
