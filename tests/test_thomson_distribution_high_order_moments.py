@@ -34,7 +34,7 @@ def test_gaussian_projected_evdf_has_expected_fifth_and_sixth_moments():
     sigma = 2.0e5
     velocity = np.linspace(-8.0 * sigma, 8.0 * sigma, 321)
     density = np.exp(-0.5 * (velocity / sigma) ** 2)
-    density /= np.trapezoid(density, velocity)
+    density /= np.trapz(density, velocity)
     covariance = np.eye(velocity.size) * 1.0e-24
 
     result = _projected_evdf_physical_moments(
