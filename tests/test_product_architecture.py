@@ -477,3 +477,37 @@ def test_thomson_product_solver_modules_do_not_shadow_top_level_definitions():
             f"{filename} contains shadowed top-level solver definitions: {duplicates}"
         )
 
+
+
+
+def test_advanced_thomson_dashboard_api_routes_through_product_boundary(monkeypatch):
+    from tis.products.thomson import api
+    from tis.products.thomson.physics import cts_full_physics
+
+    sentinel = {"solver": "advanced-kernel", "model": "cts_tabulated_evdf_landau"}
+    captured = {}
+
+    def fake_dispatch(model, *args, **kwargs):
+        captured["model"] = model
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return sentinel
+
+    monkeypatch.setattr(cts_full_physics, "run_advanced_thomson_physics", fake_dispatch)
+    result = api.run_advanced_physics(
+        "cts_tabulated_evdf_landau",
+        [1.0, 2.0, 3.0],
+        velocity_grid_m_s=[-2.0, 0.0, 2.0],
+        probability_density_s_per_m=[0.1, 0.8, 0.1],
+    )
+
+    assert result is sentinel
+    assert captured == {
+        "model": "cts_tabulated_evdf_landau",
+        "args": ([1.0, 2.0, 3.0],),
+        "kwargs": {
+            "velocity_grid_m_s": [-2.0, 0.0, 2.0],
+            "probability_density_s_per_m": [0.1, 0.8, 0.1],
+        },
+    }
+    assert "run_advanced_physics" in api.__all__
