@@ -2283,6 +2283,13 @@ def analyze_thomson_spectral_distribution(
             nominal_inverse["evdf_geometry_sensitivity_jacobian"] = geometry_jacobian
             nominal_inverse["evdf_geometry_covariance"] = geometry_evdf_covariance
             nominal_inverse["geometry_sensitivity_regularization_strength"] = nominal_regularization
+            nominal_inverse["geometry_uncertainty_equations"] = {
+                "parameter_covariance": "C_g = [[sigma_lambda0^2, Cov(lambda0,theta)], [Cov(lambda0,theta), sigma_theta^2]]",
+                "evdf_sensitivity": "J_g[:,0] = d f_q / d lambda0; J_g[:,1] = d f_q / d theta",
+                "evdf_covariance": "C_f,total = C_f,spectral + J_g C_g J_g^T",
+                "method": "central finite-difference Jacobian of the exact relativistic forward/inverse operator at fixed selected regularization strength",
+                "scope": "local first-order calibration covariance for the one-dimensional q-parallel EVDF; response, background and spectral covariance held fixed",
+            }
         elif use_relativistic_inverse:
             result["projected_evdf_inference"]["geometry_uncertainty_covariance_included"] = False
         result["projected_evdf_inference"]["source_spectrum"] = (
