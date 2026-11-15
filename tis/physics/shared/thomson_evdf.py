@@ -159,6 +159,76 @@ def _projected_evdf_forward_matrix(wavelength, velocity, response, laser_wavelen
     }
 
 
+def _piecewise_linear_polynomial_weights(velocity, power, center_m_s=0.0):
+    """Exact integral weights for a nodal piecewise-linear EVDF.
+
+    Returns w such that w @ f equals integral (v-center)**power f(v) dv
+    for the piecewise-linear interpolant through the supplied velocity nodes.
+    Three-point Gauss-Legendre quadrature is exact through power four because
+    the highest interval integrand is a fifth-degree polynomial.
+    """
+    grid = np.asarray(velocity, dtype=float)
+    if (grid.ndim != 1 or grid.size < 2 or not np.all(np.isfinite(grid))
+            or np.any(np.diff(grid) <= 0.0)):
+        raise ValueError("velocity grid must be finite, strictly increasing and contain at least two nodes")
+    if (isinstance(power, (bool, np.bool_))
+            or not isinstance(power, (int, np.integer))
+            or not 0 <= int(power) <= 4):
+        raise ValueError("piecewise-linear polynomial moment power must be an integer from zero to four")
+    center = float(center_m_s)
+    if not np.isfinite(center):
+        raise ValueError("moment center must be finite")
+    nodes, quadrature = np.polynomial.legendre.leggauss(3)
+    result = np.zeros(grid.size, dtype=float)
+    for index, (left, right) in enumerate(zip(grid[:-1], grid[1:])):
+        half_width = 0.5 * (right - left)
+        midpoint = 0.5 * (right + left)
+        points = midpoint + half_width * nodes
+        left_basis = (right - points) / (right - left)
+        right_basis = (points - left) / (right - left)
+        weighted_power = half_width * quadrature * (points - center) ** int(power)
+        result[index] += float(weighted_power @ left_basis)
+        result[index + 1] += float(weighted_power @ right_basis)
+    return result
+
+
+def _piecewise_linear_evdf_moments(velocity, distribution):
+    """Return exact normalized moments through fourth order for a linear EVDF."""
+    grid = np.asarray(velocity, dtype=float)
+    pdf = np.asarray(distribution, dtype=float)
+    if (pdf.shape != grid.shape or pdf.ndim != 1 or np.any(~np.isfinite(pdf))
+            or np.any(pdf < 0.0)):
+        raise ValueError("EVDF moments require a finite non-negative density matching the velocity grid")
+    weights = [_piecewise_linear_polynomial_weights(grid, power) for power in range(5)]
+    normalization = float(weights[0] @ pdf)
+    if not np.isfinite(normalization) or normalization <= 0.0:
+        raise ValueError("EVDF must have positive finite probability integral")
+    raw = np.asarray([float(weight @ pdf) / normalization for weight in weights])
+    mean = raw[1]
+    variance_weights = _piecewise_linear_polynomial_weights(grid, 2, mean)
+    third_weights = _piecewise_linear_polynomial_weights(grid, 3, mean)
+    fourth_weights = _piecewise_linear_polynomial_weights(grid, 4, mean)
+    variance = float(variance_weights @ pdf) / normalization
+    third = float(third_weights @ pdf) / normalization
+    fourth = float(fourth_weights @ pdf) / normalization
+    if not np.isfinite(variance) or variance <= 0.0:
+        raise ValueError("EVDF has non-positive or non-finite velocity variance")
+    sigma = float(np.sqrt(variance))
+    return {
+        "normalization": normalization,
+        "raw_moments": raw,
+        "mean": float(mean),
+        "variance": float(variance),
+        "sigma": sigma,
+        "third": float(third),
+        "fourth": float(fourth),
+        "skewness": float(third / sigma**3),
+        "excess_kurtosis": float(fourth / variance**2 - 3.0),
+        "normalization_weights": weights[0],
+        "raw_moment_weights": weights[1:],
+    }
+
+
 def _nonuniform_second_derivative_matrix(velocity):
     """Return the three-point second-derivative operator on a monotone grid.
 
@@ -613,16 +683,14 @@ def reconstruct_thomson_evdf(
         ),
     }
     integral = lambda values: float(trapezoid(values, velocity))
-    mean_v = integral(velocity * distribution)
-    centred = velocity - mean_v
-    variance = integral(centred**2 * distribution)
-    if variance <= 0 or not np.isfinite(variance):
-        raise ValueError("Reconstructed EVDF has non-positive variance")
-    sigma_v = float(np.sqrt(variance))
-    central_third_moment = integral(centred**3 * distribution)
-    central_fourth_moment = integral(centred**4 * distribution)
-    skewness = central_third_moment / sigma_v**3
-    excess_kurtosis = central_fourth_moment / variance**2 - 3.0
+    selected_moments = _piecewise_linear_evdf_moments(velocity, distribution)
+    mean_v = selected_moments["mean"]
+    variance = selected_moments["variance"]
+    sigma_v = selected_moments["sigma"]
+    central_third_moment = selected_moments["third"]
+    central_fourth_moment = selected_moments["fourth"]
+    skewness = selected_moments["skewness"]
+    excess_kurtosis = selected_moments["excess_kurtosis"]
 
     # Quantify how the inferred velocity marginal changes across the same
     # regularization candidates used by GCV. This is a numerical sensitivity
@@ -644,19 +712,20 @@ def reconstruct_thomson_evdf(
             )
         except ValueError:
             continue
-        candidate_mean = integral(velocity * candidate_distribution)
-        candidate_centred = velocity - candidate_mean
-        candidate_variance = integral(
-            candidate_centred**2 * candidate_distribution
-        )
-        if not np.isfinite(candidate_variance) or candidate_variance <= 0.0:
+        try:
+            candidate_moments = _piecewise_linear_evdf_moments(
+                velocity, candidate_distribution
+            )
+        except ValueError:
             continue
+        candidate_mean = candidate_moments["mean"]
+        candidate_variance = candidate_moments["variance"]
+        candidate_sigma = candidate_moments["sigma"]
+        candidate_central_third = candidate_moments["third"]
+        candidate_central_fourth = candidate_moments["fourth"]
+        candidate_skewness = candidate_moments["skewness"]
+        candidate_excess_kurtosis = candidate_moments["excess_kurtosis"]
         regularization_candidate_distributions.append(candidate_distribution.copy())
-        candidate_sigma = float(np.sqrt(candidate_variance))
-        candidate_central_third = integral(candidate_centred**3 * candidate_distribution)
-        candidate_central_fourth = integral(candidate_centred**4 * candidate_distribution)
-        candidate_skewness = candidate_central_third / candidate_sigma**3
-        candidate_excess_kurtosis = candidate_central_fourth / candidate_variance**2 - 3.0
         candidate_temperature_eV = (
             9.1093837139e-31 * candidate_variance / 1.602176634e-19
         )
@@ -829,35 +898,37 @@ def reconstruct_thomson_evdf(
         "excess_kurtosis",
     ]
     if evdf_covariance_available:
-        spacing_weights = np.empty_like(velocity)
-        spacing_weights[0] = 0.5 * (velocity[1] - velocity[0])
-        spacing_weights[-1] = 0.5 * (velocity[-1] - velocity[-2])
-        spacing_weights[1:-1] = 0.5 * (velocity[2:] - velocity[:-2])
-        raw_m1 = spacing_weights * velocity
-        raw_m2 = spacing_weights * velocity**2
-        raw_m3 = spacing_weights * velocity**3
-        raw_m4 = spacing_weights * velocity**4
-        m1 = mean_v
-        m2 = integral(velocity**2 * distribution)
-        m3 = integral(velocity**3 * distribution)
-        m4 = integral(velocity**4 * distribution)
-        central_m3 = central_third_moment
-        central_m4 = central_fourth_moment
+        # Differentiate the exact piecewise-linear moment functionals. The
+        # EVDF covariance is on normalized nodal densities, so each raw-moment
+        # derivative includes the normalization constraint (w_k - m_k*w_0).
+        norm_weights = selected_moments["normalization_weights"]
+        raw_weights = selected_moments["raw_moment_weights"]
+        raw_values = selected_moments["raw_moments"]
+        m1, m2, m3, m4 = raw_values[1:5]
+        raw_gradients = [
+            (raw_weights[index] - raw_values[index + 1] * norm_weights)
+            / selected_moments["normalization"]
+            for index in range(4)
+        ]
+        raw_m1, raw_m2, raw_m3, raw_m4 = raw_gradients
         variance_gradient = raw_m2 - 2.0*m1*raw_m1
         sigma_gradient = variance_gradient / (2.0*sigma_v)
         temperature_gradient = (
             electron_mass / elementary_charge
         ) * variance_gradient
+        central_m3 = central_third_moment
         central_m3_gradient = (
-            raw_m3 + (-3.0*m2 + 6.0*m1**2)*raw_m1 - 3.0*m1*raw_m2
+            raw_m3 - 3.0*m1*raw_m2
+            + (-3.0*m2 + 6.0*m1**2)*raw_m1
         )
         skewness_gradient = (
             central_m3_gradient / variance**1.5
             - 1.5*central_m3*variance_gradient / variance**2.5
         )
+        central_m4 = central_fourth_moment
         central_m4_gradient = (
-            raw_m4 + (-4.0*m3 + 12.0*m1*m2 - 12.0*m1**3)*raw_m1
-            - 4.0*m1*raw_m3 + 6.0*m1**2*raw_m2
+            raw_m4 - 4.0*m1*raw_m3 + 6.0*m1**2*raw_m2
+            + (-4.0*m3 + 12.0*m1*m2 - 12.0*m1**3)*raw_m1
         )
         kurtosis_gradient = (
             central_m4_gradient / variance**2
