@@ -2160,16 +2160,96 @@ def analyze_thomson_spectral_distribution(
                 "background_signal": background.copy(),
                 **options,
             }
-        if use_relativistic_inverse and (
-            scattering_angle_uncertainty_rad is not None
-            or laser_wavelength_uncertainty_nm is not None
-            or float(laser_angle_covariance_nm_rad) != 0.0
-        ):
-            raise ValueError(
-                "laser/scattering geometry covariance propagation is currently supported "
-                "by the non-relativistic projected-EVDF inverse only; use the dedicated "
-                "relativistic multi-view geometry uncertainty workflow"
+        if use_relativistic_inverse:
+            # Propagate calibration covariance through the exact relativistic
+            # inverse.  Central finite differences hold the selected
+            # regularization fixed, making this a local first-order covariance.
+            sigma_laser = 0.0 if laser_wavelength_uncertainty_nm is None else float(laser_wavelength_uncertainty_nm)
+            sigma_angle = 0.0 if scattering_angle_uncertainty_rad is None else float(scattering_angle_uncertainty_rad)
+            cross_geometry = float(laser_angle_covariance_nm_rad)
+            geometry_covariance = np.asarray(
+                [[sigma_laser**2, cross_geometry], [cross_geometry, sigma_angle**2]],
+                dtype=float,
             )
+            if not np.all(np.isfinite(geometry_covariance)) or sigma_laser < 0.0 or sigma_angle < 0.0:
+                raise ValueError("laser wavelength and scattering-angle uncertainties must be finite and non-negative")
+            geometry_scale = max(float(np.max(np.abs(geometry_covariance))), np.finfo(float).tiny)
+            if float(np.linalg.eigvalsh(geometry_covariance)[0]) < -1e-10 * geometry_scale:
+                raise ValueError("joint laser-wavelength/scattering-angle covariance must be positive semidefinite")
+            if np.any(geometry_covariance != 0.0):
+                nominal_inverse = result["projected_evdf_inference"]
+                nominal_regularization = float(nominal_inverse["regularization_strength"])
+                nominal_pdf = nominal_inverse.get("projected_evdf_s_m")
+                if nominal_pdf is None:
+                    nominal_pdf = nominal_inverse.get("regularized_candidate_evdf_s_m")
+                if nominal_pdf is None:
+                    raise ValueError("relativistic geometry propagation requires a returned projected EVDF")
+                nominal_pdf = np.asarray(nominal_pdf, dtype=float)
+                derivative_columns = []
+                perturbations = (
+                    (0, max(abs(float(laser_wavelength_nm))*1e-6, sigma_laser*1e-2, 1e-9)),
+                    (1, max(1e-6, sigma_angle*1e-2)),
+                )
+                for coordinate, step in perturbations:
+                    if geometry_covariance[coordinate, coordinate] == 0.0 and not np.any(geometry_covariance[coordinate, :] != 0.0):
+                        derivative_columns.append(np.zeros_like(nominal_pdf))
+                        continue
+                    plus_kwargs = dict(evdf_kwargs)
+                    minus_kwargs = dict(evdf_kwargs)
+                    plus_kwargs["regularization_strength"] = nominal_regularization
+                    minus_kwargs["regularization_strength"] = nominal_regularization
+                    if coordinate == 0:
+                        if float(laser_wavelength_nm) - step <= 0.0:
+                            raise ValueError("laser wavelength uncertainty is outside the local positive-wavelength domain")
+                        plus_kwargs["laser_wavelength_nm"] = float(laser_wavelength_nm) + step
+                        minus_kwargs["laser_wavelength_nm"] = float(laser_wavelength_nm) - step
+                    else:
+                        if not 0.0 < float(scattering_angle_rad) - step < np.pi or not 0.0 < float(scattering_angle_rad) + step < np.pi:
+                            raise ValueError("scattering-angle uncertainty is outside the local (0, pi) geometry domain")
+                        plus_kwargs["scattering_angle_rad"] = float(scattering_angle_rad) + step
+                        minus_kwargs["scattering_angle_rad"] = float(scattering_angle_rad) - step
+                    plus_result = evdf_solver(**plus_kwargs)
+                    minus_result = evdf_solver(**minus_kwargs)
+                    def _candidate_pdf(item):
+                        value = item.get("projected_evdf_s_m")
+                        if value is None:
+                            value = item.get("regularized_candidate_evdf_s_m")
+                        if value is None:
+                            raise ValueError("relativistic geometry sensitivity solve did not return a projected EVDF")
+                        return np.asarray(value, dtype=float)
+                    plus_pdf = _candidate_pdf(plus_result)
+                    minus_pdf = _candidate_pdf(minus_result)
+                    if plus_pdf.shape != nominal_pdf.shape or minus_pdf.shape != nominal_pdf.shape:
+                        raise ValueError("relativistic geometry sensitivity changed the EVDF velocity-grid shape")
+                    derivative_columns.append((plus_pdf - minus_pdf) / (2.0 * step))
+                geometry_jacobian = np.column_stack(derivative_columns)
+                geometry_evdf_covariance = geometry_jacobian @ geometry_covariance @ geometry_jacobian.T
+                geometry_evdf_covariance = 0.5 * (geometry_evdf_covariance + geometry_evdf_covariance.T)
+                candidate_covariance = nominal_inverse.get("regularized_candidate_covariance")
+                if candidate_covariance is None:
+                    candidate_covariance = nominal_inverse.get("projected_evdf_covariance")
+                if candidate_covariance is not None:
+                    candidate_covariance = np.asarray(candidate_covariance, dtype=float)
+                    if candidate_covariance.shape != geometry_evdf_covariance.shape:
+                        raise ValueError("relativistic EVDF covariance shape does not match geometry sensitivity")
+                    total_candidate_covariance = candidate_covariance + geometry_evdf_covariance
+                    nominal_inverse["regularized_candidate_covariance_including_geometry"] = total_candidate_covariance
+                    nominal_inverse["regularized_candidate_standard_uncertainty_including_geometry_s_per_m"] = np.sqrt(np.maximum(np.diag(total_candidate_covariance), 0.0))
+                    if nominal_inverse.get("projected_evdf_s_m") is not None:
+                        nominal_inverse["evdf_covariance_including_geometry"] = total_candidate_covariance
+                        nominal_inverse["projected_evdf_covariance_including_geometry"] = total_candidate_covariance
+                        nominal_inverse["projected_evdf_standard_uncertainty_including_geometry_s_per_m"] = np.sqrt(np.maximum(np.diag(total_candidate_covariance), 0.0))
+                nominal_inverse["geometry_uncertainty_covariance_included"] = True
+                nominal_inverse["scattering_geometry_covariance_status"] = "first_order_central_finite_difference_fixed_regularization"
+                nominal_inverse["laser_wavelength_uncertainty_nm"] = sigma_laser
+                nominal_inverse["scattering_angle_uncertainty_rad"] = sigma_angle
+                nominal_inverse["laser_angle_covariance_nm_rad"] = cross_geometry
+                nominal_inverse["laser_angle_geometry_covariance"] = geometry_covariance
+                nominal_inverse["evdf_geometry_sensitivity_jacobian"] = geometry_jacobian
+                nominal_inverse["evdf_geometry_covariance"] = geometry_evdf_covariance
+                nominal_inverse["geometry_sensitivity_regularization_strength"] = nominal_regularization
+            else:
+                result["projected_evdf_inference"]["geometry_uncertainty_covariance_included"] = False
         if not use_relativistic_inverse:
             if scattering_angle_uncertainty_rad is not None:
                 evdf_kwargs["scattering_angle_uncertainty_rad"] = float(scattering_angle_uncertainty_rad)
@@ -2223,7 +2303,12 @@ def analyze_thomson_spectral_distribution(
             candidate_pdf = inverse.get("regularized_candidate_evdf_s_m")
             projected_pdf = primary_pdf if primary_pdf is not None else candidate_pdf
             evdf_primary_identified = primary_pdf is not None
-            moment_covariance_source = inverse.get("projected_evdf_covariance") if evdf_primary_identified else None
+            moment_covariance_source = (
+                inverse.get("evdf_covariance_including_geometry")
+                if evdf_primary_identified else None
+            )
+            if moment_covariance_source is None and evdf_primary_identified:
+                moment_covariance_source = inverse.get("projected_evdf_covariance")
         else:
             projected_pdf = inverse.get("evdf_parallel_s_per_m")
             # A regularized inverse is not promoted to a data-identified
