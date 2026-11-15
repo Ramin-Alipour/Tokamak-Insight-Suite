@@ -815,7 +815,7 @@ def _fit_noncollective(
         "likelihood": "Gaussian_or_GLS",
         "fitted_spectrum": fitted,
         "captured_spectral_probability": captured_spectral_probability,
-        "spectral_bin_integration": ("exact_Student_t_CDF_finite_volume_bin_averages" if distribution_model == "kappa" else "exact_Gaussian_CDF_finite_volume_bin_averages"),
+        "spectral_bin_integration": "exact_Gaussian_CDF_finite_volume_bin_averages",
         "fit_parameters": fit_parameters,
         "fit_parameter_names": fit_parameter_names,
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),

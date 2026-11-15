@@ -1130,8 +1130,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
                     "electron_velocity_vector_m_s": None,
                     "electron_velocity_covariance_m2_s2": None,
                     "reason": (
-                        "The spectral-fit Jacobian nullspace overlaps one or more "
-                        "view-flow projections; correlated flow uncertainty is not identifiable."
+                        "The fit-derived flow-projection covariance is required; the spectral-fit "
+                        "Jacobian nullspace overlaps one or more view-flow projections, "
+                        "so correlated flow uncertainty is not identifiable."
                     ),
                 }
             else:
