@@ -222,6 +222,40 @@ def bootstrap_reference_pca_basis(
     }
 
 
+def _normalized_evdf_second_moment_jacobians(distribution, velocity_grid_m_s, voxel_volume_m3_s3):
+    """Return central first/second moments and their exact normalized-EVDF Jacobians.
+
+    The derivatives are with respect to nodal EVDF densities while respecting
+    the normalization quotient. In particular, dC_ij/df_a =
+    w_a * ((v_a-u)_i (v_a-u)_j - C_ij); omitting the -C_ij term gives an
+    incorrect covariance whenever the input covariance is not exactly tangent
+    to the normalization constraint.
+    """
+    f = _real_array(distribution, "normalized_evdf_m3_s3", 1)
+    velocity = _real_array(velocity_grid_m_s, "velocity_grid_m_s", 2)
+    volume = _real_array(voxel_volume_m3_s3, "voxel_volume_m3_s3", 1)
+    if velocity.shape != (f.size, 3) or volume.shape != f.shape:
+        raise ValueError("EVDF, Cartesian velocity grid and voxel-volume dimensions are inconsistent")
+    if np.any(f < 0.0) or np.any(volume <= 0.0):
+        raise ValueError("EVDF values must be non-negative and voxel volumes strictly positive")
+    normalization = float(volume @ f)
+    if not np.isclose(normalization, 1.0, rtol=1e-9, atol=1e-11):
+        raise ValueError("normalized_evdf_m3_s3 must integrate to one using voxel_volume_m3_s3")
+    probability_mass = f * volume
+    mean_velocity = np.einsum("a,ai->i", probability_mass, velocity)
+    centered = velocity - mean_velocity[None, :]
+    velocity_covariance = np.einsum("a,ai,aj->ij", probability_mass, centered, centered)
+    velocity_covariance = 0.5 * (velocity_covariance + velocity_covariance.T)
+    mean_jacobian = centered.T * volume[None, :]
+    covariance_jacobian = np.empty((9, f.size), dtype=float)
+    for voxel, vector in enumerate(centered):
+        derivative = volume[voxel] * (
+            np.outer(vector, vector) - velocity_covariance
+        )
+        covariance_jacobian[:, voxel] = derivative.reshape(9)
+    return mean_velocity, velocity_covariance, mean_jacobian, covariance_jacobian
+
+
 def derive_3d_evdf_third_moments(
     normalized_evdf_m3_s3, velocity_grid_m_s, voxel_volume_m3_s3, *,
     distribution_covariance=None, data_identifiable=True,
@@ -267,6 +301,17 @@ def derive_3d_evdf_third_moments(
         scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
         if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12 * scale):
             raise ValueError("distribution_covariance must be symmetric")
+        covariance_eigenvalues = np.linalg.eigvalsh(
+            0.5 * (covariance + covariance.T)
+        )
+        covariance_tolerance = 1e-10 * max(
+            float(np.max(np.abs(covariance_eigenvalues))),
+            np.finfo(float).tiny,
+        )
+        if float(covariance_eigenvalues.min()) < -covariance_tolerance:
+            raise ValueError(
+                "distribution_covariance must be positive semidefinite"
+            )
         third_jacobian = np.empty((27, distribution.size), dtype=float)
         for voxel, vector in enumerate(centered):
             derivative = volume[voxel] * (
@@ -461,13 +506,13 @@ def reconstruct_multiview_3d_evdf(
     # These are distribution moments, not a claim that every velocity-space
     # degree of freedom is independently identifiable.
     probability_mass = distribution * volume
-    candidate_mean_velocity = np.einsum("i,ij->j", probability_mass, velocity)
-    centered_velocity = velocity - candidate_mean_velocity[None, :]
-    candidate_velocity_covariance = np.einsum(
-        "i,ij,ik->jk", probability_mass, centered_velocity, centered_velocity
-    )
-    candidate_velocity_covariance = 0.5 * (
-        candidate_velocity_covariance + candidate_velocity_covariance.T
+    (
+        candidate_mean_velocity,
+        candidate_velocity_covariance,
+        mean_jacobian,
+        covariance_jacobian,
+    ) = _normalized_evdf_second_moment_jacobians(
+        distribution, velocity, volume
     )
     # The kinetic electron-temperature tensor is the central second velocity
     # moment converted from m^2/s^2 to eV: T_ij[eV] = (m_e/e) C_ij.
@@ -483,16 +528,8 @@ def reconstruct_multiview_3d_evdf(
     )
     mean_velocity_covariance = None
     velocity_covariance_tensor_covariance = None
+    temperature_tensor_covariance_eV2 = None
     if identifiable:
-        mean_jacobian = velocity.T * volume[None, :]
-        covariance_jacobian = np.empty((9, nvoxel), dtype=float)
-        for voxel, vector in enumerate(velocity):
-            derivative = volume[voxel] * (
-                np.outer(vector, vector)
-                - np.outer(vector, candidate_mean_velocity)
-                - np.outer(candidate_mean_velocity, vector)
-            )
-            covariance_jacobian[:, voxel] = derivative.reshape(9)
         mean_velocity_covariance = (
             mean_jacobian @ distribution_covariance @ mean_jacobian.T
         )
@@ -505,6 +542,10 @@ def reconstruct_multiview_3d_evdf(
         velocity_covariance_tensor_covariance = 0.5 * (
             velocity_covariance_tensor_covariance
             + velocity_covariance_tensor_covariance.T
+        )
+        temperature_scale = electron_mass_kg / elementary_charge_C
+        temperature_tensor_covariance_eV2 = (
+            temperature_scale**2 * velocity_covariance_tensor_covariance
         )
     higher_moments = derive_3d_evdf_third_moments(
         distribution, velocity, volume,
@@ -534,6 +575,10 @@ def reconstruct_multiview_3d_evdf(
         "velocity_covariance_tensor_m2_s2": candidate_velocity_covariance.copy() if identifiable else None,
         "mean_velocity_covariance_m2_s2": mean_velocity_covariance,
         "velocity_covariance_tensor_covariance_m4_s4": velocity_covariance_tensor_covariance,
+        "temperature_tensor_covariance_eV2": temperature_tensor_covariance_eV2,
+        "temperature_tensor_covariance_order": (
+            "row-major [xx, xy, xz, yx, yy, yz, zx, zy, zz]"
+        ),
         "candidate_mean_velocity_vector_m_s": candidate_mean_velocity.copy(),
         "candidate_velocity_covariance_tensor_m2_s2": candidate_velocity_covariance.copy(),
         "temperature_tensor_eV": (
