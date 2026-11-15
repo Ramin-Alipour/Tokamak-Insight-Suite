@@ -143,6 +143,17 @@ def fit_kinetic_spectrum_with_background(*args: Any, **kwargs: Any) -> Any:
     return fit_noncollective_kinetic_thomson_with_background(*args, **kwargs)
 
 
+def run_advanced_physics(model: str, *args: Any, **kwargs: Any) -> Any:
+    """Execute an explicitly named advanced Thomson physics kernel via the product API.
+
+    This boundary is for advanced, composable physical kernels that are not
+    separate catalog analysis IDs. Catalog workflows must continue to use
+    run_analysis(), which enforces product ownership and registered contracts.
+    """
+    from .physics.cts_full_physics import run_advanced_thomson_physics
+    return run_advanced_thomson_physics(model, *args, **kwargs)
+
+
 def propagate_full_em_cts_ray_geometry_uncertainty(*args: Any, **kwargs: Any) -> Any:
     """Propagate supplied ray/equilibrium geometry uncertainty through Full-EM CTS refits."""
     from .physics.thomson_workflow import propagate_full_em_cts_ray_geometry_uncertainty as propagate
@@ -151,6 +162,7 @@ def propagate_full_em_cts_ray_geometry_uncertainty(*args: Any, **kwargs: Any) ->
 __all__ = [
     "PRODUCT_ID",
     "run_analysis",
+    "run_advanced_physics",
     "analyze_spectra",
     "analyze_cts",
     "reconstruct_profiles",
