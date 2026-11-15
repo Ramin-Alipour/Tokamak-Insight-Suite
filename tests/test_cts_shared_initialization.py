@@ -25,40 +25,47 @@ def _case():
     return probe_frequency, frequency, geometry, species, fractions, spectrum
 
 
-def test_shared_cts_seed_matches_legacy_physical_initializer():
-    from tokamak_analysis.cts_analysis import (
-        estimate_cts_optimizer_initial_parameters as legacy_estimator,
+def test_shared_cts_seed_matches_the_physical_seed_equations():
+    f0, frequency, geometry, species, fractions, spectrum = _case()
+    result = estimate_cts_optimizer_initial_parameters(
+        frequency,
+        spectrum,
+        probe_frequency_Hz=f0,
+        scattering_geometry=geometry,
+        ion_species=species,
+        ion_fractions=fractions,
     )
 
-    f0, frequency, geometry, species, fractions, spectrum = _case()
-    actual = estimate_cts_optimizer_initial_parameters(
-        frequency,
-        spectrum,
-        probe_frequency_Hz=f0,
-        scattering_geometry=geometry,
-        ion_species=species,
-        ion_fractions=fractions,
-    )
-    legacy = legacy_estimator(
-        frequency,
-        spectrum,
-        probe_frequency_Hz=f0,
-        scattering_geometry=geometry,
-        ion_species=species,
-        ion_fractions=fractions,
-    )
-    for key in (
-        "electron_density_m3",
-        "electron_temperature_eV",
-        "ion_temperature_eV",
-        "spectral_centroid_Hz",
-        "spectral_rms_width_Hz",
-        "spectral_core_rms_width_Hz",
-    ):
-        assert actual[key] == pytest.approx(legacy[key], rel=2e-13, abs=0.0)
-    assert actual["role"] == "optimizer_initial_estimates_only"
-    assert actual["scattering_wave_number_rad_m"] > 0.0
-    assert actual["effective_ion_mass_amu"] == pytest.approx(2.014)
+    baseline = np.quantile(spectrum, 0.05)
+    weights = np.maximum(spectrum - baseline, 0.0)
+    total = np.sum(weights)
+    centroid = np.sum(weights * frequency) / total
+    offsets = frequency - centroid
+    variance = np.sum(weights * offsets**2) / total
+    angle = geometry["scattering_angle_rad"]
+    q = 4.0 * np.pi * f0 / 299792458.0 * np.sin(angle / 2.0)
+    electron_velocity_rms = 2.0 * np.pi * np.sqrt(variance) / q
+    expected_te = 9.1093837015e-31 * electron_velocity_rms**2 / 1.602176634e-19
+
+    order = np.argsort(np.abs(offsets))
+    cumulative = np.cumsum(weights[order]) / total
+    selected = order[cumulative <= 0.68]
+    if selected.size < 3:
+        selected = order[: min(max(3, int(np.ceil(0.25 * frequency.size))), frequency.size)]
+    core_weights = weights[selected]
+    core_variance = np.sum(core_weights * offsets[selected]**2) / np.sum(core_weights)
+    ion_velocity_rms = 2.0 * np.pi * np.sqrt(max(core_variance, variance * 1e-6)) / q
+    expected_ti = 2.014 * 1.66053906660e-27 * ion_velocity_rms**2 / 1.602176634e-19
+    expected_ne_seed = 8.8541878128e-12 * expected_te * q**2 / 1.602176634e-19
+
+    assert result["electron_temperature_eV"] == pytest.approx(expected_te, rel=2e-13)
+    assert result["ion_temperature_eV"] == pytest.approx(expected_ti, rel=2e-13)
+    assert result["electron_density_m3"] == pytest.approx(expected_ne_seed, rel=2e-13)
+    assert result["spectral_centroid_Hz"] == pytest.approx(centroid, rel=2e-13)
+    assert result["spectral_rms_width_Hz"] == pytest.approx(np.sqrt(variance), rel=2e-13)
+    assert result["role"] == "optimizer_initial_estimates_only"
+    assert result["scattering_wave_number_rad_m"] == pytest.approx(q, rel=2e-13)
+    assert result["effective_ion_mass_amu"] == pytest.approx(2.014)
 
 
 def test_product_cts_seed_wrapper_uses_the_shared_initializer():
