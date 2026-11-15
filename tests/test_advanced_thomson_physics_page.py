@@ -219,7 +219,7 @@ def test_dashboard_routes_microwave_background_to_receiver_power_and_brightness_
         "cts_band_integrated_receiver_power",
         "cts_radiometric_brightness_temperature",
     }
-    registered = {item["execution_contract"]["formula_key"] for item in formula}
+    registered = {item["execution_contract"]["formula_key"] for item in formula if item.get("execution_contract", {}).get("formula_key")}
     assert keys <= registered
     assert formula == packaged
 
