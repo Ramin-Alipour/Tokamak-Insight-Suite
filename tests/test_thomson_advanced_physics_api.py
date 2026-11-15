@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-import tokamak_analysis.cts_full_physics as physics
+import tis.products.thomson.physics.cts_full_physics as physics
 
 
 @pytest.mark.parametrize(
