@@ -422,7 +422,8 @@ def reconstruct_thomson_evdf(
         raise ValueError("The current Doppler inversion is non-relativistic and requires every represented |v_parallel| < 0.1 c; use a relativistic forward model otherwise")
 
     # Integrate the nodal EVDF density over velocity space with the same
-    # trapezoidal measure used for normalization and physical moments.
+    # trapezoidal measure used for normalization; physical moments of the
+    # resulting piecewise-linear interpolant use exact interval quadrature.
     # Without these weights, nonuniform velocity grids solve an unweighted
     # sum of delta-lines rather than the physical integral int f(v)K(lambda|v)dv.
     forward, forward_metadata = _projected_evdf_forward_matrix(
@@ -913,10 +914,8 @@ def reconstruct_thomson_evdf(
     # Boltzmann's constant is not part of this eV conversion.
     directional_temperature_ev = electron_mass * variance / elementary_charge
 
-    # Propagate the normalized-EVDF covariance into the actual physical
-    # velocity moments.  The covariance above is on the sampled probability
-    # density, so use the same trapezoidal quadrature measure as the reported
-    # moments; do not treat the grid samples as independent point estimates.
+    # Propagate normalized-EVDF covariance through the exact piecewise-linear
+    # moment functionals; do not treat nodal values as independent point estimates.
     moment_covariance = None
     moment_standard_uncertainty = None
     moment_covariance_order = [
@@ -1415,68 +1414,32 @@ def reconstruct_thomson_evdf(
                 "model_averaged_projected_evdf_standard_uncertainty_s_per_m"
             ] = np.sqrt(np.maximum(np.diag(total_model_averaged_covariance), 0.0))
 
-            # Propagate candidate-family uncertainty from the model-averaged
-            # projected EVDF into its actual physical moments.  This is a
-            # distinct covariance from the selected non-parametric inverse.
-            quadrature = np.empty_like(velocity)
-            quadrature[0] = 0.5 * (velocity[1] - velocity[0])
-            quadrature[-1] = 0.5 * (velocity[-1] - velocity[-2])
-            quadrature[1:-1] = 0.5 * (velocity[2:] - velocity[:-2])
-            model_mean = float(integral(velocity * model_averaged_pdf))
-            model_raw2 = float(integral(velocity**2 * model_averaged_pdf))
-            model_raw3 = float(integral(velocity**3 * model_averaged_pdf))
-            model_raw4 = float(integral(velocity**4 * model_averaged_pdf))
-            model_variance = model_raw2 - model_mean**2
-            if np.isfinite(model_variance) and model_variance > 0.0:
-                model_sigma = float(np.sqrt(model_variance))
-                model_central3 = (
-                    model_raw3 - 3.0*model_mean*model_raw2 + 2.0*model_mean**3
-                )
-                model_central4 = (
-                    model_raw4 - 4.0*model_mean*model_raw3
-                    + 6.0*model_mean**2*model_raw2 - 3.0*model_mean**4
-                )
-                raw1_gradient = quadrature * velocity
-                raw2_gradient = quadrature * velocity**2
-                raw3_gradient = quadrature * velocity**3
-                raw4_gradient = quadrature * velocity**4
-                variance_gradient = raw2_gradient - 2.0*model_mean*raw1_gradient
-                central3_gradient = (
-                    raw3_gradient
-                    + (-3.0*model_raw2 + 6.0*model_mean**2)*raw1_gradient
-                    - 3.0*model_mean*raw2_gradient
-                )
-                central4_gradient = (
-                    raw4_gradient
-                    + (-4.0*model_raw3 + 12.0*model_mean*model_raw2
-                       - 12.0*model_mean**3)*raw1_gradient
-                    - 4.0*model_mean*raw3_gradient
-                    + 6.0*model_mean**2*raw2_gradient
-                )
-                model_moment_jacobian = np.vstack((
-                    raw1_gradient,
-                    variance_gradient,
-                    variance_gradient/(2.0*model_sigma),
-                    (9.1093837139e-31/1.602176634e-19)*variance_gradient,
-                    central3_gradient/model_variance**1.5
-                    - 1.5*model_central3*variance_gradient/model_variance**2.5,
-                    central4_gradient/model_variance**2
-                    - 2.0*model_central4*variance_gradient/model_variance**3,
-                ))
-                moment_order = [
-                    "mean_velocity_parallel_m_s",
-                    "velocity_parallel_variance_m2_s2",
-                    "velocity_parallel_standard_deviation_m_s",
-                    "directional_equivalent_temperature_eV",
-                    "skewness",
-                    "excess_kurtosis",
-                ]
-                model_moments = np.array([
-                    model_mean, model_variance, model_sigma,
-                    9.1093837139e-31*model_variance/1.602176634e-19,
-                    model_central3/model_sigma**3,
-                    model_central4/model_variance**2-3.0,
-                ])
+            # Propagate candidate-family uncertainty through the same exact
+            # piecewise-linear physical-moment functionals as the selected EVDF.
+            model_moments_exact = _piecewise_linear_evdf_moments(
+                velocity, model_averaged_pdf
+            )
+            model_moment_jacobian = model_moments_exact["moment_jacobian"]
+            moment_order = [
+                "mean_velocity_parallel_m_s",
+                "velocity_parallel_variance_m2_s2",
+                "velocity_parallel_standard_deviation_m_s",
+                "directional_equivalent_temperature_eV",
+                "central_third_velocity_moment_m3_s3",
+                "central_fourth_velocity_moment_m4_s4",
+                "skewness",
+                "excess_kurtosis",
+            ]
+            model_moments = np.array([
+                model_moments_exact["mean"],
+                model_moments_exact["variance"],
+                model_moments_exact["sigma"],
+                9.1093837139e-31 * model_moments_exact["variance"] / 1.602176634e-19,
+                model_moments_exact["third"],
+                model_moments_exact["fourth"],
+                model_moments_exact["skewness"],
+                model_moments_exact["excess_kurtosis"],
+            ])
                 between_moment_covariance = (
                     model_moment_jacobian @ between_model_covariance
                     @ model_moment_jacobian.T
@@ -1631,14 +1594,11 @@ def reconstruct_thomson_evdf(
         "velocity_moment_jacobian": (
             moment_jacobian if evdf_covariance_available else None
         ),
-        "velocity_moment_quadrature": "exact_intervalwise_three_point_Gauss_Legendre_for_piecewise_linear_EVDF_through_fourth_order",
-        "velocity_moment_jacobian": (
-            moment_jacobian if evdf_covariance_available else None
-        ),
         "velocity_moment_covariance": moment_covariance,
         "velocity_moment_covariance_including_scattering_geometry": moment_covariance_including_geometry,
         "scattering_geometry_velocity_moment_covariance": geometry_moment_covariance,
-        "velocity_moment_standard_uncertainty": moment_standard_uncertainty,        "velocity_moment_covariance_including_geometry": moment_covariance_including_geometry,
+        "velocity_moment_standard_uncertainty": moment_standard_uncertainty,
+        "velocity_moment_covariance_including_geometry": moment_covariance_including_geometry,
         "velocity_moment_standard_uncertainty_including_geometry": ({name: float(np.sqrt(max(float(moment_covariance_including_geometry[i, i]), 0.0))) for i, name in enumerate(moment_covariance_order)} if moment_covariance_including_geometry is not None else None),
 
         "velocity_moment_uncertainty_status": (
@@ -1647,7 +1607,7 @@ def reconstruct_thomson_evdf(
             "unavailable_evdf_covariance_not_finite_or_not_identifiable"
         ),
         "velocity_moment_covariance_interpretation": (
-            "First-order Jacobian propagation of the conditional normalized-EVDF covariance through the same trapezoidal first-to-fourth velocity moments; correlations among flow, directional variance, equivalent temperature, central third/fourth moments, skewness and kurtosis are retained."
+            "First-order Jacobian propagation of the conditional normalized-EVDF covariance through exact interval-wise piecewise-linear moments; correlations among flow, directional variance, equivalent temperature, central third/fourth moments, skewness and kurtosis are retained."
             if moment_covariance is not None else
             "No physical-moment uncertainty is reported because a finite normalized-EVDF covariance is unavailable."
         ),
