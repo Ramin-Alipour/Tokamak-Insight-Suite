@@ -159,7 +159,7 @@ def test_collective_kappa_dispatch_forwards_mixed_kinetic_populations():
 def test_gyrotropic_public_api_closes_multi_view_projections_to_3d_flow():
     from tokamak_analysis.thomson_anisotropic_inference import _gaussian_bin_average
 
-    wavelength = np.linspace(1062.0, 1066.0, 161)
+    wavelength = np.linspace(1034.0, 1094.0, 601)
     laser = 1064.0
     angle = np.pi / 2.0
     magnetic = np.array([0.0, 0.0, 1.0])
@@ -169,10 +169,10 @@ def test_gyrotropic_public_api_closes_multi_view_projections_to_3d_flow():
         [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
     ])
-    true_flow = np.array([1.2e4, -8.0e3, 1.5e4])
+    true_flow = np.array([1.2e5, -8.0e4, 1.5e5])
     projections = directions @ true_flow
     pitch2 = (directions @ magnetic) ** 2
-    directional_temperature = 350.0 + (900.0 - 350.0) * pitch2
+    directional_temperature = 5.0 + (12.0 - 5.0) * pitch2
     spectra = []
     for temperature, flow in zip(directional_temperature, projections):
         sigma_v = np.sqrt(1.602176634e-19 * temperature / 9.1093837015e-31)
@@ -189,7 +189,10 @@ def test_gyrotropic_public_api_closes_multi_view_projections_to_3d_flow():
         magnetic_field_unit=magnetic,
         scattering_vector_unit=directions,
         instrument_response_matrix=np.eye(wavelength.size),
-        temperature_bounds_eV=(20.0, 3000.0),
+        signal_uncertainty=np.full((len(directions), wavelength.size), 1.0e-4),
+        initial_temperature_parallel_eV=12.0,
+        initial_temperature_perpendicular_eV=5.0,
+        temperature_bounds_eV=(1.0, 100.0),
         flow_bounds_m_s=(-1.0e6, 1.0e6),
     )
     flow = result["three_dimensional_flow_inference"]

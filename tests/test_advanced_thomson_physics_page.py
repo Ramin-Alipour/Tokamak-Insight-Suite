@@ -318,6 +318,23 @@ def test_general_tensor_raw_spectrum_solver_is_exposed_through_advanced_api_and_
     assert result["reportable_as_inferred_parameter"] is True
     np.testing.assert_allclose(result["electron_temperature_tensor_eV"],tensor,rtol=3e-3,atol=0.5)
 
+    # Per-view response matrices must each conserve probability. A pooled sum
+    # across views can hide view-dependent losses and is not a valid contract.
+    weights = np.arange(1.0, len(q) + 1.0)
+    weights /= weights.sum()
+    nonconserving_response = (
+        weights[:, None, None]
+        * np.broadcast_to(np.eye(wavelength.size), (len(q), wavelength.size, wavelength.size))
+    )
+    with pytest.raises(ValueError, match="each response matrix"):
+        run_advanced_thomson_physics(
+            model, wavelength, np.asarray(spectra), laser_wavelength_nm=laser,
+            scattering_angle_rad=angle, scattering_vector_unit=q,
+            instrument_response_matrix=nonconserving_response,
+            signal_uncertainty=np.full((len(q), wavelength.size), 1e-4),
+            initial_temperature_tensor_eV=np.eye(3)*350.0,
+        )
+
 
 def test_physical_multiview_evdf_model_is_exposed_in_dashboard_contract():
     from tis.ui.advanced_thomson_physics_page import MODEL_LABELS, MODEL_PHYSICS_NOTES, EXAMPLES
