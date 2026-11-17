@@ -354,7 +354,13 @@ def reconstruct_thomson_evdf(
     The Doppler mapping uses the non-relativistic single-particle relation
     delta_omega = q dot v, with |q|/|k_i| = 2 sin(theta/2). The latent spectrum
     is convolved with the supplied measured response matrix before fitting.
-    The fitted background is an explicit input. Regularization strength is optional: when omitted, the solver selects it by generalized cross-validation (GCV); a finite positive value overrides that selection. The result is
+    The fitted background is an explicit input. A finite-window response may
+    have sub-unit column sums when calibrated probability falls outside the
+    measured wavelength interval; this is accepted only with the explicit
+    allow_finite_window_response_loss flag and is never renormalized.
+    Regularization strength is optional: when omitted, the solver selects it
+    by generalized cross-validation (GCV); a finite positive value overrides
+    that selection. The result is
     shape-normalized; absolute density is not inferred by this inverse routine.
 
     Optional model_discrepancy_covariance and systematic_covariance are additive
@@ -1697,7 +1703,12 @@ def reconstruct_thomson_evdf(
             "conditional on the supplied covariance matrices"
             if residual_covariance is not None else "no signal or background uncertainty supplied; unweighted fit"
         ),
-        "forward_model": "non-relativistic single-particle Doppler projection with measured response and trapezoidal velocity-space quadrature",
+        "forward_model": "non-relativistic single-particle Doppler projection with measured source/detector response and trapezoidal velocity-space quadrature",
+        "finite_window_response_loss_allowed": bool(allow_finite_window_response_loss),
+        "composed_response_column_integrals": response.sum(axis=0).copy(),
+        "finite_window_response_loss_preserved": bool(
+            np.any(response.sum(axis=0) < 1.0 - 1e-10)
+        ),
         "velocity_quadrature_weights_m_s": forward_metadata["velocity_quadrature_weights_m_s"],
         "forward_operator_column_integrated_spectral_power_per_unit_evdf": forward_metadata["column_integrated_spectral_power_per_unit_evdf"],
         "velocity_integral_discretization": "trapezoidal_finite_volume_measure_on_nodal_EVDF_density",
