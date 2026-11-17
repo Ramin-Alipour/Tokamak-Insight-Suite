@@ -4788,6 +4788,10 @@ def analyze_thomson_spectra(
                     scattering_angle_rad=float(scattering_angle_rad),
                     instrument_response_matrix=channel_instrument_responses[channel_index],
                     background_signal=fitted_background,
+                    # Calibrated finite-window kernels may have sub-unit edge
+                    # columns because off-window probability is genuine loss.
+                    # The EVDF solver preserves that loss without renormalizing.
+                    allow_finite_window_response_loss=True,
                     laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
                     laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
                     regularization_strength=None,
