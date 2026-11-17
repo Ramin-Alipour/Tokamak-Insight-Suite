@@ -24,7 +24,7 @@ def _finite_vector(values, name, minimum=9):
     return out
 
 
-def _response_matrix(values, n):
+def _response_matrix(values, n, *, allow_finite_window_loss=False):
     raw = np.asarray(values)
     if raw.dtype.kind not in "iuf":
         raise ValueError("instrument_response_matrix must contain real numeric values")
@@ -34,10 +34,18 @@ def _response_matrix(values, n):
     sums = response.sum(axis=0)
     if np.any(sums <= 0):
         raise ValueError("every instrument-response column must have positive integrated response")
-    if not np.allclose(sums, 1.0, rtol=1e-8, atol=1e-10):
+    if allow_finite_window_loss:
+        if np.any(sums > 1.0 + 1e-8):
+            raise ValueError(
+                "finite-window instrument-response columns must have integrated "
+                "probability no greater than one; missing edge probability is "
+                "preserved and never renormalized"
+            )
+    elif not np.allclose(sums, 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError(
             "measured instrument-response matrix columns must already sum to one; "
-            "the calibrated response operator is not renormalized"
+            "set allow_finite_window_response_loss=True only for a calibrated "
+            "finite-window operator whose missing edge probability is known"
         )
     return response
 
@@ -332,6 +340,7 @@ def reconstruct_thomson_evdf(
     background_uncertainty=None,
     background_covariance=None,
     signal_background_cross_covariance=None,
+    allow_finite_window_response_loss=False,
     model_discrepancy_covariance=None,
     systematic_covariance=None,
     scattering_angle_uncertainty_rad=None,
@@ -396,7 +405,13 @@ def reconstruct_thomson_evdf(
             or not 0.0 < float(boundary_mass_fraction_limit) < 1.0):
         raise ValueError("boundary_mass_fraction_limit must lie strictly between 0 and 1")
 
-    response = _response_matrix(instrument_response_matrix, wavelength.size)
+    if not isinstance(allow_finite_window_response_loss, (bool, np.bool_)):
+        raise ValueError("allow_finite_window_response_loss must be boolean")
+    response = _response_matrix(
+        instrument_response_matrix,
+        wavelength.size,
+        allow_finite_window_loss=bool(allow_finite_window_response_loss),
+    )
     if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
         raise ValueError("Supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither.")
     laser_source_metadata = None
