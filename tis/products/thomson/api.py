@@ -37,6 +37,11 @@ def analyze_spectra(*args: Any, **kwargs: Any) -> Any:
     identifies absolute density. Total absolute uncertainty is withheld
     without the joint density/EVDF covariance; a single view does not identify
     the full three-dimensional pressure tensor, heat flux or unrestricted EVDF.
+
+    For non-relativistic projected-EVDF inversion, the measured incident-laser
+    spectrum and detector response are now passed as separate operators. The
+    solver composes source broadening before detector response exactly once;
+    finite-window edge probability is retained rather than renormalized.
     """
     return _run(1, *args, **kwargs)
 
