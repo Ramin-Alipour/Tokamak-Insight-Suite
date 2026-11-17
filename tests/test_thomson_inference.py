@@ -2455,3 +2455,43 @@ def test_analysis1_kappa_poisson_formula_registry_and_product_contract_are_synch
     )
     assert "κ>3/2" in formula["equation"]
     assert any(item["name"] == "observed_counts" for item in entry["execution_contract"]["input_specs"])
+
+def test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_response():
+    from tis.physics.shared.thomson_inference import _laser_source_response
+    from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
+
+    x, intrinsic, _ = _spectral_case(100.0)
+    source_wavelength = np.linspace(531.90, 532.10, 101)
+    source_sigma = 0.018
+    source_density = np.exp(
+        -0.5 * ((source_wavelength - 532.0) / source_sigma) ** 2
+    )
+    source_operator, _ = _laser_source_response(
+        x, 532.0, source_wavelength, source_density
+    )
+    background = 25.0 + 0.1 * (x - 532.0)
+    measured = source_operator @ (intrinsic - 25.0) + background
+
+    result = product_analyze_spectra(
+        x,
+        measured[None, :],
+        [0.2],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response=np.eye(x.size),
+        laser_spectrum_wavelength_nm=source_wavelength,
+        laser_spectrum_density_per_nm=source_density,
+    )
+
+    evdf = result["channels"][0]["electron_velocity_distribution"]
+    assert evdf["analysis_status"] in {
+        "completed", "conditional_regularized_candidate"
+    }, evdf
+    assert evdf["laser_spectral_profile"]["source_profile_used"] is True
+    assert evdf["background_source"].startswith(
+        "nuisance background fitted by the selected primary"
+    )
+    closure = result["channels"][0]["spectral_distribution"][
+        "projected_evdf_spectral_moment_closure"
+    ]
+    assert closure["measured_instrument_and_laser_response_applied"] is True
