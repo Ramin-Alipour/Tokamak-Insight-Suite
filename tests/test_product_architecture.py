@@ -526,3 +526,13 @@ def test_advanced_thomson_dashboard_does_not_bypass_product_api():
     assert "from tis.products.thomson.api import run_advanced_physics" in source
     assert "from tis.products.thomson.physics.cts_full_physics import run_advanced_thomson_physics" not in source
     assert "run_advanced_thomson_physics(" not in source
+
+def test_thomson_package_root_reexports_complete_public_api():
+    """The package loaded by the product catalog must expose every public API callable."""
+    from tis.products import load_product_api
+    from tis.products.thomson import api as implementation_api
+
+    package_api = load_product_api("thomson-scattering")
+    assert package_api.__all__ == implementation_api.__all__
+    for name in implementation_api.__all__:
+        assert getattr(package_api, name) is getattr(implementation_api, name)
