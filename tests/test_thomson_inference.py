@@ -2469,8 +2469,13 @@ def test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_r
     source_operator, _ = _laser_source_response(
         x, 532.0, source_wavelength, source_density
     )
+    detector_kernel = np.array([0.2, 0.6, 0.2])
+    from tis.physics.shared.thomson_inference import _response_for_channel
+    detector_response = _response_for_channel(
+        detector_kernel, 0, 1, x.size, x
+    )
     background = 25.0 + 0.1 * (x - 532.0)
-    measured = source_operator @ (intrinsic - 25.0) + background
+    measured = detector_response @ source_operator @ (intrinsic - 25.0) + background
 
     result = product_analyze_spectra(
         x,
@@ -2478,7 +2483,7 @@ def test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_r
         [0.2],
         laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi / 2,
-        instrument_response=np.eye(x.size),
+        instrument_response=detector_kernel,
         laser_spectrum_wavelength_nm=source_wavelength,
         laser_spectrum_density_per_nm=source_density,
     )
