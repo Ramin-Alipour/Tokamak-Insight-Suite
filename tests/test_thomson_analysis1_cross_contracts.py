@@ -473,3 +473,39 @@ def test_multiview_3d_evdf_rejects_non_psd_model_discrepancy_covariance():
             model_discrepancy_covariance=invalid,
             regularization_strength=0.01,
         )
+
+def test_analysis1_source_detector_evdf_operator_is_registered_and_reached_by_product_api():
+    import json
+    from pathlib import Path
+    from tis.products.api import resolve_product_analysis, load_product_api
+
+    root = Path(__file__).resolve().parents[1]
+    formula_records = json.loads(
+        (root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    packaged_formula_records = json.loads(
+        (root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert formula_records == packaged_formula_records
+    formula = next(
+        item for item in formula_records
+        if item.get("execution_contract", {}).get("formula_key")
+        == "optical_thomson_source_detector_projected_evdf_operator"
+    )
+    assert formula["execution_contract"]["function_link"] == (
+        "tis.physics.shared.thomson_evdf._projected_evdf_forward_matrix"
+    )
+    assert {
+        "instrument_response_matrix",
+        "laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm",
+        "allow_finite_window_response_loss",
+    } <= {
+        item["name"] for item in formula["execution_contract"]["input_specs"]
+    }
+    solver = resolve_product_analysis("thomson-scattering", 1)
+    assert solver.__module__ == "tis.products.thomson.physics.thomson_workflow"
+    product_api = load_product_api("thomson-scattering")
+    assert callable(product_api.analyze_spectra)
+    dashboard_source = (root / "app.py").read_text(encoding="utf-8")
+    assert "laser_spectrum_wavelength_nm" in dashboard_source
+    assert "laser_spectrum_density_per_nm" in dashboard_source
