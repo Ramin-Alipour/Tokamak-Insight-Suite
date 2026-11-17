@@ -2242,10 +2242,17 @@ def analyze_thomson_spectra(
             for row in range(nchan_cov) for col in range(nchan_cov) if row != col
         )
     results = []
+    # Keep the calibrated detector operator separate from the composed
+    # laser-source × detector operator. The projected-EVDF solver accepts the
+    # former and composes the measured laser profile itself; passing the
+    # already-composed matrix would either double-convolve the source or fail
+    # its unit-column detector-response contract.
+    channel_instrument_responses = []
     channel_responses = []
     for i in range(y.shape[0]):
         xi = xs[i]
         response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1], xi)
+        channel_instrument_responses.append(response.copy())
         source_response = None
         source_profile_metadata = None
         if laser_spectrum_wavelength_nm is not None:
@@ -4779,8 +4786,10 @@ def analyze_thomson_spectra(
                     y[channel_index],
                     laser_wavelength_nm=float(laser_wavelength_nm),
                     scattering_angle_rad=float(scattering_angle_rad),
-                    instrument_response_matrix=channel_responses[channel_index],
+                    instrument_response_matrix=channel_instrument_responses[channel_index],
                     background_signal=fitted_background,
+                    laser_spectrum_wavelength_nm=laser_spectrum_wavelength_nm,
+                    laser_spectrum_density_per_nm=laser_spectrum_density_per_nm,
                     regularization_strength=None,
                     velocity_grid_m_s=velocity_grid,
                     velocity_points=int(evdf_velocity_points),
