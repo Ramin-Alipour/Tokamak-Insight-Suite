@@ -79,8 +79,20 @@ def test_thomson_profile_and_spectral_distribution_remain_distinct_workflows():
     distribution_outputs = {
         item["name"] for item in distribution["execution_contract"]["output_specs"]
     }
-    assert "laser_wavelength_nm" not in distribution_inputs
-    assert "scattering_angle_rad" not in distribution_inputs
+    assert {"laser_wavelength_nm", "scattering_angle_rad"} <= distribution_inputs
+    geometry_specs = {
+        item["name"]: item
+        for item in distribution["execution_contract"]["input_specs"]
+    }
+    for geometry_name in ("laser_wavelength_nm", "scattering_angle_rad"):
+        geometry_spec = geometry_specs[geometry_name]
+        assert geometry_spec["required"] is False
+        assert geometry_spec["required_when"]["physical_model"] == [
+            "non_collective_maxwellian",
+            "kappa",
+            "relativistic_maxwell_juttner",
+        ]
+        assert geometry_spec["required_when"]["projected_evdf_options"] == ["non-null"]
     assert "electron_velocity_distribution" not in distribution_outputs
     assert "observed_sigma_nm" in distribution_outputs
     distribution_inputs = {

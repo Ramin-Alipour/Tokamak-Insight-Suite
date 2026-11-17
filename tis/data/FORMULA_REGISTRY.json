@@ -12575,6 +12575,133 @@
     }
   },
   {
+    "name": "Finite-bin Poisson optical Thomson inference for isotropic Kappa electrons",
+    "equation": "ν=2κ−1; s=σ_λ√((ν−2)/ν); p(λ)=Γ(κ)/[s√(νπ)Γ(κ−1/2)]·[1+(λ−μ)²/(νs²)]^(−κ), κ>3/2; μ_i=Σ_j R_ij A s√(νπ)Γ(κ−1/2)/Γ(κ)·[T_ν((e_{j+1}−μ)/s)−T_ν((e_j−μ)/s)]+b_iΔλ_i; D=2Σ_i[μ_i−n_i+n_i ln(n_i/μ_i)]; I_ab=Σ_i μ_i⁻¹(∂μ_i/∂p_a)(∂μ_i/∂p_b)",
+    "inputs": "Non-negative integer detector counts n_i; calibrated wavelength-bin edges; measured normalized response matrix R; laser wavelength λ0; scattering angle θ; optional laser/angle calibration covariance; initial and bounded Kappa index κ.",
+    "output": "Electron temperature from the finite second moment [eV], q-parallel flow [m s^-1], Kappa index, fitted expected counts, Poisson deviance and local expected-Fisher parameter covariance.",
+    "assumptions": "Single-scattering non-collective optical Thomson line shape; isotropic non-relativistic finite-variance Kappa distribution; κ>3/2; independent Poisson detector counts; known calibrated detector response and scattering geometry; non-negative linear detector-space background. The Student-t projected spectral family is not the generalized plasma dispersion function and does not represent arbitrary or unrestricted 3-D EVDFs.",
+    "status": "D",
+    "category": "Thomson scattering — Analysis 1",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "formula_key": "thomson_kappa_finite_bin_poisson_inference",
+      "function_link": "tis.physics.shared.thomson_inference.fit_optical_thomson_poisson_counts",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing finite-volume bin centres",
+          "required": true
+        },
+        {
+          "name": "observed_counts",
+          "unit": "non-negative integer detector counts per wavelength bin",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; 0<θ<π",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured normalized wavelength response matrix/kernel",
+          "required": false
+        },
+        {
+          "name": "kappa_initial",
+          "unit": "dimensionless; κ>3/2",
+          "required": false
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless finite-variance bounds; lower>3/2",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1σ",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1σ",
+          "required": false
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm·rad",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; second-moment temperature"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; q-parallel flow"
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; fitted tail index"
+        },
+        {
+          "name": "fit_covariance",
+          "unit": "6×6 expected-Fisher local parameter covariance"
+        },
+        {
+          "name": "expected_counts",
+          "unit": "expected detector counts per wavelength bin"
+        },
+        {
+          "name": "poisson_deviance",
+          "unit": "dimensionless"
+        }
+      ],
+      "uncertainty_model": "The expected Poisson Fisher matrix is I=J_mu^T diag(1/mu) J_mu, where J_mu is the derivative of the exact finite-bin, response-convolved expected-count operator with respect to amplitude, centroid, standard deviation, two background endpoint rates and kappa. The inverse is reported only after rank and condition-number checks. Laser/angle covariance and fitted-centre/geometry cross-covariance are propagated through the physical Te and q-flow transformation.",
+      "algorithm": "Integrate the Student-t CDF over each finite wavelength bin using ν=2κ−1 and s=σλ√((ν−2)/ν), apply the calibrated response to bin-integrated counts, add a non-negative detector-space linear background, and minimize the signed Poisson deviance. Fit κ jointly with the spectral width and centroid. Derive Te from the second-moment width, then transform the joint fit/geometry covariance to (Te,vq).",
+      "limitations": [
+        "Kappa is constrained to κ>3/2; no infinite-variance distribution is assigned a finite Te.",
+        "The model is a one-dimensional isotropic Kappa/Student-t spectral marginal, not a generalized Landau-dispersion solution or arbitrary EVDF reconstruction.",
+        "Independent Poisson counts are assumed; correlated readout noise, overdispersion, response uncertainty and additive Gaussian discrepancy covariance are not included.",
+        "Counts alone do not identify absolute density or calibrated scattered power."
+      ],
+      "test_links": [
+        "tests/test_thomson_inference.py::test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index"
+      ]
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield et al.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "scope": "Thomson scattering kinematics and spectral inference framework."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "calibrated_integer_photon_count_spectrum_and_measured_response",
+    "execution_scope": "finite_bin_kappa_optical_thomson_count_space_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "subanalysis": "Optical Thomson finite-variance Kappa Poisson count-space inference",
+    "implementation_trace": {
+      "function_link": "tis.physics.shared.thomson_inference.fit_optical_thomson_poisson_counts",
+      "formula_key": "thomson_kappa_finite_bin_poisson_inference",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_inference.py::test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index"
+      ]
+    }
+  },
+  {
     "name": "Normalized 3-D EVDF velocity and temperature-tensor covariance propagation",
     "equation": "u=Σ_a f_a ΔV_a v_a; C=Σ_a f_a ΔV_a(v_a−u)(v_a−u)^T; ∂u/∂f_a=ΔV_a(v_a−u); ∂C/∂f_a=ΔV_a[(v_a−u)(v_a−u)^T−C]; T_eV=(m_e/e)C; Cov(vec(T_eV))=(m_e/e)^2 J_C Cov(f) J_C^T",
     "inputs": "Normalized 3-D EVDF nodal density f_a, Cartesian velocity voxels v_a, voxel-volume quadrature ΔV_a, and optional full covariance of normalized EVDF nodal densities.",
@@ -12651,5 +12778,192 @@
     },
     "description": "Analytic uncertainty propagation for mean flow and the full Cartesian 3-D EVDF temperature tensor.",
     "formula_key": "thomson_normalized_3d_evdf_temperature_covariance"
+  },
+  {
+    "name": "Relativistic projected optical Thomson EVDF calibration-geometry covariance",
+    "equation": "C_g=[[σ_λ0²,Cov(λ0,θ)],[Cov(λ0,θ),σ_θ²]]; J_g[:,0]=∂f_q/∂λ0; J_g[:,1]=∂f_q/∂θ; C_f,total=C_f,spectral+J_g C_g J_gᵀ",
+    "inputs": "Calibrated optical Thomson spectrum, measured wavelength response and background, exact relativistic Thomson or polarized Compton single-electron kernel, projected velocity grid, laser-wavelength standard uncertainty, scattering-angle standard uncertainty, and their cross-covariance.",
+    "output": "First-order calibration-geometry contribution to the normalized one-dimensional q-parallel EVDF covariance, combined with the spectral inverse covariance when the inverse supplies a covariance.",
+    "assumptions": "The calibration covariance is a finite positive-semidefinite 2×2 matrix. The geometry Jacobian is evaluated by central finite differences of the exact relativistic inverse while holding the nominally selected Tikhonov regularization strength fixed. The spectral covariance, measured response, background, incident polarization and velocity grid are held fixed in the geometry perturbations. The result is local first-order uncertainty, not a nonlinear posterior or experimental calibration. Calibration-geometry errors are treated as independent of spectral measurement noise; no geometry/spectrum cross-covariance is supplied or inferred.",
+    "status": "D",
+    "category": "Thomson spectral distribution — relativistic projected EVDF",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+      "formula_key": "optical_thomson_relativistic_projected_evdf_geometry_covariance",
+      "input_specs": [
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; positive calibrated incident wavelength",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; 0 < theta < pi",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; non-negative one-sigma uncertainty",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; non-negative one-sigma uncertainty",
+          "required": false
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm rad; covariance of wavelength and angle",
+          "required": false
+        },
+        {
+          "name": "projected_evdf_options.kinematics",
+          "unit": "relativistic_thomson or compton",
+          "required": true
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "positive fixed strength; otherwise selected by nominal GCV and held fixed for sensitivity solves",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "evdf_geometry_sensitivity_jacobian",
+          "unit": "(s m^-1)/nm and (s m^-1)/rad; velocity-node by geometry-parameter matrix"
+        },
+        {
+          "name": "evdf_geometry_covariance",
+          "unit": "(s m^-1)^2; covariance contribution from wavelength/angle calibration"
+        },
+        {
+          "name": "evdf_covariance_including_geometry",
+          "unit": "(s m^-1)^2; combined covariance when the primary EVDF is data-identified"
+        },
+        {
+          "name": "geometry_uncertainty_equations",
+          "unit": "equation and method provenance"
+        },
+        {
+          "name": "geometry_covariance_independent_of_spectral_noise_assumed",
+          "unit": "boolean provenance flag"
+        }
+      ],
+      "prerequisites": [
+        "The nominal relativistic inverse must return a normalized projected EVDF and its selected regularization strength.",
+        "Perturbed geometry must remain inside the positive laser-wavelength and (0, pi) scattering-angle domain.",
+        "The inverse velocity-grid shape must remain unchanged across the central finite-difference solves."
+      ],
+      "uncertainty_model": "C_f,geometry=J_g C_g J_gᵀ, with J_g obtained from central finite differences of the complete exact relativistic inverse. This contribution is added to the solver's fixed-active-set spectral covariance. The finite-difference solves use the same signal/background/discrepancy/systematic covariance and the same selected regularization strength. When the data-only inverse is rank deficient, the covariance remains attached to the conditional regularized candidate and is not promoted to a primary identified EVDF. Calibration-geometry and spectral measurement errors are assumed independent; no cross-covariance between these error classes is inferred.",
+      "limitations": [
+        "First-order local propagation; large geometry uncertainties can require nonlinear sampling.",
+        "Response-matrix, background-model, polarization and velocity-grid calibration uncertainties are held fixed and are not included by this term.",
+        "A single view remains a one-dimensional q-parallel marginal and does not identify an unrestricted 3-D EVDF.",
+        "No experimental validation is claimed."
+      ],
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_rejects_non_psd_joint_geometry_covariance"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "relativistic_calibrated_optical_spectrum_to_projected_evdf_with_joint_laser_geometry_covariance",
+      "input_data_level": "calibrated_measured_spectrum_and_measured_response",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Spectral distribution — relativistic projected EVDF uncertainty"
+    },
+    "implementation_trace": {
+      "function_link": "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+      "formula_key": "optical_thomson_relativistic_projected_evdf_geometry_covariance",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance",
+        "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_rejects_non_psd_joint_geometry_covariance"
+      ]
+    },
+    "description": "Propagates correlated incident-laser wavelength and scattering-angle calibration uncertainty through the exact relativistic Thomson/Compton projected-EVDF inverse and combines it with the spectral inverse covariance without changing the primary-versus-conditional identifiability gate."
+  },
+  {
+    "name": "Fourth central velocity-moment tensor and radial kurtosis of a 3-D Thomson EVDF",
+    "equation": "M_ijkl = ∫ f(v)(v_i-u_i)(v_j-u_j)(v_k-u_k)(v_l-u_l) d³v; M_iijj = ∫ f(v)|v-u|⁴ d³v",
+    "inputs": "Normalized 3-D electron EVDF f(v) [s³ m⁻³], mean velocity u [m s⁻¹], velocity-space voxel volumes [m³ s⁻³]",
+    "output": "M_ijkl [m⁴ s⁻⁴]; radial fourth central moment M_iijj [m⁴ s⁻⁴]; covariance [m⁸ s⁻⁸]",
+    "assumptions": "The EVDF is normalized with the supplied voxel-volume quadrature. Primary moments and covariance are reported only when the stacked multi-view measurement operator identifies the EVDF. The covariance is first-order delta-method propagation conditional on the fixed inverse active set.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.advanced_inference.derive_3d_evdf_third_moments",
+      "formula_key": "thomson_evdf_fourth_central_moment_tensor",
+      "input_specs": [
+        {
+          "name": "normalized_evdf_m3_s3",
+          "unit": "s³ m⁻³",
+          "description": "Normalized reconstructed 3-D EVDF on the supplied velocity-space voxels.",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s⁻¹; n_voxel x 3",
+          "description": "Cartesian velocity vector at each voxel.",
+          "required": true
+        },
+        {
+          "name": "voxel_volume_m3_s3",
+          "unit": "m³ s⁻³",
+          "description": "Positive velocity-space quadrature volume for each voxel.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "fourth_central_velocity_moment_tensor_m4_s4",
+          "unit": "m⁴ s⁻⁴; 3x3x3x3",
+          "description": "Fourth central Cartesian velocity moment tensor, primary only for data-identifiable EVDF."
+        },
+        {
+          "name": "candidate_fourth_central_velocity_moment_tensor_m4_s4",
+          "unit": "m⁴ s⁻⁴; 3x3x3x3",
+          "description": "Fourth central moment tensor of the regularized candidate."
+        },
+        {
+          "name": "fourth_central_velocity_moment_covariance_m8_s8",
+          "unit": "m⁸ s⁻⁸; 81x81",
+          "description": "First-order delta-method covariance propagated from normalized EVDF covariance."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_m4_s4",
+          "unit": "m⁴ s⁻⁴",
+          "description": "Trace-pair contraction M_iijj, equal to the EVDF average of |v-u|⁴."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_variance_m8_s8",
+          "unit": "m⁸ s⁻⁸",
+          "description": "Propagated variance of the radial fourth central moment."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_standard_uncertainty_m4_s4",
+          "unit": "m⁴ s⁻⁴",
+          "description": "One-sigma uncertainty of the radial fourth central moment."
+        }
+      ],
+      "prerequisites": [
+        "A normalized 3-D EVDF identified by the stacked multi-view measurement operator.",
+        "Velocity-space quadrature volumes consistent with the forward model."
+      ],
+      "uncertainty_model": "Exact normalized-EVDF first-order Jacobian for the fourth central tensor, including all four mean-velocity derivative terms; covariance is J C_f J^T.",
+      "limitations": [
+        "The fourth moment is conditional on the supplied finite velocity grid and its quadrature; grid truncation is not folded into the statistical covariance.",
+        "Regularization does not promote data-null-space modes to identified EVDF structure.",
+        "No relativistic interpretation of fourth velocity moments is implied when velocities approach c."
+      ],
+      "test_links": [
+        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_fourth_central_moment_tensor_and_covariance_match_quadrature_and_finite_difference"
+      ],
+      "note": "Executable fourth-order 3-D EVDF moment and covariance closure; verified against direct discrete quadrature and finite-difference Jacobians, not experimental validation."
+    }
   }
 ]
