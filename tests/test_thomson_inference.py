@@ -2493,6 +2493,9 @@ def test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_r
         "completed", "conditional_regularized_candidate"
     }, evdf
     assert evdf["laser_spectral_profile"]["source_profile_used"] is True
+    assert evdf["finite_window_response_loss_allowed"] is True
+    assert evdf["finite_window_response_loss_preserved"] is True
+    assert np.any(evdf["composed_response_column_integrals"] < 1.0)
     assert evdf["background_source"].startswith(
         "nuisance background fitted by the selected primary"
     )
