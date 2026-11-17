@@ -12965,5 +12965,103 @@
       ],
       "note": "Executable fourth-order 3-D EVDF moment and covariance closure; verified against direct discrete quadrature and finite-difference Jacobians, not experimental validation."
     }
+  },
+  {
+    "name": "Optical Thomson measured-source and finite-window detector forward operator for projected EVDF",
+    "equation": "λ_s(λ_i,v_q)=λ_i[1−(q/k_i)v_q/c], q/k_i=2sin(θ/2); p_i(λ_i)=P_i(λ_i)/∫P_i dλ_i; L_{mn}=∫p_i(λ_i) ϕ_m(λ_n λ_i/λ_0)dλ_i; A=R L K W_v; μ_j=b_j+Σ_l A_{jl}f_q(v_l); Σ_j A_{jl}Δλ_j≤Δv_l, with finite-window probability loss retained and never renormalized.",
+    "inputs": "Calibrated wavelength bins; normalized measured incident-laser spectral density or monochromatic-source assumption; laser reference wavelength; scattering angle; calibrated detector response matrix or finite-window response kernel; explicit fitted background; q-parallel velocity grid and non-negative EVDF coefficients.",
+    "output": "Finite-volume source-broadened and detector-convolved forward operator, predicted measured spectrum, integrated response probability per velocity node, and normalized q-parallel EVDF conditional on the selected velocity grid and regularization.",
+    "assumptions": "Optically thin, single-scattering, non-relativistic Thomson limit with Δω=q·v; incident laser spectral profile is normalized by its measured area; source wavelength scaling follows elastic Thomson kinematics; detector response acts after source broadening; wavelength and velocity integrals use finite-volume quadrature. A single view identifies only the one-dimensional marginal along q. Sub-unit response-column sums represent probability outside the finite measured wavelength window and must not be renormalized.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "formula_key": "optical_thomson_source_detector_projected_evdf_operator",
+      "function_link": "tis.physics.shared.thomson_evdf._projected_evdf_forward_matrix",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; increasing calibrated detector-bin centres",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1; strictly increasing projected-velocity nodes",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; reference incident wavelength",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; 0 < θ < π",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "detector-bin probability operator; normalized or explicitly finite-window sub-stochastic",
+          "required": true
+        },
+        {
+          "name": "laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm",
+          "unit": "nm and normalized measured spectral density per nm",
+          "required": false
+        },
+        {
+          "name": "background_signal",
+          "unit": "calibrated detector spectral density",
+          "required": true
+        },
+        {
+          "name": "allow_finite_window_response_loss",
+          "unit": "boolean explicit opt-in for calibrated sub-stochastic finite-window response",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "forward_operator",
+          "unit": "detector spectral-density response per unit EVDF coefficient"
+        },
+        {
+          "name": "column_integrated_spectral_power_per_unit_evdf",
+          "unit": "dimensionless captured probability per velocity node; may be below one at finite-window edges"
+        },
+        {
+          "name": "predicted_spectrum",
+          "unit": "calibrated detector spectral density"
+        }
+      ],
+      "prerequisites": [
+        "The detector response is applied after incident-source spectral broadening.",
+        "A measured laser profile is supplied as calibrated spectral density and normalized internally by its integrated area.",
+        "Finite-window probability outside the measured wavelength interval is retained as loss, not folded back into measured bins or silently renormalized.",
+        "A single scattering geometry cannot identify transverse EVDF structure."
+      ],
+      "uncertainty_model": "The forward operator is deterministic conditional on the supplied wavelength grids, source profile, scattering geometry and detector response. Uncertainties in those inputs must be propagated by the parent Analysis-1 inference; no missing covariance is inferred by this operator.",
+      "limitations": [
+        "Non-relativistic elastic Thomson mapping; relativistic recoil and Klein-Nishina effects use the separate relativistic projected-EVDF solver.",
+        "One scattering view recovers only the q-parallel marginal.",
+        "Finite-window truncation and regularization limit recoverable velocity support and resolution."
+      ],
+      "test_links": [
+        "tests/test_thomson_inference.py::test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_response",
+        "tests/test_thomson_evdf.py::test_evdf_rejects_non_normalized_measured_response_without_renormalizing"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "function_links": [
+        "tis.physics.shared.thomson_evdf.reconstruct_thomson_evdf",
+        "tis.physics.shared.thomson_inference._laser_source_response"
+      ],
+      "execution_scope": "measured_laser_spectrum_to_detector_response_composed_projected_evdf_forward_operator",
+      "input_data_level": "calibrated_laser_spectrum_measured_thomson_spectrum_and_measured_detector_response",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson / projected EVDF"
+    },
+    "description": "The primary optical Thomson fit and its projected-EVDF inverse now use the same physical ordering: elastic source-spectrum wavelength scaling followed by the measured detector response. The inverse receives the base detector operator and measured source profile separately, so it composes each exactly once. Calibrated finite-window edge losses remain sub-stochastic rather than being normalized away."
   }
 ]
