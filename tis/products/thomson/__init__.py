@@ -20,6 +20,8 @@ from .api import (
     fit_kinetic_spectrum_with_background,
     propagate_full_em_cts_ray_geometry_uncertainty,
     fit_cts_ion_species_flows,
+    calculate_cts_tabulated_evdf_spectrum,
+    calculate_cts_multi_population_tabulated_evdf_spectrum,
     fit_full_em_cts_spatial_profiles,
 )
 
@@ -44,5 +46,7 @@ __all__ = [
     "fit_kinetic_spectrum_with_background",
     "propagate_full_em_cts_ray_geometry_uncertainty",
     "fit_cts_ion_species_flows",
+    "calculate_cts_tabulated_evdf_spectrum",
+    "calculate_cts_multi_population_tabulated_evdf_spectrum",
     "fit_full_em_cts_spatial_profiles",
 ]
