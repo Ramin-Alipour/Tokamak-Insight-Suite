@@ -1547,8 +1547,14 @@ def test_projected_evdf_physical_moment_covariance_matches_normalized_finite_dif
         ]
 
     expected_covariance = numerical_jacobian @ covariance @ numerical_jacobian.T
+    selected_indices = [
+        result["moment_covariance_order"].index(key) for key in keys
+    ]
+    selected_covariance = result["moment_covariance"][
+        np.ix_(selected_indices, selected_indices)
+    ]
     np.testing.assert_allclose(
-        result["moment_covariance"],
+        selected_covariance,
         expected_covariance,
         rtol=3.0e-5,
         atol=1.0e-12,
