@@ -2082,6 +2082,7 @@ def test_analysis_81_contract_exposes_the_physical_evdf_moment_covariance():
         "skewness",
         "excess_kurtosis",
         "standardized_sixth_central_moment",
+        "excess_sixth_standardized_central_moment",
         "standardized_sixth_cumulant",
         "moment_covariance",
         "parallel_projected_pressure_heat_flux_joint_covariance",
