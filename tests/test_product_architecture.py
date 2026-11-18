@@ -527,6 +527,54 @@ def test_advanced_thomson_dashboard_does_not_bypass_product_api():
     assert "from tis.products.thomson.physics.cts_full_physics import run_advanced_thomson_physics" not in source
     assert "run_advanced_thomson_physics(" not in source
 
+
+def test_cts_species_flow_and_full_em_spatial_solvers_use_public_product_api(monkeypatch):
+    from tis.products.thomson import api
+
+    calls = []
+
+    def fake_advanced(model, *args, **kwargs):
+        calls.append((model, args, kwargs))
+        return {"selected_model": model, "measured_input": args[0]}
+
+    monkeypatch.setattr(api, "run_advanced_physics", fake_advanced)
+
+    species_result = api.fit_cts_ion_species_flows(
+        "measured-cts-spectrum",
+        ion_species=["D+", "He2+"],
+        ion_fractions=[0.8, 0.2],
+        electron_density_m3=2.0e19,
+    )
+    spatial_result = api.fit_full_em_cts_spatial_profiles(
+        "measured-full-em-spectrum",
+        frequency_resolved_geometry="supplied-ray-volume",
+    )
+
+    assert species_result == {
+        "selected_model": "cts_multi_ion_flow_inference",
+        "measured_input": "measured-cts-spectrum",
+    }
+    assert spatial_result == {
+        "selected_model": "cts_full_em_spatial_profiles",
+        "measured_input": "measured-full-em-spectrum",
+    }
+    assert calls == [
+        (
+            "cts_multi_ion_flow_inference",
+            ("measured-cts-spectrum",),
+            {"ion_species": ["D+", "He2+"], "ion_fractions": [0.8, 0.2],
+             "electron_density_m3": 2.0e19},
+        ),
+        (
+            "cts_full_em_spatial_profiles",
+            ("measured-full-em-spectrum",),
+            {"frequency_resolved_geometry": "supplied-ray-volume"},
+        ),
+    ]
+    assert "fit_cts_ion_species_flows" in api.__all__
+    assert "fit_full_em_cts_spatial_profiles" in api.__all__
+
+
 def test_thomson_package_root_reexports_complete_public_api():
     """The package loaded by the product catalog must expose every public API callable."""
     from tis.products import load_product_api
