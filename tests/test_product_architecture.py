@@ -590,6 +590,31 @@ def test_cts_species_flow_and_full_em_spatial_solvers_use_public_product_api(mon
     assert "fit_full_em_cts_spatial_profiles" in api.__all__
 
 
+def test_tabulated_evdf_cts_forward_models_are_exposed_by_product_api(monkeypatch):
+    from tis.products.thomson import api
+
+    calls = []
+    monkeypatch.setattr(
+        api, "run_advanced_physics",
+        lambda model, *args, **kwargs: calls.append((model, args, kwargs)) or model,
+    )
+    measured = [1.0, 2.0, 3.0]
+    grid = [-3.0, -1.0, 1.0, 3.0]
+    pdf = [0.0, 0.25, 0.25, 0.0]
+    assert api.calculate_cts_tabulated_evdf_spectrum(
+        measured, electron_velocity_grid_m_s=grid,
+        electron_probability_density_s_m=pdf, ion_species=["D+"],
+    ) == "cts_tabulated_evdf_landau"
+    assert api.calculate_cts_multi_population_tabulated_evdf_spectrum(
+        measured, population_velocity_grids_m_s=[grid],
+        population_probability_densities_s_m=[pdf],
+    ) == "cts_multi_population_tabulated_evdf_landau"
+    assert calls[0][1] == (measured,)
+    assert calls[0][2]["electron_velocity_grid_m_s"] == grid
+    assert calls[1][1] == (measured,)
+    assert "calculate_cts_tabulated_evdf_spectrum" in api.__all__
+    assert "calculate_cts_multi_population_tabulated_evdf_spectrum" in api.__all__
+
 def test_thomson_package_root_reexports_complete_public_api():
     """The package loaded by the product catalog must expose every public API callable."""
     from tis.products import load_product_api
