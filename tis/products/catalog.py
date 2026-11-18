@@ -9,6 +9,22 @@ from tokamak_analysis.analysis_registry import (
     get_analysis,
 )
 
+# Thomson product-native callable ownership is the executable source of truth.
+# Scientific descriptions remain in the analysis catalogue; callable paths are
+# projected from this product-specific map for both Dashboard and execution.
+THOMSON_ENTRY_POINTS = {
+    1: ("thomson_workflow", "analyze_thomson_spectra"),
+    30: ("cts_analysis", "analyze_cts_spectrum_model"),
+    46: ("thomson_workflow", "reconstruct_thomson_profile_from_spectra"),
+    81: ("thomson_distribution", "analyze_thomson_spectral_distribution"),
+    82: ("thomson_workflow", "fit_gyrotropic_thomson_spectra"),
+    83: ("thomson_workflow", "fit_general_temperature_tensor_thomson_spectra"),
+    84: ("cts_full_physics", "analyze_landau_fdt_full_em_spectrum_converged"),
+    85: ("advanced_inference", "reconstruct_relativistic_optical_thomson_3d_evdf"),
+    86: ("thomson_temperature_tensor", "compare_general_temperature_tensor_thomson_models"),
+    87: ("thomson_scattering", "infer_thomson_path_averaged_density"),
+    88: ("advanced_inference", "reconstruct_optical_thomson_3d_evdf"),
+}
 _PRODUCT_SLUGS = {
     1: "thomson-scattering",
     2: "langmuir-electrostatic-probes",
@@ -64,6 +80,15 @@ def _build_product(family: dict) -> dict:
     product["product_status"] = "modular_monolith"
     product["api_module"] = _PRODUCT_API_MODULES[family["id"]]
     product["entry_points"] = [get_analysis(entry_id) for entry_id in family["entry_ids"]]
+    if family["id"] == 1:
+        # Keep the Dashboard callable contract identical to runtime resolution.
+        for entry in product["entry_points"]:
+            try:
+                entry["module"], entry["function"] = THOMSON_ENTRY_POINTS[entry["id"]]
+            except KeyError as exc:
+                raise RuntimeError(
+                    f"Thomson analysis {entry['id']} has no product-native callable"
+                ) from exc
     product["execution_entry_point_count"] = len(product["entry_points"])
     return product
 
