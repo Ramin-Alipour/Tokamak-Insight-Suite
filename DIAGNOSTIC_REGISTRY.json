@@ -9721,7 +9721,11 @@
         {
           "name": "standardized_sixth_cumulant",
           "unit": "dimensionless; kappa_6,q/sigma_q^6",
-          "description": "True standardized sixth cumulant, including the third- and fourth-central-moment terms; not mu_6/sigma_q^6 - 15."
+          "description": "True standardized sixth cumulant, including third- and fourth-central-moment terms; distinct from the legacy Gaussian-reference offset."
+        },
+        {
+          "name": "excess_sixth_standardized_central_moment",
+          "unit": "dimensionless; legacy Gaussian-reference offset mu_6,q/sigma_q^6 - 15"
         }
       ],
       "assumptions": [
