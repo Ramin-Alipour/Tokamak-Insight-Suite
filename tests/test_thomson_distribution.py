@@ -2485,3 +2485,106 @@ def test_relativistic_projected_evdf_geometry_covariance_is_registered():
     assert entry["execution_contract"]["calibrated_measurements_to_physics"] is True
     assert "J_g[:,0]=∂f_q/∂λ0" in entry["equation"] and "J_g[:,1]=∂f_q/∂θ" in entry["equation"]
     assert "tests/test_thomson_distribution.py::test_relativistic_projected_evdf_propagates_joint_laser_angle_geometry_covariance" in entry["execution_contract"]["test_links"]
+
+
+def test_projected_evdf_sixth_cumulant_matches_gaussian_and_skewed_mixture_closures():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-12.0, 12.0, 2401)
+    gaussian_sigma = 1.1
+    gaussian = np.exp(-0.5 * (velocity / gaussian_sigma) ** 2)
+    gaussian /= np.trapz(gaussian, velocity)
+    gaussian_result = _projected_evdf_physical_moments(velocity, gaussian)
+    assert gaussian_result["standardized_sixth_cumulant"] == pytest.approx(
+        0.0, abs=2.0e-3
+    )
+
+    weight_1, weight_2 = 0.63, 0.37
+    mean_1, mean_2 = -0.8, 1.45
+    sigma_1, sigma_2 = 0.72, 0.94
+    mixture = (
+        weight_1 * np.exp(-0.5 * ((velocity - mean_1) / sigma_1) ** 2) / (
+            np.sqrt(2.0 * np.pi) * sigma_1
+        )
+        + weight_2 * np.exp(-0.5 * ((velocity - mean_2) / sigma_2) ** 2) / (
+            np.sqrt(2.0 * np.pi) * sigma_2
+        )
+    )
+    mixture /= np.trapz(mixture, velocity)
+    result = _projected_evdf_physical_moments(velocity, mixture)
+
+    mean = weight_1 * mean_1 + weight_2 * mean_2
+    offsets = (mean_1 - mean, mean_2 - mean)
+    weights = (weight_1, weight_2)
+    variances = (sigma_1**2, sigma_2**2)
+    expected = {}
+    for order in (2, 3, 4, 6):
+        total = 0.0
+        for w, offset, variance in zip(weights, offsets, variances):
+            if order == 2:
+                component = offset**2 + variance
+            elif order == 3:
+                component = offset**3 + 3.0 * offset * variance
+            elif order == 4:
+                component = offset**4 + 6.0 * offset**2 * variance + 3.0 * variance**2
+            else:
+                component = (
+                    offset**6
+                    + 15.0 * offset**4 * variance
+                    + 45.0 * offset**2 * variance**2
+                    + 15.0 * variance**3
+                )
+            total += w * component
+        expected[order] = total
+
+    expected_cumulant = (
+        expected[6] / expected[2]**3
+        - 15.0 * expected[4] / expected[2]**2
+        - 10.0 * expected[3]**2 / expected[2]**3
+        + 30.0
+    )
+    assert result["standardized_sixth_central_moment"] == pytest.approx(
+        expected[6] / expected[2]**3, rel=2.0e-3
+    )
+    assert result["standardized_sixth_cumulant"] == pytest.approx(
+        expected_cumulant, rel=3.0e-3, abs=3.0e-3
+    )
+    assert result["excess_sixth_standardized_central_moment"] == pytest.approx(
+        result["standardized_sixth_cumulant"], rel=0.0, abs=0.0
+    )
+
+
+def test_projected_evdf_sixth_cumulant_covariance_uses_full_analytic_jacobian():
+    from tis.products.thomson.physics.thomson_distribution import (
+        _projected_evdf_physical_moments,
+    )
+
+    velocity = np.linspace(-5.0, 6.0, 81)
+    density = (
+        0.7 * np.exp(-0.5 * ((velocity + 0.45) / 1.2) ** 2)
+        + 0.3 * np.exp(-0.5 * ((velocity - 1.8) / 0.75) ** 2)
+    )
+    covariance = np.diag((0.012 * density + 1.0e-7) ** 2)
+    result = _projected_evdf_physical_moments(velocity, density, covariance)
+    key = "standardized_sixth_cumulant"
+    index = result["moment_covariance_order"].index(key)
+    numerical_gradient = np.empty(velocity.size)
+    for column in range(velocity.size):
+        step = max(abs(density[column]) * 1.0e-5, 1.0e-10)
+        plus = density.copy()
+        minus = density.copy()
+        plus[column] += step
+        minus[column] -= step
+        p = _projected_evdf_physical_moments(velocity, plus)
+        m = _projected_evdf_physical_moments(velocity, minus)
+        numerical_gradient[column] = (
+            p[key] - m[key]
+        ) / (2.0 * step)
+    expected_variance = float(
+        numerical_gradient @ covariance @ numerical_gradient
+    )
+    assert result["moment_covariance"][index, index] == pytest.approx(
+        expected_variance, rel=2.0e-4, abs=1.0e-16
+    )
