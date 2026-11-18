@@ -235,6 +235,8 @@ def render_product_workspace_page(st: Any) -> None:
                                 "skewness",
                                 "excess_kurtosis",
                                 "standardized_fifth_central_moment",
+                                "standardized_sixth_central_moment",
+                                "standardized_sixth_cumulant",
                                 "excess_sixth_standardized_central_moment",
                                 "velocity_moment_covariance_order",
                                 "velocity_moment_covariance",
