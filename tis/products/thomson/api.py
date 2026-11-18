@@ -198,6 +198,22 @@ def run_advanced_physics(model: str, *args: Any, **kwargs: Any) -> Any:
     return run_advanced_thomson_physics(model, *args, **kwargs)
 
 
+
+def fit_cts_ion_species_flows(*args: Any, **kwargs: Any) -> Any:
+    """Infer identifiable per-species CTS flow projections from measured spectra.
+
+    The solver keeps ion composition, temperatures, electron state, geometry
+    and response as explicit supplied inputs. It reports species flows only
+    when the measured-spectrum Jacobian identifies the requested parameters.
+    """
+    return run_advanced_physics("cts_multi_ion_flow_inference", *args, **kwargs)
+
+
+def fit_full_em_cts_spatial_profiles(*args: Any, **kwargs: Any) -> Any:
+    """Infer node-wise relative plasma profiles from spatially resolved Full-EM CTS."""
+    return run_advanced_physics("cts_full_em_spatial_profiles", *args, **kwargs)
+
+
 def propagate_full_em_cts_ray_geometry_uncertainty(*args: Any, **kwargs: Any) -> Any:
     """Propagate supplied ray/equilibrium geometry uncertainty through Full-EM CTS refits."""
     from .physics.thomson_workflow import propagate_full_em_cts_ray_geometry_uncertainty as propagate
@@ -223,4 +239,6 @@ __all__ = [
     "fit_n_population_relativistic_spectrum",
     "fit_kinetic_spectrum_with_background",
     "propagate_full_em_cts_ray_geometry_uncertainty",
+    "fit_cts_ion_species_flows",
+    "fit_full_em_cts_spatial_profiles",
 ]
