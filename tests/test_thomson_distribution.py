@@ -1613,8 +1613,13 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
     physical = inverse["projected_evdf_physical_moments"]
     assert inverse["velocity_moment_covariance"].shape == (8, 8)
     assert len(inverse["velocity_moment_covariance_order"]) == 8
-    assert physical["moment_covariance"].shape == (10, 10)
-    assert physical["moment_covariance_order"]
+    assert physical["moment_covariance"].shape == (
+        len(physical["moment_covariance_order"]),
+        len(physical["moment_covariance_order"]),
+    )
+    assert len(physical["moment_covariance_order"]) == 14
+    assert "standardized_sixth_cumulant" in physical["moment_covariance_order"]
+    assert np.isfinite(physical["standardized_sixth_cumulant"])
     assert inverse["velocity_moment_quadrature"].startswith("exact_intervalwise_three_point_Gauss_Legendre")
 
 
