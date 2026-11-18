@@ -4872,6 +4872,37 @@ def analyze_thomson_spectra(
                 evdf["projected_moment_thermodynamic_closure"]["status"] = (
                     "conditional_regularized_candidate_not_primary_measurement"
                 )
+
+            # Subanalysis 81 consumes the exact projected EVDF already inferred
+            # by Analysis 1. Do not launch a second inverse or substitute
+            # wavelength-space moments for velocity-space moments.
+            if (
+                distribution.get("analysis_status") == "completed"
+                and "velocity_parallel_m_s" in evdf
+                and "evdf_parallel_s_per_m" in evdf
+            ):
+                from .thomson_distribution import _projected_evdf_physical_moments
+                distribution["projected_evdf_physical_moments"] = (
+                    _projected_evdf_physical_moments(
+                        evdf["velocity_parallel_m_s"],
+                        evdf["evdf_parallel_s_per_m"],
+                        covariance=evdf.get("evdf_covariance"),
+                        electron_density_m3=density_for_closure,
+                        electron_density_uncertainty_m3=channel_result.get(
+                            "electron_density_uncertainty_m3"
+                        ) if density_for_closure is not None else None,
+                    )
+                )
+                distribution["projected_evdf_source"] = (
+                    "same_channel_analysis_1_electron_velocity_distribution"
+                )
+                distribution["projected_evdf_inverse_repeated"] = False
+                distribution["projected_evdf_moment_status"] = (
+                    "derived_from_identified_analysis_1_evdf"
+                    if evdf.get("analysis_status") == "completed"
+                    else "conditional_regularized_candidate_not_primary_measurement"
+                )
+                distribution["wavelength_moments_are_velocity_moments"] = False
         # Reuse the EVDF already reconstructed by the parent API and close its
         # first two velocity moments against the same-channel measured spectrum.
         # This avoids a duplicate inverse solve and keeps API/Dashboard output aligned.
