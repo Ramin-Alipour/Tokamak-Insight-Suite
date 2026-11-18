@@ -1620,6 +1620,7 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
     assert len(physical["moment_covariance_order"]) == 15
     assert "standardized_sixth_cumulant" in physical["moment_covariance_order"]
     assert np.isfinite(physical["standardized_sixth_cumulant"])
+    assert "excess_sixth_standardized_central_moment" in physical
     assert inverse["velocity_moment_quadrature"].startswith("exact_intervalwise_three_point_Gauss_Legendre")
 
 
@@ -2607,3 +2608,50 @@ def test_projected_evdf_sixth_cumulant_covariance_uses_full_analytic_jacobian():
     assert result["moment_covariance"][index, index] == pytest.approx(
         expected_variance, rel=2.0e-4, abs=1.0e-16
     )
+
+
+def test_sixth_cumulant_is_connected_to_dashboard_and_both_scientific_registries():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    dashboard = (
+        root / "tis" / "ui" / "product_workspace_page.py"
+    ).read_text(encoding="utf-8")
+    assert '"standardized_sixth_cumulant"' in dashboard
+    assert '"excess_sixth_standardized_central_moment"' in dashboard
+
+    diagnostic_root = json.loads(
+        (root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    diagnostic_packaged = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert diagnostic_root == diagnostic_packaged
+    diagnostic = next(
+        item for item in diagnostic_root
+        if item.get("diagnostic") == "Thomson spectral distribution"
+    )
+    diagnostic_outputs = {
+        item["name"] for item in diagnostic["execution_contract"]["output_specs"]
+    }
+    assert {
+        "standardized_sixth_central_moment",
+        "standardized_sixth_cumulant",
+        "excess_sixth_standardized_central_moment",
+    } <= diagnostic_outputs
+
+    formula_root = json.loads(
+        (root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    formula_packaged = json.loads(
+        (root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert formula_root == formula_packaged
+    formula = next(
+        item for item in formula_root
+        if item.get("execution_contract", {}).get("formula_key")
+        == "optical_thomson_projected_evdf_velocity_moment_covariance"
+    )
+    assert "standardized_sixth_cumulant" in formula["equation"]
+    assert "15 x N Jacobian" in formula["execution_contract"]["uncertainty_model"]
