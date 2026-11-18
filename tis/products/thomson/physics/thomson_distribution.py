@@ -162,7 +162,7 @@ def _projected_evdf_physical_moments(
         "skewness",
         "excess_kurtosis",
         "standardized_fifth_central_moment",
-        "excess_sixth_standardized_central_moment",
+        "standardized_sixth_central_moment",
         "standardized_sixth_cumulant",
         "mean_random_kinetic_energy_parallel_eV",
         "random_kinetic_energy_parallel_variance_eV2",
@@ -255,6 +255,12 @@ def _projected_evdf_physical_moments(
             name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
             for i, name in enumerate(moment_order)
         }
+        # The historical Gaussian-reference offset differs from the
+        # standardized sixth central moment only by a constant (15), so its
+        # standard uncertainty is identical and is exposed under the legacy key.
+        moment_standard_uncertainty[
+            "excess_sixth_standardized_central_moment"
+        ] = moment_standard_uncertainty["standardized_sixth_central_moment"]
     # A one-dimensional projected EVDF identifies only the parallel
     # kinetic-energy-flux contribution.  It does NOT identify the complete
     # 3-D heat flux, whose integrand also contains the perpendicular energy.
