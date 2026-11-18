@@ -258,11 +258,13 @@ def test_collective_kappa_is_executable_through_canonical_optical_analysis():
     assert channel["kappa_index"] == pytest.approx(3.5, rel=2e-3)
     assert channel["parameter_provenance"]["electron_distribution"].startswith("kappa")
 
-def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_systematic_covariance(monkeypatch):
+@pytest.mark.parametrize("measurement_kind", ["pointwise", "joint"])
+def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_systematic_covariance(monkeypatch, measurement_kind):
     import tis.physics.shared.thomson_evdf as evdf_module
 
     wavelength, signal, _ = _spectral_case(100.0, n=401)
     measurement_sigma = np.full((1, wavelength.size), 2.0)
+    measurement_covariance = np.diag(measurement_sigma[0] ** 2)
     discrepancy = np.eye(wavelength.size) * 0.5
     systematic = np.eye(wavelength.size) * 0.25
     captured = {}
@@ -272,7 +274,6 @@ def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_syst
         velocity = np.linspace(-5.0e5, 5.0e5, 101)
         pdf = np.exp(-0.5 * (velocity / 1.0e5) ** 2)
         pdf /= np.trapz(pdf, velocity)
-        captured["synthetic_evdf"] = (velocity, pdf)
         return {
             "velocity_parallel_m_s": velocity,
             "evdf_parallel_s_per_m": pdf,
@@ -285,6 +286,11 @@ def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_syst
     monkeypatch.setattr(evdf_module, "reconstruct_thomson_evdf", fake_evdf_solver)
     from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
 
+    measurement_options = (
+        {"signal_uncertainty": measurement_sigma}
+        if measurement_kind == "pointwise"
+        else {"joint_spectral_covariance": measurement_covariance}
+    )
     result = product_analyze_spectra(
         wavelength,
         signal[None, :],
@@ -292,18 +298,20 @@ def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_syst
         laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi / 2.0,
         instrument_response=np.eye(wavelength.size),
-        signal_uncertainty=measurement_sigma,
         model_discrepancy_covariance=discrepancy,
         systematic_covariance=systematic,
         enable_evdf_reconstruction=True,
+        **measurement_options,
     )
 
-    np.testing.assert_allclose(
-        captured["signal_covariance"], np.diag(measurement_sigma[0] ** 2)
-    )
+    if measurement_kind == "pointwise":
+        np.testing.assert_allclose(captured["signal_uncertainty"], measurement_sigma[0])
+        assert captured["signal_covariance"] is None
+    else:
+        np.testing.assert_allclose(captured["signal_covariance"], measurement_covariance)
+        assert captured["signal_uncertainty"] is None
     np.testing.assert_allclose(captured["model_discrepancy_covariance"], discrepancy)
     np.testing.assert_allclose(captured["systematic_covariance"], systematic)
-    assert captured["signal_uncertainty"] is None
     assert result["electron_velocity_distribution"][0]["analysis_status"] == "completed"
     spectral_distribution = result["spectral_distribution"][0]
     assert spectral_distribution["projected_evdf_source"] == (
