@@ -1621,6 +1621,12 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
     assert "standardized_sixth_cumulant" in physical["moment_covariance_order"]
     assert np.isfinite(physical["standardized_sixth_cumulant"])
     assert "excess_sixth_standardized_central_moment" in physical
+    assert "standardized_sixth_central_moment" in physical["moment_covariance_order"]
+    assert physical["moment_standard_uncertainty"][
+        "excess_sixth_standardized_central_moment"
+    ] == pytest.approx(
+        physical["moment_standard_uncertainty"]["standardized_sixth_central_moment"]
+    )
     assert inverse["velocity_moment_quadrature"].startswith("exact_intervalwise_three_point_Gauss_Legendre")
 
 
