@@ -9315,7 +9315,12 @@
           "required": false
         },
         {
-          "name": "model_discrepancy_covariance and systematic_covariance",
+          "name": "model_discrepancy_covariance",
+          "unit": "positive-semidefinite wavelength-space covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
           "unit": "positive-semidefinite wavelength-space covariance",
           "required": false
         },

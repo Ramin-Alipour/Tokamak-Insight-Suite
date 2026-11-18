@@ -1,3 +1,26 @@
+def test_tensor_finite_window_forward_returns_zero_when_signal_is_outside_acquired_band():
+    from tis.products.thomson.physics.thomson_temperature_tensor import (
+        _tensor_apply_finite_window_response,
+    )
+
+    wavelength = np.linspace(529.0, 535.0, 121)
+    response = np.eye(wavelength.size)
+    predicted, captured = _tensor_apply_finite_window_response(
+        wavelength, 1.0e6, 0.02, response
+    )
+    assert captured == 0.0
+    np.testing.assert_array_equal(predicted, np.zeros_like(wavelength))
+
+    predicted, captured = _tensor_apply_finite_window_response(
+        wavelength, 532.0, 0.5, response
+    )
+    assert 0.0 < captured < 1.0
+    np.testing.assert_allclose(
+        np.sum(predicted * (wavelength[1] - wavelength[0])),
+        captured, rtol=1e-10,
+    )
+
+
 import json
 from pathlib import Path
 

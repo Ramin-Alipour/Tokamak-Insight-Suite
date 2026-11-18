@@ -410,6 +410,28 @@ def _tensor_finite_bin_gaussian_density(wavelength_nm, centre_nm, sigma_nm):
     return probability / widths, probability, widths
 
 
+def _tensor_apply_finite_window_response(wavelength_nm, centre_nm, sigma_nm, response_matrix):
+    """Apply the measured response without inventing probability outside the band.
+
+    A trial spectrum shifted wholly outside the acquired wavelength window has
+    zero detector-space Thomson contribution. This is a valid finite-window
+    forward prediction, not an optimizer exception or a renormalized spectrum.
+    """
+    wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
+    response = _finite_array(response_matrix, "response_matrix", 2)
+    if response.shape != (wavelength.size, wavelength.size) or np.any(response < 0.0):
+        raise ValueError("response_matrix must be a non-negative square wavelength-bin operator")
+    density, probability, widths = _tensor_finite_bin_gaussian_density(
+        wavelength, centre_nm, sigma_nm
+    )
+    captured = float(np.sum(probability))
+    if not np.isfinite(captured) or captured < -1e-12 or captured > 1.0 + 1e-8:
+        raise ValueError("finite-window Thomson probability is outside its physical range")
+    if captured <= np.finfo(float).tiny:
+        return np.zeros(wavelength.size, dtype=float), max(captured, 0.0)
+    return (response @ (density * widths)) / widths, captured
+
+
 def _tensor_finite_bin_kappa_density(wavelength_nm, centre_nm, sigma_nm, kappa_index):
     """Exact finite-bin projected marginal of an ellipsoidal 3-D Kappa EVDF."""
     wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
@@ -708,15 +730,22 @@ def fit_general_temperature_tensor_thomson_spectra(
             centre=laser*(1.0-q_factor*flow_projections[view]/299792458.0)
             sigma=laser*q_factor*np.sqrt(_E*projected[view]/_M_E)/299792458.0
             if distribution_model=="maxwellian":
-                density, probability, _ = _tensor_finite_bin_gaussian_density(wavelength,centre,sigma)
+                convolved, captured = _tensor_apply_finite_window_response(
+                    wavelength, centre, sigma, response[view]
+                )
             else:
                 kappa_value = 1.5+np.exp(parameters[-1]) if fit_kappa_index else kappa_seed
                 density, probability, _ = _tensor_finite_bin_kappa_density(wavelength,centre,sigma,kappa_value)
-            captured=float(np.sum(probability))
-            if captured <= 0.0 or not np.isfinite(captured):
-                raise ValueError("spectral wavelength window captures no physical Thomson signal")
+                captured=float(np.sum(probability))
+                if not np.isfinite(captured) or captured < -1e-12 or captured > 1.0 + 1e-8:
+                    raise ValueError("finite-window Kappa probability is outside its physical range")
+                convolved = (
+                    np.zeros(n_wave, dtype=float)
+                    if captured <= np.finfo(float).tiny
+                    else (response[view] @ (density * widths)) / widths
+                )
             # The measured operator acts on finite-bin integrated spectral power.
-            convolved=(response[view]@(density*widths))/widths
+            # Probability outside the acquired wavelength window is not renormalized.
             baseline=offset+slope*(wavelength-laser)/max(float(np.ptp(wavelength)),1e-12)
             result[view]=np.exp(log_amp)*convolved+baseline
         return result
