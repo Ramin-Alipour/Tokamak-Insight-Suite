@@ -1617,7 +1617,7 @@ def test_thomson_spectral_distribution_executes_through_specialist_product_api()
         len(physical["moment_covariance_order"]),
         len(physical["moment_covariance_order"]),
     )
-    assert len(physical["moment_covariance_order"]) == 14
+    assert len(physical["moment_covariance_order"]) == 15
     assert "standardized_sixth_cumulant" in physical["moment_covariance_order"]
     assert np.isfinite(physical["standardized_sixth_cumulant"])
     assert inverse["velocity_moment_quadrature"].startswith("exact_intervalwise_three_point_Gauss_Legendre")
@@ -2565,7 +2565,12 @@ def test_projected_evdf_sixth_cumulant_matches_gaussian_and_skewed_mixture_closu
         expected_cumulant, rel=3.0e-3, abs=3.0e-3
     )
     assert result["excess_sixth_standardized_central_moment"] == pytest.approx(
-        result["standardized_sixth_cumulant"], rel=0.0, abs=0.0
+        result["standardized_sixth_central_moment"] - 15.0,
+        rel=0.0,
+        abs=1.0e-12,
+    )
+    assert result["excess_sixth_standardized_central_moment"] != pytest.approx(
+        result["standardized_sixth_cumulant"], abs=1.0e-3
     )
 
 
