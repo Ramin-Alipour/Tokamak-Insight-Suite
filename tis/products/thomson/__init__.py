@@ -19,6 +19,8 @@ from .api import (
     fit_n_population_relativistic_spectrum,
     fit_kinetic_spectrum_with_background,
     propagate_full_em_cts_ray_geometry_uncertainty,
+    fit_cts_ion_species_flows,
+    fit_full_em_cts_spatial_profiles,
 )
 
 __all__ = [
@@ -41,4 +43,6 @@ __all__ = [
     "fit_n_population_relativistic_spectrum",
     "fit_kinetic_spectrum_with_background",
     "propagate_full_em_cts_ray_geometry_uncertainty",
+    "fit_cts_ion_species_flows",
+    "fit_full_em_cts_spatial_profiles",
 ]
