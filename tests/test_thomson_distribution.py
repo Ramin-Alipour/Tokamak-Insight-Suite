@@ -2653,5 +2653,5 @@ def test_sixth_cumulant_is_connected_to_dashboard_and_both_scientific_registries
         if item.get("execution_contract", {}).get("formula_key")
         == "optical_thomson_projected_evdf_velocity_moment_covariance"
     )
-    assert "standardized_sixth_cumulant" in formula["equation"]
+    assert "κ_6,q" in formula["equation"]
     assert "15 x N Jacobian" in formula["execution_contract"]["uncertainty_model"]
