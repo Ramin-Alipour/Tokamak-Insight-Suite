@@ -251,6 +251,14 @@ def render_product_workspace_page(st: Any) -> None:
                                 {"status": "not available for this channel/model"},
                             )
                         )
+                        spectral_distribution = channel.get("spectral_distribution") or {}
+                        st.markdown("**Subanalysis 81 · physical moments from the same Analysis 1 EVDF**")
+                        st.json({
+                            "status": spectral_distribution.get("projected_evdf_moment_status"),
+                            "source": spectral_distribution.get("projected_evdf_source"),
+                            "inverse_repeated": spectral_distribution.get("projected_evdf_inverse_repeated"),
+                            "physical_moments": spectral_distribution.get("projected_evdf_physical_moments"),
+                        })
             if selected_id == 1 and selected_analysis_id == 81:
                 st.markdown("### Measured spectral-shape diagnostics")
                 st.json({
