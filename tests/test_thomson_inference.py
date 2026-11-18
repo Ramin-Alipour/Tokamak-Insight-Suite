@@ -269,7 +269,14 @@ def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_syst
 
     def fake_evdf_solver(*args, **kwargs):
         captured.update(kwargs)
+        velocity = np.linspace(-5.0e5, 5.0e5, 101)
+        pdf = np.exp(-0.5 * (velocity / 1.0e5) ** 2)
+        pdf /= np.trapz(pdf, velocity)
+        captured["synthetic_evdf"] = (velocity, pdf)
         return {
+            "velocity_parallel_m_s": velocity,
+            "evdf_parallel_s_per_m": pdf,
+            "evdf_covariance": np.eye(velocity.size) * 1.0e-20,
             "velocity_parallel_standard_deviation_m_s": 1.0e5,
             "central_third_velocity_moment_m3_s3": 0.0,
             "higher_order_moment_validity": {"quantitative_reporting_allowed": True},
@@ -296,6 +303,15 @@ def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_syst
     np.testing.assert_allclose(captured["systematic_covariance"], systematic)
     assert captured["signal_uncertainty"] is None
     assert result["electron_velocity_distribution"][0]["analysis_status"] == "completed"
+    spectral_distribution = result["spectral_distribution"][0]
+    assert spectral_distribution["projected_evdf_source"] == (
+        "same_channel_analysis_1_electron_velocity_distribution"
+    )
+    assert spectral_distribution["projected_evdf_inverse_repeated"] is False
+    moments = spectral_distribution["projected_evdf_physical_moments"]
+    assert moments["directional_equivalent_temperature_eV"] > 0.0
+    assert abs(moments["skewness"]) < 1e-10
+    assert spectral_distribution["wavelength_moments_are_velocity_moments"] is False
 
 
 def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
