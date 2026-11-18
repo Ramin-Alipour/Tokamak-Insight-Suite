@@ -208,6 +208,23 @@ def fit_cts_ion_species_flows(*args: Any, **kwargs: Any) -> Any:
     """
     return run_advanced_physics("cts_multi_ion_flow_inference", *args, **kwargs)
 
+def calculate_cts_tabulated_evdf_spectrum(*args: Any, **kwargs: Any) -> Any:
+    """Evaluate electrostatic CTS from an explicitly supplied projected 1-D electron EVDF.
+
+    This is a forward model, not a 3-D fast-ion inverse. Ion composition and
+    ion velocity distributions/temperatures remain explicit caller inputs.
+    """
+    return run_advanced_physics("cts_tabulated_evdf_landau", *args, **kwargs)
+
+
+def calculate_cts_multi_population_tabulated_evdf_spectrum(*args: Any, **kwargs: Any) -> Any:
+    """Evaluate electrostatic CTS for explicit multiple tabulated populations.
+
+    Population fractions, projected velocity grids and distributions are not
+    inferred or fabricated by this wrapper.
+    """
+    return run_advanced_physics("cts_multi_population_tabulated_evdf_landau", *args, **kwargs)
+
 
 def fit_full_em_cts_spatial_profiles(*args: Any, **kwargs: Any) -> Any:
     """Infer node-wise relative plasma profiles from spatially resolved Full-EM CTS."""
@@ -240,5 +257,7 @@ __all__ = [
     "fit_kinetic_spectrum_with_background",
     "propagate_full_em_cts_ray_geometry_uncertainty",
     "fit_cts_ion_species_flows",
+    "calculate_cts_tabulated_evdf_spectrum",
+    "calculate_cts_multi_population_tabulated_evdf_spectrum",
     "fit_full_em_cts_spatial_profiles",
 ]
