@@ -1,3 +1,26 @@
+def test_distribution_returns_joint_covariance_for_nonlinear_spectral_moments():
+    x, y = _spectrum()
+    result = _run(x, y, signal_uncertainty=np.full(x.size, 1.0), moment_mc_samples=120)
+    expected_order = [
+        "spectral_centroid_nm", "observed_variance_nm2", "observed_sigma_nm",
+        "spectral_skewness", "spectral_excess_kurtosis",
+    ]
+    assert result["spectral_moment_covariance_order"] == expected_order
+    covariance = result["spectral_moment_covariance"]
+    correlation = result["spectral_moment_correlation"]
+    assert covariance.shape == correlation.shape == (5, 5)
+    np.testing.assert_allclose(covariance, covariance.T, rtol=1e-12, atol=1e-18)
+    assert np.linalg.eigvalsh(covariance).min() >= -1e-10 * np.max(np.abs(covariance))
+    np.testing.assert_allclose(np.diag(correlation), np.ones(5), atol=1e-12)
+    assert result["spectral_moment_covariance_scope"].startswith("joint Monte Carlo covariance")
+    for index, key in enumerate((
+        "spectral_centroid_uncertainty_nm", "observed_variance_uncertainty_nm2",
+        "observed_sigma_uncertainty_nm", "spectral_skewness_uncertainty",
+        "spectral_excess_kurtosis_uncertainty",
+    )):
+        assert result[key] == pytest.approx(np.sqrt(covariance[index, index]), rel=1e-12)
+
+
 import json
 
 import numpy as np

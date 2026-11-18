@@ -9226,7 +9226,7 @@
       "tis.physics.shared.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf",
       "tis.products.thomson.physics.thomson_distribution.infer_projected_parallel_heat_flux"
     ],
-    "implementation_status": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics are implemented. Optional non-negative projected-EVDF inversion now supports non-relativistic Doppler, exact relativistic Thomson and Compton/Klein-Nishina kinematics; rank-deficient relativistic inversions retain a clearly labelled regularized candidate and expose q-parallel physical moments without promoting them to identified results. The projected q-parallel EVDF is additionally transformed into a cumulative random-kinetic-energy marginal. The reconstructed projected EVDF now yields the third-moment one-dimensional parallel kinetic-energy-flux contribution and its covariance; absolute projected flux requires an independent density input. The projected-EVDF physical-moment transform now reports the standardized sixth central moment and the mathematically complete standardized sixth cumulant, with separate analytic covariance derivatives; the historical Gaussian-reference sixth-moment offset remains available under its legacy output key.",
+    "implementation_status": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics are implemented. Optional non-negative projected-EVDF inversion now supports non-relativistic Doppler, exact relativistic Thomson and Compton/Klein-Nishina kinematics; rank-deficient relativistic inversions retain a clearly labelled regularized candidate and expose q-parallel physical moments without promoting them to identified results. The projected q-parallel EVDF is additionally transformed into a cumulative random-kinetic-energy marginal. The reconstructed projected EVDF now yields the third-moment one-dimensional parallel kinetic-energy-flux contribution and its covariance; absolute projected flux requires an independent density input. The projected-EVDF physical-moment transform now reports the standardized sixth central moment and the mathematically complete standardized sixth cumulant, with separate analytic covariance derivatives; the historical Gaussian-reference sixth-moment offset remains available under its legacy output key. The five nonlinear wavelength-space moments now also expose their full 5x5 joint Monte Carlo covariance and correlation, preserving cross-moment dependence.",
     "execution_contract": {
       "schema_version": "1.1",
       "execution_level": "analysis_pipeline",
@@ -9731,6 +9731,26 @@
         {
           "name": "excess_sixth_standardized_central_moment",
           "unit": "dimensionless; legacy Gaussian-reference offset mu_6,q/sigma_q^6 - 15"
+        },
+        {
+          "name": "spectral_moment_covariance_order",
+          "unit": "ordered names",
+          "description": "Order of rows and columns in the joint wavelength-moment covariance matrix."
+        },
+        {
+          "name": "spectral_moment_covariance",
+          "unit": "5 x 5 covariance matrix",
+          "description": "Joint Monte Carlo covariance of centroid, variance, standard deviation, skewness and excess kurtosis."
+        },
+        {
+          "name": "spectral_moment_correlation",
+          "unit": "5 x 5 correlation matrix",
+          "description": "Correlation matrix derived from the joint wavelength-moment covariance."
+        },
+        {
+          "name": "spectral_moment_covariance_scope",
+          "unit": "text",
+          "description": "Declares covariance scope and uncertainty components included in Monte Carlo propagation."
         }
       ],
       "assumptions": [

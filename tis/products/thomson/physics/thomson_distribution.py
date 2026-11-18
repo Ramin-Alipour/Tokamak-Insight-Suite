@@ -1663,7 +1663,33 @@ def analyze_thomson_spectral_distribution(
                 ("kurtosis", "spectral_excess_kurtosis_uncertainty"),
             ):
                 moment_uncertainties[out_key] = float(np.std([item[key] for item in draws], ddof=1))
+            # Keep nonlinear cross-moment dependence; marginal 1-sigma values
+            # alone are insufficient for downstream joint inference.
+            moment_covariance_order = (
+                "spectral_centroid_nm", "observed_variance_nm2",
+                "observed_sigma_nm", "spectral_skewness",
+                "spectral_excess_kurtosis",
+            )
+            draw_matrix = np.asarray([
+                [item[key] for key in ("center", "variance", "sigma_observed", "skewness", "kurtosis")]
+                for item in draws
+            ], dtype=float)
+            moment_covariance_matrix = np.atleast_2d(np.cov(draw_matrix, rowvar=False, ddof=1))
+            moment_covariance_matrix = 0.5 * (moment_covariance_matrix + moment_covariance_matrix.T)
+            covariance_scale = max(float(np.max(np.abs(moment_covariance_matrix))), np.finfo(float).tiny)
+            if (not np.all(np.isfinite(moment_covariance_matrix))
+                    or float(np.linalg.eigvalsh(moment_covariance_matrix)[0]) < -1e-10 * covariance_scale):
+                raise ValueError("Monte Carlo spectral-moment covariance is not positive semidefinite")
+            moment_sd = np.sqrt(np.maximum(np.diag(moment_covariance_matrix), 0.0))
+            moment_correlation_matrix = np.divide(
+                moment_covariance_matrix, np.outer(moment_sd, moment_sd),
+                out=np.zeros_like(moment_covariance_matrix),
+                where=np.outer(moment_sd, moment_sd) > 0.0,
+            )
         else:
+            moment_covariance_order = None
+            moment_covariance_matrix = None
+            moment_correlation_matrix = None
             moment_uncertainties["moment_uncertainty_warning"] = "Too few valid signal/background Monte Carlo draws to estimate moment uncertainty."
     covariance_valid = bool(np.all(np.isfinite(covariance)) and np.all(np.diag(covariance) > 0))
     covariance_condition = None
@@ -1715,6 +1741,14 @@ def analyze_thomson_spectral_distribution(
         "spectral_skewness": float(skewness),
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
+        "spectral_moment_covariance_order": moment_covariance_order if moment_covariance_matrix is not None else None,
+        "spectral_moment_covariance": moment_covariance_matrix,
+        "spectral_moment_correlation": moment_correlation_matrix,
+        "spectral_moment_covariance_scope": (
+            "joint Monte Carlo covariance of signed wavelength-space centroid, variance, standard deviation, skewness and excess kurtosis; includes all supplied measurement/background/cross/model/systematic covariance components"
+            if moment_covariance_matrix is not None
+            else "unavailable_due_to_insufficient_valid_monte_carlo_draws_or_no_uncertainty_inputs"
+        ),
         "moment_uncertainty_method": (
             "parametric Monte Carlo from the correlated joint signal/background block covariance plus independent model-discrepancy/systematic components"
             if joint_signal_background_cholesky is not None and (

@@ -252,6 +252,22 @@ def render_product_workspace_page(st: Any) -> None:
                             )
                         )
             if selected_id == 1 and selected_analysis_id == 81:
+                st.markdown("### Measured spectral-shape diagnostics")
+                st.json({
+                    "spectral_centroid_nm": result.get("spectral_centroid_nm"),
+                    "observed_variance_nm2": result.get("observed_variance_nm2"),
+                    "observed_sigma_nm": result.get("observed_sigma_nm"),
+                    "spectral_skewness": result.get("spectral_skewness"),
+                    "spectral_excess_kurtosis": result.get("spectral_excess_kurtosis"),
+                    "gaussian_fit_parameters": result.get("gaussian_fit_parameters"),
+                    "gaussian_fit_parameter_uncertainties": result.get("gaussian_fit_parameter_uncertainties"),
+                    "reduced_chi_square": result.get("reduced_chi_square"),
+                    "r_squared": result.get("r_squared"),
+                    "spectral_moment_covariance_order": result.get("spectral_moment_covariance_order"),
+                    "spectral_moment_covariance": result.get("spectral_moment_covariance"),
+                    "spectral_moment_correlation": result.get("spectral_moment_correlation"),
+                    "spectral_moment_covariance_scope": result.get("spectral_moment_covariance_scope"),
+                })
                 st.markdown("### Projected EVDF physical inference")
                 projected = result.get("projected_evdf_inference")
                 if projected is None:

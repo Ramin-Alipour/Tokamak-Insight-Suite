@@ -13078,5 +13078,54 @@
       "subanalysis": "Optical Thomson / projected EVDF"
     },
     "description": "The primary optical Thomson fit and its projected-EVDF inverse now use the same physical ordering: elastic source-spectrum wavelength scaling followed by the measured detector response. The inverse receives the base detector operator and measured source profile separately, so it composes each exactly once. Calibrated finite-window edge losses remain sub-stochastic rather than being normalized away."
+  },
+  {
+    "name": "Joint covariance of measured Thomson spectral moments",
+    "equation": "C_m = (1/(N-1)) Σ_r (m_r - m̄)(m_r - m̄)^T; ρ_ij = C_m,ij/(σ_i σ_j)",
+    "inputs": "Joint signal/background draws sampled from supplied measurement, background, model-discrepancy and systematic covariance components",
+    "output": "5x5 covariance and correlation matrices for centroid, variance, standard deviation, skewness and excess kurtosis",
+    "assumptions": "Parametric Monte Carlo; independent covariance components except for explicitly supplied signal-background block covariance; signed wavelength moments are recomputed for every draw.",
+    "status": "D",
+    "category": "Thomson spectral inference",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.products.thomson.physics.thomson_distribution.analyze_thomson_spectral_distribution",
+      "formula_key": "thomson_spectral_moment_joint_covariance",
+      "input_specs": [
+        {
+          "name": "measurement_background_and_systematic_covariance",
+          "unit": "wavelength-space covariance components",
+          "required": false
+        },
+        {
+          "name": "moment_mc_samples",
+          "unit": "integer draws >=20",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_moment_covariance_order",
+          "unit": "ordered names"
+        },
+        {
+          "name": "spectral_moment_covariance",
+          "unit": "5x5 covariance"
+        },
+        {
+          "name": "spectral_moment_correlation",
+          "unit": "5x5 correlation"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated wavelength axis and exactly one explicit background representation."
+      ],
+      "uncertainty_model": "Each draw samples the supplied covariance model, recomputes the nonlinear signed spectral moments, and estimates the unbiased sample covariance across the five moments.",
+      "test_links": [
+        "tests/test_thomson_distribution.py::test_distribution_returns_joint_covariance_for_nonlinear_spectral_moments"
+      ],
+      "note": "Numerical verification; not empirical validation on tokamak measurements."
+    }
   }
 ]
