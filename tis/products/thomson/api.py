@@ -81,9 +81,10 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     moments through sixth order, including the standardized sixth central
     moment and the sixth cumulant
     mu6/sigma6 - 15 mu4/sigma4 - 10 mu3^2/sigma6 + 30, with its analytic
-    normalization-aware covariance Jacobian. The legacy
-    excess_sixth_standardized_central_moment key is retained as an alias
-    for the corrected sixth cumulant. When the inverse solver supplies
+    normalization-aware covariance Jacobian. The historical
+    excess_sixth_standardized_central_moment output remains available with
+    its original Gaussian-reference offset definition (mu6/sigma6 - 15);
+    the corrected sixth cumulant is exposed separately. When the inverse solver supplies
     candidate-family model averaging, the exact physical moments of the
     Akaike-weighted EVDF mixture are returned with its
     within/between-family covariance scope explicitly distinguished. The
