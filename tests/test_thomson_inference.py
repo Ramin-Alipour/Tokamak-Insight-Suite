@@ -283,7 +283,9 @@ def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_syst
         }
 
     monkeypatch.setattr(evdf_module, "reconstruct_thomson_evdf", fake_evdf_solver)
-    result = _analyze_thomson_spectra(
+    from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
+
+    result = product_analyze_spectra(
         wavelength,
         signal[None, :],
         [0.1],
