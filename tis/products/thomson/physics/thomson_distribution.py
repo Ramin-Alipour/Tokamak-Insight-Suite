@@ -1618,6 +1618,9 @@ def analyze_thomson_spectral_distribution(
 
     moment_uncertainties = {}
     successful_draws = 0
+    moment_covariance_order = None
+    moment_covariance_matrix = None
+    moment_correlation_matrix = None
     if (uncertainty is not None or signal_covariance_matrix is not None
             or background_uncertainty is not None or background_covariance_matrix is not None
             or model_discrepancy_factor is not None or systematic_factor is not None):
