@@ -78,9 +78,14 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     electron_density_flux_per_density_cross_covariance_W_m2 when its
     covariance with the EVDF flux-per-density estimate is known.
     The physical-moment result also returns exact piecewise-linear EVDF
-    moments through sixth order, their full first-order covariance, and,
-    when the inverse solver supplies candidate-family model averaging, the
-    exact physical moments of the Akaike-weighted EVDF mixture with its
+    moments through sixth order, including the standardized sixth central
+    moment and the sixth cumulant
+    mu6/sigma6 - 15 mu4/sigma4 - 10 mu3^2/sigma6 + 30, with its analytic
+    normalization-aware covariance Jacobian. The legacy
+    excess_sixth_standardized_central_moment key is retained as an alias
+    for the corrected sixth cumulant. When the inverse solver supplies
+    candidate-family model averaging, the exact physical moments of the
+    Akaike-weighted EVDF mixture are returned with its
     within/between-family covariance scope explicitly distinguished. The
     mixture is computed as f_bar(v)=sum_m w_m f_m(v), and its moment covariance
     uses C_M=J_M C_bar J_M.T; relative Akaike weights are not posterior
