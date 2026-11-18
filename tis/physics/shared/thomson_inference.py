@@ -4781,6 +4781,34 @@ def analyze_thomson_spectra(
                 if not velocity_high > velocity_low:
                     raise ValueError("Measured wavelength coverage does not span a finite projected-velocity interval.")
                 velocity_grid = np.linspace(velocity_low, velocity_high, int(evdf_velocity_points))
+                # Keep the EVDF inverse likelihood decomposition identical to
+                # the accepted parent fit. The channel block in joint_covariance
+                # already contains additive discrepancy/systematic terms, so
+                # remove those blocks before passing them separately below.
+                evdf_measurement_covariance = None
+                evdf_measurement_uncertainty = None
+                if measurement_covariance_supplied and channel_covariance is not None:
+                    evdf_measurement_covariance = np.asarray(
+                        channel_covariance, dtype=float
+                    ).copy()
+                    if independent_discrepancy_blocks is not None:
+                        evdf_measurement_covariance -= independent_discrepancy_blocks[channel_index]
+                    if independent_systematic_blocks is not None:
+                        evdf_measurement_covariance -= independent_systematic_blocks[channel_index]
+                    evdf_measurement_covariance = 0.5 * (
+                        evdf_measurement_covariance + evdf_measurement_covariance.T
+                    )
+                elif measurement_covariance_supplied:
+                    evdf_measurement_uncertainty = channel_uncertainty
+
+                evdf_discrepancy_covariance = (
+                    independent_discrepancy_blocks[channel_index]
+                    if independent_discrepancy_blocks is not None else None
+                )
+                evdf_systematic_covariance = (
+                    independent_systematic_blocks[channel_index]
+                    if independent_systematic_blocks is not None else None
+                )
                 evdf = reconstruct_thomson_evdf(
                     xs[channel_index],
                     y[channel_index],
@@ -4797,8 +4825,10 @@ def analyze_thomson_spectra(
                     regularization_strength=None,
                     velocity_grid_m_s=velocity_grid,
                     velocity_points=int(evdf_velocity_points),
-                    signal_uncertainty=channel_uncertainty,
-                    signal_covariance=channel_covariance,
+                    signal_uncertainty=evdf_measurement_uncertainty,
+                    signal_covariance=evdf_measurement_covariance,
+                    model_discrepancy_covariance=evdf_discrepancy_covariance,
+                    systematic_covariance=evdf_systematic_covariance,
                 )
                 evdf["laser_spectral_profile"] = (
                     dict(source_profile_metadata) if source_profile_metadata is not None
