@@ -401,6 +401,13 @@ def test_product_workspace_documents_and_renders_analysis1_poisson_count_route()
     assert '"kappa_1sigma"' in source
 
 
+def test_analysis1_dashboard_exposes_spectral_distribution_moments_from_the_same_evdf():
+    source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "product_workspace_page.py").read_text(encoding="utf-8")
+    assert "Subanalysis 81 · physical moments from the same Analysis 1 EVDF" in source
+    assert '"projected_evdf_physical_moments"' in source
+    assert '"projected_evdf_inverse_repeated"' in source
+
+
 def test_product_workspace_renders_fifth_and_sixth_projected_evdf_moments():
     source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "product_workspace_page.py").read_text(encoding="utf-8")
     assert '"central_fifth_velocity_moment_m5_s5"' in source
