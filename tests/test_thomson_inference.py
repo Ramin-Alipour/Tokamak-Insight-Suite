@@ -258,6 +258,46 @@ def test_collective_kappa_is_executable_through_canonical_optical_analysis():
     assert channel["kappa_index"] == pytest.approx(3.5, rel=2e-3)
     assert channel["parameter_provenance"]["electron_distribution"].startswith("kappa")
 
+def test_projected_evdf_inverse_receives_parent_measurement_discrepancy_and_systematic_covariance(monkeypatch):
+    import tis.physics.shared.thomson_evdf as evdf_module
+
+    wavelength, signal, _ = _spectral_case(100.0, n=401)
+    measurement_sigma = np.full((1, wavelength.size), 2.0)
+    discrepancy = np.eye(wavelength.size) * 0.5
+    systematic = np.eye(wavelength.size) * 0.25
+    captured = {}
+
+    def fake_evdf_solver(*args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "velocity_parallel_standard_deviation_m_s": 1.0e5,
+            "central_third_velocity_moment_m3_s3": 0.0,
+            "higher_order_moment_validity": {"quantitative_reporting_allowed": True},
+        }
+
+    monkeypatch.setattr(evdf_module, "reconstruct_thomson_evdf", fake_evdf_solver)
+    result = _analyze_thomson_spectra(
+        wavelength,
+        signal[None, :],
+        [0.1],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=measurement_sigma,
+        model_discrepancy_covariance=discrepancy,
+        systematic_covariance=systematic,
+        enable_evdf_reconstruction=True,
+    )
+
+    np.testing.assert_allclose(
+        captured["signal_covariance"], np.diag(measurement_sigma[0] ** 2)
+    )
+    np.testing.assert_allclose(captured["model_discrepancy_covariance"], discrepancy)
+    np.testing.assert_allclose(captured["systematic_covariance"], systematic)
+    assert captured["signal_uncertainty"] is None
+    assert result["electron_velocity_distribution"][0]["analysis_status"] == "completed"
+
+
 def test_kappa_physical_and_moment_covariances_include_geometry_uncertainty():
     from tis.products.thomson.api import analyze_spectra as product_analyze_spectra
 
