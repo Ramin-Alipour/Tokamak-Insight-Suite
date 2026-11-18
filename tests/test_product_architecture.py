@@ -48,6 +48,16 @@ def test_product_analysis_listing_uses_canonical_registry_contracts():
     assert entries[0]["module"] == "thomson_workflow"
     assert entries[0]["function"] == "analyze_thomson_spectra"
 
+def test_thomson_dashboard_contract_and_runtime_resolver_share_one_callable_map():
+    from tis.products.catalog import THOMSON_ENTRY_POINTS
+    from tis.products.thomson.registry import THOMSON_ENTRY_POINTS as runtime_entry_points
+
+    entries = list_product_analyses("thomson-scattering")
+    assert runtime_entry_points is THOMSON_ENTRY_POINTS
+    assert {entry["id"] for entry in entries} == set(THOMSON_ENTRY_POINTS)
+    for entry in entries:
+        assert (entry["module"], entry["function"]) == THOMSON_ENTRY_POINTS[entry["id"]]
+
 
 def test_execution_api_forwards_arguments_without_changing_measurements(monkeypatch):
     import tis.products.api as api
