@@ -11,7 +11,11 @@ from collections.abc import Mapping
 import numpy as np
 from scipy.special import ndtr, stdtr
 
-from tis.products.thomson.api import run_advanced_physics
+from tis.products.thomson.api import (
+    run_advanced_physics,
+    fit_cts_ion_species_flows,
+    fit_full_em_cts_spatial_profiles,
+)
 from tis.products.thomson.physics.advanced_inference import build_relativistic_3d_thomson_kernels
 
 
@@ -1334,7 +1338,12 @@ def render_advanced_thomson_physics_page(st) -> None:
                     "tis.products.thomson.api.infer_path_averaged_density -> analysis_id_87"
                 )
             else:
-                result = run_advanced_physics(model, **config)
+                if model == "cts_multi_ion_flow_inference":
+                    result = fit_cts_ion_species_flows(**config)
+                elif model == "cts_full_em_spatial_profiles":
+                    result = fit_full_em_cts_spatial_profiles(**config)
+                else:
+                    result = run_advanced_physics(model, **config)
             safe = json_safe(result)
             if model == "thomson_channel_path_averaged_density" and isinstance(result, Mapping):
                 st.subheader("Channel-resolved path-averaged electron density")
