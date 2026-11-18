@@ -138,6 +138,7 @@ def _projected_evdf_physical_moments(
     excess_kurtosis = mu4 / variance**2 - 3.0
     standardized_fifth = mu5 / variance**2.5
     standardized_sixth = mu6 / variance**3
+    legacy_excess_sixth = standardized_sixth - 15.0
     # The sixth standardized cumulant is not mu6/sigma^6 - 15 except
     # for a symmetric distribution with zero skewness and Gaussian-like
     # fourth moment.  The general cumulant includes mu4 and mu3 terms.
@@ -161,6 +162,7 @@ def _projected_evdf_physical_moments(
         "skewness",
         "excess_kurtosis",
         "standardized_fifth_central_moment",
+        "excess_sixth_standardized_central_moment",
         "standardized_sixth_cumulant",
         "mean_random_kinetic_energy_parallel_eV",
         "random_kinetic_energy_parallel_variance_eV2",
@@ -237,7 +239,8 @@ def _projected_evdf_physical_moments(
             mean_gradient, variance_gradient, sigma_gradient, temperature_gradient,
             mu3_gradient, mu4_gradient, mu5_gradient, mu6_gradient,
             skewness_gradient, kurtosis_gradient,
-            standardized_fifth_gradient, standardized_sixth_cumulant_gradient,
+            standardized_fifth_gradient, standardized_sixth_gradient,
+            standardized_sixth_cumulant_gradient,
             mean_energy_gradient, energy_variance_gradient,
         ))
         moment_covariance = jacobian @ cov @ jacobian.T
@@ -572,8 +575,9 @@ def _projected_evdf_physical_moments(
         "standardized_fifth_central_moment": float(standardized_fifth),
         "standardized_sixth_central_moment": float(standardized_sixth),
         "standardized_sixth_cumulant": float(standardized_sixth_cumulant),
-        # Backwards-compatible key; its corrected value is the sixth cumulant.
-        "excess_sixth_standardized_central_moment": float(standardized_sixth_cumulant),
+        # Preserve the historical Gaussian-reference offset without calling it
+        # a cumulant; the mathematically complete cumulant has its own key.
+        "excess_sixth_standardized_central_moment": float(legacy_excess_sixth),
         "parallel_projected_heat_flux_per_density_W_m": float(heat_flux_per_density),
         "parallel_projected_heat_flux_per_density_standard_uncertainty_W_m": heat_flux_per_density_uncertainty,
         "parallel_projected_heat_flux_W_m2": (
@@ -635,7 +639,7 @@ def _projected_evdf_physical_moments(
             "standardized_fifth": "lambda_5,q = mu_5,q / sigma_q^5",
             "standardized_sixth_central_moment": "m_6,q = mu_6,q / sigma_q^6",
             "standardized_sixth_cumulant": "kappa_6,q/sigma_q^6 = mu_6,q/sigma_q^6 - 15 mu_4,q/sigma_q^4 - 10 mu_3,q^2/sigma_q^6 + 30",
-            "legacy_excess_sixth_alias": "excess_sixth_standardized_central_moment is retained as a compatibility alias for standardized_sixth_cumulant",
+            "legacy_excess_sixth": "legacy_excess_sixth = mu_6,q/sigma_q^6 - 15; Gaussian-reference offset only, not the sixth cumulant",
             "skewness": "gamma_1,q = mu_3,q/sigma_q^3",
             "excess_kurtosis": "gamma_2,q = mu_4,q/sigma_q^4 - 3",
             "mean_random_energy": "mean(E_q) = (m_e/(2e)) sigma_q^2 = T_eq,q/2",
@@ -884,12 +888,7 @@ def _projected_evdf_grid_truncation_sensitivity(velocity_m_s, probability_densit
                 - 10.0 * third**2 / variance**3
                 + 30.0
             ),
-            "excess_sixth_standardized_central_moment": (
-                sixth / variance**3
-                - 15.0 * fourth / variance**2
-                - 10.0 * third**2 / variance**3
-                + 30.0
-            ),
+            "excess_sixth_standardized_central_moment": sixth / variance**3 - 15.0,
         }, norm
 
     full, full_norm = _moments(velocity, density)
