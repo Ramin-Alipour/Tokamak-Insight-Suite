@@ -9471,7 +9471,7 @@
     "name": "Optical Thomson projected-EVDF velocity moments and uncertainty propagation",
     "equation": "W_i^(k)=integral_hat_i(v)(v-u_q)^k dv (4-point Gauss-Legendre, exact for piecewise-linear EVDF through k=6); N=Σ_i W_i^(0) f_i; u_q=Σ_i W_i^(1)(0) f_i/N; μ_k,q=Σ_i W_i^(k)(u_q) f_i/N (k=2..6); T_eq,q=(m_e/e)μ_2,q; γ_1,q=μ_3,q/μ_2,q^(3/2); γ_2,q=μ_4,q/μ_2,q²−3; m_6,q=μ_6,q/μ_2,q³; κ_6,q/μ_2,q³=m_6,q−15μ_4,q/μ_2,q²−10μ_3,q²/μ_2,q³+30; ∂M/∂f_i includes the normalization quotient and central-moment chain rule; Cov(M)=J_M Cov(f_q) J_Mᵀ",
     "inputs": "Calibrated optical Thomson spectrum, wavelength grid, laser wavelength, scattering angle, measured spectral response matrix, explicit background, optional signal/background covariance and model-discrepancy/systematic covariance, selected velocity grid and regularization.",
-    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, variance, standard deviation and directional equivalent temperature; dimensional central third through sixth velocity moments; skewness, excess kurtosis, standardized sixth central moment and standardized sixth cumulant; 14 x 14 covariance and standard uncertainties in moment_covariance_order. The legacy excess_sixth_standardized_central_moment output is retained as a compatibility alias for the corrected sixth cumulant. Separately reported regularization-choice and parametric-family spreads remain distinct from measurement covariance.",
+    "output": "Non-negative normalized one-dimensional q-projected EVDF; mean projected flow, variance, standard deviation and directional equivalent temperature; dimensional central third through sixth velocity moments; skewness, excess kurtosis, standardized sixth central moment and legacy Gaussian-reference sixth-moment offset and standardized sixth cumulant; 15 x 15 covariance and standard uncertainties in moment_covariance_order. The legacy excess_sixth_standardized_central_moment output is retained as a compatibility alias for the corrected sixth cumulant. Separately reported regularization-choice and parametric-family spreads remain distinct from measurement covariance.",
     "assumptions": "Non-relativistic single-particle Doppler mapping Δω=q·v; optically thin Thomson scattering; one scattering view; explicit calibrated response and background. The EVDF is represented as a piecewise-linear interpolant between strictly increasing, possibly nonuniform velocity nodes. Its normalization uses the composite trapezoidal measure, exactly integrating that interpolant. Moments through sixth order use interval-wise four-point Gauss-Legendre quadrature, exact for the piecewise-linear interpolant multiplied by velocity polynomials through degree six. The EVDF is a normalized one-dimensional marginal, not a 3-D distribution or absolute-density estimate. Moment uncertainty is a first-order delta-method approximation conditional on the selected grid, active set, response, background and regularization. The directional equivalent temperature is m_e Var(v_q)/e; Boltzmann's constant is not part of the joule-to-eV conversion.",
     "status": "D",
     "category": "Thomson scattering",
@@ -9565,7 +9565,7 @@
         },
         {
           "name": "velocity_moment_covariance",
-          "unit": "14 x 14 covariance in velocity_moment_covariance_order: mean, variance, standard deviation, directional temperature, central third through sixth moments, skewness, excess kurtosis, standardized fifth moment and standardized sixth cumulant, plus random-energy moments"
+          "unit": "15 x 15 covariance in velocity_moment_covariance_order: mean, variance, standard deviation, directional temperature, central third through sixth moments, skewness, excess kurtosis, standardized fifth moment, legacy sixth-moment offset, standardized sixth cumulant, and random-energy moments"
         },
         {
           "name": "velocity_moment_standard_uncertainty",
@@ -9582,6 +9582,10 @@
         {
           "name": "standardized_sixth_cumulant",
           "unit": "dimensionless; kappa_6,q/sigma_q^6 including skewness and kurtosis terms"
+        },
+        {
+          "name": "excess_sixth_standardized_central_moment",
+          "unit": "dimensionless; legacy Gaussian-reference offset mu_6,q/sigma_q^6 - 15"
         }
       ],
       "prerequisites": [
@@ -9590,7 +9594,7 @@
         "The directional equivalent temperature is a scalar electron temperature only if isotropy is independently justified.",
         "The directional second-moment temperature is T_eq,eV=m_e Var(v_q)/e. k_B is not included when converting kinetic energy in joules to electronvolts."
       ],
-      "uncertainty_model": "The exact piecewise-linear moment functionals through sixth order are differentiated with the quotient rule, including the EVDF normalization denominator and central-moment chain rule. Four-point Gauss-Legendre quadrature is exact for the piecewise-linear interpolant multiplied by velocity polynomials through degree six. The resulting 14 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, central third through sixth moments, skewness, excess kurtosis, standardized fifth moment, standardized sixth cumulant and random-energy moments. The sixth-cumulant derivative includes the μ3 and μ4 terms, not merely the Gaussian reference offset 15. Regularization and active-set conditioning remain part of the covariance interpretation. Regularization-choice and parametric-family spreads are reported separately and are not added to the measurement covariance.",
+      "uncertainty_model": "The exact piecewise-linear moment functionals through sixth order are differentiated with the quotient rule, including the EVDF normalization denominator and central-moment chain rule. Four-point Gauss-Legendre quadrature is exact for the piecewise-linear interpolant multiplied by velocity polynomials through degree six. The resulting 15 x N Jacobian propagates the full N x N conditional active-set EVDF covariance into the correlated covariance of mean flow, variance, standard deviation, directional equivalent temperature, central third through sixth moments, skewness, excess kurtosis, standardized fifth moment, legacy Gaussian-reference sixth-moment offset, standardized sixth cumulant and random-energy moments. The sixth-cumulant derivative includes the μ3 and μ4 terms; the historical Gaussian-reference offset remains a separate covariance component. Regularization and active-set conditioning remain part of the covariance interpretation. Regularization-choice and parametric-family spreads are reported separately and are not added to the measurement covariance.",
       "limitations": [
         "Non-relativistic q·v Doppler approximation; use the separate relativistic projected-EVDF solver outside this domain.",
         "One scattering view cannot recover unrestricted 3-D anisotropy.",
@@ -9623,8 +9627,8 @@
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Optical Thomson / projected EVDF"
     },
-    "description": "Physical central moments through sixth order and their correlated uncertainty are derived from the response-aware reconstructed normalized q-parallel EVDF. The piecewise-linear velocity interpolant is integrated exactly through sixth order on nonuniform grids; covariance uses the matching normalization-aware analytic Jacobian. The standardized sixth cumulant includes the μ3 and μ4 terms and is distinct from the standardized sixth central moment. A single projected marginal does not identify an unrestricted 3-D EVDF or full parallel heat flux.",
-    "note": "undefined The sixth standardized cumulant is calculated with the full cumulant relation, including the third- and fourth-central-moment terms; the old output key is retained as a compatibility alias for this corrected quantity."
+    "description": "Physical central moments through sixth order and their correlated uncertainty are derived from the response-aware reconstructed normalized q-parallel EVDF. The piecewise-linear velocity interpolant is integrated exactly through sixth order on nonuniform grids; covariance uses the matching normalization-aware analytic Jacobian. The standardized sixth cumulant includes the μ3 and μ4 terms and is distinct from both the standardized sixth central moment and the legacy Gaussian-reference offset. A single projected marginal does not identify an unrestricted 3-D EVDF or full parallel heat flux.",
+    "note": "undefined The sixth standardized cumulant is calculated with the full cumulant relation, including the third- and fourth-central-moment terms; the historical excess_sixth_standardized_central_moment key retains mu_6/sigma_q^6 - 15 as a legacy Gaussian-reference offset; standardized_sixth_cumulant is the mathematically complete sixth cumulant."
   },
   {
     "name": "Three-dimensional Bloch-periodic full-vector Maxwell energy closure",
