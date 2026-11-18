@@ -523,7 +523,12 @@ def test_advanced_thomson_dashboard_does_not_bypass_product_api():
         / "tis" / "ui" / "advanced_thomson_physics_page.py"
     ).read_text(encoding="utf-8")
 
-    assert "from tis.products.thomson.api import run_advanced_physics" in source
+    assert "from tis.products.thomson.api import (" in source
+    assert "run_advanced_physics," in source
+    assert "fit_cts_ion_species_flows," in source
+    assert "fit_full_em_cts_spatial_profiles," in source
+    assert 'result = fit_cts_ion_species_flows(**config)' in source
+    assert 'result = fit_full_em_cts_spatial_profiles(**config)' in source
     assert "from tis.products.thomson.physics.cts_full_physics import run_advanced_thomson_physics" not in source
     assert "run_advanced_thomson_physics(" not in source
 
