@@ -1,3 +1,17 @@
+def test_tensor_kappa_finite_window_does_not_renormalize_unobserved_probability():
+    from tis.products.thomson.physics.thomson_temperature_tensor import (
+        _tensor_finite_bin_kappa_density,
+    )
+
+    wavelength = np.linspace(529.0, 535.0, 121)
+    density, probability, widths = _tensor_finite_bin_kappa_density(
+        wavelength, 1.0e6, 0.02, 4.0
+    )
+    assert np.all(np.isfinite(density))
+    assert np.all(probability == 0.0)
+    assert np.all(widths > 0.0)
+
+
 def test_tensor_finite_window_forward_returns_zero_when_signal_is_outside_acquired_band():
     from tis.products.thomson.physics.thomson_temperature_tensor import (
         _tensor_apply_finite_window_response,
