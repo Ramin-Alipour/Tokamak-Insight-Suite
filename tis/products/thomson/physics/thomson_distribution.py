@@ -161,7 +161,6 @@ def _projected_evdf_physical_moments(
         "skewness",
         "excess_kurtosis",
         "standardized_fifth_central_moment",
-        "standardized_sixth_central_moment",
         "standardized_sixth_cumulant",
         "mean_random_kinetic_energy_parallel_eV",
         "random_kinetic_energy_parallel_variance_eV2",
@@ -238,8 +237,7 @@ def _projected_evdf_physical_moments(
             mean_gradient, variance_gradient, sigma_gradient, temperature_gradient,
             mu3_gradient, mu4_gradient, mu5_gradient, mu6_gradient,
             skewness_gradient, kurtosis_gradient,
-            standardized_fifth_gradient, standardized_sixth_gradient,
-            standardized_sixth_cumulant_gradient,
+            standardized_fifth_gradient, standardized_sixth_cumulant_gradient,
             mean_energy_gradient, energy_variance_gradient,
         ))
         moment_covariance = jacobian @ cov @ jacobian.T
