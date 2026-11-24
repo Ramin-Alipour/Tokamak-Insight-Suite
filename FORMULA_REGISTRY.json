@@ -8456,6 +8456,26 @@
           "name": "laser_angle_covariance_nm_rad",
           "unit": "nm·rad; laser-wavelength/scattering-angle calibration covariance",
           "required": false
+        },
+        {
+          "name": "background_model",
+          "unit": "constant, linear, polynomial, cubic spline or researcher-supplied detector-space templates",
+          "required": false
+        },
+        {
+          "name": "background_degree",
+          "unit": "integer polynomial degree",
+          "required": false
+        },
+        {
+          "name": "background_interior_knots",
+          "unit": "integer spline interior-knot count",
+          "required": false
+        },
+        {
+          "name": "background_templates",
+          "unit": "detector-space nuisance template matrix",
+          "required": false
         }
       ],
       "output_specs": [
@@ -8498,6 +8518,146 @@
         {
           "name": "projected_evdf_moment_closure",
           "unit": "analytic q-parallel Kappa variance, finite third/fourth-moment conditions, and geometry-propagated moment covariance"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s⁻¹; q-parallel flow projection"
+        },
+        {
+          "name": "electron_temperature_uncertainty_eV",
+          "unit": "eV; fit and supplied geometry covariance"
+        },
+        {
+          "name": "electron_velocity_projection_uncertainty_m_s",
+          "unit": "m s⁻¹; fit and supplied geometry covariance"
+        },
+        {
+          "name": "physical_parameter_covariance",
+          "unit": "joint [Te, q-flow] covariance including geometry"
+        },
+        {
+          "name": "total_physical_parameter_covariance",
+          "unit": "joint [Te, q-flow] total covariance"
+        },
+        {
+          "name": "physical_parameter_covariance_order",
+          "unit": "ordered physical parameter names"
+        },
+        {
+          "name": "physical_parameter_correlation_fit_only",
+          "unit": "dimensionless; fit-only correlation"
+        },
+        {
+          "name": "physical_parameter_correlation",
+          "unit": "dimensionless; total correlation"
+        },
+        {
+          "name": "physical_parameter_covariance_components",
+          "unit": "structured fit/geometry covariance provenance"
+        },
+        {
+          "name": "physical_parameter_covariance_status",
+          "unit": "text; covariance status"
+        },
+        {
+          "name": "likelihood_jacobian_rank",
+          "unit": "integer; response-convolved whitened likelihood Jacobian rank"
+        },
+        {
+          "name": "likelihood_parameter_count",
+          "unit": "integer"
+        },
+        {
+          "name": "fitted_center_nm",
+          "unit": "nm; fitted centroid"
+        },
+        {
+          "name": "intrinsic_sigma_nm",
+          "unit": "nm; fitted intrinsic Kappa scale parameter"
+        },
+        {
+          "name": "amplitude",
+          "unit": "calibrated spectral-density amplitude"
+        },
+        {
+          "name": "background_intercept",
+          "unit": "calibrated spectral density at fitted centre"
+        },
+        {
+          "name": "background_slope_per_nm",
+          "unit": "calibrated spectral density per nm; optional"
+        },
+        {
+          "name": "background_model",
+          "unit": "text; selected detector-space nuisance basis"
+        },
+        {
+          "name": "background_coefficients",
+          "unit": "detector-background coefficient vector"
+        },
+        {
+          "name": "background_basis",
+          "unit": "wavelength-bin × nuisance-basis matrix"
+        },
+        {
+          "name": "background_fitted_spectrum",
+          "unit": "calibrated spectral density; detector-space background"
+        },
+        {
+          "name": "fit_covariance",
+          "unit": "joint fitted parameter covariance"
+        },
+        {
+          "name": "residual",
+          "unit": "calibrated spectral density; measured minus fitted"
+        },
+        {
+          "name": "fit_parameters",
+          "unit": "fitted physical and background parameter vector"
+        },
+        {
+          "name": "fit_parameter_names",
+          "unit": "ordered fitted parameter names"
+        },
+        {
+          "name": "integrated_scattered_power_uncertainty_W",
+          "unit": "W; fitted model-area uncertainty"
+        },
+        {
+          "name": "spectral_window_truncation_warning",
+          "unit": "text; optional heavy-tail truncation warning"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless; optional when noise covariance is supplied"
+        },
+        {
+          "name": "spectral_covariance_used",
+          "unit": "boolean"
+        },
+        {
+          "name": "spectral_covariance_interpretation",
+          "unit": "text; within-channel spectral covariance provenance"
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "calibrated spectral density after measured response"
+        },
+        {
+          "name": "optimizer",
+          "unit": "structured deterministic multistart optimizer diagnostics"
+        },
+        {
+          "name": "model",
+          "unit": "text; non-collective isotropic Kappa forward-model identifier"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "structured non-relativistic theta_e and flow-beta screens"
+        },
+        {
+          "name": "assumptions",
+          "unit": "list of model assumptions"
         }
       ],
       "prerequisites": [
@@ -8505,7 +8665,7 @@
         "Laser wavelength, scattering angle and a measured detector-response operator",
         "A measured wavelength grid with strictly increasing bin centres; finite-volume edges are midpoint-defined"
       ],
-      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. Laser-wavelength and scattering-angle 1-sigma calibration errors, including their supplied cross-covariance, are propagated by first-order Jacobian linearization into electron temperature, q-parallel flow and analytic projected-Kappa moments. Cross-covariance between fitted spectral parameters and geometry is not supplied and is assumed zero.",
+      "uncertainty_model": "The within-channel pointwise uncertainty or full spectral covariance is propagated through the response-convolved Student-t fit. The physical [Te, q-flow] covariance and analytic projected-Kappa moment closure include the supplied laser-wavelength/scattering-angle covariance and their cross-covariance by first-order Jacobian propagation. Cross-covariance between fitted spectral parameters and geometry is not supplied and is assumed zero.",
       "limitations": [
         "No relativistic or Compton correction; the canonical fitter rejects fits outside its theta_e and bulk-flow beta screens.",
         "Kappa is a fitted parametric closure, not a general measured EVDF.",
