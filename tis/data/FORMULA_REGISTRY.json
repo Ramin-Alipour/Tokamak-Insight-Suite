@@ -7743,6 +7743,14 @@
         {
           "name": "experimental_validation",
           "unit": "text; experimental validation status"
+        },
+        {
+          "name": "fitted_spectra",
+          "unit": "calibrated spectral density; fitted spectrum per view"
+        },
+        {
+          "name": "model_validity",
+          "unit": "structured approximation and validity declaration"
         }
       ],
       "prerequisites": [
