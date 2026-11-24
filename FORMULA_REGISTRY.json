@@ -8305,6 +8305,10 @@
         {
           "name": "assumptions",
           "unit": "list of model assumptions"
+        },
+        {
+          "name": "model",
+          "unit": "text; non-collective non-relativistic Maxwellian forward-model identifier"
         }
       ],
       "prerequisites": [
