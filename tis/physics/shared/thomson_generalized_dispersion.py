@@ -56,6 +56,9 @@ def _apply_measured_spectral_response(
         raise ValueError("instrument_response_matrix must contain real numeric values")
     response = response.astype(float, copy=False)
     n = wavelength.size
+    if (spectrum.shape != (n,) or np.any(~np.isfinite(spectrum))
+            or np.any(spectrum < 0.0)):
+        raise ValueError("spectral_density_per_nm must be finite, non-negative and match wavelength_nm")
     if (response.shape != (n, n) or np.any(~np.isfinite(response))
             or np.any(response < 0.0)):
         raise ValueError("instrument_response_matrix must be finite, non-negative and square on the wavelength grid")
