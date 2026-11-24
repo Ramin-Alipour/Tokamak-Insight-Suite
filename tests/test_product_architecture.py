@@ -631,7 +631,7 @@ def test_main_optical_thomson_dashboard_uses_the_product_execution_api():
     from pathlib import Path
 
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
-    start = source.index("elif mode=='Thomson multi-channel spectral inference':")
+    start = source.index("if mode=='Thomson multi-channel spectral inference':")
     end = source.index("\nelif page==", start)
     workflow = source[start:end]
 
