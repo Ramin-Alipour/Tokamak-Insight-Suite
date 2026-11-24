@@ -13441,7 +13441,7 @@
     "name": "Collective Thomson spectrum from multi-population Landau–FDT response",
     "equation": "χ_e(k,ω)=−Σ_a[ω_pe²η_a/k² ∫_L f′_a(v)/(v−ω/k)dv]; χ_j=−ω_pj²/k² ∫_L f′_j(v)/(v−ω/k)dv; ε=1+χ_e+Σ_jχ_j; S(k,ω)=(2π/k){|1+Σ_jχ_j|²f_e+Σ_j Z_j²(n_j/n_e)|χ_e|²f_j}/|ε|²; f_e=Σ_aη_af_a; S_λ=S|dω/dλ|, |dω/dλ|=2πc/λ²",
     "inputs": "Scattering wave number k [m^-1], phase velocity ω/k [m s^-1], electron density and temperature, finite-variance Kappa index, explicit electron population fractions/temperature ratios/drifts/distribution types, ion species/fractions/temperatures/flows",
-    "output": "Complex longitudinal dielectric response and collective dynamic structure factor; wavelength spectral density after photon-frequency Jacobian",
+    "output": "Collective Thomson spectral density from explicit electron/ion populations, species fractions, projected velocity distributions, susceptibility and dielectric response, dynamic structure factor, phase velocity, screening and scattering-parameter diagnostics.",
     "assumptions": "Collisionless, unmagnetized, electrostatic Landau–FDT model. Each population is a normalized projected 1-D Maxwellian or finite-variance Kappa marginal; the solver sums susceptibilities before dielectric screening. Population fractions sum to one. This is not Full-EM, collisional, or an unrestricted 3-D EVDF model.",
     "status": "D",
     "category": "Optical and collective Thomson scattering",
@@ -13517,6 +13517,82 @@
         {
           "name": "electron_mixture_moments",
           "unit": "projected density-weighted moments and finite-moment status"
+        },
+        {
+          "name": "electron_populations",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "model",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "ion_species",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "ion_flow_projections_m_s",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "static_screening_status",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "electron_debye_length_m",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "electron_population_projected_vdfs_s_m",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "electron_reference_flow_projection_m_s",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "ion_populations",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "scattering_parameter_alpha",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "ion_susceptibility",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
+        },
+        {
+          "name": "electron_susceptibility",
+          "unit": "as returned by the multi-population kinetic CTS spectrum solver"
         }
       ],
       "prerequisites": [
@@ -13534,7 +13610,8 @@
       ],
       "test_links": [
         "tests/test_thomson_inference.py::test_collective_kappa_population_mixture_is_reachable_through_analysis1_api"
-      ]
+      ],
+      "note": "The contract lists the public solver's complete returned population, species, susceptibility, screening and spectral outputs. Species fractions, temperatures, flows and Kappa index are explicit inputs; the solver does not invent plasma composition."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
