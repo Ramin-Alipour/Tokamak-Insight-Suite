@@ -634,9 +634,10 @@ def test_main_optical_thomson_dashboard_uses_the_product_execution_api():
     start = source.index("if mode=='Thomson multi-channel spectral inference':")
     end = source.index("\n    elif mode=='ECE channel/profile analysis':", start)
     workflow = source[start:end]
+    normalized_workflow = "".join(workflow.split())
 
-    assert "product_api.run_analysis(1,wavelengths[channel_index],spectra[channel_index]" in workflow
-    assert "result=product_api.run_analysis(analysis_id,wavelengths,spectra,radii,**kwargs)" in workflow
+    assert "channel_result=product_api.run_analysis(1,wavelengths[channel_index],spectra[channel_index]," in normalized_workflow
+    assert "result=product_api.run_analysis(analysis_id,wavelengths,spectra,radii,**kwargs)" in normalized_workflow
     assert "reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)" not in workflow
     assert "analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)" not in workflow
 
