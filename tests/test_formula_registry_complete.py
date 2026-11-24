@@ -331,7 +331,11 @@ def test_registry_output_specs_cover_all_statically_returned_keys():
     for row in rows:
         module_name, function_name = row["execution_contract"]["function_link"].rsplit(".", 1)
         module = importlib.import_module(module_name)
-        source = Path(module.__file__).read_text(encoding="utf-8")
+        function = getattr(module, function_name)
+        # Legacy import facades re-export the canonical implementation. Inspect
+        # the source that actually defines the callable, not the facade module.
+        implementation_module = importlib.import_module(function.__module__)
+        source = Path(implementation_module.__file__).read_text(encoding="utf-8")
         tree = ast.parse(source)
         functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
         node = functions[function_name]
