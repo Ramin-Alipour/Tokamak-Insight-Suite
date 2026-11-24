@@ -190,7 +190,9 @@ def test_dashboard_poisson_example_executes_inside_its_declared_velocity_window(
 def test_poisson_evdf_piecewise_linear_sixth_order_moments_match_maxwellian_closure():
     from tis.physics.shared.thomson_evdf import _piecewise_linear_evdf_moments_through_sixth
 
-    velocity = np.linspace(-8.0, 8.0, 1601)
+    # Dense support keeps piecewise-linear interpolation error below the
+    # analytic Maxwellian moment tolerance through sixth order.
+    velocity = np.linspace(-8.0, 8.0, 6401)
     distribution = np.exp(-0.5 * velocity**2)
     moments = _piecewise_linear_evdf_moments_through_sixth(velocity, distribution)
     assert moments["variance"] == pytest.approx(1.0, rel=2e-5)
