@@ -295,6 +295,7 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
     maximum_projected_rms_beta=0.1,
     maximum_projected_superluminal_tail_probability=1.0e-8,
+    minimum_spectral_window_coverage=0.95,
     max_nfev=4000,
 ):
     """Jointly infer T_parallel, T_perpendicular and per-view q-flow projections.
@@ -461,6 +462,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     beta_limit = float(maximum_projected_rms_beta)
     if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
         raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
+    minimum_coverage = float(minimum_spectral_window_coverage)
+    if not np.isfinite(minimum_coverage) or not 0.0 < minimum_coverage <= 1.0:
+        raise ValueError("minimum_spectral_window_coverage must lie in (0, 1]")
     projected_tail_tolerance = float(maximum_projected_superluminal_tail_probability)
     if not np.isfinite(projected_tail_tolerance) or not 0.0 < projected_tail_tolerance < 1.0:
         raise ValueError("maximum_projected_superluminal_tail_probability must lie strictly between zero and one")
@@ -546,7 +550,12 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         transform[0, 0] = np.exp(fit.x[0])
         transform[1, 1] = np.exp(fit.x[1])
         parameter_covariance = transform @ parameter_covariance @ transform.T
-    spectrally_identifiable_anisotropy = geometry_rank == 2 and full_rank
+    spectral_window_coverage_identifiable = bool(
+        np.all(captured_probability >= minimum_coverage)
+    )
+    spectrally_identifiable_anisotropy = (
+        geometry_rank == 2 and full_rank and spectral_window_coverage_identifiable
+    )
     reportable_anisotropy = (
         spectrally_identifiable_anisotropy and not projected_tail_exceeds_tolerance
     )
@@ -583,6 +592,8 @@ def fit_gyrotropic_bi_maxwellian_thomson(
         ),
         "directional_temperature_eV": directional,
         "captured_spectral_probability": captured_probability,
+        "minimum_spectral_window_coverage_required": minimum_coverage,
+        "spectral_window_coverage_identifiable": spectral_window_coverage_identifiable,
         "spectral_window_coverage_warning": (
             "The measured wavelength window truncates more than one percent of the fitted Maxwellian feature in at least one view."
             if np.any(captured_probability < 0.99) else None
@@ -616,7 +627,14 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             "model_outside_nonrelativistic_validity_domain" if projected_tail_exceeds_tolerance
             else "identified" if reportable_anisotropy else "not_identifiable"
         ),
-        "non_identifiability_reason": None if spectrally_identifiable_anisotropy else "Distinct squared magnetic pitch angles and a full-rank spectral fit are required to identify both T_parallel and T_perpendicular.",
+        "non_identifiability_reason": (
+            None if spectrally_identifiable_anisotropy else
+            "Distinct squared magnetic pitch angles are required to identify both temperatures."
+            if geometry_rank != 2 else
+            "The whitened spectral Jacobian does not identify every fitted parameter."
+            if not full_rank else
+            f"The measured wavelength window captures less than the required {minimum_coverage:.3g} of at least one fitted Maxwellian feature."
+        ),
         "electron_velocity_projection_m_s": fit.x[2::4].copy(),
         "fitted_spectra": fitted,
         "residual_spectra": spectra - fitted,

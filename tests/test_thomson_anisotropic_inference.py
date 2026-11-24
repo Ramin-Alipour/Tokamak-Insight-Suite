@@ -11,7 +11,10 @@ from tokamak_analysis.thomson_anisotropic_inference import (
 
 def _synthetic_spectra():
     coordinate = np.linspace(-1.0, 1.0, 161)
-    wavelength = 1064.0 + 2.0 * (coordinate + 0.12 * coordinate**3)
+    # The window spans several thermal widths at the 900 eV reference state;
+    # the original +/-2 nm window captured only a few percent of the feature
+    # and could not identify temperature independently of a free background.
+    wavelength = 1064.0 + 200.0 * (coordinate + 0.12 * coordinate**3)
     laser = 1064.0
     angle = np.pi / 2.0
     b = np.array([0.0, 0.0, 1.0])
@@ -68,6 +71,25 @@ def test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_tempe
     assert tail["requires_relativistic_forward_model"] is False
     assert tail["maximum_projected_superluminal_probability_lower_bound"] < 1.0e-8
 
+
+def test_narrow_spectral_window_withholds_unidentifiable_anisotropy_temperatures():
+    wavelength, spectra, b, q = _synthetic_spectra()
+    selected = np.abs(wavelength - 1064.0) <= 30.0
+    result = fit_gyrotropic_bi_maxwellian_thomson(
+        wavelength[selected], spectra[:, selected], laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi/2, magnetic_field_unit=b,
+        scattering_vector_unit=q,
+        instrument_response_matrix=np.eye(np.count_nonzero(selected)),
+        initial_temperature_parallel_eV=700.0,
+        initial_temperature_perpendicular_eV=350.0,
+        temperature_bounds_eV=(20.0, 3000.0),
+        flow_bounds_m_s=(-1.0e6, 1.0e6),
+    )
+    assert result["spectral_window_coverage_identifiable"] is False
+    assert result["anisotropy_identifiability"] == "non_identifiable"
+    assert result["reportable_as_inferred_parameter"] is False
+    assert result["electron_temperature_parallel_eV"] is None
+    assert "wavelength window captures less" in result["non_identifiability_reason"]
 
 def test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures():
     wavelength, spectra, b, q = _synthetic_spectra()

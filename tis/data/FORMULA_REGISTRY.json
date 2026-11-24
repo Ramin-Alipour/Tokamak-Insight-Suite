@@ -5459,7 +5459,8 @@
     "assumptions": [
       "Optically thin single scattering.",
       "All path-dependent optical/geometry factors are supplied and already characterized.",
-      "The result is a kernel-weighted path-average density; one integrated power does not identify an arbitrary pointwise density profile."
+      "The result is a kernel-weighted path-average density; one integrated power does not identify an arbitrary pointwise density profile.",
+      "When optical-profile covariance is supplied it is a full 4N × 4N covariance in the declared factor-major order; optional scattered-power/profile cross-covariance must form a positive-semidefinite joint covariance."
     ],
     "status": "implemented_and_tested",
     "category": "Thomson scattering",
@@ -5538,6 +5539,16 @@
           "name": "scattered_power_uncertainty_W",
           "unit": "W; 1-sigma",
           "required": false
+        },
+        {
+          "name": "optical_profile_covariance",
+          "unit": "(profile units)^2; full 4N × 4N covariance",
+          "required": false
+        },
+        {
+          "name": "scattered_power_optical_profile_cross_covariance",
+          "unit": "W × profile units; length 4N",
+          "required": false
         }
       ],
       "output_specs": [
@@ -5560,6 +5571,38 @@
         {
           "name": "identifiability",
           "unit": "structured primary/conditional/non-identifiable classification"
+        },
+        {
+          "name": "electron_density_optical_profile_uncertainty_m3",
+          "unit": "m⁻³; optional"
+        },
+        {
+          "name": "path_coordinate_m",
+          "unit": "m; supplied coordinate vector"
+        },
+        {
+          "name": "path_weighting_model",
+          "unit": "text; explicit kernel definition"
+        },
+        {
+          "name": "density_interpretation",
+          "unit": "text; weighted path-average"
+        },
+        {
+          "name": "assumptions",
+          "unit": "list of model assumptions"
+        },
+        {
+          "name": "optical_profile_covariance_order",
+          "unit": "ordered list; optional"
+        },
+        {
+          "name": "scattered_power_optical_profile_cross_covariance_supplied",
+          "unit": "boolean"
+        },
+        {
+          "name": "uncertainty_model",
+          "unit": "text; propagated covariance scope"
         }
       ],
       "prerequisites": [
@@ -5567,7 +5610,7 @@
         "All path-dependent optical/geometry factors are explicitly supplied and already characterized.",
         "Optically thin single scattering."
       ],
-      "uncertainty_model": "First-order propagation of supplied scattered-power uncertainty only. Uncertainty and covariance of path-dependent optical factors are not included.",
+      "uncertainty_model": "First-order Jacobian propagation of supplied scattered-power uncertainty and the full 4N × 4N optical-profile covariance, including cross-position and cross-factor correlations; supplied scattered-power/profile cross-covariance is included after validating the joint covariance as positive semidefinite.",
       "test_links": [
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"

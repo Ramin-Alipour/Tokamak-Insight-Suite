@@ -146,7 +146,7 @@ def test_generalized_landau_integral_includes_distributional_finite_support_edge
     assert result["interior_derivative_integral"] == 0.0j
     assert result["finite_support_boundary_integral"] == expected
     assert result["integral"] == expected
-    assert result["finite_support_extension"] == "zero_outside_tabulated_velocity_interval"
+    assert result["finite_support_extension"] == "zero_outside_tabulated_velocity_interval_with_distributional_endpoint_jumps"
 
 
 def test_collective_tabulated_evdf_accepts_compact_support_and_includes_edge_terms():
