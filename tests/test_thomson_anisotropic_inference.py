@@ -579,7 +579,9 @@ def test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options():
     from tokamak_analysis.thomson_workflow import fit_gyrotropic_thomson_spectra
 
     coordinate = np.linspace(-1.0, 1.0, 121)
-    wavelength = 1064.0 + 1.8 * (coordinate + 0.1*coordinate**3)
+    # Cover the full 850 eV Maxwellian width so the flow projections are
+    # identifiable independently of a truncated, nearly flat spectral tail.
+    wavelength = 1064.0 + 120.0 * (coordinate + 0.1*coordinate**3)
     directions = np.eye(3)
     magnetic_field = np.array([0.0, 0.0, 1.0])
     common_flow = np.array([8.0e3, -6.0e3, 1.0e4])
@@ -612,6 +614,7 @@ def test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options():
     )
     assert result["analysis_entry_point"] == "fit_gyrotropic_thomson_spectra"
     assert result["three_dimensional_flow_inference"]["geometry_uncertainty_included"] is True
+    assert np.all(result["captured_spectral_probability"] >= 0.95)
     assert result["three_dimensional_flow_inference"]["reportable_as_inferred_parameter"] is True
     np.testing.assert_allclose(
         result["three_dimensional_flow_inference"]["electron_velocity_vector_m_s"],
