@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.integrate import trapezoid
 import pytest
 
 from tokamak_analysis.thomson_evdf import reconstruct_thomson_evdf
@@ -38,7 +39,7 @@ def test_evdf_trapezoidal_normalization_jacobian_matches_finite_difference():
     velocity = np.linspace(-3.0, 4.0, 9)
     coefficients = np.array([0.4, 1.1, 0.7, 2.0, 1.3, 0.8, 1.6, 0.9, 0.5])
     distribution, analytic_jacobian = _normalize_evdf_coefficients(coefficients, velocity)
-    assert np.trapz(distribution, velocity) == pytest.approx(1.0, abs=1e-13)
+    assert trapezoid(distribution, velocity) == pytest.approx(1.0, abs=1e-13)
     numerical_jacobian = np.empty_like(analytic_jacobian)
     step = 1e-6
     for index in range(coefficients.size):
@@ -58,7 +59,7 @@ def test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection():
     f = out["evdf_parallel_s_per_m"]
     v = out["velocity_parallel_m_s"]
     assert np.all(f >= 0)
-    assert np.trapz(f, v) == pytest.approx(1.0, rel=2e-5)
+    assert trapezoid(f, v) == pytest.approx(1.0, rel=2e-5)
     assert out["scattering_vector_projection_only"] is True
     assert out["absolute_density_identified"] is False
     expected_directional_temperature = (
@@ -416,7 +417,7 @@ def test_projected_evdf_is_exposed_through_public_physics_api_and_dashboard():
     assert result["scattering_vector_projection_only"] is True
     assert result["absolute_density_identified"] is False
     assert result["evdf_parallel_s_per_m"].shape == result["velocity_parallel_m_s"].shape
-    assert np.trapz(result["evdf_parallel_s_per_m"], result["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
+    assert trapezoid(result["evdf_parallel_s_per_m"], result["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
     assert result["velocity_moment_covariance"].shape == (8, 8)
     assert len(result["velocity_moment_covariance_order"]) == 8
     assert "exact_intervalwise_three_point_Gauss_Legendre" in result["velocity_moment_quadrature"]
@@ -564,7 +565,7 @@ def test_evdf_normalization_jacobian_supports_nonuniform_velocity_grid():
     velocity = np.array([-4.0, -2.5, -1.0, -0.2, 0.4, 1.8, 4.5])
     coefficients = np.array([0.3, 0.8, 1.4, 2.0, 1.2, 0.7, 0.2])
     distribution, analytic = _normalize_evdf_coefficients(coefficients, velocity)
-    assert np.trapz(distribution, velocity) == pytest.approx(1.0, abs=1e-13)
+    assert trapezoid(distribution, velocity) == pytest.approx(1.0, abs=1e-13)
     numerical = np.empty_like(analytic)
     step = 1e-6
     for index in range(coefficients.size):
@@ -589,7 +590,7 @@ def test_projected_evdf_reconstruction_accepts_nonuniform_velocity_grid():
     reconstructed = out["evdf_parallel_s_per_m"]
     assert np.all(np.isfinite(reconstructed))
     assert np.all(reconstructed >= 0.0)
-    assert np.trapz(reconstructed, velocity) == pytest.approx(1.0, rel=2e-5)
+    assert trapezoid(reconstructed, velocity) == pytest.approx(1.0, rel=2e-5)
     assert out["velocity_parallel_m_s"].shape == velocity.shape
     from tis.physics.shared.thomson_evdf import _piecewise_linear_evdf_moments
     expected = _piecewise_linear_evdf_moments(velocity, reconstructed)
@@ -638,7 +639,7 @@ def test_evdf_reports_akaike_model_selection_and_between_model_uncertainty():
     averaged_pdf = selection["model_averaged_projected_evdf_s_per_m"]
     assert averaged_pdf.shape == velocity.shape
     assert np.all(averaged_pdf >= 0.0)
-    assert np.trapz(averaged_pdf, velocity) == pytest.approx(1.0, rel=1e-8)
+    assert trapezoid(averaged_pdf, velocity) == pytest.approx(1.0, rel=1e-8)
     between_covariance = selection["between_model_projected_evdf_covariance_s2_per_m2"]
     assert between_covariance.shape == (velocity.size, velocity.size)
     np.testing.assert_allclose(between_covariance, between_covariance.T, rtol=1e-10, atol=1e-14)

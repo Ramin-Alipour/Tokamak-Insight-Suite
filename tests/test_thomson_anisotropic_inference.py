@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.integrate import trapezoid
 import pytest
 
 from tokamak_analysis.thomson_anisotropic_inference import (

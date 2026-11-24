@@ -641,3 +641,14 @@ def test_main_optical_thomson_dashboard_uses_the_product_execution_api():
     assert "reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)" not in workflow
     assert "analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)" not in workflow
 
+def test_all_thomson_registered_entry_points_import_through_product_resolver():
+    from tis.products.api import resolve_product_analysis
+    from tis.products.thomson.registry import THOMSON_ENTRY_POINTS
+
+    assert set(THOMSON_ENTRY_POINTS) == set(get_product("thomson-scattering")["entry_ids"])
+    for analysis_id in sorted(THOMSON_ENTRY_POINTS):
+        solver = resolve_product_analysis("thomson-scattering", analysis_id)
+        assert callable(solver), f"Thomson analysis {analysis_id} did not resolve to a callable"
+        assert solver.__module__.startswith("tis.products.thomson.physics."), (
+            analysis_id, solver.__module__
+        )
