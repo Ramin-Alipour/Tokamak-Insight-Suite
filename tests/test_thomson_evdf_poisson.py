@@ -105,5 +105,9 @@ def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_di
         "thomson_evdf_poisson", "reconstruct_thomson_evdf_poisson"
     )
     assert direct["likelihood"] == dispatched["likelihood"] == registered["likelihood"] == "independent_poisson_counts"
+    assert "projected_evdf_physical_moments" in direct
+    assert direct["projected_evdf_physical_moments"]["central_third_velocity_moment_m3_s3"] is not None
+    assert direct["projected_evdf_physical_moments"]["parallel_projected_heat_flux_W_m2"] is None
+    assert "not the full 3-D" in direct["projected_evdf_physical_moments"]["heat_flux_physical_scope"]
     assert "thomson_projected_evdf_poisson" in MODEL_LABELS
     assert "thomson_projected_evdf_poisson" in MODEL_PHYSICS_NOTES
