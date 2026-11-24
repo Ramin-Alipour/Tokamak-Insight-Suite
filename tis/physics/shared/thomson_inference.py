@@ -5505,6 +5505,106 @@ def fit_optical_thomson_poisson_counts(
             - ndtr((edges[0] - center) / sigma)
         )
         integrated_counts = float(amplitude * np.sqrt(2.0 * np.pi) * sigma * probability)
+    # Convert the fitted spectral standard deviation to the second central
+    # moment of the q-parallel electron-velocity marginal. For an isotropic
+    # Maxwellian this is Gaussian; for the finite-variance Kappa model the
+    # projected marginal is Student-t with nu=2*kappa-1 degrees of freedom.
+    q_magnitude = 2.0 * np.sin(angle / 2.0)
+    sigma_velocity = C_M_S * sigma / (laser_nm * q_magnitude)
+    velocity_variance = sigma_velocity**2
+    variance_gradient = np.zeros(fit.x.size, dtype=float)
+    variance_gradient[2] = 2.0 * velocity_variance / sigma
+    variance_variance = float(
+        variance_gradient @ covariance @ variance_gradient
+    )
+    projected_moments = {
+        "mean_velocity_q_m_s": float(velocity),
+        "variance_velocity_q_m2_s2": float(velocity_variance),
+        "variance_standard_uncertainty_m2_s2": float(
+            np.sqrt(max(variance_variance, 0.0))
+        ),
+        "central_third_moment_m3_s3": None,
+        "skewness": None,
+        "central_fourth_moment_m4_s4": None,
+        "excess_kurtosis": None,
+        "excess_kurtosis_standard_uncertainty": None,
+        "central_fourth_moment_standard_uncertainty_m4_s4": None,
+        "moment_existence": {},
+        "interpretation": (
+            "Parametric q-parallel EVDF moments derived from the fitted "
+            "Maxwellian/Kappa spectral family; not wavelength-space moments."
+        ),
+    }
+    if distribution_model == "maxwellian":
+        fourth_moment = 3.0 * velocity_variance**2
+        fourth_gradient = np.zeros(fit.x.size, dtype=float)
+        fourth_gradient[2] = 4.0 * fourth_moment / sigma
+        fourth_variance = float(fourth_gradient @ covariance @ fourth_gradient)
+        projected_moments.update({
+            "central_third_moment_m3_s3": 0.0,
+            "skewness": 0.0,
+            "central_fourth_moment_m4_s4": float(fourth_moment),
+            "excess_kurtosis": 0.0,
+            "central_fourth_moment_standard_uncertainty_m4_s4": float(
+                np.sqrt(max(fourth_variance, 0.0))
+            ),
+            "excess_kurtosis_standard_uncertainty": 0.0,
+            "moment_existence": {
+                "third_absolute_moment": True,
+                "fourth_moment": True,
+            },
+        })
+    else:
+        degrees = 2.0 * float(fit.x[5]) - 1.0
+        third_exists = degrees > 3.0
+        fourth_exists = degrees > 4.0
+        projected_moments["moment_existence"] = {
+            "third_absolute_moment": bool(third_exists),
+            "fourth_moment": bool(fourth_exists),
+            "condition": "Student-t moment of order r exists only when degrees_of_freedom > r",
+        }
+        if third_exists:
+            projected_moments["central_third_moment_m3_s3"] = 0.0
+            projected_moments["skewness"] = 0.0
+        if fourth_exists:
+            excess_kurtosis = 6.0 / (degrees - 4.0)
+            fourth_moment = 3.0 * velocity_variance**2 * (
+                (degrees - 2.0) / (degrees - 4.0)
+            )
+            fourth_gradient = np.zeros(fit.x.size, dtype=float)
+            fourth_gradient[2] = 4.0 * fourth_moment / sigma
+            fourth_gradient[5] = (
+                -12.0 * velocity_variance**2 / (degrees - 4.0)**2
+            )
+            fourth_variance = float(
+                fourth_gradient @ covariance @ fourth_gradient
+            )
+            kurtosis_gradient = np.zeros(fit.x.size, dtype=float)
+            kurtosis_gradient[5] = -12.0 / (degrees - 4.0)**2
+            kurtosis_variance = float(
+                kurtosis_gradient @ covariance @ kurtosis_gradient
+            )
+            projected_moments.update({
+                "central_fourth_moment_m4_s4": float(fourth_moment),
+                "excess_kurtosis": float(excess_kurtosis),
+                "central_fourth_moment_standard_uncertainty_m4_s4": float(
+                    np.sqrt(max(fourth_variance, 0.0))
+                ),
+                "excess_kurtosis_standard_uncertainty": float(
+                    np.sqrt(max(kurtosis_variance, 0.0))
+                ),
+            })
+    projected_moments["heat_flux_status"] = (
+        "zero_for_symmetric_parametric_marginal"
+        if projected_moments["central_third_moment_m3_s3"] is not None
+        else "third_absolute_moment_diverges_for_fitted_kappa"
+    )
+    projected_moments["heat_flux_scope"] = (
+        "The symmetric Maxwellian/Kappa family has zero q-parallel third central "
+        "moment when it exists; this does not infer heat flux for an arbitrary "
+        "or asymmetric EVDF."
+    )
+
     deviance = float(np.sum(poisson_deviance_residual(fit.x)**2))
     dof = max(1, wavelength.size - parameter_count)
     log_likelihood = float(np.sum(
@@ -5535,6 +5635,8 @@ def fit_optical_thomson_poisson_counts(
             "background_left_counts_per_nm", "background_right_counts_per_nm",
         ] + (["kappa"] if distribution_model == "kappa" else []),
         "distribution_model": distribution_model,
+        "projected_evdf_physical_moments": projected_moments,
+        "projected_evdf_moment_covariance_method": "analytic_parametric_moment_jacobian_propagated_through_expected_Poisson_Fisher_fit_covariance",
         "kappa": float(fit.x[5]) if distribution_model == "kappa" else None,
         "kappa_uncertainty": float(np.sqrt(max(covariance[5, 5], 0.0))) if distribution_model == "kappa" else None,
         "identifiability": {
