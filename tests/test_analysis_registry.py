@@ -4,15 +4,15 @@ from pathlib import Path
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_86_unique_ordered_analysis_ids_after_retiring_id_7():
+def test_registry_contains_88_unique_ordered_analysis_ids_after_retiring_id_7_and_adding_poisson_evdf():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 86
-    assert ids == [entry_id for entry_id in range(1, 88) if entry_id != 7]
+    assert len(ANALYSES) == 88
+    assert ids == [entry_id for entry_id in range(1, 90) if entry_id != 7]
 
 
-def test_registry_uses_distinct_entry_points_for_all_86_registered_analyses():
+def test_registry_uses_distinct_entry_points_for_all_88_registered_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 86
+    assert len(set(pairs)) == 88
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -216,7 +216,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     assert (profile["module"], profile["function"]) == (
         "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
-    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82, 83, 84, 85, 86, 87]
+    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88, 89]
     tensor = get_analysis(83)
     assert (tensor["module"], tensor["function"]) == (
         "thomson_workflow", "fit_general_temperature_tensor_thomson_spectra"
@@ -264,7 +264,7 @@ def test_thomson_formula_registry_contains_traceable_physical_relations():
     for item in thomson:
         contract = item["execution_contract"]
         assert contract["implementation_link_status"] == "mapped"
-        assert contract["function_link"].startswith("tokamak_analysis.")
+        assert contract["function_link"].startswith(("tokamak_analysis.", "tis.products."))
 
 
 
