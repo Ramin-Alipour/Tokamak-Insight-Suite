@@ -13127,5 +13127,88 @@
       ],
       "note": "Numerical verification; not empirical validation on tokamak measurements."
     }
+  },
+  {
+    "name": "Poisson-likelihood projected Thomson EVDF inversion",
+    "equation": "mu_i = A_tot * Delta_lambda_i * [R K f_q]_i + b_i; minimize sum_i(mu_i - y_i ln(mu_i)) + (lambda/2)||D2 f_q||^2, subject to f_q >= 0 and sum_j w_j f_q(v_j)=1",
+    "inputs": "Integer detector-bin counts y_i; calibrated wavelength bins; laser wavelength; scattering angle; measured response R; supplied expected background b_i; velocity grid; explicit positive regularization lambda.",
+    "output": "Normalized q-parallel EVDF f_q(v), fitted expected counts, Poisson deviance, and constrained expected-Fisher covariance when identifiable.",
+    "assumptions": "Independent Poisson detector bins; fixed supplied background expectation; non-relativistic Doppler kinematics; one-dimensional scattering-vector marginal; measured detector response; explicit regularization strength.",
+    "status": "D",
+    "category": "Thomson scattering / statistical inverse problems",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tis.physics.shared.thomson_evdf_poisson.reconstruct_thomson_evdf_poisson",
+      "formula_key": "thomson_projected_evdf_poisson_count_likelihood",
+      "input_specs": [
+        {
+          "name": "observed_counts",
+          "unit": "counts/bin",
+          "required": true
+        },
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "dimensionless bin-probability matrix",
+          "required": true
+        },
+        {
+          "name": "background_expected_counts",
+          "unit": "counts/bin",
+          "required": true
+        },
+        {
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1",
+          "required": true
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "positive solver scale",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "evdf_parallel_s_per_m",
+          "unit": "s m^-1"
+        },
+        {
+          "name": "fitted_expected_counts",
+          "unit": "counts/bin"
+        },
+        {
+          "name": "poisson_deviance",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "evdf_covariance",
+          "unit": "(s m^-1)^2; conditional, optional"
+        }
+      ],
+      "prerequisites": [
+        "Raw integer detector counts, not calibrated spectral power.",
+        "Measured normalized response matrix and fixed expected background counts.",
+        "One scattering geometry identifies only the q-parallel velocity marginal."
+      ],
+      "tests": [
+        "tests/test_thomson_evdf_poisson.py"
+      ]
+    }
   }
 ]
