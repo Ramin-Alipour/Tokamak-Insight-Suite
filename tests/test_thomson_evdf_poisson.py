@@ -52,7 +52,14 @@ def test_poisson_inverse_recovers_normalized_projected_evdf_from_synthetic_count
     assert weights @ density == pytest.approx(1.0, rel=1e-7, abs=1e-9)
     assert result["likelihood"] == "independent_poisson_counts"
     assert result["physical_scope"] == "one_dimensional_q_parallel_velocity_marginal_only"
-    assert result["poisson_deviance"] < 250.0
+    assert result["poisson_deviance"] < 250.0, {
+        "optimizer_message": result["optimizer_message"],
+        "iterations": result["optimizer_iterations"],
+        "amplitude": result["total_scattered_count_amplitude"],
+        "nll": result["poisson_negative_log_likelihood"],
+        "mu_range": (float(np.min(result["fitted_expected_counts"])), float(np.max(result["fitted_expected_counts"]))),
+        "count_range": (int(np.min(counts)), int(np.max(counts))),
+    }
     assert np.corrcoef(density, truth)[0, 1] > 0.90
     assert result["fitted_expected_counts"].shape == counts.shape
     assert result["expected_count_equation"].startswith("mu_i=A_tot")
