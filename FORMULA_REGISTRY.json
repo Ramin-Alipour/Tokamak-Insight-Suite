@@ -13139,7 +13139,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tis.physics.shared.thomson_evdf_poisson.reconstruct_thomson_evdf_poisson",
+      "function_link": "tis.products.thomson.physics.thomson_evdf_poisson.reconstruct_thomson_evdf_poisson",
       "formula_key": "thomson_projected_evdf_poisson_count_likelihood",
       "input_specs": [
         {
