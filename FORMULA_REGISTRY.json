@@ -7862,6 +7862,21 @@
           "name": "spatial_mixing_covariance",
           "unit": "positive-semidefinite covariance of row-major PSF/mixing-matrix elements",
           "required": false
+        },
+        {
+          "name": "measurement_spatial_mixing_cross_covariance",
+          "unit": "Cov(measured channel data, row-major PSF/mixing elements); n_channel × (n_channel × n_latent)",
+          "required": false
+        },
+        {
+          "name": "positive",
+          "unit": "boolean; enforce non-negative latent profile",
+          "required": false
+        },
+        {
+          "name": "max_iter",
+          "unit": "positive integer; constrained least-squares iteration limit",
+          "required": false
         }
       ],
       "output_specs": [
@@ -7900,19 +7915,111 @@
         {
           "name": "profile_covariance_with_psf_uncertainty",
           "unit": "combined local profile covariance; only when data-only identifiable"
+        },
+        {
+          "name": "condition_number",
+          "unit": "dimensionless; condition number of column-scaled data-only operator"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text; experimental validation status"
+        },
+        {
+          "name": "fitted_channel_values",
+          "unit": "calibrated measured-channel units"
+        },
+        {
+          "name": "identifiability",
+          "unit": "structured primary, conditional and non-identifiable modes"
+        },
+        {
+          "name": "latent_node_count",
+          "unit": "integer"
+        },
+        {
+          "name": "latent_profile",
+          "unit": "latent physical profile; withheld when data-only rank deficient"
+        },
+        {
+          "name": "measurement_data_sensitivity_jacobian",
+          "unit": "latent × measured-channel Jacobian"
+        },
+        {
+          "name": "measurement_noise_covariance_used",
+          "unit": "measured-channel units²; covariance used for whitening"
+        },
+        {
+          "name": "measurement_psf_cross_covariance_contribution",
+          "unit": "latent-profile covariance contribution from supplied data/PSF cross-covariance"
+        },
+        {
+          "name": "measurement_psf_cross_covariance_propagated",
+          "unit": "boolean"
+        },
+        {
+          "name": "noise_model",
+          "unit": "structured measurement-noise provenance"
+        },
+        {
+          "name": "null_space_dimension",
+          "unit": "integer; data-only unresolved latent dimensions"
+        },
+        {
+          "name": "positive_constraint",
+          "unit": "boolean"
+        },
+        {
+          "name": "profile_covariance",
+          "unit": "latent-profile covariance; withheld when not data-only identifiable"
+        },
+        {
+          "name": "profile_covariance_with_joint_measurement_psf_uncertainty",
+          "unit": "latent-profile covariance including measurement, PSF and cross-covariance"
+        },
+        {
+          "name": "psf_covariance_order",
+          "unit": "text; row-major spatial-mixing matrix element order"
+        },
+        {
+          "name": "psf_uncertainty_propagated",
+          "unit": "boolean"
+        },
+        {
+          "name": "regularized_candidate_covariance_with_joint_measurement_psf_uncertainty",
+          "unit": "latent-profile candidate covariance including joint measurement/PSF covariance"
+        },
+        {
+          "name": "regularized_candidate_covariance_with_psf_uncertainty",
+          "unit": "latent-profile candidate covariance including PSF covariance"
+        },
+        {
+          "name": "residual",
+          "unit": "measured-channel units; measured minus fitted"
+        },
+        {
+          "name": "spatial_mixing_matrix",
+          "unit": "non-negative measured-channel × latent-node operator"
+        },
+        {
+          "name": "uncertainty_interpretation",
+          "unit": "text; frequentist regularized-estimator covariance scope"
+        },
+        {
+          "name": "uncertainty_method",
+          "unit": "text; estimator-sandwich/Jacobian propagation"
         }
       ],
       "prerequisites": [
         "Supplied spatial PSF/mixing operator on the latent profile grid",
         "Calibrated channel measurements"
       ],
-      "uncertainty_model": "Local covariance conditional on selected regularization plus first-order PSF/mixing-operator covariance propagation when supplied; assumes operator and measurement errors are independent, excludes their cross-covariance and higher-order effects.",
+      "uncertainty_model": "Frequentist first-order sampling covariance of the regularized estimator on the active set, computed as J_y C_y J_yᵀ. Supplied PSF/mixing covariance and supplied measurement/PSF cross-covariance are propagated by first-order differentiation of the regularized normal equations; higher-order operator effects are excluded.",
       "limitations": [
         "GCV selects regularization, not the spatial grid or PSF.",
         "Data-only null-space modes remain non-identifiable regardless of regularization.",
         "Non-negative active-set GCV is an approximate effective-degrees-of-freedom criterion.",
         "PSF covariance propagation is first-order and requires the full covariance of row-major mixing-matrix elements.",
-        "Cross-covariance between measured data and PSF/mixing operator is not propagated."
+        "Measurement/PSF cross-covariance is propagated only when measurement_spatial_mixing_cross_covariance and the corresponding joint covariance are explicitly supplied."
       ],
       "test_links": [
         "tests/test_thomson_gap_closure.py::test_psf_aware_profile_selects_regularization_by_gcv_when_omitted",
