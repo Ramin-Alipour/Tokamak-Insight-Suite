@@ -154,7 +154,7 @@ def test_thomson_family_maps_all_registered_distinct_executable_subanalyses():
     # historical tokamak_analysis registry remains a compatibility layer and
     # must not be used to assert product-owned module paths.
     product = get_product("thomson-scattering")
-    expected_ids = [1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88]
+    expected_ids = [1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88, 89]
     assert product["entry_ids"] == expected_ids
     assert sorted(THOMSON_ENTRY_POINTS) == expected_ids
     assert len(set(THOMSON_ENTRY_POINTS.values())) == len(expected_ids)
