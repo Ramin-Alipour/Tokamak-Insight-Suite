@@ -13332,7 +13332,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "function_link": "tis.physics.shared.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
       "formula_key": "cts_tabulated_evdf_exact_frequency_geometry",
       "input_specs": [
         {
@@ -13558,9 +13558,9 @@
     "execution_scope": "physics_based_forward_model",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "function_link": "tis.physics.shared.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
       "function_links": [
-        "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
+        "tis.physics.shared.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
       ],
       "formula_key": "cts_tabulated_evdf_exact_frequency_geometry",
       "implementation_link_status": "mapped",
