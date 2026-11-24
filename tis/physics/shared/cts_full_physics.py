@@ -827,6 +827,7 @@ ADVANCED_THOMSON_PHYSICS_MODELS = frozenset({
     "cts_multi_ion_flow_inference",
     "cts_electrostatic_measured_spectrum_inference",
     "thomson_projected_evdf",
+    "thomson_projected_evdf_poisson",
     "thomson_projected_bi_kappa_evdf",
     "thomson_temperature_from_spectral_width",
     "thomson_relativistic_exact_flow_projection",
@@ -934,6 +935,7 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
       - thomson_kinetic_background_fit: finite-bin Kappa or bin-averaged relativistic
         Maxwell-Juttner physical fit with detector background, instrument response,
         measurement/model-discrepancy/systematic covariance and joint nuisance covariance.
+      - thomson_projected_evdf_poisson: finite-bin non-negative projected-EVDF inversion using the exact independent-Poisson count likelihood and a constrained normalized density.
       - thomson_projected_evdf: response-aware non-negative inversion of the
         measured optical Thomson electron feature to its 1-D q-projected VDF;
         absolute density and the unobserved 3-D distribution are not inferred.
@@ -1059,6 +1061,9 @@ def run_advanced_thomson_physics(model, *args, **kwargs):
         solver = thomson_velocity_projection_relativistic_exact
     elif model == "thomson_projected_evdf":
         solver = reconstruct_thomson_evdf
+    elif model == "thomson_projected_evdf_poisson":
+        from .thomson_evdf_poisson import reconstruct_thomson_evdf_poisson
+        solver = reconstruct_thomson_evdf_poisson
     elif model == "thomson_projected_bi_kappa_evdf":
         solver = project_gyrotropic_bi_kappa_electron_vdf
     elif model == "thomson_relativistic_projected_evdf":
