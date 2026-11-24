@@ -4638,6 +4638,8 @@ elif page=='Advanced Analysis':
                 tp_col=col_select('Measured spectral power (display only)',[x for x in numeric if x!=tf_col] or numeric,'cts_tabulated_power')
                 config_upload=st.file_uploader('Physical input JSON (electron EVDF, ion species/EVDFs, flows and beam directions)',type=['json'],key='cts_tabulated_evdf_config')
             with c2:
+                response_upload=st.file_uploader('Optional measured wavelength-response matrix CSV',type=['csv','txt'],key='cts_tabulated_evdf_response')
+                allow_response_loss=st.checkbox('Allow calibrated finite-window response loss',value=False,key='cts_tabulated_evdf_response_loss')
                 st.markdown('**Required JSON fields**')
                 st.code('''{
   "probe_frequency_Hz": 2.82e14,
@@ -4682,6 +4684,14 @@ elif page=='Advanced Analysis':
                     order=np.argsort(wavelength_nm)
                     physical['wavelength_nm']=wavelength_nm[order]
                     physical['laser_wavelength_nm']=299792458.0/probe*1e9
+                    if response_upload is not None:
+                        response_matrix=pd.read_csv(response_upload,header=None).to_numpy(dtype=float)
+                        if response_matrix.shape!=(frequency.size,frequency.size):
+                            raise ValueError('Measured response matrix must be square and match the spectral bins.')
+                        physical['instrument_response_matrix']=response_matrix[np.ix_(order,order)]
+                        physical['allow_finite_window_response_loss']=bool(allow_response_loss)
+                    elif allow_response_loss:
+                        raise ValueError('Finite-window response loss can only be enabled when a measured response matrix is uploaded.')
                     result_cts=analyze_cts_spectrum_model(model='electrostatic_tabulated_evdf',**physical)
                     st.success('Tabulated-EVDF electrostatic CTS forward calculation completed.')
                     st.caption('Measured power is shown for reference only. Direct quantitative comparison requires applying the calibrated receiver response and matching absolute spectral normalization.')
@@ -4690,6 +4700,7 @@ elif page=='Advanced Analysis':
                         'frequency_shift_Hz':frequency[order],
                         'measured_power_display_only':measured_power[order],
                         'model_spectral_density_per_nm':result_cts['spectral_density_per_nm'],
+                        'physical_spectral_density_per_nm':result_cts['spectral_density_per_nm_physical'],
                         'scattering_wavenumber_m_inverse':result_cts['wavenumber_m_inverse'],
                         'phase_velocity_m_s':result_cts['phase_velocity_m_s'],
                     })
