@@ -4631,7 +4631,7 @@ elif page=='Advanced Analysis':
                     st.error(f'Relativistic gyrotropic CTS VDF inversion failed: {e}')
 
         elif cts_model=='electrostatic_tabulated_evdf':
-            st.caption('Generalized collisionless, unmagnetized electrostatic CTS forward model. Supply the measured electron projected EVDF, ion composition and species flows explicitly in JSON. The model evaluates each spectral bin with exact photon-frequency conversion and frequency-dependent |k_s-k_i|. This is a forward model: it does not fit plasma parameters or apply a detector response matrix.')
+            st.caption('Generalized collisionless, unmagnetized electrostatic CTS forward model. Supply the measured electron projected EVDF, ion composition and species flows explicitly in JSON. The model evaluates each spectral bin with exact photon-frequency conversion and frequency-dependent |k_s-k_i|. This is a forward model, not a plasma-parameter inverse. An optional measured wavelength-response matrix is applied as a finite-volume photon-probability operator.')
             c1,c2=st.columns(2)
             with c1:
                 tf_col=col_select('Frequency shift (Hz)',numeric,'cts_tabulated_frequency')
@@ -4694,7 +4694,10 @@ elif page=='Advanced Analysis':
                         raise ValueError('Finite-window response loss can only be enabled when a measured response matrix is uploaded.')
                     result_cts=analyze_cts_spectrum_model(model='electrostatic_tabulated_evdf',**physical)
                     st.success('Tabulated-EVDF electrostatic CTS forward calculation completed.')
-                    st.caption('Measured power is shown for reference only. Direct quantitative comparison requires applying the calibrated receiver response and matching absolute spectral normalization.')
+                    if result_cts['instrument_response_applied']:
+                        st.caption('The supplied calibrated receiver response has been applied. Measured power remains a reference until absolute spectral normalization and calibration units are matched.')
+                    else:
+                        st.caption('Measured power is shown for reference only. Upload the calibrated receiver response for detector-convolved model output; absolute spectral normalization must also be matched.')
                     result_table=pd.DataFrame({
                         'wavelength_nm':result_cts['wavelength_nm'] if 'wavelength_nm' in result_cts else wavelength_nm[order],
                         'frequency_shift_Hz':frequency[order],
