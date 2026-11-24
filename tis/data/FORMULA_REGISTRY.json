@@ -12577,7 +12577,7 @@
     "name": "Non-gyrotropic 3-D Thomson temperature-tensor spectral model",
     "equation": "T_q = qhat^T T_e qhat; sigma_lambda = lambda_L q_s sqrt(e T_q/m_e)/c; lambda_c = lambda_L(1 - q_s u_q/c); C_p,total=C_p,GLS+G_q C_qq G_q^T+A C_yq G_q^T+G_q C_qy A^T, G_q=−(J_p^T J_p)^−1 J_p^T J_q",
     "inputs": "Calibrated multi-view spectra, unit scattering directions, laser wavelength, scattering angle, measured bin-response matrices; optional tangent-plane scattering-direction covariance and measured-spectrum/geometry cross-covariance",
-    "output": "Full symmetric positive-definite 3-D temperature tensor jointly inferred from raw multi-view spectra, directional projections and flow vector, Maxwellian/Kappa forward model, instrument-response convolution, fit/identifiability and validity diagnostics, covariance decomposition including spectral-geometry cross terms, derived pressure and explicit inference scope.",
+    "output": "Joint raw multi-view spectral inference of a symmetric positive-definite 3-D electron temperature tensor and Cartesian flow, with Maxwellian or ellipsoidal-Kappa closure, instrument-response convolution, fit/identifiability and validity diagnostics, pressure tensor and decomposed spectral/geometry/systematic covariance. The Kappa closure is parametric and is not an unrestricted 3-D EVDF reconstruction.",
     "assumptions": "Single-scattering, non-relativistic elastic Thomson limit; Gaussian 3-D electron velocity distribution; fixed measured geometry and response.",
     "status": "D",
     "category": "Thomson scattering",
@@ -12952,7 +12952,7 @@
         "tests/test_thomson_temperature_tensor.py::test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry",
         "tests/test_thomson_temperature_tensor_api.py::test_raw_temperature_tensor_fit_propagates_scattering_geometry_covariance"
       ],
-      "note": "The contract enumerates the returned fields of the joint raw-spectrum solver, including model selection, Kappa controls, vector flow, joint covariance blocks and validity gates. The Kappa branch is an ellipsoidal parametric closure, not an unrestricted 3-D EVDF reconstruction; the solver is non-relativistic elastic Thomson."
+      "note": "Output specifications enumerate the complete result mapping of the raw multi-view spectral inverse, including joint tensor/flow inference, validity gates, pressure and covariance decomposition. The Kappa branch is an ellipsoidal parametric closure (not an unrestricted 3-D EVDF); the solver is non-relativistic elastic Thomson. Model-selection uncertainty is reported separately and is not included unless a distinct model-family comparison is run."
     }
   },
   {
