@@ -798,3 +798,29 @@ def test_tabulated_cts_response_finite_window_loss_is_explicit_and_never_renorma
         0.8 * metadata["total_input_power"], rel=1e-13
     )
     assert np.allclose(convolved, 0.8 * spectrum)
+
+
+def test_tabulated_landau_susceptibility_recovers_analytic_maxwellian_limit():
+    from tokamak_analysis.thomson_generalized_dispersion import generalized_electron_susceptibility
+    from tokamak_analysis.thomson_kinetic_models import _landau_susceptibility
+
+    density = 1.0e18
+    wavenumber = 120.0
+    sigma = 2.0e6
+    phase_velocity = 0.713 * sigma
+    velocity = np.linspace(-8.0 * sigma, 8.0 * sigma, 2401)
+    maxwellian = np.exp(-0.5 * (velocity / sigma) ** 2) / (np.sqrt(2.0 * np.pi) * sigma)
+    tabulated = generalized_electron_susceptibility(
+        velocity, maxwellian, phase_velocity,
+        electron_density_m3=density,
+        wavenumber_m_inverse=wavenumber,
+        pole_imaginary_part_m_s=1.0e3,
+    )["electron_susceptibility"]
+    omega_pe_squared = density * 1.602176634e-19**2 / (
+        8.8541878128e-12 * 9.1093837015e-31
+    )
+    analytic = _landau_susceptibility(
+        phase_velocity, omega_pe_squared, wavenumber, sigma,
+        distribution="maxwellian",
+    )
+    np.testing.assert_allclose(tabulated, analytic, rtol=2.0e-3, atol=2.0e-5)
