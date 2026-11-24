@@ -708,9 +708,16 @@ def test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_
         incident_direction=[1.0, 0.0, 0.0],
         scattered_direction=[0.0, 1.0, 0.0],
         pole_imaginary_part_m_s=100.0,
+        instrument_response_matrix=np.eye(wavelength.size),
     )
     assert result["product_execution_path"] == "thomson-scattering/analysis-30"
     assert result["api_model"] == "electrostatic_tabulated_evdf"
+    assert result["instrument_response_applied"] is True
+    np.testing.assert_allclose(
+        result["spectral_density_per_nm"],
+        result["spectral_density_per_nm_physical"],
+        rtol=1e-13, atol=0.0,
+    )
     assert result["phase_velocity_mapping"].startswith("exact_delta_omega_over_frequency_dependent")
     assert result["wavenumber_m_inverse"].shape == wavelength.shape
     assert result["spectral_density_per_nm"].shape == wavelength.shape
@@ -750,3 +757,44 @@ def test_exact_frequency_resolved_cts_kinematics_formula_is_registered_and_synch
         item["name"] for item in contract["output_specs"]
     }
     assert "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api" in contract["test_links"]
+
+
+def test_tabulated_cts_measured_response_conserves_bin_integrated_power_on_nonuniform_grid():
+    from tokamak_analysis.thomson_generalized_dispersion import _apply_measured_spectral_response
+
+    wavelength = np.array([500.0, 500.2, 500.7, 501.5, 502.0, 503.2, 505.0, 506.0, 508.0])
+    spectrum = np.array([0.1, 0.3, 0.8, 1.2, 0.9, 0.5, 0.25, 0.12, 0.04])
+    response = 0.75 * np.eye(wavelength.size) + 0.25 * np.roll(
+        np.eye(wavelength.size), 1, axis=0
+    )
+    convolved, metadata = _apply_measured_spectral_response(
+        wavelength, spectrum, response
+    )
+    widths = np.diff(np.r_[
+        wavelength[0] - 0.5 * (wavelength[1] - wavelength[0]),
+        0.5 * (wavelength[:-1] + wavelength[1:]),
+        wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2]),
+    ])
+    assert np.all(np.isfinite(convolved))
+    assert np.all(convolved >= 0.0)
+    assert np.sum(convolved * widths) == np.sum(spectrum * widths)
+    assert metadata["total_output_power"] == metadata["total_input_power"]
+
+
+def test_tabulated_cts_response_finite_window_loss_is_explicit_and_never_renormalized():
+    import pytest
+    from tokamak_analysis.thomson_generalized_dispersion import _apply_measured_spectral_response
+
+    wavelength = np.linspace(500.0, 508.0, 9)
+    spectrum = np.linspace(1.0, 2.0, wavelength.size)
+    response = 0.8 * np.eye(wavelength.size)
+    with pytest.raises(ValueError, match="columns must sum to one"):
+        _apply_measured_spectral_response(wavelength, spectrum, response)
+    convolved, metadata = _apply_measured_spectral_response(
+        wavelength, spectrum, response,
+        allow_finite_window_response_loss=True,
+    )
+    assert metadata["total_output_power"] == pytest.approx(
+        0.8 * metadata["total_input_power"], rel=1e-13
+    )
+    assert np.allclose(convolved, 0.8 * spectrum)
