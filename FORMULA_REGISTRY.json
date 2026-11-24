@@ -13444,6 +13444,82 @@
         {
           "name": "instrument_response_metadata",
           "unit": "finite-volume integrated input/output power and column probability coverage"
+        },
+        {
+          "name": "electron_susceptibility_phase_velocity_derivative_s_m",
+          "unit": "s m⁻¹; optional analytic derivative with respect to phase velocity"
+        },
+        {
+          "name": "electron_susceptibility_derivative_definition",
+          "unit": "text; derivative scope and fixed-k convention"
+        },
+        {
+          "name": "phase_velocity_mapping",
+          "unit": "text; exact frequency-resolved kinematic mapping"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s⁻¹; supplied electron bulk-flow projection"
+        },
+        {
+          "name": "ion_flow_projections_m_s",
+          "unit": "m s⁻¹; one supplied bulk-flow projection per ion species"
+        },
+        {
+          "name": "electron_projected_moments",
+          "unit": "record; normalized 1-D q-parallel EVDF central moments"
+        },
+        {
+          "name": "ion_projected_moments",
+          "unit": "records; one normalized 1-D projected moment record per ion species"
+        },
+        {
+          "name": "ion_projected_pdf_at_resonance",
+          "unit": "s m⁻¹; species-resolved ion PDF evaluated at Landau resonance"
+        },
+        {
+          "name": "electron_distribution_model",
+          "unit": "text; supplied electron EVDF scope"
+        },
+        {
+          "name": "ion_distribution_model",
+          "unit": "text; supplied tabulated or Maxwellian ion closure"
+        },
+        {
+          "name": "ion_distribution_normalization",
+          "unit": "text; ion EVDF normalization and composition convention"
+        },
+        {
+          "name": "electron_distribution_normalization",
+          "unit": "text; electron EVDF normalization and absolute-density scope"
+        },
+        {
+          "name": "model",
+          "unit": "text; selected unmagnetized electrostatic CTS forward model"
+        },
+        {
+          "name": "pole_quadrature",
+          "unit": "text; Landau pole and finite-support endpoint treatment"
+        },
+        {
+          "name": "velocity_support_extension",
+          "unit": "text; finite velocity support extension convention"
+        },
+        {
+          "name": "pole_imaginary_part_m_s",
+          "unit": "m s⁻¹; numerical retarded-pole displacement or zero for exact Landau limit"
+        },
+        {
+          "name": "landau_limit",
+          "unit": "boolean; exact Sokhotski-Plemelj boundary-value selection"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of explicit physical and numerical scope limits"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text; empirical-validation status"
         }
       ],
       "prerequisites": [
