@@ -1372,8 +1372,8 @@ def render_advanced_thomson_physics_page(st) -> None:
             else:
                 if model == "cts_multi_ion_flow_inference":
                     # Keep the dashboard on the specialist product API boundary.
-                    from tis.products.thomson.api import fit_cts_ion_species_flows as fit_product_cts_ion_flows
-                    result = dict(fit_product_cts_ion_flows(**config))
+                    from tis.products.thomson.api import fit_cts_ion_species_flows
+                    result = dict(fit_cts_ion_species_flows(**config))
                     result["dashboard_execution_path"] = (
                         "tis.ui.advanced_thomson_physics_page -> "
                         "tis.products.thomson.api.fit_cts_ion_species_flows"
