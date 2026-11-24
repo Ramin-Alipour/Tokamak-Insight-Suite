@@ -47,7 +47,14 @@ def analyze_spectra(*args: Any, **kwargs: Any) -> Any:
 
 
 def analyze_cts(*args: Any, **kwargs: Any) -> Any:
-    """Run collective/coherent Thomson scattering inference (entry 30)."""
+    """Run registered collective/coherent Thomson scattering workflows (entry 30).
+
+    Select model="electrostatic_tabulated_evdf" to evaluate the generalized
+    unmagnetized Landau response from explicit projected electron/ion EVDFs.
+    That forward model uses exact frequency-resolved photon kinematics and can
+    apply a calibrated finite-volume wavelength-response matrix. It does not
+    infer the supplied distributions or plasma parameters.
+    """
     return _run(30, *args, **kwargs)
 
 
