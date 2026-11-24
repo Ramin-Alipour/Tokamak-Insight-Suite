@@ -168,12 +168,12 @@ def _projected_evdf_forward_matrix(wavelength, velocity, response, laser_wavelen
 
 
 def _piecewise_linear_polynomial_weights(velocity, power, center_m_s=0.0):
-    """Exact integral weights for a nodal piecewise-linear EVDF.
+    """Exact interval weights for polynomial moments of a linear EVDF.
 
-    Returns w such that w @ f equals integral (v-center)**power f(v) dv
-    for the piecewise-linear interpolant through the supplied velocity nodes.
-    Three-point Gauss-Legendre quadrature is exact through power four because
-    the highest interval integrand is a fifth-degree polynomial.
+    Returns w such that w @ f equals integral (v-center)**power f(v) dv.
+    Three-point Gauss-Legendre quadrature is exact through power four; the
+    four-point rule is exact through power six because the interval integrand
+    is a polynomial of degree power+1.
     """
     grid = np.asarray(velocity, dtype=float)
     if (grid.ndim != 1 or grid.size < 2 or not np.all(np.isfinite(grid))
@@ -181,12 +181,12 @@ def _piecewise_linear_polynomial_weights(velocity, power, center_m_s=0.0):
         raise ValueError("velocity grid must be finite, strictly increasing and contain at least two nodes")
     if (isinstance(power, (bool, np.bool_))
             or not isinstance(power, (int, np.integer))
-            or not 0 <= int(power) <= 4):
-        raise ValueError("piecewise-linear polynomial moment power must be an integer from zero to four")
+            or not 0 <= int(power) <= 6):
+        raise ValueError("piecewise-linear polynomial moment power must be an integer from zero to six")
     center = float(center_m_s)
     if not np.isfinite(center):
         raise ValueError("moment center must be finite")
-    nodes, quadrature = np.polynomial.legendre.leggauss(3)
+    nodes, quadrature = np.polynomial.legendre.leggauss(3 if int(power) <= 4 else 4)
     result = np.zeros(grid.size, dtype=float)
     for index, (left, right) in enumerate(zip(grid[:-1], grid[1:])):
         half_width = 0.5 * (right - left)
