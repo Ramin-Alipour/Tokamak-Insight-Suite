@@ -2570,3 +2570,71 @@ def test_cts_3d_fast_ion_vector_flow_is_projected_onto_q_and_frequency_resolved_
     assert np.all(np.isfinite(ray_spectrum))
     assert np.all(ray_spectrum >= 0.0)
 
+
+
+def test_cts_ion_flow_fit_accepts_full_cross_frequency_covariance(monkeypatch):
+    from tis.products.thomson.physics import cts_analysis as cts
+
+    frequency = np.linspace(-2.0, 2.0, 31)
+    response = np.eye(frequency.size)
+    species = [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}]
+
+    def forward(freq, probe_frequency_Hz, geometry, **kwargs):
+        flow = kwargs["ion_velocity_projection_m_s"]
+        if isinstance(flow, dict):
+            flow = flow["D+"]
+        center = 0.35 * float(np.asarray(flow).reshape(-1)[0]) / 1.0e5
+        return np.exp(-0.5 * ((freq - center) / 0.55) ** 2)
+
+    monkeypatch.setattr(cts, "cts_spectral_density", forward)
+    truth = forward(
+        frequency, 140e9, {"scattering_angle_rad": 1.2},
+        ion_velocity_projection_m_s={"D+": 7.5e4},
+    )
+    correlation = 0.35 ** np.abs(
+        np.subtract.outer(np.arange(frequency.size), np.arange(frequency.size))
+    )
+    covariance = 0.0025 * correlation + np.eye(frequency.size) * 1.0e-8
+
+    result = cts.fit_cts_ion_species_flows(
+        frequency, 1.7 * truth + 0.03,
+        probe_frequency_Hz=140e9,
+        scattering_geometry={"scattering_angle_rad": 1.2},
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1000.0,
+        ion_temperature_eV=500.0,
+        ion_species=species, ion_fractions=[1.0],
+        electron_velocity_projection_m_s=0.0,
+        instrument_response=response,
+        ion_velocity_initial_m_s={"D+": 5.0e4},
+        spectral_covariance=covariance,
+        ion_velocity_bounds_m_s=(-2.0e5, 2.0e5),
+    )
+    assert result["spectral_covariance_used"] is True
+    assert "cross-frequency" in result["spectral_covariance_assumption"]
+    assert result["candidate_ion_velocity_projection_m_s"]["D+"] == pytest.approx(
+        7.5e4, rel=2e-3
+    )
+    assert result["parameter_covariance"].shape == (3, 3)
+    np.testing.assert_allclose(
+        result["parameter_covariance"], result["parameter_covariance"].T,
+        rtol=1e-10, atol=1e-12,
+    )
+
+
+def test_cts_ion_flow_fit_requires_one_uncertainty_representation():
+    from tis.products.thomson.physics.cts_analysis import fit_cts_ion_species_flows
+
+    with pytest.raises(ValueError, match="exactly one"):
+        fit_cts_ion_species_flows(
+            np.linspace(-1.0, 1.0, 12), np.ones(12),
+            probe_frequency_Hz=140e9,
+            scattering_geometry={"scattering_angle_rad": 1.0},
+            electron_density_m3=1e19,
+            electron_temperature_eV=100.0,
+            ion_temperature_eV=50.0,
+            ion_species=[{"name": "D+"}], ion_fractions=[1.0],
+            electron_velocity_projection_m_s=0.0,
+            instrument_response=np.eye(12),
+            ion_velocity_initial_m_s={"D+": 0.0},
+        )

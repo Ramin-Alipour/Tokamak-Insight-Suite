@@ -57,6 +57,16 @@ def analyze_cts(*args: Any, **kwargs: Any) -> Any:
     """
     return _run(30, *args, **kwargs)
 
+def fit_cts_ion_species_flows(*args: Any, **kwargs: Any) -> Any:
+    """Conditionally infer species-resolved projected ion flows from CTS.
+
+    Accepts either independent per-bin signal_uncertainty or a full
+    positive-definite spectral_covariance, used in the GLS likelihood.
+    """
+    from .physics.cts_analysis import fit_cts_ion_species_flows as solve
+    return solve(*args, **kwargs)
+
+
 
 def reconstruct_profiles(*args: Any, **kwargs: Any) -> Any:
     """Reconstruct spatial profiles from measured Thomson spectra (entry 46)."""

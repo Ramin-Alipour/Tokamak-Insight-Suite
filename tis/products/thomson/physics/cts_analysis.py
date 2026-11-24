@@ -1897,7 +1897,8 @@ def fit_cts_ion_species_flows(
     scattering_geometry, electron_density_m3, electron_temperature_eV,
     ion_temperature_eV, ion_species, ion_fractions,
     electron_velocity_projection_m_s, instrument_response,
-    ion_velocity_initial_m_s, signal_uncertainty,
+    ion_velocity_initial_m_s, signal_uncertainty=None,
+    spectral_covariance=None,
     ion_velocity_bounds_m_s=(-5.0e5, 5.0e5),
 ):
     """Conditionally infer independent ion-species flow projections from CTS.
@@ -1913,11 +1914,27 @@ def fit_cts_ion_species_flows(
 
     frequency = _array(frequency_shift_Hz, "frequency_shift_Hz", 1)
     observed = _array(measured_spectrum, "measured_spectrum", 1)
-    uncertainty = _array(signal_uncertainty, "signal_uncertainty", 1)
-    if frequency.size != observed.size or uncertainty.shape != observed.shape or frequency.size < 12:
-        raise ValueError("frequency, measured spectrum and signal uncertainty must match and contain at least 12 bins")
-    if np.any(np.diff(frequency) <= 0.0) or np.any(observed < 0.0) or np.any(uncertainty <= 0.0):
-        raise ValueError("frequency must increase; measured spectrum must be non-negative; uncertainty must be positive")
+    if (signal_uncertainty is None) == (spectral_covariance is None):
+        raise ValueError("supply exactly one of signal_uncertainty or spectral_covariance")
+    if frequency.size != observed.size or frequency.size < 12:
+        raise ValueError("frequency and measured spectrum must match and contain at least 12 bins")
+    if np.any(np.diff(frequency) <= 0.0) or np.any(observed < 0.0):
+        raise ValueError("frequency must increase and measured spectrum must be non-negative")
+    covariance_factor = None
+    if spectral_covariance is not None:
+        supplied_covariance = _array(spectral_covariance, "spectral_covariance", 2)
+        if supplied_covariance.shape != (frequency.size, frequency.size):
+            raise ValueError("spectral_covariance must be square on the measured frequency grid")
+        covariance_scale = max(float(np.max(np.abs(supplied_covariance))), np.finfo(float).tiny)
+        if not np.allclose(supplied_covariance, supplied_covariance.T, rtol=1e-9, atol=1e-12 * covariance_scale):
+            raise ValueError("spectral_covariance must be symmetric")
+        supplied_covariance = 0.5 * (supplied_covariance + supplied_covariance.T)
+        covariance_factor = np.linalg.cholesky(supplied_covariance)
+        uncertainty = np.sqrt(np.diag(supplied_covariance))
+    else:
+        uncertainty = _array(signal_uncertainty, "signal_uncertainty", 1)
+        if uncertainty.shape != observed.shape or np.any(uncertainty <= 0.0):
+            raise ValueError("signal_uncertainty must match the spectrum and be strictly positive")
     if not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes)) or not ion_species:
         raise ValueError("ion_species must be a non-empty sequence")
     names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
@@ -1940,6 +1957,12 @@ def fit_cts_ion_species_flows(
     y_scale = max(float(np.max(observed)), float(np.max(uncertainty)), np.finfo(float).tiny)
     v_scale = max(abs(float(bounds[0])), abs(float(bounds[1])), 1.0)
     normalized_uncertainty = uncertainty / y_scale
+    if covariance_factor is not None:
+        from scipy.linalg import solve_triangular
+        normalized_covariance_factor = covariance_factor / y_scale
+    else:
+        solve_triangular = None
+        normalized_covariance_factor = None
     initial_physical = cts_spectral_density(
         frequency, probe_frequency_Hz, scattering_geometry,
         electron_density_m3=electron_density_m3,
@@ -1974,7 +1997,14 @@ def fit_cts_ion_species_flows(
         return np.exp(parameters[-2]) * _convolve(response, physical, frequency) + parameters[-1]
 
     def residual(parameters):
-        return (predict(parameters) - observed / y_scale) / normalized_uncertainty
+        difference = predict(parameters) - observed / y_scale
+        if normalized_covariance_factor is not None:
+            # Exact GLS whitening retains all supplied cross-frequency terms.
+            return solve_triangular(
+                normalized_covariance_factor, difference, lower=True,
+                check_finite=False,
+            )
+        return difference / normalized_uncertainty
 
     fit = least_squares(residual, x0, bounds=(lower, upper), method="trf", x_scale="jac")
     jacobian = np.asarray(fit.jac, dtype=float)
@@ -2011,6 +2041,13 @@ def fit_cts_ion_species_flows(
         "ion_velocity_uncertainty_m_s": flow_uncertainties,
         "parameter_names": [f"u_{name}_parallel_m_s" for name in names] + ["log_spectral_scale", "normalized_offset"],
         "parameter_covariance": covariance,
+        "spectral_covariance_used": spectral_covariance is not None,
+        "spectral_covariance_order": "frequency_shift_Hz ascending, matching frequency_shift_Hz",
+        "spectral_covariance_assumption": (
+            "full supplied positive-definite cross-frequency Gaussian covariance"
+            if spectral_covariance is not None
+            else "independent Gaussian bins with supplied signal_uncertainty"
+        ),
         "spectral_scale": float(np.exp(fit.x[-2])),
         "spectral_offset": float(fit.x[-1] * y_scale),
         "fitted_spectrum": fitted_spectrum,
@@ -2042,6 +2079,10 @@ def fit_cts_ion_species_flows(
             "Maxwellian bulk electrons and ions",
             "one constant projected flow per ion species over the scattering volume",
             "supplied plasma parameters and composition are fixed, not inferred by this fit",
-            "independent Gaussian spectral errors described by signal_uncertainty",
+            (
+                "correlated Gaussian spectral errors described by spectral_covariance"
+                if spectral_covariance is not None
+                else "independent Gaussian spectral errors described by signal_uncertainty"
+            ),
         ],
     }
