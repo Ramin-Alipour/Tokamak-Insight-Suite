@@ -4124,6 +4124,46 @@
           "name": "relativistic_kinematics",
           "unit": "boolean",
           "description": "Indicates use of relativistic electron and photon kinematics."
+        },
+        {
+          "name": "scattering_cross_section_model",
+          "unit": "text; differential cross-section model"
+        },
+        {
+          "name": "compton_energy_ratio_epsilon_scattered_over_incident_rest_frame",
+          "unit": "dimensionless; scattered-to-incident photon energy ratio in electron rest frame"
+        },
+        {
+          "name": "maximum_recoil_correction_fraction_on_quadrature_support",
+          "unit": "dimensionless; maximum omitted recoil correction on represented support"
+        },
+        {
+          "name": "quadrature_to_analytic_normalization_ratio",
+          "unit": "dimensionless; numerical-to-analytic normalization ratio"
+        },
+        {
+          "name": "quadrature_momentum_normalization",
+          "unit": "dimensionless; momentum-space quadrature normalization"
+        },
+        {
+          "name": "momentum_tail_renormalization_performed",
+          "unit": "boolean; whether truncated momentum support was renormalized"
+        },
+        {
+          "name": "momentum_probability_coverage",
+          "unit": "dimensionless; probability represented by finite momentum support"
+        },
+        {
+          "name": "effective_differential_cross_section_m2_sr",
+          "unit": "m² sr⁻¹; polarization-weighted effective differential cross-section"
+        },
+        {
+          "name": "analytic_momentum_normalization",
+          "unit": "dimensionless; analytic Maxwell-Jüttner momentum normalization"
+        },
+        {
+          "name": "wavelength_bin_widths_nm",
+          "unit": "nm; finite-volume wavelength-bin widths"
         }
       ],
       "prerequisites": [
