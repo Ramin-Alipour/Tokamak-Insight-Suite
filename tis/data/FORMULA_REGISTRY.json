@@ -8120,6 +8120,41 @@
           "name": "systematic_covariance",
           "unit": "additive spectral covariance",
           "required": false
+        },
+        {
+          "name": "background_model",
+          "unit": "constant, linear, polynomial, cubic spline or researcher-supplied detector-space templates",
+          "required": false
+        },
+        {
+          "name": "background_degree",
+          "unit": "integer polynomial degree",
+          "required": false
+        },
+        {
+          "name": "background_interior_knots",
+          "unit": "integer spline interior-knot count",
+          "required": false
+        },
+        {
+          "name": "background_templates",
+          "unit": "measured/calibrated detector-space nuisance template matrix",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma calibration uncertainty",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma geometry uncertainty",
+          "required": false
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm·rad; supplied cross-covariance",
+          "required": false
         }
       ],
       "output_specs": [
@@ -8146,6 +8181,130 @@
         {
           "name": "residual",
           "unit": "calibrated spectral density"
+        },
+        {
+          "name": "optimizer",
+          "unit": "structured optimizer convergence and Jacobian diagnostics"
+        },
+        {
+          "name": "fit_parameter_names",
+          "unit": "ordered fitted parameter names"
+        },
+        {
+          "name": "fit_parameters",
+          "unit": "fitted amplitude, centre, width and detector-background coefficients"
+        },
+        {
+          "name": "fit_covariance",
+          "unit": "joint fit-parameter covariance"
+        },
+        {
+          "name": "amplitude",
+          "unit": "calibrated spectral-density amplitude"
+        },
+        {
+          "name": "fitted_center_nm",
+          "unit": "nm; fitted line centre"
+        },
+        {
+          "name": "intrinsic_sigma_nm",
+          "unit": "nm; intrinsic Gaussian standard deviation"
+        },
+        {
+          "name": "background_model",
+          "unit": "text; selected detector-space nuisance basis"
+        },
+        {
+          "name": "background_coefficients",
+          "unit": "detector-background coefficient vector"
+        },
+        {
+          "name": "background_basis",
+          "unit": "wavelength-bin × nuisance-basis matrix"
+        },
+        {
+          "name": "background_coefficient_covariance",
+          "unit": "covariance of fitted background coefficients"
+        },
+        {
+          "name": "background_intercept",
+          "unit": "calibrated spectral density at fitted centre"
+        },
+        {
+          "name": "background_slope_per_nm",
+          "unit": "calibrated spectral density per nm; optional"
+        },
+        {
+          "name": "likelihood",
+          "unit": "Gaussian or GLS"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless; optional when noise covariance is supplied"
+        },
+        {
+          "name": "integrated_scattered_power_W",
+          "unit": "W; fitted Gaussian feature integral in calibrated power units"
+        },
+        {
+          "name": "integrated_scattered_power_uncertainty_W",
+          "unit": "W; propagated fitted-feature integral uncertainty"
+        },
+        {
+          "name": "electron_temperature_uncertainty_eV",
+          "unit": "eV; includes supplied laser/angle calibration covariance"
+        },
+        {
+          "name": "electron_velocity_projection_uncertainty_m_s",
+          "unit": "m s⁻¹; q-projection uncertainty"
+        },
+        {
+          "name": "physical_parameter_covariance_fit_only",
+          "unit": "joint covariance of [Te, q-flow] from spectral fit only"
+        },
+        {
+          "name": "physical_parameter_covariance",
+          "unit": "joint covariance of [Te, q-flow] including supplied geometry covariance"
+        },
+        {
+          "name": "physical_parameter_covariance_including_geometry",
+          "unit": "joint covariance of [Te, q-flow] including geometry"
+        },
+        {
+          "name": "physical_parameter_covariance_order",
+          "unit": "ordered physical parameter names"
+        },
+        {
+          "name": "physical_parameter_correlation_fit_only",
+          "unit": "dimensionless; fit-only Te/flow correlation"
+        },
+        {
+          "name": "physical_parameter_correlation",
+          "unit": "dimensionless; total Te/flow correlation"
+        },
+        {
+          "name": "physical_parameter_covariance_components",
+          "unit": "structured fit and geometry covariance provenance"
+        },
+        {
+          "name": "physical_parameter_covariance_status",
+          "unit": "text; identified covariance scope"
+        },
+        {
+          "name": "validity_screening",
+          "unit": "structured non-relativistic theta_e and flow-beta screens"
+        },
+        {
+          "name": "uncertainty_interpretation",
+          "unit": "text; measurement-noise calibration and covariance scope"
+        },
+        {
+          "name": "identifiability",
+          "unit": "structured whitened Jacobian rank/condition diagnostics"
+        },
+        {
+          "name": "assumptions",
+          "unit": "list of model assumptions"
         }
       ],
       "prerequisites": [
@@ -8153,7 +8312,7 @@
         "Laser wavelength, scattering angle and a measured detector-response operator",
         "A measured wavelength grid with strictly increasing bin centres; finite-volume edges are midpoint-defined"
       ],
-      "uncertainty_model": "The selected within-channel measurement covariance or pointwise uncertainty is propagated through the whitened spectral fit. Model/systematic covariance is supplied independently and combined once by the canonical API. The finite-bin CDF integral is deterministic conditional on wavelength centres, laser wavelength, geometry and fitted parameters.",
+      "uncertainty_model": "The local fit covariance uses the supplied within-channel pointwise uncertainty or full spectral covariance. The physical [Te, q-flow] covariance is propagated from the fitted centre/width covariance and the supplied laser-wavelength/scattering-angle covariance, including their cross-covariance. Fit/geometry cross-covariance is explicitly assumed zero because it is not supplied; without measurement noise, covariance is residual-scaled and is not measurement-noise-calibrated.",
       "limitations": [
         "No relativistic or Compton correction; the canonical fitter rejects fits outside its theta_e and bulk-flow beta screens.",
         "Only the q-projected one-dimensional Maxwellian marginal is identified from a single scattering geometry.",
