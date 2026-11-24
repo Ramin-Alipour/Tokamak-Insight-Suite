@@ -7216,12 +7216,28 @@
         {
           "name": "receiver_spectral_power_uncertainty_W_Hz",
           "unit": "W Hz^-1"
+        },
+        {
+          "name": "receiver_spectral_power_W_Hz",
+          "unit": "W Hz⁻¹; receiver spectral power per frequency bin"
+        },
+        {
+          "name": "input_covariance_order",
+          "unit": "ordered input parameter names [radiance bins, etendue, efficiency]"
+        },
+        {
+          "name": "propagation_jacobian",
+          "unit": "∂Pν/∂[Lν,G,η]; n_frequency × (n_frequency+2) matrix"
+        },
+        {
+          "name": "uncertainty_method",
+          "unit": "text; first-order full joint covariance propagation"
         }
       ],
       "prerequisites": [
         "All radiance-bin, etendue and efficiency uncertainties and their cross-covariances are represented in input_covariance"
       ],
-      "uncertainty_model": "Full first-order joint covariance propagation J C_x J^T; no missing cross-covariance is inferred.",
+      "uncertainty_model": "Full first-order joint covariance propagation J C_x J^T; radiance-bin, receiver-etendue and end-to-end-efficiency cross-covariances are retained in the declared input order.",
       "test_links": [
         "tests/test_cts_em_background.py::test_receiver_spectral_power_covariance_propagates_cross_correlations",
         "tests/test_cts_em_background.py::test_receiver_spectral_power_covariance_rejects_non_psd_joint_input"
