@@ -8,7 +8,12 @@ def test_tensor_kappa_finite_window_does_not_renormalize_unobserved_probability(
         wavelength, 1.0e6, 0.02, 4.0
     )
     assert np.all(np.isfinite(density))
-    assert np.all(probability == 0.0)
+    # A Student-t/Kappa marginal has algebraic, non-compact tails. A centre
+    # far outside the acquired band therefore has tiny but non-zero captured
+    # probability; forcing it to zero would truncate the physical EVDF.
+    assert np.all(probability > 0.0)
+    assert 0.0 < float(np.sum(probability)) < 1.0e-50
+    np.testing.assert_allclose(density * widths, probability, rtol=1e-12, atol=0.0)
     assert np.all(widths > 0.0)
 
 
