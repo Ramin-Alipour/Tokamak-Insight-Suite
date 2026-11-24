@@ -13044,7 +13044,7 @@
     "name": "N-population relativistic optical Thomson mixture inference",
     "equation": "S_mix(λ) = [Σ_j η_j σ_j S_j(λ; T_j, u_j)] / [Σ_j η_j σ_j],  η_j ≥ 0,  Σ_j η_j = 1",
     "inputs": "Measured calibrated wavelength and intensity vectors, measured response matrix, population_count (2–8), ordered initial temperatures, initial number fractions, initial shared flow (or per-population flow initial values), incident polarization, and optional measurement/model-discrepancy covariance.",
-    "output": "N-component relativistic Maxwell-Jüttner mixture, fitted temperatures and number fractions, shared or population-specific scattering-vector flow projections, fitted signal/background, residuals and joint parameter covariance.",
+    "output": "N-component relativistic Maxwell-Jüttner mixture, fitted temperatures and number fractions, shared or population-specific scattering-vector flow projections, fitted signal/background, residuals and joint parameter covariance. The solver also returns decomposed measurement/model/systematic spectral covariance, geometry covariance and finite-difference geometry-induced internal-parameter covariance with sensitivity and trace diagnostics.",
     "assumptions": "Finite mixture of 2–8 isotropic relativistic Maxwell-Jüttner populations. Temperatures are ordered to remove label switching; fractions lie on the unit simplex. A shared flow is default; independent population flow projections are optional. This is not an unrestricted EVDF inversion and does not infer absolute density.",
     "status": "D",
     "category": "Thomson scattering",
@@ -13271,6 +13271,38 @@
           "name": "experimental_validation",
           "unit": "text",
           "description": "Experimental validation status."
+        },
+        {
+          "name": "geometry_covariance_nm2_rad2",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "systematic_covariance_included",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "total_spectral_covariance",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "geometry_parameter_sensitivity_internal_per_nm_rad",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "geometry_uncertainty_method",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "covariance_component_trace",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "geometry_covariance_included",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
+        },
+        {
+          "name": "geometry_induced_internal_parameter_covariance",
+          "unit": "as returned by the N-population relativistic optical Thomson mixture solver"
         }
       ],
       "prerequisites": [
@@ -13285,7 +13317,7 @@
         "tests/test_thomson_n_population.py::test_n_population_forward_model_supports_distinct_physical_flow_projections",
         "tests/test_thomson_n_population.py::test_n_population_inverse_is_connected_to_public_physics_dispatcher"
       ],
-      "note": "The N-population solver already exists as an independent physical model; this registry entry maps its existing implementation into the shared Analysis-1 public physics API and advanced Dashboard. Data-only Jacobian rank and conditioning gate the fitted decomposition."
+      "note": "Includes explicit N-population relativistic mixture fit and all returned covariance decomposition and geometry-sensitivity diagnostics. Population fractions, temperatures and projected flows are fitted jointly; absolute density is not inferred without an independent calibration."
     },
     "references": [
       {
