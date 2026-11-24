@@ -5707,6 +5707,54 @@
         {
           "name": "relative_group_energy_velocity_difference",
           "unit": "dimensionless"
+        },
+        {
+          "name": "frequency_Hz",
+          "unit": "Hz"
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer branch index"
+        },
+        {
+          "name": "refractive_index",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "wavevector_rad_m",
+          "unit": "rad m⁻¹; 3-vector"
+        },
+        {
+          "name": "wave_normal_direction",
+          "unit": "unit 3-vector"
+        },
+        {
+          "name": "wave_energy_relation",
+          "unit": "text; Brillouin energy/Poynting definitions"
+        },
+        {
+          "name": "energy_velocity_relation",
+          "unit": "text; energy-transport relation"
+        },
+        {
+          "name": "frequency_derivative_method",
+          "unit": "text; numerical method"
+        },
+        {
+          "name": "wavevector_derivative_method",
+          "unit": "text; analytical method"
+        },
+        {
+          "name": "mode_is_simple",
+          "unit": "boolean; mode non-degeneracy status"
+        },
+        {
+          "name": "model_scope",
+          "unit": "text; local model scope"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of model limitations"
         }
       ],
       "prerequisites": [
