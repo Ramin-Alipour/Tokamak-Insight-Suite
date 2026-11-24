@@ -81,7 +81,8 @@ def test_poisson_inverse_rejects_noninteger_counts_and_invalid_normalization_inp
 
 def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_dispatch():
     from tis.products.thomson.api import reconstruct_projected_evdf_poisson
-    from tis.products.thomson.api import run_advanced_physics
+    from tis.products.thomson.api import run_advanced_physics, run_analysis
+    from tis.products.catalog import THOMSON_ENTRY_POINTS, get_product
     from tis.ui.advanced_thomson_physics_page import MODEL_LABELS, MODEL_PHYSICS_NOTES
 
     wavelength, velocity, counts, background, response, _ = _synthetic_counts()
@@ -98,6 +99,11 @@ def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_di
     dispatched = run_advanced_physics(
         "thomson_projected_evdf_poisson", wavelength, counts, **kwargs
     )
-    assert direct["likelihood"] == dispatched["likelihood"] == "independent_poisson_counts"
+    registered = run_analysis(89, wavelength, counts, **kwargs)
+    assert 89 in get_product("thomson-scattering")["entry_ids"]
+    assert THOMSON_ENTRY_POINTS[89] == (
+        "thomson_evdf_poisson", "reconstruct_thomson_evdf_poisson"
+    )
+    assert direct["likelihood"] == dispatched["likelihood"] == registered["likelihood"] == "independent_poisson_counts"
     assert "thomson_projected_evdf_poisson" in MODEL_LABELS
     assert "thomson_projected_evdf_poisson" in MODEL_PHYSICS_NOTES
