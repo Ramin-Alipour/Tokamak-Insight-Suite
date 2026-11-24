@@ -2452,6 +2452,26 @@ def test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_ind
     assert result["identifiability"]["whitened_jacobian_rank"] == 6
     assert result["spectral_bin_integration"] == "exact_Student_t_CDF_finite_volume_bin_averages"
     assert result["density_inference_available"] is False
+    moments = result["projected_evdf_physical_moments"]
+    nu = 2.0 * result["kappa"] - 1.0
+    expected_excess_kurtosis = 6.0 / (nu - 4.0)
+    expected_velocity_variance = (
+        299792458.0 * result["intrinsic_sigma_nm"]
+        / (laser * 2.0 * np.sin(angle / 2.0))
+    )**2
+    assert moments["variance_velocity_q_m2_s2"] == pytest.approx(
+        expected_velocity_variance, rel=1e-12
+    )
+    assert moments["excess_kurtosis"] == pytest.approx(
+        expected_excess_kurtosis, rel=1e-12
+    )
+    assert moments["central_fourth_moment_m4_s4"] == pytest.approx(
+        3.0 * expected_velocity_variance**2 * (nu - 2.0)/(nu - 4.0),
+        rel=1e-12,
+    )
+    assert moments["central_third_moment_m3_s3"] == 0.0
+    assert moments["excess_kurtosis_standard_uncertainty"] > 0.0
+    assert moments["moment_existence"]["fourth_moment"] is True
 
     routed = product_poisson_fit(
         wavelength, counts, laser_wavelength_nm=laser,
