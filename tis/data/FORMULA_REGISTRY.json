@@ -10946,6 +10946,10 @@
         {
           "name": "pressure_anisotropy_Tperp_over_Tparallel",
           "unit": "dimensionless"
+        },
+        {
+          "name": "moment_definition",
+          "unit": "text; relativistic number-normalized energy and momentum-flux moment definitions"
         }
       ],
       "prerequisites": [
