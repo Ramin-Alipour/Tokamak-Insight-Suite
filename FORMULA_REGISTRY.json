@@ -13184,30 +13184,21 @@
         },
         {
           "name": "electron_density_m3",
-          "unit": "m^-3; independently supplied; optional, not inferred"
+          "unit": "m^-3; independently supplied; optional, not inferred",
+          "required": false,
+          "description": "Optional independent density; used only to calculate the one-dimensional q-parallel kinetic-energy-flux contribution, never inferred from normalized EVDF or count amplitude."
         },
         {
           "name": "electron_density_uncertainty_m3",
-          "unit": "m^-3; optional 1-sigma uncertainty"
+          "unit": "m^-3; optional 1-sigma uncertainty",
+          "required": false,
+          "description": "Requires electron_density_m3; propagated jointly with the EVDF third-moment covariance."
         },
         {
           "name": "electron_density_mu3_cross_covariance_s_minus3",
-          "unit": "(m^-3)*(m^3 s^-3); optional cross-covariance"
-        },
-        {
-          "name": "electron_density_m3",
-          "unit": "m^-3",
-          "required": false
-        },
-        {
-          "name": "electron_density_uncertainty_m3",
-          "unit": "m^-3",
-          "required": false
-        },
-        {
-          "name": "electron_density_mu3_cross_covariance_s_minus3",
-          "unit": "m^-1 s^-3",
-          "required": false
+          "unit": "s^-3; Cov(n_e, mu_3,q)",
+          "required": false,
+          "description": "Optional density/third-central-moment cross-covariance; requires density, density uncertainty and an available EVDF moment covariance, and is checked against the joint PSD bound."
         }
       ],
       "output_specs": [
@@ -13225,7 +13216,7 @@
         },
         {
           "name": "evdf_covariance",
-          "unit": "(s m^-1)^2; conditional frequentist fixed-active-set sandwich covariance, optional"
+          "unit": "(s m^-1)^2; conditional frequentist fixed-active-set Poisson sandwich covariance, optional"
         },
         {
           "name": "projected_evdf_physical_moments",
@@ -13237,11 +13228,7 @@
         },
         {
           "name": "parallel_projected_heat_flux_W_m2",
-          "unit": "W m^-2; optional 1-D q-parallel contribution, only with independently supplied density"
-        },
-        {
-          "name": "parallel_projected_heat_flux_W_m2",
-          "unit": "W m^-2; only with independent density"
+          "unit": "W m^-2; optional one-dimensional q-parallel contribution, only with independently supplied density"
         },
         {
           "name": "parallel_projected_heat_flux_standard_uncertainty_W_m2",
@@ -13259,8 +13246,29 @@
       ],
       "tests": [
         "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_recovers_normalized_projected_evdf_from_synthetic_counts",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_rejects_noninteger_counts_and_invalid_normalization_inputs",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_dispatch",
         "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_propagates_moment_covariance_and_optional_projected_heat_flux",
-        "tests/test_thomson_evdf_poisson.py::test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance"
+        "tests/test_thomson_evdf_poisson.py::test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance",
+        "tests/test_thomson_evdf_poisson.py::test_dashboard_poisson_example_executes_inside_its_declared_velocity_window"
+      ],
+      "algorithm": "Construct the finite-bin Doppler kernel K(lambda_i|v_j), integrate over detector bins and compose the measured response R. Parameterize normalized nodal probability masses p_j=w_j f_q(v_j) by softmax logits so p_j>=0 and sum_j p_j=1 exactly; fit log(A_tot) as the positive count-amplitude nuisance. Minimize the exact independent-Poisson negative log likelihood sum_i[mu_i-y_i ln(mu_i)] plus lambda/2 ||D2 f_q||^2, with mu_i=A_tot*Delta_lambda_i*[R K f_q]_i+b_i. Compute F=J_mu^T diag(1/mu) J_mu and penalized curvature H=F+lambda P; propagate the fixed-active-set frequentist covariance H^-1 F H^-1 projected onto the normalization tangent space. Integrate the recovered piecewise-linear EVDF to obtain physical q-parallel moments through sixth order and propagate their covariance through the normalization-aware moment Jacobian. If an independent density is supplied, calculate only the one-dimensional parallel kinetic-energy-flux contribution q_q^(1D)=(m_e*n_e/2)*mu_3,q.",
+      "uncertainty_model": "Conditional frequentist fixed-active-set Poisson sandwich covariance H^-1 F H^-1, with H=F+lambda P and F the expected Poisson information, projected onto the exact normalization tangent space. The full q-parallel physical-moment covariance is propagated through the exact piecewise-linear EVDF moment Jacobian. Conditional on fixed supplied background, measured response, velocity grid and selected regularization; background, response, geometry and regularization-selection uncertainties are not included. Optional density and its cross-covariance with the third moment are propagated only when explicitly supplied.",
+      "limitations": [
+        "One scattering view identifies only the q-parallel velocity marginal, not a general 3-D EVDF or perpendicular structure.",
+        "Absolute density is not inferred from normalized EVDF or detector count amplitude; it must be supplied independently to calculate q_q^(1D).",
+        "The third-moment flux is the one-dimensional q-parallel kinetic-energy-flux contribution, not the full three-dimensional electron heat flux.",
+        "Expected background counts are fixed; background uncertainty and its covariance with measured counts are not propagated by this Poisson likelihood.",
+        "The model uses non-relativistic Doppler kinematics and requires the declared velocity-grid validity bound.",
+        "Regularization strength is explicit; its selection uncertainty is not included in the conditional sampling covariance."
+      ],
+      "test_links": [
+        "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_recovers_normalized_projected_evdf_from_synthetic_counts",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_rejects_noninteger_counts_and_invalid_normalization_inputs",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_dispatch",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_propagates_moment_covariance_and_optional_projected_heat_flux",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance",
+        "tests/test_thomson_evdf_poisson.py::test_dashboard_poisson_example_executes_inside_its_declared_velocity_window"
       ]
     }
   }

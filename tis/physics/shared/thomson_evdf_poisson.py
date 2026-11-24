@@ -48,9 +48,10 @@ def reconstruct_thomson_evdf_poisson(
       f_q >= 0, sum_j w_j f_q,j = 1, A_tot > 0.
 
     A_tot is the pre-window detected-count amplitude. Background counts are
-    fixed explicit expected counts. The covariance is the inverse expected
-    Poisson Fisher information on the active non-negative set, projected onto
-    the normalization tangent space. It is conditional on the selected
+    fixed explicit expected counts. The frequentist covariance is the
+    fixed-active-set Poisson sandwich H^-1 F H^-1, projected onto the exact
+    normalization tangent space; H includes Tikhonov curvature and F is the
+    expected Poisson information. It is conditional on the selected
     regularization, velocity grid, response and fixed background.
     """
     wavelength = _finite_vector(wavelength_nm, "wavelength_nm")
