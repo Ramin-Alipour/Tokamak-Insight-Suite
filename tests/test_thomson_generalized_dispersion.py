@@ -750,7 +750,7 @@ def test_exact_frequency_resolved_cts_kinematics_formula_is_registered_and_synch
     contract = matches[0]["execution_contract"]
     assert contract["implementation_link_status"] == "mapped"
     assert contract["function_link"] == (
-        "tokamak_analysis.thomson_generalized_dispersion."
+        "tis.physics.shared.thomson_generalized_dispersion."
         "collective_tabulated_electron_spectral_density"
     )
     assert "wavenumber_m_inverse" in {
