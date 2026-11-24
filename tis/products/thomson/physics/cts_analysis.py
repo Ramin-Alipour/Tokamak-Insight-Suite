@@ -1787,6 +1787,7 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
             "ion_temperature_eV", "ion_velocity_grids_m_s",
             "ion_probability_densities_s_m", "pole_imaginary_part_m_s",
             "landau_limit", "include_electron_phase_velocity_derivative",
+            "instrument_response_matrix", "allow_finite_window_response_loss",
         }
         unexpected = sorted(set(kwargs) - allowed)
         if unexpected:
