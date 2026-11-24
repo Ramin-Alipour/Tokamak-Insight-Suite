@@ -265,17 +265,22 @@ def collective_tabulated_electron_spectral_density(
     if vi.shape != (len(species), 3) or np.any(~np.isfinite(vi)) or np.any(np.linalg.norm(vi, axis=1) >= C):
         raise ValueError("ion_velocity_m_s must contain one finite subluminal vector per ion species")
     ui = vi @ qhat
-    k = 4*np.pi*np.sin(angle/2)/(laser*1e-9)
-    # Convert the measured wavelength to angular-frequency shift exactly:
-    # Delta_omega = 2*pi*c*(1/lambda - 1/lambda_0), not the
-    # first-order approximation -2*pi*c*Delta_lambda/lambda_0**2.
-    # The electrostatic resonance is v_phi = Delta_omega / |k_s-k_i|.
-    # Keeping this conversion exact matters for broad CTS spectra and avoids
-    # an avoidable wavelength-linearization error in the Landau pole.
-    angular_frequency_shift = (
-        2.0*np.pi*C*1e9*(1.0/x - 1.0/laser)
+    # The scattered photon wave number changes across a finite spectral
+    # window.  Compute |k_s-k_i| from the two measured photon wavelengths
+    # rather than freezing it at the incident laser frequency:
+    # k^2=(2*pi)^2*(lambda_0^-2+lambda^-2
+    #               -2*cos(theta)/(lambda_0*lambda)).
+    inverse_wavelength_geometry = (
+        1.0/laser**2 + 1.0/x**2
+        - 2.0*np.cos(angle)/(laser*x)
     )
-    vphase = angular_frequency_shift/k
+    if np.any(~np.isfinite(inverse_wavelength_geometry)) or np.any(inverse_wavelength_geometry <= 0.0):
+        raise ValueError("measured wavelengths and scattering geometry must define a positive scattering wavenumber")
+    k = 2.0*np.pi*1e9*np.sqrt(inverse_wavelength_geometry)
+    # Convert measured wavelength to angular-frequency shift exactly:
+    # Delta_omega = 2*pi*c*(1/lambda - 1/lambda_0).
+    angular_frequency_shift = 2.0*np.pi*C*1e9*(1.0/x - 1.0/laser)
+    # The electrostatic resonance is v_phi(lambda)=Delta_omega(lambda)/k(lambda).
     if (vgrid.ndim != 1 or fgrid.shape != vgrid.shape or vgrid.size < 9
             or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
             or np.any(np.diff(vgrid) <= 0) or np.any(fgrid < 0)):
@@ -306,7 +311,7 @@ def collective_tabulated_electron_spectral_density(
     for j, vp in enumerate(vphase):
         electron_response = generalized_electron_susceptibility(
             vgrid, fgrid, vp-ue, electron_density_m3=ne,
-            wavenumber_m_inverse=k,
+            wavenumber_m_inverse=k[j],
             pole_imaginary_part_m_s=pole_imaginary_part_m_s,
             landau_limit=landau_limit,
             include_phase_velocity_derivative=include_electron_phase_velocity_derivative,
@@ -344,7 +349,7 @@ def collective_tabulated_electron_spectral_density(
             grid_i = ion_grids[index]
             pdf_i = np.interp(vphase-ui[index], grid_i, ion_distributions[index], left=0.0, right=0.0)
             chi_i = np.asarray([
-                -(omega_pi2/k**2)*generalized_landau_integral(
+                -(omega_pi2/k[j]**2)*generalized_landau_integral(
                     grid_i, ion_distributions[index], vphase[j]-ui[index],
                     pole_imaginary_part_m_s=pole_imaginary_part_m_s,
                     landau_limit=landau_limit,
@@ -355,7 +360,7 @@ def collective_tabulated_electron_spectral_density(
             sigma_i = np.sqrt(temperatures[index]*E_CHARGE/item["mass_kg"])
             pdf_i, _, _ = _maxwellian_pdf_and_derivatives(vphase-ui[index], sigma_i)
             chi_i = np.asarray([
-                _landau_susceptibility(vphase[j]-ui[index], omega_pi2, k, sigma_i)
+                _landau_susceptibility(vphase[j]-ui[index], omega_pi2, k[j], sigma_i)
                 for j in range(x.size)
             ], dtype=complex)
         ion_pdf.append(pdf_i)
@@ -431,7 +436,7 @@ def collective_tabulated_electron_spectral_density(
         "dynamic_structure_factor": dynamic_structure,
         "angular_frequency_shift_rad_s": angular_frequency_shift,
         "phase_velocity_m_s": vphase,
-        "phase_velocity_mapping": "exact_delta_omega_over_scattering_wavenumber_from_measured_wavelength",
+        "phase_velocity_mapping": "exact_delta_omega_over_frequency_dependent_scattering_wavenumber_from_measured_wavelength",
         "electron_flow_projection_m_s": ue,
         "ion_flow_projections_m_s": ui,
         "electron_projected_moments": electron_moments,
