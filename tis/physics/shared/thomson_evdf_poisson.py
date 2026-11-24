@@ -193,7 +193,7 @@ def reconstruct_thomson_evdf_poisson(
         covariance_full = None
 
     from scipy.special import gammaln
-    nll = float(np.sum(mu - counts * np.log(mu) + gammaln(counts + 1.0)))
+    nll = float(np.sum(mu - counts * np.log(np.maximum(mu, tiny)) + gammaln(counts + 1.0)))
     return {
         "velocity_parallel_m_s": velocity.copy(),
         "evdf_parallel_s_per_m": density.copy(),
