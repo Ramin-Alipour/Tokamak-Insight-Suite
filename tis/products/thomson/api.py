@@ -208,6 +208,8 @@ def run_advanced_physics(model: str, *args: Any, **kwargs: Any) -> Any:
     separate catalog analysis IDs. Catalog workflows must continue to use
     run_analysis(), which enforces product ownership and registered contracts.
     """
+    if model == "thomson_projected_evdf_poisson":
+        return reconstruct_projected_evdf_poisson(*args, **kwargs)
     from .physics.cts_full_physics import run_advanced_thomson_physics
     return run_advanced_thomson_physics(model, *args, **kwargs)
 
