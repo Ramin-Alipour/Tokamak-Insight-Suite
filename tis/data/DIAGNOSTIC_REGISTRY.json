@@ -9264,7 +9264,7 @@
           "name": "background_signal_covariance",
           "unit": "full wavelength-space covariance of fitted background_signal",
           "required": false,
-          "description": "Optional finite symmetric positive-definite covariance for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_uncertainty. Cross-covariance with the measured signal is represented separately by signal_background_cross_covariance when both marginal covariance models are supplied."
+          "description": "Optional finite symmetric positive-definite covariance for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_uncertainty. May be combined with signal_background_cross_covariance when the complete joint signal/background block covariance is positive definite."
         },
         {
           "name": "signal_background_cross_covariance",
