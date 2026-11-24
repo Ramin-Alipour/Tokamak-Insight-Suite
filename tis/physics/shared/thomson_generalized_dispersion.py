@@ -434,6 +434,7 @@ def collective_tabulated_electron_spectral_density(
         "ion_susceptibility": np.asarray(ion_chi),
         "dielectric_function": dielectric,
         "dynamic_structure_factor": dynamic_structure,
+        "wavenumber_m_inverse": k,
         "angular_frequency_shift_rad_s": angular_frequency_shift,
         "phase_velocity_m_s": vphase,
         "phase_velocity_mapping": "exact_delta_omega_over_frequency_dependent_scattering_wavenumber_from_measured_wavelength",
