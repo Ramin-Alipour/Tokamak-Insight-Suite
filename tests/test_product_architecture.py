@@ -31,9 +31,9 @@ def test_product_lookup_accepts_stable_slug_and_returns_defensive_copy():
     by_id = get_product(1)
     by_slug = get_product("thomson-scattering")
     assert by_id["id"] == by_slug["id"] == 1
-    assert by_id["entry_ids"] == [1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88]
+    assert by_id["entry_ids"] == [1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88, 89]
     by_id["entry_ids"].clear()
-    assert len(get_product(1)["entry_ids"]) == 11
+    assert len(get_product(1)["entry_ids"]) == 12
 
 
 def test_every_registered_analysis_has_exactly_one_product_owner():
@@ -213,6 +213,7 @@ def test_named_product_workflow_wrappers_dispatch_to_their_own_registered_ids(mo
                 ("compare_temperature_tensor_models", 86),
                 ("infer_path_averaged_density", 87),
                 ("reconstruct_nonrelativistic_3d_evdf", 88),
+                ("reconstruct_thomson_evdf_poisson", 89),
             ]
         elif product["id"] == 2:
             calls = [
@@ -405,7 +406,7 @@ def test_every_thomson_analysis_resolves_through_product_owned_registry():
     from tis.products.thomson.registry import THOMSON_ENTRY_POINTS, THOMSON_ANALYSIS_IDS
     from tis.products.api import resolve_product_analysis
 
-    expected_ids = {1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88}
+    expected_ids = {1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88, 89}
     assert THOMSON_ANALYSIS_IDS == expected_ids
     assert set(get_product("thomson-scattering")["entry_ids"]) == expected_ids
 
