@@ -4503,8 +4503,8 @@ elif page=='Advanced Analysis':
     elif workflow=='Analysis 1 / Microwave CTS subanalysis':
         st.markdown('Analysis 1 subanalysis — microwave CTS: infer plasma and ion parameters from a measured, calibrated frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
-            'electrostatic','electrostatic_kappa','full_electromagnetic','full_em_spatial_profiles','full_em_gyrotropic_vdf_shape'
-        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons' if v=='electrostatic_kappa' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else ('Relativistic gyrotropic Full-EM CTS VDF-shape inverse' if v=='full_em_gyrotropic_vdf_shape' else 'Magnetized full-electromagnetic CTS'))),key='cts_physical_model')
+            'electrostatic','electrostatic_kappa','electrostatic_tabulated_evdf','full_electromagnetic','full_em_spatial_profiles','full_em_gyrotropic_vdf_shape'
+        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons' if v=='electrostatic_kappa' else ('Unmagnetized electrostatic CTS with measured tabulated electron/ion EVDFs' if v=='electrostatic_tabulated_evdf' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else ('Relativistic gyrotropic Full-EM CTS VDF-shape inverse' if v=='full_em_gyrotropic_vdf_shape' else 'Magnetized full-electromagnetic CTS')))),key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
         elif cts_model is None:
@@ -4629,6 +4629,75 @@ elif page=='Advanced Analysis':
                     add_report_section('Relativistic gyrotropic CTS VDF inverse',result_cts)
                 except Exception as e:
                     st.error(f'Relativistic gyrotropic CTS VDF inversion failed: {e}')
+
+        elif cts_model=='electrostatic_tabulated_evdf':
+            st.caption('Generalized collisionless, unmagnetized electrostatic CTS forward model. Supply the measured electron projected EVDF, ion composition and species flows explicitly in JSON. The model evaluates each spectral bin with exact photon-frequency conversion and frequency-dependent |k_s-k_i|. This is a forward model: it does not fit plasma parameters or apply a detector response matrix.')
+            c1,c2=st.columns(2)
+            with c1:
+                tf_col=col_select('Frequency shift (Hz)',numeric,'cts_tabulated_frequency')
+                tp_col=col_select('Measured spectral power (display only)',[x for x in numeric if x!=tf_col] or numeric,'cts_tabulated_power')
+                config_upload=st.file_uploader('Physical input JSON (electron EVDF, ion species/EVDFs, flows and beam directions)',type=['json'],key='cts_tabulated_evdf_config')
+            with c2:
+                st.markdown('**Required JSON fields**')
+                st.code('''{
+  "probe_frequency_Hz": 2.82e14,
+  "scattering_angle_rad": 1.57079632679,
+  "electron_density_m3": 1.0e18,
+  "electron_velocity_grid_m_s": [-8e6, ..., 8e6],
+  "electron_probability_density_s_m": [ ... ],
+  "ion_species": [{"name":"D+","charge_state":1,"mass_amu":2.014}],
+  "ion_fractions": [1.0],
+  "ion_temperature_eV": [10.0],
+  "electron_velocity_m_s": [0,0,0],
+  "ion_velocity_m_s": [[0,0,0]],
+  "incident_direction": [1,0,0],
+  "scattered_direction": [0,1,0]
+}''',language='json')
+                st.caption('For tabulated ions, also provide ion_velocity_grids_m_s and ion_probability_densities_s_m (one row per species).')
+            if st.button('Calculate tabulated-EVDF CTS spectrum',type='primary',key='run_cts_tabulated_evdf'):
+                try:
+                    if df is None or config_upload is None:
+                        raise ValueError('Load the measured frequency table and the explicit physical-input JSON.')
+                    frequency=pd.to_numeric(df[tf_col],errors='coerce').to_numpy(dtype=float)
+                    measured_power=pd.to_numeric(df[tp_col],errors='coerce').to_numpy(dtype=float)
+                    if (frequency.ndim!=1 or measured_power.shape!=frequency.shape
+                            or frequency.size<9 or not np.all(np.isfinite(frequency))
+                            or not np.all(np.isfinite(measured_power)) or np.any(np.diff(frequency)<=0)):
+                        raise ValueError('Frequency and measured-power columns must be finite, matching and strictly increasing with at least nine bins.')
+                    physical=json.loads(config_upload.getvalue().decode('utf-8'))
+                    if not isinstance(physical,dict):
+                        raise ValueError('Physical-input JSON must contain one object.')
+                    required={'probe_frequency_Hz','scattering_angle_rad','electron_density_m3',
+                              'electron_velocity_grid_m_s','electron_probability_density_s_m',
+                              'ion_species','ion_fractions','electron_velocity_m_s','ion_velocity_m_s',
+                              'incident_direction','scattered_direction'}
+                    missing=sorted(k for k in required if k not in physical or physical[k] is None)
+                    if missing:
+                        raise ValueError('Missing required physical JSON fields: '+', '.join(missing))
+                    probe=float(physical.pop('probe_frequency_Hz'))
+                    angle=float(physical['scattering_angle_rad'])
+                    if not np.isfinite(probe) or probe<=0 or not 0<angle<=np.pi or np.any(probe+frequency<=0):
+                        raise ValueError('Probe frequency, scattering angle or scattered frequencies are outside the physical domain.')
+                    wavelength_nm=299792458.0/(probe+frequency)*1e9
+                    order=np.argsort(wavelength_nm)
+                    physical['wavelength_nm']=wavelength_nm[order]
+                    physical['laser_wavelength_nm']=299792458.0/probe*1e9
+                    result_cts=analyze_cts_spectrum_model(model='electrostatic_tabulated_evdf',**physical)
+                    st.success('Tabulated-EVDF electrostatic CTS forward calculation completed.')
+                    st.caption('Measured power is shown for reference only. Direct quantitative comparison requires applying the calibrated receiver response and matching absolute spectral normalization.')
+                    result_table=pd.DataFrame({
+                        'wavelength_nm':result_cts['wavelength_nm'] if 'wavelength_nm' in result_cts else wavelength_nm[order],
+                        'frequency_shift_Hz':frequency[order],
+                        'measured_power_display_only':measured_power[order],
+                        'model_spectral_density_per_nm':result_cts['spectral_density_per_nm'],
+                        'scattering_wavenumber_m_inverse':result_cts['wavenumber_m_inverse'],
+                        'phase_velocity_m_s':result_cts['phase_velocity_m_s'],
+                    })
+                    st.dataframe(result_table,use_container_width=True)
+                    json_download('Export tabulated-EVDF CTS forward result',result_cts,'tis_cts_tabulated_evdf_forward.json')
+                    add_report_section('Tabulated-EVDF CTS forward model',result_cts)
+                except Exception as e:
+                    st.error(f'Tabulated-EVDF CTS calculation failed: {e}')
 
         elif cts_model=='electrostatic_kappa':
             st.caption('Collisionless unmagnetized longitudinal CTS with an isotropic 3-D Kappa electron population and Maxwellian ions. The inverse fits n_e, T_e and kappa jointly; ion temperatures, species, composition, geometry and 3-D flows are externally supplied.')
