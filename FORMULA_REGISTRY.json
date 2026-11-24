@@ -11773,7 +11773,7 @@
     "name": "Three-dimensional Bloch-periodic full-vector Maxwell energy closure",
     "equation": "∇×∇×E−(ω/c)^2 ε_r E=iωμ_0J; H=(∇×E)/(iωμ_0); B=μ_0H; ⟨S⟩=(1/2)Re(E×H*); q_abs=(ωε_0/2)E*·Im_H(ε_r)·E; P_src=−(1/2)∫Re(E·J*)dV; for a periodic cell, P_src=P_abs",
     "inputs": "Positive angular frequency; three uniformly spaced Cartesian periodic grids; passive complex 3×3 relative dielectric tensor at each grid point or a spatially uniform tensor; complex impressed current-density vector field; optional Bloch wavevector.",
-    "output": "Full complex electric field, magnetic field intensity H, magnetic flux density B, time-averaged Poynting vector, local and integrated material absorption, integrated impressed-source power, discrete linear-system residual and global source-to-absorption energy-balance residual.",
+    "output": "Full complex electric field, magnetic field intensity H, magnetic flux density B, time-averaged Poynting vector, local and integrated material absorption, integrated impressed-source power, discrete linear-system residual and global source-to-absorption energy-balance residual. Returned grid coordinates, dielectric field, Bloch boundary metadata, solver/operator description, mode-conversion scope and approximation limits are also included.",
     "assumptions": "Linear local dielectric response; exp(−iωt) convention; periodic Cartesian unit cell with Bloch phase; second-order finite-difference frequency-domain curl-curl operator; passive Hermitian dissipative dielectric part. No open ports or PML.",
     "status": "D",
     "category": "Collective Thomson / Full-EM wave physics",
@@ -11845,6 +11845,54 @@
         {
           "name": "relative_linear_system_residual",
           "unit": "dimensionless"
+        },
+        {
+          "name": "x_m",
+          "unit": "m; x-coordinate grid"
+        },
+        {
+          "name": "y_m",
+          "unit": "m; y-coordinate grid"
+        },
+        {
+          "name": "z_m",
+          "unit": "m; z-coordinate grid"
+        },
+        {
+          "name": "epsilon_r",
+          "unit": "complex dimensionless; local relative dielectric tensor field"
+        },
+        {
+          "name": "grid_shape_nz_ny_nx",
+          "unit": "integer tuple; grid shape in solver flattening order"
+        },
+        {
+          "name": "boundary_condition",
+          "unit": "text; periodic/Bloch-periodic boundary condition"
+        },
+        {
+          "name": "bloch_wavevector_rad_m",
+          "unit": "rad m^-1; Bloch wavevector"
+        },
+        {
+          "name": "solver",
+          "unit": "text; sparse finite-difference solver identifier"
+        },
+        {
+          "name": "maxwell_operator",
+          "unit": "text; discretized vector Maxwell operator"
+        },
+        {
+          "name": "mode_conversion",
+          "unit": "text; full-vector coupling/mode-conversion scope"
+        },
+        {
+          "name": "approximation_scope",
+          "unit": "text; numerical and physical approximation scope"
+        },
+        {
+          "name": "magnetic_field_A_m",
+          "unit": "A m^-1; compatibility alias for magnetic_field_intensity_A_m"
         }
       ],
       "prerequisites": [
@@ -11865,7 +11913,7 @@
         "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_is_executable_through_public_analysis_dispatcher",
         "tests/test_cts_full_wave_energy.py::test_3d_periodic_maxwell_rejects_weakly_active_dielectric"
       ],
-      "note": "Publicly dispatched as periodic_3d_full_wave and exposed in the Advanced Thomson/CTS Dashboard. H/B units, local dissipative power, Poynting vector and periodic-cell source/absorption balance are explicit. Dielectric passivity is enforced to floating-point tolerance; even weak active gain is rejected. Numerical verification is not experimental validation.",
+      "note": "The output contract includes the full returned field tensors, input dielectric and grid metadata, Bloch boundary/operator metadata, energy diagnostics and explicit approximation scope. This is a periodic full-vector Maxwell wave kernel, not an open-boundary CTS scattering solver.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
