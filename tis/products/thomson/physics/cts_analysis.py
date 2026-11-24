@@ -1763,6 +1763,41 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
         raise ValueError("Select an explicit CTS model; no default model is selected.")
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
+    if model == "electrostatic_tabulated_evdf":
+        # Product/API execution path for the generalized Landau response.
+        # All plasma composition, projected distributions and viewing geometry
+        # are explicit inputs; this branch never invents ion species or flows.
+        from tis.physics.shared.thomson_generalized_dispersion import (
+            collective_tabulated_electron_spectral_density,
+        )
+        required = {
+            "wavelength_nm", "laser_wavelength_nm", "scattering_angle_rad",
+            "electron_density_m3", "electron_velocity_grid_m_s",
+            "electron_probability_density_s_m", "ion_species", "ion_fractions",
+            "electron_velocity_m_s", "ion_velocity_m_s",
+            "incident_direction", "scattered_direction",
+        }
+        missing = sorted(name for name in required if kwargs.get(name) is None)
+        if missing:
+            raise ValueError(
+                "electrostatic_tabulated_evdf requires explicit physical inputs: "
+                + ", ".join(missing)
+            )
+        allowed = required | {
+            "ion_temperature_eV", "ion_velocity_grids_m_s",
+            "ion_probability_densities_s_m", "pole_imaginary_part_m_s",
+            "landau_limit", "include_electron_phase_velocity_derivative",
+        }
+        unexpected = sorted(set(kwargs) - allowed)
+        if unexpected:
+            raise ValueError(
+                "unsupported electrostatic_tabulated_evdf inputs: "
+                + ", ".join(unexpected)
+            )
+        result = collective_tabulated_electron_spectral_density(**kwargs)
+        result["product_execution_path"] = "thomson-scattering/analysis-30"
+        result["api_model"] = "electrostatic_tabulated_evdf"
+        return result
     if model == "electrostatic_kappa":
         from tis.physics.shared.thomson_kinetic_models import fit_collective_kappa
         args = dict(kwargs)
@@ -1853,7 +1888,7 @@ def analyze_cts_spectrum_model(model=None, **kwargs):
         if "spectrum" in kwargs:
             kwargs["measured_spectrum"] = kwargs.pop("spectrum")
         return analyze_full_em_cts_spectrum(**kwargs)
-    raise ValueError("model must be 'electrostatic', 'electrostatic_kappa', 'full_electromagnetic', 'full_em_spatial_profiles' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
+    raise ValueError("model must be 'electrostatic', 'electrostatic_kappa', 'electrostatic_tabulated_evdf', 'full_electromagnetic', 'full_em_spatial_profiles' or 'full_em_gyrotropic_vdf_shape'; no automatic model substitution is performed")
 
 
 def fit_cts_ion_species_flows(
