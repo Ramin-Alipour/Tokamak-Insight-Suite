@@ -502,6 +502,7 @@ def collective_tabulated_electron_spectral_density(
         spectral = spectral_physical
         response_metadata = None
     return {
+        "wavelength_nm": x.copy(),
         "spectral_density_per_nm": spectral,
         "spectral_density_per_nm_physical": spectral_physical,
         "instrument_response_applied": instrument_response_matrix is not None,
