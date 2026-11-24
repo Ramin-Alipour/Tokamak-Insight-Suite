@@ -12556,7 +12556,7 @@
     "name": "Non-gyrotropic 3-D Thomson temperature-tensor spectral model",
     "equation": "T_q = qhat^T T_e qhat; sigma_lambda = lambda_L q_s sqrt(e T_q/m_e)/c; lambda_c = lambda_L(1 - q_s u_q/c); C_p,total=C_p,GLS+G_q C_qq G_q^T+A C_yq G_q^T+G_q C_qy A^T, G_q=−(J_p^T J_p)^−1 J_p^T J_q",
     "inputs": "Calibrated multi-view spectra, unit scattering directions, laser wavelength, scattering angle, measured bin-response matrices; optional tangent-plane scattering-direction covariance and measured-spectrum/geometry cross-covariance",
-    "output": "General symmetric positive-definite electron second-moment temperature tensor [eV], per-view q-parallel flow [m/s], fitted spectra and joint covariance; geometry-propagated parameter covariance and spectral/geometry cross-covariance contribution",
+    "output": "Full symmetric positive-definite 3-D temperature tensor jointly inferred from raw multi-view spectra, directional projections and flow vector, Maxwellian/Kappa forward model, instrument-response convolution, fit/identifiability and validity diagnostics, covariance decomposition including spectral-geometry cross terms, derived pressure and explicit inference scope.",
     "assumptions": "Single-scattering, non-relativistic elastic Thomson limit; Gaussian 3-D electron velocity distribution; fixed measured geometry and response.",
     "status": "D",
     "category": "Thomson scattering",
@@ -12694,6 +12694,218 @@
         {
           "name": "geometry_cross_parameter_covariance",
           "unit": "parameter covariance cross-term from measured-spectrum/scattering-geometry correlation"
+        },
+        {
+          "name": "electron_pressure_covariance_status",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_temperature_flow_joint_covariance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "maximum_projected_superluminal_tail_probability",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "geometry_covariance_order",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_pressure_equation",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "kappa_fit_status",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "model_discrepancy_parameter_covariance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "chi_square",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "physical_scope",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_velocity_vector_m_s",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_velocity_vector_covariance_m2_s2",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "scattering_vector_covariance_used",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "principal_axes_cartesian_columns",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "spectral_parameter_covariance_decomposition_status",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "spectral_parameter_covariance_components",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "measurement_parameter_covariance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "covariance_status",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "view_dyad_condition_number",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "projected_temperature_equation",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "maximum_flow_beta",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "flow_model",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "distribution_model",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_pressure_covariance_equation",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "spectral_forward_model",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "optimizer",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "thermal_rms_beta",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "spectral_parameter_covariance_component_order",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "systematic_parameter_covariance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_temperature_flow_joint_covariance_order",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "model",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "parameter_covariance_order",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "covariance_provenance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "model_selection_uncertainty_status",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "model_selection_uncertainty_included",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "model_validity_limits",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "jacobian_parameter_count",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "spectral_geometry_cross_covariance_used",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "kappa_index_uncertainty",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "projected_temperature_eV",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "geometry_covariance_method",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "electron_density_temperature_tensor_cross_covariance",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "flow_projection_equation",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "view_dyad_rank",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "projected_superluminal_tail_probability_per_view",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
+        },
+        {
+          "name": "primary_result_status",
+          "unit": "as returned by the general 3-D temperature-tensor spectral inference solver"
         }
       ],
       "prerequisites": [
@@ -12719,7 +12931,7 @@
         "tests/test_thomson_temperature_tensor.py::test_raw_spectral_tensor_fit_rejects_nonidentifiable_view_geometry",
         "tests/test_thomson_temperature_tensor_api.py::test_raw_temperature_tensor_fit_propagates_scattering_geometry_covariance"
       ],
-      "note": "Raw-spectrum physical forward fit, distinct from the algebraic projection-only tensor inversion. Scattering geometry and its cross-covariance with measured spectra are now propagated into the fit-parameter covariance rather than being treated as exact."
+      "note": "The contract enumerates the returned fields of the joint raw-spectrum solver, including model selection, Kappa controls, vector flow, joint covariance blocks and validity gates. The Kappa branch is an ellipsoidal parametric closure, not an unrestricted 3-D EVDF reconstruction; the solver is non-relativistic elastic Thomson."
     }
   },
   {
