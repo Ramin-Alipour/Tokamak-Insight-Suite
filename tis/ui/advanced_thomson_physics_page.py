@@ -807,6 +807,7 @@ EXAMPLES = {
         "instrument_response": np.eye(41).tolist(),
         "ion_velocity_initial_m_s": {"D+": -40000.0, "C6+": 80000.0},
         "signal_uncertainty": np.full(41, 1.0).tolist(),
+        "spectral_covariance": None,
         "ion_velocity_bounds_m_s": [-500000.0, 500000.0]
     },
     "cts_electrostatic_measured_spectrum_inference": {
@@ -1370,7 +1371,13 @@ def render_advanced_thomson_physics_page(st) -> None:
                 )
             else:
                 if model == "cts_multi_ion_flow_inference":
-                    result = fit_cts_ion_species_flows(**config)
+                    # Keep the dashboard on the specialist product API boundary.
+                    from tis.products.thomson.api import fit_cts_ion_species_flows as fit_product_cts_ion_flows
+                    result = dict(fit_product_cts_ion_flows(**config))
+                    result["dashboard_execution_path"] = (
+                        "tis.ui.advanced_thomson_physics_page -> "
+                        "tis.products.thomson.api.fit_cts_ion_species_flows"
+                    )
                 elif model == "cts_full_em_spatial_profiles":
                     result = fit_full_em_cts_spatial_profiles(**config)
                 else:

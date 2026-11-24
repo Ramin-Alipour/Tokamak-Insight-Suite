@@ -140,6 +140,8 @@ def test_dashboard_routes_conditional_multi_ion_cts_flow_inference():
     assert result["reportable_as_inferred_parameter"] is True
 
     from pathlib import Path
+    dashboard_source = (Path(__file__).resolve().parents[1] / "tis" / "ui" / "advanced_thomson_physics_page.py").read_text(encoding="utf-8")
+    assert "tis.products.thomson.api.fit_cts_ion_species_flows" in dashboard_source
     root = Path(__file__).resolve().parents[1]
     formula = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
     packaged = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
