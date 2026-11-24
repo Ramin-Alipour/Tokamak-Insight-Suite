@@ -13752,6 +13752,321 @@
         {
           "name": "maximum_projected_superluminal_tail_probability",
           "unit": "dimensionless; maximum across views"
+        },
+        {
+          "name": "model",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "distribution_model",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "kappa_index_uncertainty",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "kappa_fit_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "principal_axes_cartesian_columns",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "projected_temperature_equation",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_velocity_vector_m_s",
+          "unit": "m s^-1; Cartesian 3-vector",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_velocity_vector_covariance_m2_s2",
+          "unit": "(m s^-1)^2; 3x3 covariance",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_temperature_flow_joint_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_temperature_flow_joint_covariance_order",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1 per view",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "flow_projection_equation",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "residual_spectra",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "chi_square",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "jacobian_rank",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "jacobian_parameter_count",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "jacobian_condition_number",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "view_dyad_rank",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "view_dyad_condition_number",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "spectral_parameter_covariance_components",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "spectral_parameter_covariance_component_order",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "spectral_parameter_covariance_decomposition_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_discrepancy_parameter_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "systematic_parameter_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "measurement_parameter_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_selection_uncertainty_included",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_selection_uncertainty_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "scattering_vector_covariance_used",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "spectral_geometry_cross_covariance_used",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "geometry_parameter_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "geometry_cross_parameter_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "geometry_covariance_order",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "geometry_covariance_method",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "parameter_covariance_order",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3; 1-sigma",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_pressure_tensor_Pa",
+          "unit": "Pa; symmetric 3x3 tensor",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_pressure_parameter_covariance_Pa2",
+          "unit": "Pa^2; six-component covariance",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_pressure_covariance_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_density_temperature_tensor_cross_covariance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_pressure_covariance_equation",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "electron_pressure_equation",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "covariance_provenance",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "covariance_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "thermal_rms_beta",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "maximum_flow_beta",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "flow_model",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_validity_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_validity_limits",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "primary_result_status",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "physical_scope",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "spectral_forward_model",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "optimizer",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_family_comparison",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_averaged_temperature_tensor_eV",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_averaged_parameter_covariance_eV2",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "within_model_parameter_covariance_eV2",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_selection_parameter_covariance_eV2",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
+        },
+        {
+          "name": "model_selection_covariance_equation",
+          "unit": "solver output; see description and covariance/status fields",
+          "description": "Returned by fit_general_temperature_tensor_thomson_spectra. This field is conditional on the supplied measured spectra, explicit geometry, selected Maxwellian/Kappa closure, and the solver's rank/validity gates."
         }
       ],
       "prerequisites": [
@@ -13768,7 +14083,8 @@
         "Non-relativistic Kappa reportability is withheld when any projected Student-t marginal exceeds the explicit superluminal-tail probability threshold."
       ],
       "test_links": [
-        "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa"
+        "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ]
     },
     "raw_data_to_physics": false,
@@ -13787,7 +14103,8 @@
       "formula_key": "optical_thomson_general_anisotropic_kappa_tensor",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa"
+        "tests/test_thomson_temperature_tensor_api.py::test_general_non_gyrotropic_kappa_tensor_fit_recovers_tensor_and_kappa",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ]
     }
   },
