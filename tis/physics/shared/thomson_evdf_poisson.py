@@ -110,14 +110,20 @@ def reconstruct_thomson_evdf_poisson(
     tiny = np.finfo(float).tiny
     mass_operator = operator / weights[None, :]
     mass_initial = weights / float(np.sum(weights))
-    x0 = np.concatenate([mass_initial, [total_initial]])
+    # Optimize log(A_tot), not A_tot itself. The count amplitude is commonly
+    # O(10^5--10^9), whereas the simplex masses are O(1/n); using A directly
+    # gives SLSQP badly imbalanced parameter and gradient scales and can leave
+    # the optimizer at a background-only, formally converged solution.
+    log_amplitude_initial = float(np.log(total_initial))
+    x0 = np.concatenate([mass_initial, [log_amplitude_initial]])
+    log_amplitude_upper = float(np.log(max(total_initial, float(np.sum(counts)), 1.0) * 1.0e6))
 
     def density_from_mass(mass):
         return mass / weights
 
     def expected(parameters):
         mass = parameters[:n]
-        amplitude = parameters[n]
+        amplitude = float(np.exp(parameters[n]))
         return amplitude * (mass_operator @ mass) + background
 
     def objective(parameters):
@@ -131,13 +137,13 @@ def reconstruct_thomson_evdf_poisson(
     def gradient(parameters):
         mass = parameters[:n]
         density = density_from_mass(mass)
-        amplitude = parameters[n]
+        amplitude = float(np.exp(parameters[n]))
         mu = np.maximum(expected(parameters), tiny)
         score = 1.0 - counts / mu
         grad_mass = amplitude * (mass_operator.T @ score)
         grad_mass += lam * ((penalty.T @ (penalty @ density)) / weights)
-        grad_amplitude = float(np.dot(mass_operator @ mass, score))
-        return np.concatenate([grad_mass, [grad_amplitude]])
+        grad_log_amplitude = amplitude * float(np.dot(mass_operator @ mass, score))
+        return np.concatenate([grad_mass, [grad_log_amplitude]])
 
     constraint = {
         "type": "eq",
@@ -146,7 +152,7 @@ def reconstruct_thomson_evdf_poisson(
     }
     fit = minimize(
         objective, x0, jac=gradient, method="SLSQP",
-        bounds=[(0.0, None)] * n + [(tiny, None)],
+        bounds=[(0.0, None)] * n + [(float(np.log(tiny)), log_amplitude_upper)],
         constraints=[constraint],
         options={"maxiter": int(max_iter), "ftol": 1e-10, "disp": False},
     )
@@ -154,7 +160,7 @@ def reconstruct_thomson_evdf_poisson(
         raise ValueError(f"Poisson EVDF constrained optimizer failed: {fit.message}")
     mass = fit.x[:n]
     density = density_from_mass(mass)
-    amplitude = float(fit.x[n])
+    amplitude = float(np.exp(fit.x[n]))
     normalization = float(weights @ density)
     if not np.isclose(normalization, 1.0, rtol=1e-7, atol=1e-9):
         raise ArithmeticError("Poisson EVDF optimizer violated the finite-volume normalization constraint")
@@ -170,7 +176,10 @@ def reconstruct_thomson_evdf_poisson(
     active = mass > max(float(np.max(mass)) * 1e-8, tiny)
     free_indices = np.flatnonzero(active)
     parameter_indices = np.concatenate([free_indices, [n]])
-    fisher_design = np.column_stack([amplitude * mass_operator[:, free_indices], mass_operator @ mass])
+    fisher_design = np.column_stack([
+        amplitude * mass_operator[:, free_indices],
+        amplitude * (mass_operator @ mass),
+    ])
     data_fisher = fisher_design.T @ (fisher_design / np.maximum(mu, tiny)[:, None])
     fisher = data_fisher.copy()
     density_penalty_jacobian = penalty[:, free_indices] / weights[free_indices][None, :]
@@ -198,7 +207,7 @@ def reconstruct_thomson_evdf_poisson(
             covariance_active_mass = tangent @ covariance_reduced @ tangent.T
             # Transform covariance from dimensionless masses p_j to density
             # coefficients f_j=p_j/w_j, retaining the amplitude cross terms.
-            transform = np.diag(np.concatenate([1.0 / weights[free_indices], [1.0]]))
+            transform = np.diag(np.concatenate([1.0 / weights[free_indices], [amplitude]]))
             covariance_active = transform @ covariance_active_mass @ transform.T
             covariance_full = np.zeros((n + 1, n + 1))
             covariance_full[np.ix_(parameter_indices, parameter_indices)] = covariance_active
