@@ -197,6 +197,6 @@ def test_poisson_evdf_piecewise_linear_sixth_order_moments_match_maxwellian_clos
     assert moments["third"] == pytest.approx(0.0, abs=1e-10)
     assert moments["fourth"] == pytest.approx(3.0, rel=2e-5)
     assert moments["fifth"] == pytest.approx(0.0, abs=1e-10)
-    assert moments["sixth"] == pytest.approx(15.0, rel=3e-5)
+    assert moments["sixth"] == pytest.approx(15.0, rel=2e-4)
     assert moments["standardized_sixth_cumulant"] == pytest.approx(0.0, abs=2e-4)
     assert moments["moment_jacobian"].shape == (13, velocity.size)

@@ -13304,7 +13304,8 @@
         "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_dispatch",
         "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_propagates_moment_covariance_and_optional_projected_heat_flux",
         "tests/test_thomson_evdf_poisson.py::test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance",
-        "tests/test_thomson_evdf_poisson.py::test_dashboard_poisson_example_executes_inside_its_declared_velocity_window"
+        "tests/test_thomson_evdf_poisson.py::test_dashboard_poisson_example_executes_inside_its_declared_velocity_window",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_piecewise_linear_sixth_order_moments_match_maxwellian_closure"
       ]
     }
   }
