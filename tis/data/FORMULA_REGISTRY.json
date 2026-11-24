@@ -6530,6 +6530,30 @@
         {
           "name": "relative_lab_thomson_differential_scattering_weight",
           "unit": "dimensionless; optional polarized elastic Thomson differential weight with lab flux and aberration Jacobians"
+        },
+        {
+          "name": "electron_velocity_axis",
+          "unit": "text; 1-D projected-velocity axis definition"
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless; normalized 3-vector"
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless; normalized 3-vector"
+        },
+        {
+          "name": "scattering_vector_unit",
+          "unit": "dimensionless; normalized q-direction 3-vector"
+        },
+        {
+          "name": "geometry_source",
+          "unit": "text; supplied rays or constructed symmetric geometry"
+        },
+        {
+          "name": "dimensionality_limit",
+          "unit": "text; projected 1-D velocity-space scope"
         }
       ],
       "prerequisites": [
