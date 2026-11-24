@@ -10994,89 +10994,83 @@
   },
   {
     "name": "Projected tabulated EVDF central moments and directional kinetic temperature",
-    "equation": "u_q=∫v f_q(v)dv; σ_q²=∫(v−u_q)²f_q(v)dv; T_q=mσ_q²/e; γ_1=μ_3/σ_q³; γ_2=μ_4/σ_q⁴−3",
-    "inputs": "Finite increasing projected velocity grids and non-negative electron/ion EVDFs, species masses and explicit bulk-flow projections; or Maxwellian ion temperatures",
-    "output": "Per-species projected mean velocity, variance, directional second-moment temperature, standardized skewness and excess kurtosis alongside the CTS spectrum",
-    "assumptions": "Each supplied EVDF is a normalized one-dimensional marginal along the scattering vector. Temperatures are directional second moments, not unrestricted three-dimensional temperatures. Explicit bulk-flow projections remain separate from residual EVDF means. The collective response remains collisionless, unmagnetized, non-relativistic and electrostatic.",
+    "equation": "f_N(v)=f(v)/∫f(v)dv; u_q=∫v f_N(v)dv; σ_q²=∫(v−u_q)²f_N(v)dv; T_q=mσ_q²/e; γ_1=μ_3/σ_q³; γ_2=μ_4/σ_q⁴−3",
+    "inputs": "Finite strictly increasing projected velocity grid [m s^-1], non-negative tabulated 1-D EVDF [s m^-1], and positive species mass [kg].",
+    "output": "Normalized projected mean velocity [m s^-1], variance [m^2 s^-2], directional second-moment temperature [eV], standardized skewness and excess kurtosis.",
+    "assumptions": "Piecewise-linear tabulated 1-D projected EVDF on finite supplied support, normalized internally by trapezoidal quadrature. Temperature is the classical directional second central moment mσ²/e, not an unrestricted 3-D or relativistic temperature.",
     "status": "D",
     "category": "Collective Thomson scattering",
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "function_link": "tis.physics.shared.thomson_generalized_dispersion.projected_evdf_central_moments",
       "formula_key": "cts_tabulated_evdf_projected_moments",
       "input_specs": [
         {
-          "name": "electron_velocity_grid_m_s",
-          "unit": "m s^-1; strictly increasing",
+          "name": "velocity_grid_m_s",
+          "unit": "m s^-1; finite, strictly increasing projected velocity grid",
           "required": true
         },
         {
-          "name": "electron_probability_density_s_m",
-          "unit": "s m^-1; non-negative projected 1-D EVDF",
+          "name": "probability_density_s_m",
+          "unit": "s m^-1; finite non-negative tabulated projected EVDF",
           "required": true
         },
         {
-          "name": "ion_velocity_grids_m_s",
-          "unit": "m s^-1; one row per ion species",
-          "required": false
-        },
-        {
-          "name": "ion_probability_densities_s_m",
-          "unit": "s m^-1; one projected EVDF per species",
-          "required": false
-        },
-        {
-          "name": "ion_species",
-          "unit": "species mass and charge records",
+          "name": "mass_kg",
+          "unit": "kg; positive species mass",
           "required": true
-        },
-        {
-          "name": "ion_temperature_eV",
-          "unit": "eV; Maxwellian closure only, optional for tabulated ions",
-          "required": false
         }
       ],
       "output_specs": [
         {
-          "name": "electron_projected_moments.directional_second_moment_temperature_eV",
-          "unit": "eV"
+          "name": "mean_velocity_relative_to_species_frame_m_s",
+          "unit": "m s^-1"
         },
         {
-          "name": "electron_projected_moments.standardized_skewness",
+          "name": "variance_m2_s2",
+          "unit": "m^2 s^-2"
+        },
+        {
+          "name": "directional_second_moment_temperature_eV",
+          "unit": "eV; classical q-direction second-moment temperature"
+        },
+        {
+          "name": "standardized_skewness",
           "unit": "dimensionless"
         },
         {
-          "name": "electron_projected_moments.excess_kurtosis",
+          "name": "excess_kurtosis",
           "unit": "dimensionless"
         },
         {
-          "name": "ion_projected_moments",
-          "unit": "per-species projected central-moment records"
+          "name": "moment_definition",
+          "unit": "central-moment convention identifier"
         }
       ],
       "prerequisites": [
-        "EVDFs are normalized by their finite-grid integral before moments are evaluated.",
-        "Directional temperature is m times the central variance of the projected 1-D distribution divided by elementary charge.",
-        "Bulk-flow projections are returned separately; total mean projection includes the residual first moment of the supplied EVDF.",
-        "Maxwellian ion moments are analytic; tabulated ion moments are computed from the supplied species-specific velocity grid."
+        "A finite, strictly increasing projected velocity grid with at least three samples",
+        "A non-negative tabulated projected EVDF with positive finite integral",
+        "A positive species mass"
       ],
-      "uncertainty_model": "Moment estimates are conditional on the supplied tabulated EVDF and its finite velocity support. No measurement or EVDF reconstruction covariance is inferred by this forward-model diagnostic.",
+      "uncertainty_model": "Deterministic trapezoidal quadrature of the supplied tabulated EVDF. No covariance is inferred; uncertainties in the EVDF, velocity grid and mass must be propagated by the caller or a joint inverse.",
       "limitations": [
         "Projected 1-D moments do not determine a general 3-D temperature tensor or unrestricted EVDF.",
         "Finite-support truncation and grid resolution affect higher moments and must be assessed against supplied EVDF tail coverage.",
         "No relativistic, magnetized, collisional or Full-EM response is added."
       ],
       "test_links": [
-        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api",
-        "tests/test_thomson_generalized_dispersion.py::test_maxwellian_ion_moment_output_matches_analytic_temperature"
+        "tests/test_thomson_generalized_dispersion.py::test_projected_evdf_central_moments_match_shifted_maxwellian_kinetic_reference",
+        "tests/test_thomson_generalized_dispersion.py::test_projected_evdf_central_moments_reject_invalid_mass_and_non_normalizable_pdf",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api"
       ],
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "derived_physical_moments_on_supplied_model_EVDF_with_collective_forward_model",
       "input_data_level": "model_parameters_or_supplied_projected_EVDF",
       "analysis_family": "Analysis 1 — Thomson scattering",
-      "subanalysis": "Collective Thomson scattering — projected electron/ion EVDF"
+      "subanalysis": "Collective Thomson scattering — projected electron/ion EVDF",
+      "note": "This public moment kernel is called by the tabulated-EVDF CTS forward solver for electron and ion projected moments. It normalizes each supplied EVDF and reports only q-parallel classical central moments."
     },
     "references": [
       {
@@ -11088,18 +11082,19 @@
       }
     ],
     "implementation_trace": {
-      "function_link": "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "function_link": "tis.physics.shared.thomson_generalized_dispersion.projected_evdf_central_moments",
       "function_links": [
-        "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
+        "tis.physics.shared.thomson_generalized_dispersion.projected_evdf_central_moments"
       ],
       "formula_key": "cts_tabulated_evdf_projected_moments",
       "implementation_link_status": "mapped",
       "test_links": [
-        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api",
-        "tests/test_thomson_generalized_dispersion.py::test_maxwellian_ion_moment_output_matches_analytic_temperature"
+        "tests/test_thomson_generalized_dispersion.py::test_projected_evdf_central_moments_match_shifted_maxwellian_kinetic_reference",
+        "tests/test_thomson_generalized_dispersion.py::test_projected_evdf_central_moments_reject_invalid_mass_and_non_normalizable_pdf",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api"
       ]
     },
-    "description": "Derived central moments and directional kinetic temperatures of supplied projected tabulated electron and ion EVDFs, returned with the collective CTS spectrum."
+    "description": "Computes normalized projected EVDF central moments and the corresponding classical directional kinetic temperature using finite-support trapezoidal quadrature."
   },
   {
     "name": "Landau–FDT current-noise propagation to electromagnetic field fluctuations",

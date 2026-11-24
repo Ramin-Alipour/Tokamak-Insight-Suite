@@ -20,6 +20,49 @@ def _trapezoid(y, x):
         integrate = np.trapz
     return integrate(y, x)
 
+
+def projected_evdf_central_moments(velocity_grid_m_s, probability_density_s_m, mass_kg):
+    """Return classical central moments of a normalized projected 1-D EVDF.
+
+    The supplied tabulation is interpreted as a piecewise-linear probability
+    density on its finite support and normalized by trapezoidal quadrature.
+    The returned temperature is the directional second-moment temperature
+    m <(v-<v>)^2>/e; it is not a 3-D temperature tensor or a relativistic
+    thermodynamic temperature.
+    """
+    velocity = np.asarray(velocity_grid_m_s)
+    density = np.asarray(probability_density_s_m)
+    if (velocity.dtype.kind not in "iuf" or velocity.ndim != 1
+            or velocity.size < 3 or np.any(~np.isfinite(velocity))
+            or np.any(np.diff(velocity) <= 0.0)):
+        raise ValueError("velocity_grid_m_s must be a finite, strictly increasing real vector with at least three points")
+    if (density.dtype.kind not in "iuf" or density.shape != velocity.shape
+            or np.any(~np.isfinite(density)) or np.any(density < 0.0)):
+        raise ValueError("probability_density_s_m must be finite, non-negative and match velocity_grid_m_s")
+    if (isinstance(mass_kg, (bool, np.bool_))
+            or not isinstance(mass_kg, (int, float, np.integer, np.floating))
+            or not np.isfinite(mass_kg) or mass_kg <= 0.0):
+        raise ValueError("mass_kg must be a positive finite real scalar")
+    normalization = float(_trapezoid(density, velocity))
+    if not np.isfinite(normalization) or normalization <= 0.0:
+        raise ValueError("probability_density_s_m must have a positive finite integral")
+    probability = density / normalization
+    centered_mean = float(_trapezoid(velocity * probability, velocity))
+    centered = velocity - centered_mean
+    variance = float(_trapezoid(centered**2 * probability, velocity))
+    if not np.isfinite(variance) or variance <= 0.0:
+        raise ValueError("projected EVDF must have a positive finite second central moment")
+    third = float(_trapezoid(centered**3 * probability, velocity))
+    fourth = float(_trapezoid(centered**4 * probability, velocity))
+    return {
+        "mean_velocity_relative_to_species_frame_m_s": centered_mean,
+        "variance_m2_s2": variance,
+        "directional_second_moment_temperature_eV": float(mass_kg * variance / E_CHARGE),
+        "standardized_skewness": float(third / variance**1.5),
+        "excess_kurtosis": float(fourth / variance**2 - 3.0),
+        "moment_definition": "central_moments_of_normalized_projected_1D_EVDF",
+    }
+
 def _wavelength_bin_widths(wavelength_nm):
     """Midpoint finite-volume widths for a strictly increasing wavelength grid."""
     axis = np.asarray(wavelength_nm, dtype=float)
@@ -443,32 +486,13 @@ def collective_tabulated_electron_spectral_density(
         ion_pdf.append(pdf_i)
         ion_chi.append(chi_i)
 
-    # Derive directional central moments from the supplied projected EVDFs.
-    # These are q-parallel moments, not unrestricted 3-D temperatures.
-    def _projected_moments(grid, density, mass_kg):
-        area = float(_trapezoid(density, grid))
-        normalized = np.asarray(density, dtype=float) / area
-        mean = float(_trapezoid(grid * normalized, grid))
-        centered = grid - mean
-        variance = float(_trapezoid(centered**2 * normalized, grid))
-        if not np.isfinite(variance) or variance <= 0.0:
-            raise ValueError("projected EVDF must have a positive finite second central moment")
-        third = float(_trapezoid(centered**3 * normalized, grid))
-        fourth = float(_trapezoid(centered**4 * normalized, grid))
-        return {
-            "mean_velocity_relative_to_species_frame_m_s": mean,
-            "variance_m2_s2": variance,
-            "directional_second_moment_temperature_eV": float(mass_kg * variance / E_CHARGE),
-            "standardized_skewness": float(third / variance**1.5),
-            "excess_kurtosis": float(fourth / variance**2 - 3.0),
-            "moment_definition": "central_moments_of_normalized_projected_1D_EVDF",
-        }
-
-    electron_moments = _projected_moments(vgrid, fgrid, ME)
+    # Derive directional central moments from the same normalized projected
+    # EVDFs used by the Landau response; these are q-parallel, not 3-D moments.
+    electron_moments = projected_evdf_central_moments(vgrid, fgrid, ME)
     ion_moments = []
     for index, item in enumerate(species):
         if tabulated_ions:
-            moments = _projected_moments(ion_grids[index], ion_distributions[index], item["mass_kg"])
+            moments = projected_evdf_central_moments(ion_grids[index], ion_distributions[index], item["mass_kg"])
             moments["distribution_source"] = "researcher_supplied_tabulated_projected_1D_EVDF"
         else:
             variance = temperatures[index] * E_CHARGE / item["mass_kg"]

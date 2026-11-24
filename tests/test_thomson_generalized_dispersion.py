@@ -374,7 +374,7 @@ def test_projected_evdf_moment_formula_registry_is_synchronized_and_executable()
     assert len(matches) == 1
     contract = matches[0]["execution_contract"]
     assert contract["implementation_link_status"] == "mapped"
-    assert contract["function_link"] == "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
+    assert contract["function_link"] == "tis.physics.shared.thomson_generalized_dispersion.projected_evdf_central_moments"
     assert "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_evdfs_return_directional_temperature_and_shape_moments_through_public_api" in contract["test_links"]
 
 
@@ -829,3 +829,32 @@ def test_tabulated_landau_susceptibility_recovers_analytic_maxwellian_limit():
         distribution="maxwellian",
     )
     np.testing.assert_allclose(tabulated, analytic, rtol=2.0e-3, atol=2.0e-5)
+
+
+def test_projected_evdf_central_moments_match_shifted_maxwellian_kinetic_reference():
+    from tis.physics.shared.thomson_generalized_dispersion import projected_evdf_central_moments
+
+    mass = 2.0 * 1.66053906660e-27
+    temperature_eV = 17.0
+    mean_velocity = 1.8e4
+    sigma = np.sqrt(temperature_eV * 1.602176634e-19 / mass)
+    velocity = np.linspace(mean_velocity - 9.0*sigma, mean_velocity + 9.0*sigma, 6001)
+    density = np.exp(-0.5*((velocity-mean_velocity)/sigma)**2)
+    moments = projected_evdf_central_moments(velocity, density, mass)
+    assert np.isclose(moments["mean_velocity_relative_to_species_frame_m_s"], mean_velocity, rtol=1e-10, atol=1e-5)
+    assert np.isclose(moments["variance_m2_s2"], sigma**2, rtol=2e-5)
+    assert np.isclose(moments["directional_second_moment_temperature_eV"], temperature_eV, rtol=2e-5)
+    assert abs(moments["standardized_skewness"]) < 1e-10
+    assert abs(moments["excess_kurtosis"]) < 2e-4
+
+
+def test_projected_evdf_central_moments_reject_invalid_mass_and_non_normalizable_pdf():
+    import pytest
+    from tis.physics.shared.thomson_generalized_dispersion import projected_evdf_central_moments
+
+    velocity = np.linspace(-1.0, 1.0, 101)
+    density = np.exp(-velocity**2)
+    with pytest.raises(ValueError, match="mass_kg"):
+        projected_evdf_central_moments(velocity, density, 0.0)
+    with pytest.raises(ValueError, match="positive finite integral"):
+        projected_evdf_central_moments(velocity, np.zeros_like(velocity), 1.0)
