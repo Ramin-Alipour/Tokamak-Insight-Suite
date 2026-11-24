@@ -665,17 +665,21 @@ def test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapp
         pole_imaginary_part_m_s=100.0,
     )
 
-    scattering_wavenumber = 4.0 * np.pi * np.sin(angle / 2.0) / (laser * 1e-9)
+    exact_scattering_wavenumber = 2.0 * np.pi * 1e9 * np.sqrt(
+        1.0 / laser**2 + 1.0 / wavelength**2
+        - 2.0 * np.cos(angle) / (laser * wavelength)
+    )
     exact_delta_omega = 2.0 * np.pi * 299_792_458.0 * 1e9 * (1.0 / wavelength - 1.0 / laser)
-    exact_phase_velocity = exact_delta_omega / scattering_wavenumber
+    exact_phase_velocity = exact_delta_omega / exact_scattering_wavenumber
     linearized_phase_velocity = (
         -299_792_458.0 * (wavelength - laser)
         / (2.0 * laser * np.sin(angle / 2.0))
     )
 
+    np.testing.assert_allclose(result["wavenumber_m_inverse"], exact_scattering_wavenumber, rtol=2e-15, atol=0.0)
     np.testing.assert_allclose(result["angular_frequency_shift_rad_s"], exact_delta_omega, rtol=2e-15, atol=0.0)
     np.testing.assert_allclose(result["phase_velocity_m_s"], exact_phase_velocity, rtol=2e-15, atol=0.0)
-    assert result["phase_velocity_mapping"] == "exact_delta_omega_over_scattering_wavenumber_from_measured_wavelength"
+    assert result["phase_velocity_mapping"] == "exact_delta_omega_over_frequency_dependent_scattering_wavenumber_from_measured_wavelength"
     # The exact and first-order maps coincide at line centre and diverge
     # quadratically away from it; the outer-bin difference is measurable.
     assert exact_phase_velocity[wavelength > laser][-1] != linearized_phase_velocity[wavelength > laser][-1]
