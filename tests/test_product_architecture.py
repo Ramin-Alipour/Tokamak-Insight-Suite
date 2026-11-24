@@ -632,7 +632,7 @@ def test_main_optical_thomson_dashboard_uses_the_product_execution_api():
 
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     start = source.index("if mode=='Thomson multi-channel spectral inference':")
-    end = source.index("\nelif page==", start)
+    end = source.index("\n    elif mode=='ECE channel/profile analysis':", start)
     workflow = source[start:end]
 
     assert "product_api.run_analysis(1,wavelengths[channel_index],spectra[channel_index]" in workflow
