@@ -6988,6 +6988,26 @@
           "unit": "dimensionless",
           "description": "Supplied calibrated response matrix on the measured frequency grid.",
           "required": true
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz; positive probe frequency",
+          "required": false
+        },
+        {
+          "name": "scattering_geometry",
+          "unit": "explicit incident/scattered directions and scattering-vector geometry",
+          "required": false
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s⁻¹; fixed supplied electron flow projection",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_bounds_m_s",
+          "unit": "m s⁻¹; ordered subluminal [lower, upper] fit bounds",
+          "required": false
         }
       ],
       "output_specs": [
@@ -7010,6 +7030,86 @@
           "name": "identifiability",
           "unit": "categorical",
           "description": "Full-rank conditional identifiability or non-identifiable species-flow combination."
+        },
+        {
+          "name": "model",
+          "unit": "text; CTS model identifier"
+        },
+        {
+          "name": "candidate_ion_velocity_projection_m_s",
+          "unit": "m s⁻¹; candidate per-species projections even when withheld"
+        },
+        {
+          "name": "parameter_names",
+          "unit": "ordered fitted parameter names"
+        },
+        {
+          "name": "spectral_scale",
+          "unit": "dimensionless; fitted positive scale"
+        },
+        {
+          "name": "spectral_offset",
+          "unit": "calibrated spectral units; fitted constant offset"
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "calibrated spectral units"
+        },
+        {
+          "name": "residual",
+          "unit": "calibrated spectral units; fitted minus observed"
+        },
+        {
+          "name": "chi_square",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "integer"
+        },
+        {
+          "name": "jacobian_rank",
+          "unit": "integer; numerical rank of weighted fit Jacobian"
+        },
+        {
+          "name": "parameter_count",
+          "unit": "integer"
+        },
+        {
+          "name": "singular_values",
+          "unit": "singular values of weighted fit Jacobian"
+        },
+        {
+          "name": "optimizer_success",
+          "unit": "boolean"
+        },
+        {
+          "name": "optimizer_message",
+          "unit": "text; optimizer termination report"
+        },
+        {
+          "name": "result_classification",
+          "unit": "Conditional or Non-identifiable"
+        },
+        {
+          "name": "reportability_reason",
+          "unit": "text; why the estimate is reportable or withheld"
+        },
+        {
+          "name": "flow_parameter_at_bound",
+          "unit": "boolean"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean"
+        },
+        {
+          "name": "conditional_inputs",
+          "unit": "list of externally fixed physical inputs"
+        },
+        {
+          "name": "assumptions",
+          "unit": "list of model assumptions"
         }
       ],
       "prerequisites": [
@@ -7017,7 +7117,7 @@
         "Calibrated instrument response and positive per-bin spectral uncertainties.",
         "Sufficient spectral information to distinguish each species Doppler shift."
       ],
-      "uncertainty_model": "Independent Gaussian per-bin spectral errors supplied explicitly; local covariance is reported only when the complete weighted spectral Jacobian is full rank.",
+      "uncertainty_model": "Independent Gaussian per-bin spectral errors supplied explicitly; covariance is computed from the complete weighted Jacobian only when all species-flow, scale and offset parameters are identifiable. Estimates at user-supplied flow bounds are withheld from reportable outputs.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_multi_ion_flow_inference_recovers_species_resolved_projections",
         "tests/test_cts_analysis.py::test_cts_differential_multi_ion_flow_changes_physical_spectrum",
