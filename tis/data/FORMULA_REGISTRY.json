@@ -7470,6 +7470,81 @@
           "unit": "dimensionless; conservative non-relativistic rms speed screen",
           "required": false,
           "default": 0.1
+        },
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing calibrated bins",
+          "required": false
+        },
+        {
+          "name": "measured_spectra",
+          "unit": "calibrated spectral density; view × wavelength",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": false
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized response matrix per view",
+          "required": false
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full channel-major spectral covariance",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "view × wavelength; positive 1-sigma",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "full channel-major additive PSD covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "full channel-major additive PSD covariance",
+          "required": false
+        },
+        {
+          "name": "temperature_bounds_eV",
+          "unit": "eV; positive ordered bounds",
+          "required": false
+        },
+        {
+          "name": "kappa_bounds",
+          "unit": "dimensionless; 3/2 < lower < upper",
+          "required": false
+        },
+        {
+          "name": "flow_bounds_m_s",
+          "unit": "m s⁻¹; ordered subluminal bounds",
+          "required": false
+        },
+        {
+          "name": "maximum_projected_superluminal_tail_probability",
+          "unit": "dimensionless; validity tolerance",
+          "required": false
+        },
+        {
+          "name": "minimum_spectral_window_coverage",
+          "unit": "dimensionless; minimum probability captured in each view for reporting",
+          "required": false
+        },
+        {
+          "name": "max_nfev",
+          "unit": "positive integer; optimizer evaluation limit",
+          "required": false
         }
       ],
       "output_specs": [
@@ -7516,6 +7591,158 @@
         {
           "name": "velocity_grid_probability_coverage",
           "unit": "dimensionless; represented probability mass, without tail renormalization"
+        },
+        {
+          "name": "model",
+          "unit": "text; forward-model identifier"
+        },
+        {
+          "name": "distribution_definition",
+          "unit": "text; 3-D gyrotropic bi-Kappa closure"
+        },
+        {
+          "name": "projected_marginal",
+          "unit": "text; exact 1-D Student-t marginal"
+        },
+        {
+          "name": "temperature_definition",
+          "unit": "text; second-moment temperature definition"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "joint fitted-parameter covariance; withheld unless identified"
+        },
+        {
+          "name": "residual_spectra",
+          "unit": "calibrated spectral density; measured minus fitted"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s⁻¹; q-projected flow per view"
+        },
+        {
+          "name": "magnetic_pitch_cosine",
+          "unit": "dimensionless; b̂·q̂ per view"
+        },
+        {
+          "name": "magnetic_pitch_cosine_squared",
+          "unit": "dimensionless; squared pitch cosine per view"
+        },
+        {
+          "name": "geometry_design_rank",
+          "unit": "integer; squared-pitch design rank"
+        },
+        {
+          "name": "anisotropy_identifiability",
+          "unit": "identified or non-identifiable"
+        },
+        {
+          "name": "kappa_identifiability",
+          "unit": "identified or non-identifiable"
+        },
+        {
+          "name": "temperature_anisotropy_ratio_parallel_over_perpendicular",
+          "unit": "dimensionless; optional"
+        },
+        {
+          "name": "kappa_finite_variance_domain",
+          "unit": "boolean"
+        },
+        {
+          "name": "thermal_velocity_covariance_tensor_per_view_m2_s2",
+          "unit": "m² s⁻²; per-view covariance tensor"
+        },
+        {
+          "name": "thermal_velocity_covariance_definition",
+          "unit": "text; tensor closure definition"
+        },
+        {
+          "name": "projected_velocity_variance_from_tensor_m2_s2",
+          "unit": "m² s⁻²; tensor-projected variance"
+        },
+        {
+          "name": "projected_velocity_variance_expected_m2_s2",
+          "unit": "m² s⁻²; fitted directional variance"
+        },
+        {
+          "name": "projected_velocity_variance_relative_residual",
+          "unit": "dimensionless; tensor consistency residual"
+        },
+        {
+          "name": "minimum_spectral_window_coverage_required",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "spectral_window_coverage_identifiable",
+          "unit": "boolean"
+        },
+        {
+          "name": "spectral_window_coverage_warning",
+          "unit": "text; optional truncation warning"
+        },
+        {
+          "name": "relativistic_tail_diagnostic",
+          "unit": "structured projected superluminal-tail diagnostic"
+        },
+        {
+          "name": "parameter_reporting_status",
+          "unit": "text; identified, withheld or outside validity domain"
+        },
+        {
+          "name": "non_identifiability_reason",
+          "unit": "text; optional reason"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean"
+        },
+        {
+          "name": "flow_projection_covariance_m2_s2",
+          "unit": "m² s⁻²; optional covariance"
+        },
+        {
+          "name": "flow_projection_covariance_status",
+          "unit": "text; identifiability status"
+        },
+        {
+          "name": "flow_projection_parameter_names",
+          "unit": "ordered flow parameter names"
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "full supplied channel-major covariance"
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "full supplied model-discrepancy covariance"
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "full supplied systematic covariance"
+        },
+        {
+          "name": "effective_covariance",
+          "unit": "full covariance used by GLS"
+        },
+        {
+          "name": "covariance_provenance",
+          "unit": "structured covariance source and combination"
+        },
+        {
+          "name": "jacobian_singular_values",
+          "unit": "singular values of whitened fit Jacobian"
+        },
+        {
+          "name": "parameter_order",
+          "unit": "ordered parameter names"
+        },
+        {
+          "name": "optimizer",
+          "unit": "structured optimizer convergence diagnostics"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text; experimental validation status"
         }
       ],
       "prerequisites": [
@@ -7524,14 +7751,15 @@
         "Independent magnetic pitch-angle coverage",
         "Finite-variance gyrotropic bi-Kappa parameters and a calibrated magnetic/scattering direction pair"
       ],
-      "uncertainty_model": "Full supplied channel-major measurement covariance plus optional positive-semidefinite model-discrepancy covariance; local covariance from the whitened spectral Jacobian, residual-scaled only when no measurement covariance is supplied.",
+      "uncertainty_model": "The joint channel-major GLS fit combines only supplied measurement, model-discrepancy and systematic covariance components. Parameter covariance is computed from the complete whitened spectral Jacobian. Kappa and anisotropy reporting additionally require the declared finite-variance domain, independent pitch-angle geometry, adequate spectral-window probability coverage and the projected relativistic-tail validity screen.",
       "limitations": [
         "Non-relativistic elastic-Thomson Doppler approximation only",
         "Gyrotropic bi-Kappa closure is not an unrestricted measured 3-D EVDF",
         "Parallel/perpendicular temperatures require rank-two pitch-angle design and full-rank spectral Jacobian",
         "Kappa finite-variance domain is strictly greater than 3/2",
         "The forward fit is withheld when projected thermal rms beta or fitted bulk-flow beta exceeds its declared non-relativistic screen.",
-        "The returned projected distribution is the 1-D marginal along q over the wavelength window; transverse velocity dependence remains a parametric gyrotropic assumption."
+        "The returned projected distribution is the 1-D marginal along q over the wavelength window; transverse velocity dependence remains a parametric gyrotropic assumption.",
+        "Parallel/perpendicular temperatures and kappa are withheld unless each view captures at least minimum_spectral_window_coverage of its fitted Kappa feature."
       ],
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_gyrotropic_bi_kappa_fit_recovers_second_moment_temperatures_and_kappa",
