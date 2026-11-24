@@ -24,6 +24,7 @@ THOMSON_ENTRY_POINTS = {
     86: ("thomson_temperature_tensor", "compare_general_temperature_tensor_thomson_models"),
     87: ("thomson_scattering", "infer_thomson_path_averaged_density"),
     88: ("advanced_inference", "reconstruct_optical_thomson_3d_evdf"),
+    89: ("thomson_evdf_poisson", "reconstruct_thomson_evdf_poisson"),
 }
 _PRODUCT_SLUGS = {
     1: "thomson-scattering",
