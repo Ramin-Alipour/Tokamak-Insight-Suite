@@ -13311,9 +13311,9 @@
   },
   {
     "name": "Exact frequency-resolved kinematics for tabulated-EVDF electrostatic CTS",
-    "equation": "k(λ)=2π√(λ₀⁻²+λ⁻²−2cosθ/(λ₀λ)); Δω(λ)=2πc(λ⁻¹−λ₀⁻¹); vφ(λ)=Δω(λ)/k(λ); χ_s(λ)=−(ω_ps²/k(λ)²)∫f′_s(v)/(v−vφ(λ)−u_s−i0⁺)dv; ε=1+Σ_sχ_s; S(k,ω)=(2π/k)[|1+Σ_iχ_i|²|ε|⁻²f_e+Σ_i Z_iα_i|χ_e|²|ε|⁻²f_i]; P_λ=S|dω/dλ_nm|, |dω/dλ_nm|=2πc·10⁹/λ_nm²",
-    "inputs": "Measured wavelength bins [nm], laser wavelength [nm], scattering angle [rad], electron density [m⁻³], explicit projected electron EVDF and ion composition/flows; optional per-species projected ion EVDFs and Landau-pole displacement.",
-    "output": "Frequency-resolved scattering wavenumber [m⁻¹], exact angular-frequency shift [rad s⁻¹], phase velocity [m s⁻¹], electron/ion susceptibilities, dielectric function, dynamic structure factor and spectral density per nm.",
+    "equation": "k(λ)=2π√(λ₀⁻²+λ⁻²−2cosθ/(λ₀λ)); Δω(λ)=2πc(λ⁻¹−λ₀⁻¹); vφ(λ)=Δω(λ)/k(λ); χ_s(λ)=−(ω_ps²/k(λ)²)∫f′_s(v)/(v−vφ(λ)−u_s−i0⁺)dv; ε=1+Σ_sχ_s; S(k,ω)=(2π/k)[|1+Σ_iχ_i|²|ε|⁻²f_e+Σ_i Z_iα_i|χ_e|²|ε|⁻²f_i]; P_λ=S|dω/dλ_nm|, |dω/dλ_nm|=2πc·10⁹/λ_nm²; P_obs,i=(1/Δλ_i)Σ_j R_ij P_phys,j Δλ_j",
+    "inputs": "Measured wavelength bins [nm], laser wavelength [nm], scattering angle [rad], electron density [m⁻³], explicit projected electron EVDF and ion composition/flows; optional per-species projected ion EVDFs and Landau-pole displacement. Optional measured response matrix R_ij on the wavelength grid; columns represent input-bin probability and may be sub-unit only when finite-window loss is explicitly enabled.",
+    "output": "Frequency-resolved scattering wavenumber [m⁻¹], exact angular-frequency shift [rad s⁻¹], phase velocity [m s⁻¹], electron/ion susceptibilities, dielectric function, dynamic structure factor and spectral density per nm. When supplied, response-convolved spectral density and finite-volume input/output power metadata.",
     "assumptions": "Unmagnetized, collisionless, non-relativistic electrostatic longitudinal response; supplied one-dimensional projected species distributions; fixed scattering angle; finite-support EVDFs use the declared zero-extension endpoint terms. This is a forward model and does not infer EVDFs or plasma parameters.",
     "status": "D",
     "category": "Collective Thomson scattering",
@@ -13372,6 +13372,16 @@
           "name": "scattered_direction",
           "unit": "unit 3-vector",
           "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "dimensionless; non-negative square wavelength-bin probability operator with unit column sums unless finite-window loss is explicitly enabled",
+          "required": false
+        },
+        {
+          "name": "allow_finite_window_response_loss",
+          "unit": "boolean; permits calibrated response columns with integrated probability below one, never renormalized",
+          "required": false
         }
       ],
       "output_specs": [
@@ -13406,6 +13416,18 @@
         {
           "name": "spectral_density_per_nm",
           "unit": "model spectral density per nm"
+        },
+        {
+          "name": "spectral_density_per_nm_physical",
+          "unit": "unconvolved physical spectral density per nm"
+        },
+        {
+          "name": "instrument_response_applied",
+          "unit": "boolean"
+        },
+        {
+          "name": "instrument_response_metadata",
+          "unit": "finite-volume integrated input/output power and column probability coverage"
         }
       ],
       "prerequisites": [
@@ -13413,10 +13435,12 @@
         "Explicit beam directions consistent with the supplied scattering angle",
         "Explicit electron projected EVDF, ion species, charge-density fractions and flows"
       ],
-      "uncertainty_model": "No inverse parameter covariance is claimed by this forward solver. Supplied EVDF and geometry uncertainties must be propagated by an external joint forward ensemble; detector-response convolution is not performed by this kernel.",
+      "uncertainty_model": "No inverse parameter covariance is claimed by this forward solver. Supplied EVDF and geometry uncertainties must be propagated by an external joint forward ensemble; detector-response convolution is not performed by this kernel. The measured response matrix is treated as fixed; its calibration uncertainty and cross-covariance with spectral bins are not propagated by this forward kernel.",
       "test_links": [
         "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapping",
-        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api"
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_measured_response_conserves_bin_integrated_power_on_nonuniform_grid",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_response_finite_window_loss_is_explicit_and_never_renormalized"
       ],
       "note": "Both photon-frequency shift and scattering-vector magnitude are evaluated per measured wavelength bin. The former first-order wavelength-shift approximation and fixed incident-frequency scattering wavenumber are not used.",
       "raw_data_to_physics": false,
@@ -13450,7 +13474,9 @@
       "implementation_link_status": "mapped",
       "test_links": [
         "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapping",
-        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api"
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_measured_response_conserves_bin_integrated_power_on_nonuniform_grid",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_response_finite_window_loss_is_explicit_and_never_renormalized"
       ]
     }
   }
