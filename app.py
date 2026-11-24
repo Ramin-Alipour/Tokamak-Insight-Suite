@@ -4504,7 +4504,7 @@ elif page=='Advanced Analysis':
         st.markdown('Analysis 1 subanalysis — microwave CTS: infer plasma and ion parameters from a measured, calibrated frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
             'electrostatic','electrostatic_kappa','electrostatic_tabulated_evdf','full_electromagnetic','full_em_spatial_profiles','full_em_gyrotropic_vdf_shape'
-        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else ('Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons' if v=='electrostatic_kappa' else ('Unmagnetized electrostatic CTS with measured tabulated electron/ion EVDFs' if v=='electrostatic_tabulated_evdf' else ('Spatially varying magnetized Full-EM CTS profile inversion' if v=='full_em_spatial_profiles' else ('Relativistic gyrotropic Full-EM CTS VDF-shape inverse' if v=='full_em_gyrotropic_vdf_shape' else 'Magnetized full-electromagnetic CTS')))),key='cts_physical_model')
+        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: {'electrostatic':'Unmagnetized electrostatic longitudinal CTS','electrostatic_kappa':'Unmagnetized electrostatic CTS with fitted isotropic Kappa electrons','electrostatic_tabulated_evdf':'Unmagnetized electrostatic CTS with measured tabulated electron/ion EVDFs','full_electromagnetic':'Magnetized full-electromagnetic CTS','full_em_spatial_profiles':'Spatially varying magnetized Full-EM CTS profile inversion','full_em_gyrotropic_vdf_shape':'Relativistic gyrotropic Full-EM CTS VDF-shape inverse'}.get(v,v),key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
         elif cts_model is None:
@@ -4643,8 +4643,8 @@ elif page=='Advanced Analysis':
   "probe_frequency_Hz": 2.82e14,
   "scattering_angle_rad": 1.57079632679,
   "electron_density_m3": 1.0e18,
-  "electron_velocity_grid_m_s": [-8e6, ..., 8e6],
-  "electron_probability_density_s_m": [ ... ],
+  "electron_velocity_grid_m_s": [-4e6,-3e6,-2e6,-1e6,0,1e6,2e6,3e6,4e6],
+  "electron_probability_density_s_m": [0.000134,0.004432,0.053991,0.241971,0.398942,0.241971,0.053991,0.004432,0.000134],
   "ion_species": [{"name":"D+","charge_state":1,"mass_amu":2.014}],
   "ion_fractions": [1.0],
   "ion_temperature_eV": [10.0],
