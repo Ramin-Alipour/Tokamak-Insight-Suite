@@ -13386,6 +13386,10 @@
       ],
       "output_specs": [
         {
+          "name": "wavelength_nm",
+          "unit": "nm; increasing calibrated spectral coordinate"
+        },
+        {
           "name": "wavenumber_m_inverse",
           "unit": "m⁻¹; frequency-resolved |k_s−k_i|"
         },
