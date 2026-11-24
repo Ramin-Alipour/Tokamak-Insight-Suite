@@ -4603,6 +4603,46 @@
         {
           "name": "relativistic_kinematics",
           "unit": "boolean"
+        },
+        {
+          "name": "anisotropy",
+          "unit": "dimensionless; perpendicular-to-parallel temperature or distribution anisotropy descriptor"
+        },
+        {
+          "name": "bare_current_spectral_covariance",
+          "unit": "complex current-noise covariance tensor before electromagnetic propagation"
+        },
+        {
+          "name": "distribution_kind",
+          "unit": "text; selected relativistic gyrotropic VDF family"
+        },
+        {
+          "name": "gyrophase_points",
+          "unit": "integer; gyrophase quadrature order"
+        },
+        {
+          "name": "momentum_space_normalization",
+          "unit": "dimensionless; momentum-space VDF normalization"
+        },
+        {
+          "name": "noise_model",
+          "unit": "text; Klimontovich particle-noise model"
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer or structured record; momentum-space quadrature order"
+        },
+        {
+          "name": "resonance_broadening_rad_s",
+          "unit": "rad s⁻¹; Lorentzian resonance broadening"
+        },
+        {
+          "name": "velocity_max_fraction_c",
+          "unit": "dimensionless; maximum represented speed divided by c"
+        },
+        {
+          "name": "wavevector_lab_rad_m",
+          "unit": "m⁻¹; laboratory-frame wavevector"
         }
       ],
       "uncertainty_model": "No experimental uncertainty is assigned to the externally supplied VDF or truncation controls; numerical convergence must be assessed independently.",
