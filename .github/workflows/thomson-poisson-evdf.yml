@@ -7,6 +7,7 @@ on:
       - "tis/physics/shared/thomson_evdf_poisson.py"
       - "tis/products/thomson/physics/thomson_evdf_poisson.py"
       - "tis/products/thomson/api.py"
+      - "tis/products/thomson/__init__.py"
       - "tis/products/catalog.py"
       - "tokamak_analysis/analysis_registry.py"
       - "tokamak_analysis/thomson_evdf_poisson.py"
