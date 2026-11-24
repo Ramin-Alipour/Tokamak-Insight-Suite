@@ -5998,6 +5998,50 @@
         {
           "name": "geometry_covariance_iterations",
           "unit": "count; iterative GLS updates when geometry covariance is supplied"
+        },
+        {
+          "name": "parameter_order",
+          "unit": "ordered parameter-name list"
+        },
+        {
+          "name": "reason",
+          "unit": "text; numerical/physical reporting reason"
+        },
+        {
+          "name": "active_temperature_lower_bounds",
+          "unit": "list of active positivity constraints"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "physicality_status",
+          "unit": "text; positive-temperature physicality classification"
+        },
+        {
+          "name": "fit_residual_projected_temperature_eV",
+          "unit": "eV; residual vector"
+        },
+        {
+          "name": "identifiability_reason",
+          "unit": "text; identifiability classification reason"
+        },
+        {
+          "name": "temperature_covariance_status",
+          "unit": "text; covariance availability/status"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean"
+        },
+        {
+          "name": "temperature_constraint",
+          "unit": "text; active constraint description"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "integer"
         }
       ],
       "prerequisites": [
