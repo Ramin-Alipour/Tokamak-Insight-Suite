@@ -4760,6 +4760,42 @@
         {
           "name": "relative_beam_overlap",
           "unit": "dimensionless; normalized across frequency bins"
+        },
+        {
+          "name": "incident_ray",
+          "unit": "record; incident cold-plasma ray path and wavevector"
+        },
+        {
+          "name": "absolute_beam_overlap_path_integral",
+          "unit": "m⁻²; absolute path-integrated incident/receiver Gaussian overlap"
+        },
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz; frequency bin associated with each scattering-volume sample"
+        },
+        {
+          "name": "scattering_sample_count",
+          "unit": "integer; number of path quadrature samples"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of geometrical-optics and spatial-uniformity assumptions"
+        },
+        {
+          "name": "scattering_volume_integration",
+          "unit": "record; ray-path quadrature and sample-weight integration metadata"
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer; selected cold-plasma propagation mode branch"
+        },
+        {
+          "name": "geometry_model",
+          "unit": "text; selected beam-overlap geometry model"
+        },
+        {
+          "name": "absolute_beam_overlap_path_integral_unit",
+          "unit": "text; unit convention for the absolute overlap integral"
         }
       ],
       "prerequisites": [
