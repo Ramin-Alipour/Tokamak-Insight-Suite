@@ -98,38 +98,47 @@ def reconstruct_thomson_evdf_poisson(
         if isinstance(initial_total_counts, (bool, np.bool_)) or not np.isscalar(initial_total_counts) or not np.isfinite(initial_total_counts) or initial_total_counts <= 0:
             raise ValueError("initial_total_counts must be finite and positive")
         total_initial = float(initial_total_counts)
-    # A broad, strictly positive initial density satisfies the exact
-    # finite-volume normalization constraint.
-    density_initial = np.ones(velocity.size) / float(weights @ np.ones(velocity.size))
-    x0 = np.concatenate([density_initial, [total_initial]])
+    # Optimize dimensionless nodal probability masses p_j=w_j*f_j rather
+    # than SI-scale densities f_j~1/(m/s). This keeps the simplex constraint
+    # sum(p)=1 and the count-amplitude nuisance on numerically comparable
+    # scales; the forward operator already contains the velocity weights.
     n = velocity.size
     tiny = np.finfo(float).tiny
+    mass_operator = operator / weights[None, :]
+    mass_initial = weights / float(np.sum(weights))
+    x0 = np.concatenate([mass_initial, [total_initial]])
+
+    def density_from_mass(mass):
+        return mass / weights
 
     def expected(parameters):
-        f = parameters[:n]
+        mass = parameters[:n]
         amplitude = parameters[n]
-        return amplitude * (operator @ f) + background
+        return amplitude * (mass_operator @ mass) + background
 
     def objective(parameters):
-        f = parameters[:n]
+        mass = parameters[:n]
+        density = density_from_mass(mass)
         mu = np.maximum(expected(parameters), tiny)
         poisson = np.sum(mu - counts * np.log(mu))
-        smooth = 0.5 * lam * float(np.dot(penalty @ f, penalty @ f))
+        smooth = 0.5 * lam * float(np.dot(penalty @ density, penalty @ density))
         return float(poisson + smooth)
 
     def gradient(parameters):
-        f = parameters[:n]
+        mass = parameters[:n]
+        density = density_from_mass(mass)
         amplitude = parameters[n]
         mu = np.maximum(expected(parameters), tiny)
         score = 1.0 - counts / mu
-        grad_f = amplitude * (operator.T @ score) + lam * (penalty.T @ (penalty @ f))
-        grad_amplitude = float(np.dot(operator @ f, score))
-        return np.concatenate([grad_f, [grad_amplitude]])
+        grad_mass = amplitude * (mass_operator.T @ score)
+        grad_mass += lam * ((penalty.T @ (penalty @ density)) / weights)
+        grad_amplitude = float(np.dot(mass_operator @ mass, score))
+        return np.concatenate([grad_mass, [grad_amplitude]])
 
     constraint = {
         "type": "eq",
-        "fun": lambda p: float(weights @ p[:n] - 1.0),
-        "jac": lambda p: np.concatenate([weights, [0.0]]),
+        "fun": lambda p: float(np.sum(p[:n]) - 1.0),
+        "jac": lambda p: np.concatenate([np.ones(n), [0.0]]),
     }
     fit = minimize(
         objective, x0, jac=gradient, method="SLSQP",
@@ -139,30 +148,32 @@ def reconstruct_thomson_evdf_poisson(
     )
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise ValueError(f"Poisson EVDF constrained optimizer failed: {fit.message}")
-    density = fit.x[:n]
+    mass = fit.x[:n]
+    density = density_from_mass(mass)
     amplitude = float(fit.x[n])
     normalization = float(weights @ density)
     if not np.isclose(normalization, 1.0, rtol=1e-7, atol=1e-9):
         raise ArithmeticError("Poisson EVDF optimizer violated the finite-volume normalization constraint")
     mu = expected(fit.x)
-    if np.any(mu <= 0) or not np.all(np.isfinite(mu)):
+    if np.any(mu < 0) or np.any((mu == 0) & (counts > 0)) or not np.all(np.isfinite(mu)):
         raise ArithmeticError("Poisson EVDF produced invalid expected detector counts")
 
     # Signed square-root deviance is a goodness-of-fit diagnostic; the
     # optimized objective is the exact Poisson negative log likelihood.
-    term = np.where(counts > 0, counts * np.log(np.maximum(counts, tiny) / mu) - (counts - mu), mu)
+    term = np.where(counts > 0, counts * np.log(np.maximum(counts, tiny) / np.maximum(mu, tiny)) - (counts - mu), mu)
     deviance = 2.0 * np.maximum(term, 0.0)
     deviance_residual = np.sign(counts - mu) * np.sqrt(deviance)
-    active = density > max(float(np.max(density)) * 1e-8, tiny)
+    active = mass > max(float(np.max(mass)) * 1e-8, tiny)
     free_indices = np.flatnonzero(active)
     parameter_indices = np.concatenate([free_indices, [n]])
-    fisher_design = np.column_stack([amplitude * operator[:, free_indices], operator @ density])
-    fisher = fisher_design.T @ (fisher_design / mu[:, None])
+    fisher_design = np.column_stack([amplitude * mass_operator[:, free_indices], mass_operator @ mass])
+    fisher = fisher_design.T @ (fisher_design / np.maximum(mu, tiny)[:, None])
+    density_penalty_jacobian = penalty[:, free_indices] / weights[free_indices][None, :]
     fisher[:free_indices.size, :free_indices.size] += (
-        lam * penalty[:, free_indices].T @ penalty[:, free_indices]
+        lam * density_penalty_jacobian.T @ density_penalty_jacobian
     )
-    # Project out the exact normalization direction before inversion.
-    equality = np.concatenate([weights[free_indices], [0.0]])[None, :]
+    # Project out the exact simplex-normalization direction before inversion.
+    equality = np.concatenate([np.ones(free_indices.size), [0.0]])[None, :]
     tangent = null_space(equality)
     reduced = tangent.T @ fisher @ tangent
     covariance_full = None
@@ -170,7 +181,11 @@ def reconstruct_thomson_evdf_poisson(
     try:
         if reduced.size and np.linalg.matrix_rank(reduced) == reduced.shape[0]:
             covariance_reduced = np.linalg.inv(reduced)
-            covariance_active = tangent @ covariance_reduced @ tangent.T
+            covariance_active_mass = tangent @ covariance_reduced @ tangent.T
+            # Transform covariance from dimensionless masses p_j to density
+            # coefficients f_j=p_j/w_j, retaining the amplitude cross terms.
+            transform = np.diag(np.concatenate([1.0 / weights[free_indices], [1.0]]))
+            covariance_active = transform @ covariance_active_mass @ transform.T
             covariance_full = np.zeros((n + 1, n + 1))
             covariance_full[np.ix_(parameter_indices, parameter_indices)] = covariance_active
             covariance_status = "expected_poisson_fisher_inverse_projected_to_normalization_tangent"
