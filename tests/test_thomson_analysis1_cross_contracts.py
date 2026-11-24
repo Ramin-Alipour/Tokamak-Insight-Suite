@@ -147,12 +147,24 @@ def test_analysis_1_declares_channelwise_background_basis_and_mj_joint_gls():
 def test_thomson_family_maps_all_registered_distinct_executable_subanalyses():
     import json
     from pathlib import Path
-    from tokamak_analysis.analysis_registry import get_analysis_family
+    from tis.products.catalog import THOMSON_ENTRY_POINTS, get_product
+    from tis.products.api import resolve_product_analysis
 
-    family = get_analysis_family(1)
-    assert family["entry_ids"] == [1, 30, 46, 81, 82, 83, 84, 85]
-    assert len({(get_analysis(i)["module"], get_analysis(i)["function"])
-                for i in family["entry_ids"]}) == 8
+    # The product-native catalog is the execution source of truth. The
+    # historical tokamak_analysis registry remains a compatibility layer and
+    # must not be used to assert product-owned module paths.
+    product = get_product("thomson-scattering")
+    expected_ids = [1, 30, 46, 81, 82, 83, 84, 85, 86, 87, 88]
+    assert product["entry_ids"] == expected_ids
+    assert sorted(THOMSON_ENTRY_POINTS) == expected_ids
+    assert len(set(THOMSON_ENTRY_POINTS.values())) == len(expected_ids)
+
+    for analysis_id in expected_ids:
+        solver = resolve_product_analysis("thomson-scattering", analysis_id)
+        assert callable(solver)
+        module_name, function_name = THOMSON_ENTRY_POINTS[analysis_id]
+        assert solver.__module__.endswith(".physics." + module_name)
+        assert solver.__name__ == function_name
 
     diagnostic_registry = json.loads(
         (Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(
@@ -160,13 +172,6 @@ def test_thomson_family_maps_all_registered_distinct_executable_subanalyses():
         )
     )
     names = {item["diagnostic"] for item in diagnostic_registry}
-    app_source = (Path(__file__).resolve().parents[1] / "app.py").read_text(
-        encoding="utf-8"
-    )
-    assert "analyze_cts_spectrum_model" in app_source
-    assert "cts_model=st.selectbox" in app_source
-    assert "spectral_distribution" in app_source
-    assert "observed_sigma_nm" in app_source
     assert {
         "Thomson scattering",
         "Collective Thomson / coherent scattering (CTS)",
@@ -175,21 +180,12 @@ def test_thomson_family_maps_all_registered_distinct_executable_subanalyses():
         "General relativistic 3-D optical Thomson EVDF reconstruction",
     } <= names
 
-    by_name = {item["diagnostic"]: item for item in diagnostic_registry}
-    expected_functions = {
-        1: ("Thomson scattering", "tokamak_analysis.thomson_workflow.analyze_thomson_spectra"),
-        30: ("Collective Thomson / coherent scattering (CTS)", "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model"),
-        46: ("Thomson spatial profile reconstruction", "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"),
-        81: ("Thomson spectral distribution", "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"),
-        85: ("General relativistic 3-D optical Thomson EVDF reconstruction", "tokamak_analysis.advanced_inference.reconstruct_relativistic_optical_thomson_3d_evdf"),
-    }
-    for analysis_id, (diagnostic_name, function_path) in expected_functions.items():
-        assert function_path in by_name[diagnostic_name]["implementation_functions"]
-        assert callable(resolve_analysis(analysis_id))
-    assert "tokamak_analysis.cts_kappa.kappa_electron_susceptibility" in by_name[
-        "Collective Thomson / coherent scattering (CTS)"
-    ]["implementation_functions"]
-
+    app_source = (Path(__file__).resolve().parents[1] / "app.py").read_text(
+        encoding="utf-8"
+    )
+    assert "from tis.products.thomson.api import" in app_source
+    assert "resolve_product_analysis" in app_source
+    assert "analyze_cts_spectrum_model" in app_source
 
 def test_cts_public_dispatcher_signature_and_conditional_outputs_match_registry():
     import inspect
