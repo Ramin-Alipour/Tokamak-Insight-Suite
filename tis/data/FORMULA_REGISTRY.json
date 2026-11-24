@@ -6657,6 +6657,46 @@
           "unit": "dimensionless; conservative non-relativistic projected thermal-speed validity threshold",
           "required": false,
           "default": 0.1
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "full channel-major additive positive-semidefinite covariance",
+          "required": false
+        },
+        {
+          "name": "initial_temperature_parallel_eV",
+          "unit": "eV; optimizer seed",
+          "required": false
+        },
+        {
+          "name": "initial_temperature_perpendicular_eV",
+          "unit": "eV; optimizer seed",
+          "required": false
+        },
+        {
+          "name": "temperature_bounds_eV",
+          "unit": "eV; positive ordered bounds",
+          "required": false
+        },
+        {
+          "name": "flow_bounds_m_s",
+          "unit": "m s⁻¹; ordered subluminal bounds",
+          "required": false
+        },
+        {
+          "name": "maximum_projected_superluminal_tail_probability",
+          "unit": "dimensionless; projected-tail validity tolerance",
+          "required": false
+        },
+        {
+          "name": "minimum_spectral_window_coverage",
+          "unit": "dimensionless; minimum captured probability required for reporting",
+          "required": false
+        },
+        {
+          "name": "max_nfev",
+          "unit": "positive integer; optimizer evaluation limit",
+          "required": false
         }
       ],
       "output_specs": [
@@ -6699,15 +6739,140 @@
         {
           "name": "spectral_bin_integration",
           "unit": "exact Gaussian CDF integration over finite wavelength bins"
+        },
+        {
+          "name": "model",
+          "unit": "text; forward-model identifier"
+        },
+        {
+          "name": "model_validity",
+          "unit": "structured approximation and validity declaration"
+        },
+        {
+          "name": "anisotropy_identifiability",
+          "unit": "identified or non-identifiable"
+        },
+        {
+          "name": "geometry_design_rank",
+          "unit": "integer; rank of squared-pitch-angle design"
+        },
+        {
+          "name": "magnetic_pitch_cosine",
+          "unit": "dimensionless; b̂·q̂ per view"
+        },
+        {
+          "name": "magnetic_pitch_cosine_squared",
+          "unit": "dimensionless; squared pitch cosine per view"
+        },
+        {
+          "name": "temperature_anisotropy_ratio_parallel_over_perpendicular",
+          "unit": "dimensionless; optional"
+        },
+        {
+          "name": "thermal_velocity_covariance_tensor_per_view_m2_s2",
+          "unit": "m² s⁻²; per-view 3×3 covariance tensors"
+        },
+        {
+          "name": "thermal_velocity_covariance_definition",
+          "unit": "text; tensor closure definition"
+        },
+        {
+          "name": "projected_velocity_variance_from_tensor_m2_s2",
+          "unit": "m² s⁻²; tensor-projected variance"
+        },
+        {
+          "name": "projected_velocity_variance_expected_m2_s2",
+          "unit": "m² s⁻²; fitted directional variance"
+        },
+        {
+          "name": "projected_velocity_variance_relative_residual",
+          "unit": "dimensionless; tensor consistency residual"
+        },
+        {
+          "name": "minimum_spectral_window_coverage_required",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "spectral_window_coverage_identifiable",
+          "unit": "boolean"
+        },
+        {
+          "name": "spectral_window_coverage_warning",
+          "unit": "text; optional truncation warning"
+        },
+        {
+          "name": "relativistic_tail_diagnostic",
+          "unit": "structured projected-tail validity diagnostic"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean"
+        },
+        {
+          "name": "parameter_reporting_status",
+          "unit": "text; identified, withheld or outside model domain"
+        },
+        {
+          "name": "non_identifiability_reason",
+          "unit": "text; optional reporting reason"
+        },
+        {
+          "name": "parameter_order",
+          "unit": "ordered parameter-name list"
+        },
+        {
+          "name": "jacobian_singular_values",
+          "unit": "singular values of whitened spectral Jacobian"
+        },
+        {
+          "name": "optimizer",
+          "unit": "structured optimizer convergence diagnostics"
+        },
+        {
+          "name": "flow_projection_covariance_m2_s2",
+          "unit": "m² s⁻²; optional covariance of q-flow projections"
+        },
+        {
+          "name": "flow_projection_covariance_status",
+          "unit": "text; identifiability status"
+        },
+        {
+          "name": "flow_projection_parameter_names",
+          "unit": "ordered flow parameter names"
+        },
+        {
+          "name": "measurement_covariance",
+          "unit": "m⁻²; supplied full channel-major measurement covariance"
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "calibrated spectral units²; optional full covariance"
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "calibrated spectral units²; optional full covariance"
+        },
+        {
+          "name": "effective_covariance",
+          "unit": "calibrated spectral units²; covariance actually used in GLS"
+        },
+        {
+          "name": "covariance_provenance",
+          "unit": "structured covariance-source and combination record"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text; experimental validation status"
         }
       ],
       "prerequisites": [
         "Measured calibrated spectra and measured response operator",
         "Magnetic-field and scattering-vector geometry for each view",
         "At least two distinct squared magnetic pitch angles to identify both temperatures",
-        "The fitted projected thermal rms beta must remain below maximum_projected_rms_beta; fitted bulk-flow beta must remain below 0.1."
+        "The fitted projected thermal rms beta must remain below maximum_projected_rms_beta; fitted bulk-flow beta must remain below 0.1.",
+        "Each view must capture at least minimum_spectral_window_coverage of its fitted Maxwellian feature; otherwise anisotropy temperatures are withheld rather than inferred from a background-dominated spectral window."
       ],
-      "uncertainty_model": "Full channel-major measurement covariance or pointwise standard uncertainties; optional independent additive model-discrepancy covariance is added once. Geometry covariance is not inferred or propagated by this spectral fitter.",
+      "uncertainty_model": "The whitened joint fit uses the supplied full channel-major measurement covariance or pointwise uncertainties, plus independently supplied model-discrepancy and systematic covariance components exactly once. Parameter covariance is derived from the complete spectral Jacobian; geometry covariance is not inferred by this spectral fitter. Anisotropy temperatures are withheld unless geometry, spectral Jacobian and minimum captured-window probability all identify them.",
       "test_links": [
         "tests/test_thomson_anisotropic_inference.py::test_joint_anisotropic_optical_fit_recovers_parallel_and_perpendicular_temperatures",
         "tests/test_thomson_anisotropic_inference.py::test_single_pitch_angle_does_not_report_separate_anisotropy_temperatures",
