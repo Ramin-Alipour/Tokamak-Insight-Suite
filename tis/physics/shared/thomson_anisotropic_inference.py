@@ -480,8 +480,32 @@ def fit_gyrotropic_bi_maxwellian_thomson(
     for i in range(n_view):
         y = spectra[i]
         span = max(float(np.ptp(y)), np.finfo(float).tiny)
-        baseline = float(np.median(np.r_[y[:edge], y[-edge:]]))
-        p0.extend([0.0, np.log(max(float(np.max(y) - baseline), span * 1e-6)), baseline, 0.0])
+        # Estimate the detector continuum from both spectral edges and use
+        # the positive finite-volume line centroid only as an optimizer start.
+        # The reported flow is still obtained from the full response-aware
+        # physical fit; no centroid-derived value is substituted into results.
+        left_level = float(np.median(y[:edge]))
+        right_level = float(np.median(y[-edge:]))
+        left_coordinate = float(np.mean(wavelength[:edge]))
+        right_coordinate = float(np.mean(wavelength[-edge:]))
+        slope0 = (right_level-left_level) / (right_coordinate-left_coordinate)
+        baseline_left_at_laser = left_level - slope0*(left_coordinate-laser)
+        baseline_right_at_laser = right_level - slope0*(right_coordinate-laser)
+        baseline = 0.5*(baseline_left_at_laser+baseline_right_at_laser)
+        continuum = baseline + slope0*(wavelength-laser)
+        positive_feature = np.maximum(y-continuum, 0.0)
+        centroid_weights = positive_feature*widths
+        total_feature = float(np.sum(centroid_weights))
+        if np.isfinite(total_feature) and total_feature > np.finfo(float).tiny:
+            observed_centroid = float(np.sum(wavelength*centroid_weights)/total_feature)
+            flow_initial = (_C/qmag_factor)*(1.0-observed_centroid/laser)
+        else:
+            flow_initial = 0.0
+        # Keep the start strictly inside scipy's open bound transform.
+        flow_margin = max(1e-9, 1e-9*(flow_hi-flow_lo))
+        flow_initial = float(np.clip(flow_initial, flow_lo+flow_margin, flow_hi-flow_margin))
+        peak_initial = max(float(np.max(positive_feature)), span*1e-6)
+        p0.extend([flow_initial, np.log(peak_initial), baseline, slope0])
         lower.extend([flow_lo, -50.0, -np.inf, -np.inf])
         upper.extend([flow_hi, 50.0, np.inf, np.inf])
     p0 = np.asarray(p0, dtype=float)
