@@ -2638,3 +2638,23 @@ def test_cts_ion_flow_fit_requires_one_uncertainty_representation():
             instrument_response=np.eye(12),
             ion_velocity_initial_m_s={"D+": 0.0},
         )
+
+
+def test_product_cts_api_exposes_species_flow_solver(monkeypatch):
+    import tis.products.thomson.physics.cts_analysis as solver_module
+    from tis.products.thomson.api import fit_cts_ion_species_flows as api_solver
+
+    sentinel = {"solver": "product_owned_cts_species_flow"}
+    captured = {}
+
+    def fake_solver(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return sentinel
+
+    monkeypatch.setattr(solver_module, "fit_cts_ion_species_flows", fake_solver)
+    covariance = np.eye(12)
+    result = api_solver("frequency", "spectrum", spectral_covariance=covariance)
+    assert result is sentinel
+    assert captured["args"] == ("frequency", "spectrum")
+    assert captured["kwargs"]["spectral_covariance"] is covariance

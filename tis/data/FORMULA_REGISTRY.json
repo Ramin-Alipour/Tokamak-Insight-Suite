@@ -7106,8 +7106,8 @@
   {
     "name": "Species-resolved ion Doppler response in electrostatic CTS",
     "equation": "ζ_j=(ω−k u_{j,∥})/(k v_{t,j}); χ_j=(k² λ_{D,j}²)⁻¹[1+ζ_j Z(ζ_j)]; S(k,ω)=(2π/k){|1−χ_e/ε|²f_e+Σ_j(Z_j²n_j/n_e)|χ_j/ε|²f_j}",
-    "inputs": "Calibrated CTS spectrum, frequency-shift axis, probe frequency, scattering geometry, fixed electron density/temperature, per-species ion temperature/composition, electron projected flow, measured response matrix and spectral uncertainty.",
-    "output": "Conditional per-ion-species projected flow u_{j,∥} [m/s], covariance and identifiability diagnostics.",
+    "inputs": "Calibrated CTS spectrum, frequency-shift axis, probe frequency, scattering geometry, fixed electron density/temperature, per-species ion temperature/composition, electron projected flow, measured response matrix and exactly one of independent per-bin uncertainty or full cross-frequency spectral covariance.",
+    "output": "Conditional per-ion-species projected flow u_{j,∥} [m/s], covariance and identifiability diagnostics; full cross-frequency covariance GLS is supported.",
     "assumptions": "Unmagnetized electrostatic longitudinal CTS; Maxwellian bulk species; each ion species has a constant projected flow over the scattering volume; density, temperatures, composition and geometry are fixed external inputs.",
     "status": "D",
     "category": "Microwave collective Thomson scattering",
@@ -7168,8 +7168,8 @@
         {
           "name": "signal_uncertainty",
           "unit": "calibrated spectral units",
-          "description": "Positive per-bin Gaussian standard uncertainty.",
-          "required": true
+          "description": "Optional positive per-bin Gaussian standard uncertainty; supply exactly one of this vector or spectral_covariance.",
+          "required": false
         },
         {
           "name": "instrument_response",
@@ -7195,6 +7195,12 @@
         {
           "name": "ion_velocity_bounds_m_s",
           "unit": "m s⁻¹; ordered subluminal [lower, upper] fit bounds",
+          "required": false
+        },
+        {
+          "name": "spectral_covariance",
+          "unit": "calibrated spectral units squared",
+          "description": "Optional full positive-definite cross-frequency covariance in ascending frequency_shift_Hz order; mutually exclusive with signal_uncertainty.",
           "required": false
         }
       ],
@@ -7298,6 +7304,21 @@
         {
           "name": "assumptions",
           "unit": "list of model assumptions"
+        },
+        {
+          "name": "spectral_covariance_used",
+          "unit": "boolean",
+          "description": "Whether the supplied full cross-frequency spectral covariance was used in the GLS objective."
+        },
+        {
+          "name": "spectral_covariance_order",
+          "unit": "text; ascending frequency-shift order",
+          "description": "Ordering of covariance rows and columns, matching the supplied frequency_shift_Hz vector."
+        },
+        {
+          "name": "spectral_covariance_assumption",
+          "unit": "text; declared Gaussian noise model",
+          "description": "Whether the likelihood used full correlated spectral covariance or independent per-bin uncertainties."
         }
       ],
       "prerequisites": [
@@ -7305,7 +7326,7 @@
         "Calibrated instrument response and positive per-bin spectral uncertainties.",
         "Sufficient spectral information to distinguish each species Doppler shift."
       ],
-      "uncertainty_model": "Independent Gaussian per-bin spectral errors supplied explicitly; covariance is computed from the complete weighted Jacobian only when all species-flow, scale and offset parameters are identifiable. Estimates at user-supplied flow bounds are withheld from reportable outputs.",
+      "uncertainty_model": "Exactly one Gaussian measurement-error representation is supplied: independent positive per-bin standard uncertainties or a full symmetric positive-definite cross-frequency covariance. The covariance is computed from the full GLS-whitened Jacobian only when all species-flow, scale and offset parameters are identifiable; estimates at user-supplied flow bounds are withheld.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_multi_ion_flow_inference_recovers_species_resolved_projections",
         "tests/test_cts_analysis.py::test_cts_differential_multi_ion_flow_changes_physical_spectrum",
