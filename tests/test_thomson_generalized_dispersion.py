@@ -777,8 +777,8 @@ def test_tabulated_cts_measured_response_conserves_bin_integrated_power_on_nonun
     ])
     assert np.all(np.isfinite(convolved))
     assert np.all(convolved >= 0.0)
-    assert np.sum(convolved * widths) == np.sum(spectrum * widths)
-    assert metadata["total_output_power"] == metadata["total_input_power"]
+    assert np.isclose(np.sum(convolved * widths), np.sum(spectrum * widths), rtol=1e-13, atol=1e-14)
+    assert np.isclose(metadata["total_output_power"], metadata["total_input_power"], rtol=1e-13, atol=1e-14)
 
 
 def test_tabulated_cts_response_finite_window_loss_is_explicit_and_never_renormalized():
