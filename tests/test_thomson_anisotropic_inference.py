@@ -152,7 +152,10 @@ def test_nonuniform_response_operator_conserves_bin_integrated_spectral_power():
 def _synthetic_bi_kappa_spectra():
     c, e, me = 299792458.0, 1.602176634e-19, 9.1093837015e-31
     coordinate = np.linspace(-1.0, 1.0, 281)
-    wavelength = 500.0 + 0.35 * (coordinate + 0.08 * coordinate**3)
+    # Capture the Kappa wings as well as its core; the former sub-nanometre
+    # window contained too little of the broad 900 eV feature for a physical
+    # temperature/kappa inference independent of the fitted background.
+    wavelength = 500.0 + 150.0 * (coordinate + 0.08 * coordinate**3)
     laser, angle, kappa = 500.0, np.pi/2, 4.2
     qmag = 2.0*np.sin(angle/2.0)
     b = np.array([0.0, 0.0, 1.0])

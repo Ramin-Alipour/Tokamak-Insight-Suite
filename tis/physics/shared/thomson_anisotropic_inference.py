@@ -692,6 +692,7 @@ def fit_gyrotropic_bi_kappa_thomson(
     flow_bounds_m_s=(-0.05 * _C, 0.05 * _C),
     maximum_projected_rms_beta=0.1,
     maximum_projected_superluminal_tail_probability=1.0e-8,
+    minimum_spectral_window_coverage=0.95,
     max_nfev=6000,
 ):
     r"""Fit a gyrotropic anisotropic 3-D Kappa distribution to multi-view spectra.
@@ -860,6 +861,9 @@ def fit_gyrotropic_bi_kappa_thomson(
     beta_limit = float(maximum_projected_rms_beta)
     if not np.isfinite(beta_limit) or not 0.0 < beta_limit < 1.0:
         raise ValueError("maximum_projected_rms_beta must lie strictly between zero and one")
+    minimum_coverage = float(minimum_spectral_window_coverage)
+    if not np.isfinite(minimum_coverage) or not 0.0 < minimum_coverage <= 1.0:
+        raise ValueError("minimum_spectral_window_coverage must lie in (0, 1]")
     projected_tail_tolerance = float(maximum_projected_superluminal_tail_probability)
     if not np.isfinite(projected_tail_tolerance) or not 0.0 < projected_tail_tolerance < 1.0:
         raise ValueError("maximum_projected_superluminal_tail_probability must lie strictly between zero and one")
@@ -950,8 +954,13 @@ def fit_gyrotropic_bi_kappa_thomson(
             systematic is not None,
         )
     )
+    spectral_window_coverage_identifiable = bool(
+        np.all(captured_probability >= minimum_coverage)
+    )
+    spectral_parameters_identifiable = full_rank and spectral_window_coverage_identifiable
     parameter_covariance = (
-        covariance_all.copy() if (full_rank and geometry_rank == 2) else None
+        covariance_all.copy()
+        if (spectral_parameters_identifiable and geometry_rank == 2) else None
     )
     if parameter_covariance is not None:
         transform = np.eye(fit.x.size)
@@ -959,7 +968,9 @@ def fit_gyrotropic_bi_kappa_thomson(
         transform[1, 1] = np.exp(fit.x[1])
         transform[2, 2] = np.exp(fit.x[2])
         parameter_covariance = transform @ parameter_covariance @ transform.T
-    spectrally_identifiable = geometry_rank == 2 and full_rank
+    spectrally_identifiable = (
+        geometry_rank == 2 and spectral_parameters_identifiable
+    )
     reportable = spectrally_identifiable and not projected_tail_exceeds_tolerance
     thermal_covariance = _gyrotropic_velocity_covariance_tensors(
         float(np.exp(fit.x[0])) if reportable else None,
@@ -992,10 +1003,12 @@ def fit_gyrotropic_bi_kappa_thomson(
         "temperature_anisotropy_ratio_parallel_over_perpendicular": (
             float(np.exp(fit.x[0] - fit.x[1])) if reportable else None
         ),
-        "kappa_index": float(kappa) if full_rank and not projected_tail_exceeds_tolerance else None,
+        "kappa_index": float(kappa) if spectral_parameters_identifiable and not projected_tail_exceeds_tolerance else None,
         "kappa_finite_variance_domain": bool(kappa > 1.5),
         "directional_temperature_eV": directional,
         "captured_spectral_probability": captured_probability,
+        "minimum_spectral_window_coverage_required": minimum_coverage,
+        "spectral_window_coverage_identifiable": spectral_window_coverage_identifiable,
         "spectral_bin_integration": "exact_Student_t_CDF_probability_per_finite_wavelength_bin",
         "projected_velocity_grid_m_s": projected_velocity_grid,
         "projected_velocity_distribution_m_s_inverse": projected_velocity_pdf,
@@ -1026,8 +1039,16 @@ def fit_gyrotropic_bi_kappa_thomson(
         "magnetic_pitch_cosine_squared": mu2,
         "geometry_design_rank": geometry_rank,
         "anisotropy_identifiability": "identified" if spectrally_identifiable else "non_identifiable",
-        "kappa_identifiability": "identified" if full_rank else "non_identifiable",
-        "reportable_as_inferred_parameter": bool(reportable and full_rank),
+        "kappa_identifiability": "identified" if spectral_parameters_identifiable else "non_identifiable",
+        "reportable_as_inferred_parameter": bool(reportable and spectral_parameters_identifiable),
+        "non_identifiability_reason": (
+            None if spectrally_identifiable else
+            "Distinct squared magnetic pitch angles are required to identify both temperatures."
+            if geometry_rank != 2 else
+            f"The measured wavelength window captures less than the required {minimum_coverage:.3g} of at least one fitted Kappa feature."
+            if not spectral_window_coverage_identifiable else
+            "The whitened spectral Jacobian does not identify every fitted parameter."
+        ),
         "parameter_reporting_status": (
             "model_outside_nonrelativistic_validity_domain" if projected_tail_exceeds_tolerance
             else "identified" if reportable else "not_identifiable"
