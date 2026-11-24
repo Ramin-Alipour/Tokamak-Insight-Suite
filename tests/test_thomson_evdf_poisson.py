@@ -169,3 +169,13 @@ def test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance
             regularization_strength=1.0e-4,
             electron_density_uncertainty_m3=1.0e17,
         )
+
+
+def test_dashboard_poisson_example_executes_inside_its_declared_velocity_window():
+    from tis.products.thomson.api import run_advanced_physics
+    from tis.ui.advanced_thomson_physics_page import EXAMPLES
+
+    example = dict(EXAMPLES["thomson_projected_evdf_poisson"])
+    result = run_advanced_physics("thomson_projected_evdf_poisson", **example)
+    assert result["optimizer_success"] is True
+    assert result["projected_evdf_physical_moments"]["directional_equivalent_temperature_eV"] > 0.0
