@@ -2850,6 +2850,21 @@
           "name": "variance_electron_temperature_eV2",
           "unit": "eV^2",
           "description": "First-order propagated variance using the full supplied joint covariance."
+        },
+        {
+          "name": "model_assumption",
+          "unit": "text",
+          "description": "Explicit conditional Maxwellian assumption and excluded broadening mechanisms."
+        },
+        {
+          "name": "input_covariance_order",
+          "unit": "ordered input names",
+          "description": "Order of the optional full covariance matrix: intrinsic width, laser wavelength, scattering angle."
+        },
+        {
+          "name": "uncertainty_model",
+          "unit": "text",
+          "description": "Returned only when uncertainty inputs are supplied; identifies joint-covariance or independent-input propagation."
         }
       ],
       "prerequisites": [
