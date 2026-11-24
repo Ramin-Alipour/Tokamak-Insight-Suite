@@ -724,3 +724,29 @@ def test_tabulated_cts_product_api_refuses_implicit_plasma_inputs():
 
     with pytest.raises(ValueError, match="requires explicit physical inputs"):
         analyze_cts(model="electrostatic_tabulated_evdf", wavelength_nm=np.linspace(1.0, 2.0, 9))
+
+
+def test_exact_frequency_resolved_cts_kinematics_formula_is_registered_and_synchronized():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    public_registry = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads((root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    assert public_registry == packaged_registry
+    matches = [
+        item for item in public_registry
+        if item.get("execution_contract", {}).get("formula_key")
+        == "cts_tabulated_evdf_exact_frequency_geometry"
+    ]
+    assert len(matches) == 1
+    contract = matches[0]["execution_contract"]
+    assert contract["implementation_link_status"] == "mapped"
+    assert contract["function_link"] == (
+        "tokamak_analysis.thomson_generalized_dispersion."
+        "collective_tabulated_electron_spectral_density"
+    )
+    assert "wavenumber_m_inverse" in {
+        item["name"] for item in contract["output_specs"]
+    }
+    assert "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api" in contract["test_links"]
