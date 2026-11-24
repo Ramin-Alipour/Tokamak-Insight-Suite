@@ -276,7 +276,12 @@ def collective_tabulated_electron_spectral_density(
     Maxwellian closure or independent supplied 1-D projected distributions in
     each species rest frame. Tabulated ions use the same Landau/Plemelj
     susceptibility integral and finite-support endpoint-jump convention as
-    electrons. This remains a 1-D electrostatic forward model.
+    electrons. This remains a 1-D electrostatic forward model. The photon
+    frequency shift and |k_s-k_i| are evaluated exactly at every measured
+    wavelength bin. An optional calibrated instrument_response_matrix is
+    applied to finite-volume bin-integrated spectral power; sub-unit response
+    column sums require the explicit finite-window-loss flag. Response
+    calibration uncertainty is not inferred here.
     """
     if not isinstance(include_electron_phase_velocity_derivative, (bool, np.bool_)):
         raise ValueError("include_electron_phase_velocity_derivative must be boolean")
@@ -545,6 +550,7 @@ def collective_tabulated_electron_spectral_density(
             "first-order Landau pole quadrature; no arbitrary-order pole closure",
             "finite velocity support is interpreted with an explicit zero extension; endpoint jumps are included; pole displacement is a numerical model input",
             "tabulated ion populations, when supplied, are independent 1-D rest-frame marginals; no unrestricted 3-D ion EVDF is inferred",
+            "the optional measured response matrix is treated as fixed; its calibration uncertainty and cross-covariance with spectral data are not propagated",
         ],
         "experimental_validation": "not_performed",
     }
