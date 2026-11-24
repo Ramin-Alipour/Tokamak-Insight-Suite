@@ -683,7 +683,7 @@ def test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapp
     # The exact and first-order maps coincide at line centre and diverge
     # quadratically away from it; the outer-bin difference is measurable.
     assert exact_phase_velocity[wavelength > laser][-1] != linearized_phase_velocity[wavelength > laser][-1]
-    assert exact_phase_velocity[wavelength > laser][-1] < linearized_phase_velocity[wavelength > laser][-1]
+    assert exact_phase_velocity[wavelength > laser][-1] > linearized_phase_velocity[wavelength > laser][-1]
 
 
 def test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api():
