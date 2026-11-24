@@ -3220,7 +3220,7 @@
       "limitations": [
         "No atomic-rate or neutral-beam attenuation model and no impurity-density estimate.",
         "No toroidal/poloidal rotation inversion; reported velocity is line-of-sight only.",
-        "No line deblending, opacity correction, non-Maxwellian distribution, or non-Gaussian instrumental response.",
+        "Instrumental width is represented only by the supplied Gaussian sigma; no line deblending, opacity correction, non-Maxwellian distribution, or non-Gaussian instrumental response.",
         "Viewing angle is metadata only and does not perform geometric deprojection.",
         "Covariance-based errors omit calibration and model systematics; independent experimental validation remains required."
       ],
