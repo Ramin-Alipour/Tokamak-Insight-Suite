@@ -10,7 +10,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.electron_plasma_frequency",
+      "function_link": "tis.physics.shared.formula_library.electron_plasma_frequency",
       "formula_key": "electron_plasma_frequency",
       "input_specs": [
         {
@@ -69,7 +69,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.debye_length",
+      "function_link": "tis.physics.shared.formula_library.debye_length",
       "formula_key": "debye_length",
       "input_specs": [
         {
@@ -130,7 +130,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.electron_cyclotron_frequency",
+      "function_link": "tis.physics.shared.formula_library.electron_cyclotron_frequency",
       "formula_key": "electron_cyclotron_frequency",
       "input_specs": [
         {
@@ -189,7 +189,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.ion_sound_speed",
+      "function_link": "tis.physics.shared.formula_library.ion_sound_speed",
       "formula_key": "ion_sound_speed",
       "input_specs": [
         {
@@ -274,7 +274,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.electron_thermal_pressure",
+      "function_link": "tis.physics.shared.formula_library.electron_thermal_pressure",
       "formula_key": "electron_thermal_pressure",
       "input_specs": [
         {
@@ -335,7 +335,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.ion_thermal_pressure",
+      "function_link": "tis.physics.shared.formula_library.ion_thermal_pressure",
       "formula_key": "ion_thermal_pressure",
       "input_specs": [
         {
@@ -396,7 +396,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.total_thermal_pressure",
+      "function_link": "tis.physics.shared.formula_library.total_thermal_pressure",
       "formula_key": "total_thermal_pressure",
       "input_specs": [
         {
@@ -457,7 +457,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thermal_stored_energy",
+      "function_link": "tis.physics.shared.formula_library.thermal_stored_energy",
       "formula_key": "thermal_stored_energy",
       "input_specs": [
         {
@@ -512,7 +512,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.line_integrated_density",
+      "function_link": "tis.physics.shared.formula_library.line_integrated_density",
       "formula_key": "line_integrated_density",
       "input_specs": [
         {
@@ -567,7 +567,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.plasma_frequency_from_density_cm3",
+      "function_link": "tis.physics.shared.formula_library.plasma_frequency_from_density_cm3",
       "formula_key": "plasma_frequency_from_density_cm3",
       "input_specs": [
         {
@@ -616,7 +616,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.doppler_line_of_sight_velocity",
+      "function_link": "tis.physics.shared.formula_library.doppler_line_of_sight_velocity",
       "formula_key": "doppler_line_of_sight_velocity",
       "input_specs": [
         {
@@ -677,7 +677,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.ion_temperature_from_doppler_sigma",
+      "function_link": "tis.physics.shared.formula_library.ion_temperature_from_doppler_sigma",
       "formula_key": "ion_temperature_from_doppler_sigma",
       "input_specs": [
         {
@@ -750,7 +750,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.gaussian_fwhm_from_sigma",
+      "function_link": "tis.physics.shared.formula_library.gaussian_fwhm_from_sigma",
       "formula_key": "gaussian_fwhm_from_sigma",
       "input_specs": [
         {
@@ -809,7 +809,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.magnetic_energy_density",
+      "function_link": "tis.physics.shared.formula_library.magnetic_energy_density",
       "formula_key": "magnetic_energy_density",
       "input_specs": [
         {
@@ -858,7 +858,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.toroidal_beta",
+      "function_link": "tis.physics.shared.formula_library.toroidal_beta",
       "formula_key": "toroidal_beta",
       "input_specs": [
         {
@@ -919,7 +919,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.safety_factor_large_aspect_ratio",
+      "function_link": "tis.physics.shared.formula_library.safety_factor_large_aspect_ratio",
       "formula_key": "safety_factor_large_aspect_ratio",
       "input_specs": [
         {
@@ -1004,7 +1004,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.faraday_induction",
+      "function_link": "tis.physics.shared.formula_library.faraday_induction",
       "formula_key": "faraday_induction",
       "input_specs": [
         {
@@ -1059,7 +1059,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.plasma_loop_resistance_proxy",
+      "function_link": "tis.physics.shared.formula_library.plasma_loop_resistance_proxy",
       "formula_key": "plasma_loop_resistance_proxy",
       "input_specs": [
         {
@@ -1120,7 +1120,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.ohmic_power_approximation",
+      "function_link": "tis.physics.shared.formula_library.ohmic_power_approximation",
       "formula_key": "ohmic_power_approximation",
       "input_specs": [
         {
@@ -1181,7 +1181,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.energy_confinement_time",
+      "function_link": "tis.physics.shared.formula_library.energy_confinement_time",
       "formula_key": "energy_confinement_time",
       "input_specs": [
         {
@@ -1242,7 +1242,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.greenwald_density_reference",
+      "function_link": "tis.physics.shared.formula_library.greenwald_density_reference",
       "formula_key": "greenwald_density_reference",
       "input_specs": [
         {
@@ -1314,7 +1314,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.debye_parameter",
+      "function_link": "tis.physics.shared.formula_library.debye_parameter",
       "formula_key": "debye_parameter",
       "input_specs": [
         {
@@ -1375,7 +1375,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.electron_plasma_angular_frequency",
+      "function_link": "tis.physics.shared.formula_library.electron_plasma_angular_frequency",
       "formula_key": "electron_plasma_angular_frequency",
       "input_specs": [
         {
@@ -1424,7 +1424,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.ion_saturation_particle_flux_proxy",
+      "function_link": "tis.physics.shared.formula_library.ion_saturation_particle_flux_proxy",
       "formula_key": "ion_saturation_particle_flux_proxy",
       "input_specs": [
         {
@@ -1485,7 +1485,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.radiated_power_fraction",
+      "function_link": "tis.physics.shared.formula_library.radiated_power_fraction",
       "formula_key": "radiated_power_fraction",
       "input_specs": [
         {
@@ -1551,7 +1551,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.integrated_surface_power",
+      "function_link": "tis.physics.shared.formula_library.integrated_surface_power",
       "formula_key": "integrated_surface_power",
       "input_specs": [
         {
@@ -1612,7 +1612,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.apparent_feature_speed",
+      "function_link": "tis.physics.shared.formula_library.apparent_feature_speed",
       "formula_key": "apparent_feature_speed",
       "input_specs": [
         {
@@ -1673,7 +1673,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.gas_pumping_speed",
+      "function_link": "tis.physics.shared.formula_library.gas_pumping_speed",
       "formula_key": "gas_pumping_speed",
       "input_specs": [
         {
@@ -1734,7 +1734,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.injected_particle_number",
+      "function_link": "tis.physics.shared.formula_library.injected_particle_number",
       "formula_key": "injected_particle_number",
       "input_specs": [
         {
@@ -1789,7 +1789,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.particle_confinement_time_proxy",
+      "function_link": "tis.physics.shared.formula_library.particle_confinement_time_proxy",
       "formula_key": "particle_confinement_time_proxy",
       "input_specs": [
         {
@@ -1850,7 +1850,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.relative_fluctuation_level",
+      "function_link": "tis.physics.shared.formula_library.relative_fluctuation_level",
       "formula_key": "relative_fluctuation_level",
       "input_specs": [
         {
@@ -1898,7 +1898,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.rms_signal",
+      "function_link": "tis.physics.shared.formula_library.rms_signal",
       "formula_key": "rms_signal",
       "input_specs": [
         {
@@ -1947,7 +1947,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.nyquist_frequency",
+      "function_link": "tis.physics.shared.formula_library.nyquist_frequency",
       "formula_key": "nyquist_frequency",
       "input_specs": [
         {
@@ -1996,7 +1996,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.cross_correlation_lag",
+      "function_link": "tis.physics.shared.formula_library.cross_correlation_lag",
       "formula_key": "cross_correlation_lag",
       "input_specs": [
         {
@@ -2051,7 +2051,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.magnitude_squared_coherence",
+      "function_link": "tis.physics.shared.formula_library.magnitude_squared_coherence",
       "formula_key": "magnitude_squared_coherence",
       "input_specs": [
         {
@@ -2122,7 +2122,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.bolometry_regularized_inverse",
+      "function_link": "tis.physics.shared.formula_library.bolometry_regularized_inverse",
       "formula_key": "bolometry_regularized_inverse",
       "input_specs": [
         {
@@ -2213,7 +2213,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.particle_balance_rate",
+      "function_link": "tis.physics.shared.formula_library.particle_balance_rate",
       "formula_key": "particle_balance_rate",
       "input_specs": [
         {
@@ -2298,7 +2298,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.langmuir_electron_temperature_from_slope",
+      "function_link": "tis.physics.shared.formula_library.langmuir_electron_temperature_from_slope",
       "formula_key": "langmuir_electron_temperature_from_slope",
       "input_specs": [
         {
@@ -2350,7 +2350,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.langmuir_ion_density_from_saturation_current",
+      "function_link": "tis.physics.shared.formula_library.langmuir_ion_density_from_saturation_current",
       "formula_key": "langmuir_ion_density_from_saturation_current",
       "input_specs": [
         {
@@ -2462,7 +2462,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.langmuir_electron_density_from_saturation_current",
+      "function_link": "tis.physics.shared.formula_library.langmuir_electron_density_from_saturation_current",
       "formula_key": "langmuir_electron_density_from_saturation_current",
       "input_specs": [
         {
@@ -2534,7 +2534,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.langmuir_bohm_particle_flux",
+      "function_link": "tis.physics.shared.formula_library.langmuir_bohm_particle_flux",
       "formula_key": "langmuir_bohm_particle_flux",
       "input_specs": [
         {
@@ -2635,7 +2635,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.langmuir_multispecies_ion_density",
+      "function_link": "tis.physics.shared.formula_library.langmuir_multispecies_ion_density",
       "formula_key": "langmuir_multispecies_ion_density",
       "input_specs": [
         {
@@ -2772,7 +2772,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thomson_electron_temperature_from_spectral_width",
+      "function_link": "tis.physics.shared.formula_library.thomson_electron_temperature_from_spectral_width",
       "formula_key": "thomson_electron_temperature_from_spectral_width",
       "input_specs": [
         {
@@ -2896,7 +2896,7 @@
     "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_electron_temperature_from_spectral_width",
+      "function_link": "tis.physics.shared.formula_library.thomson_electron_temperature_from_spectral_width",
       "function_links": [],
       "formula_key": "thomson_electron_temperature_from_spectral_width",
       "implementation_link_status": "mapped",
@@ -2916,7 +2916,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection",
+      "function_link": "tis.physics.shared.formula_library.thomson_velocity_projection",
       "formula_key": "thomson_velocity_projection",
       "input_specs": [
         {
@@ -3018,7 +3018,7 @@
     "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection",
+      "function_link": "tis.physics.shared.formula_library.thomson_velocity_projection",
       "function_links": [],
       "formula_key": "thomson_velocity_projection",
       "implementation_link_status": "mapped",
@@ -3038,7 +3038,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection_relativistic_exact",
+      "function_link": "tis.physics.shared.formula_library.thomson_velocity_projection_relativistic_exact",
       "formula_key": "thomson_velocity_projection_relativistic_exact",
       "input_specs": [
         {
@@ -3159,7 +3159,7 @@
     "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection_relativistic_exact",
+      "function_link": "tis.physics.shared.formula_library.thomson_velocity_projection_relativistic_exact",
       "function_links": [],
       "formula_key": "thomson_velocity_projection_relativistic_exact",
       "implementation_link_status": "mapped",
@@ -3181,7 +3181,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thomson_density_from_scattered_power",
+      "function_link": "tis.physics.shared.formula_library.thomson_density_from_scattered_power",
       "formula_key": "thomson_density_from_scattered_power",
       "input_specs": [
         {
@@ -3367,7 +3367,7 @@
     "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_density_from_scattered_power",
+      "function_link": "tis.physics.shared.formula_library.thomson_density_from_scattered_power",
       "function_links": [],
       "formula_key": "thomson_density_from_scattered_power",
       "implementation_link_status": "mapped",
@@ -4705,7 +4705,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.relativistic_mj_effective_differential_cross_section",
+      "function_link": "tis.physics.shared.formula_library.relativistic_mj_effective_differential_cross_section",
       "formula_key": "relativistic_mj_effective_differential_cross_section",
       "input_specs": [
         {
@@ -4808,7 +4808,7 @@
     "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
     "analysis_family": "Analysis 1 — Thomson scattering",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.relativistic_mj_effective_differential_cross_section",
+      "function_link": "tis.physics.shared.formula_library.relativistic_mj_effective_differential_cross_section",
       "function_links": [],
       "formula_key": "relativistic_mj_effective_differential_cross_section",
       "implementation_link_status": "mapped",
@@ -10990,7 +10990,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thomson_nonrelativistic_doppler_wavelength",
+      "function_link": "tis.physics.shared.formula_library.thomson_nonrelativistic_doppler_wavelength",
       "formula_key": "thomson_nonrelativistic_doppler_wavelength",
       "input_specs": [
         {
@@ -11034,9 +11034,9 @@
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Physical multi-view 3-D EVDF inversion",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_nonrelativistic_doppler_wavelength",
+      "function_link": "tis.physics.shared.formula_library.thomson_nonrelativistic_doppler_wavelength",
       "function_links": [
-        "tokamak_analysis.formula_library.thomson_nonrelativistic_doppler_wavelength",
+        "tis.physics.shared.formula_library.thomson_nonrelativistic_doppler_wavelength",
         "tokamak_analysis.advanced_inference.reconstruct_optical_thomson_3d_evdf"
       ],
       "formula_key": "thomson_nonrelativistic_doppler_wavelength",
@@ -11058,7 +11058,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.thomson_unpolarized_differential_cross_section",
+      "function_link": "tis.physics.shared.formula_library.thomson_unpolarized_differential_cross_section",
       "formula_key": "thomson_unpolarized_differential_cross_section",
       "input_specs": [
         {
@@ -11092,9 +11092,9 @@
     "analysis_family": "Analysis 1 — Thomson scattering",
     "subanalysis": "Physical multi-view 3-D EVDF inversion",
     "implementation_trace": {
-      "function_link": "tokamak_analysis.formula_library.thomson_unpolarized_differential_cross_section",
+      "function_link": "tis.physics.shared.formula_library.thomson_unpolarized_differential_cross_section",
       "function_links": [
-        "tokamak_analysis.formula_library.thomson_unpolarized_differential_cross_section",
+        "tis.physics.shared.formula_library.thomson_unpolarized_differential_cross_section",
         "tokamak_analysis.advanced_inference.reconstruct_optical_thomson_3d_evdf"
       ],
       "formula_key": "thomson_unpolarized_differential_cross_section",
