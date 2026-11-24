@@ -13308,5 +13308,150 @@
         "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_piecewise_linear_sixth_order_moments_match_maxwellian_closure"
       ]
     }
+  },
+  {
+    "name": "Exact frequency-resolved kinematics for tabulated-EVDF electrostatic CTS",
+    "equation": "k(λ)=2π√(λ₀⁻²+λ⁻²−2cosθ/(λ₀λ)); Δω(λ)=2πc(λ⁻¹−λ₀⁻¹); vφ(λ)=Δω(λ)/k(λ); χ_s(λ)=−(ω_ps²/k(λ)²)∫f′_s(v)/(v−vφ(λ)−u_s−i0⁺)dv; ε=1+Σ_sχ_s; S(k,ω)=(2π/k)[|1+Σ_iχ_i|²|ε|⁻²f_e+Σ_i Z_iα_i|χ_e|²|ε|⁻²f_i]; P_λ=S|dω/dλ_nm|, |dω/dλ_nm|=2πc·10⁹/λ_nm²",
+    "inputs": "Measured wavelength bins [nm], laser wavelength [nm], scattering angle [rad], electron density [m⁻³], explicit projected electron EVDF and ion composition/flows; optional per-species projected ion EVDFs and Landau-pole displacement.",
+    "output": "Frequency-resolved scattering wavenumber [m⁻¹], exact angular-frequency shift [rad s⁻¹], phase velocity [m s⁻¹], electron/ion susceptibilities, dielectric function, dynamic structure factor and spectral density per nm.",
+    "assumptions": "Unmagnetized, collisionless, non-relativistic electrostatic longitudinal response; supplied one-dimensional projected species distributions; fixed scattering angle; finite-support EVDFs use the declared zero-extension endpoint terms. This is a forward model and does not infer EVDFs or plasma parameters.",
+    "status": "D",
+    "category": "Collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "formula_key": "cts_tabulated_evdf_exact_frequency_geometry",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; positive, finite, strictly increasing",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; positive",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; (0, π]",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m⁻³; positive",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_grid_m_s",
+          "unit": "m s⁻¹; projected 1-D grid",
+          "required": true
+        },
+        {
+          "name": "electron_probability_density_s_m",
+          "unit": "s m⁻¹; non-negative projected EVDF",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species mass and charge-state records",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "dimensionless; charge-density fractions summing to one",
+          "required": true
+        },
+        {
+          "name": "incident_direction",
+          "unit": "unit 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "unit 3-vector",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m⁻¹; frequency-resolved |k_s−k_i|"
+        },
+        {
+          "name": "angular_frequency_shift_rad_s",
+          "unit": "rad s⁻¹; exact from measured photon wavelengths"
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s⁻¹; Δω/|k_s−k_i|"
+        },
+        {
+          "name": "electron_susceptibility",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "ion_susceptibility",
+          "unit": "dimensionless complex; one row per ion species"
+        },
+        {
+          "name": "dielectric_function",
+          "unit": "dimensionless complex"
+        },
+        {
+          "name": "dynamic_structure_factor",
+          "unit": "s"
+        },
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "model spectral density per nm"
+        }
+      ],
+      "prerequisites": [
+        "Explicit measured wavelength calibration and laser wavelength",
+        "Explicit beam directions consistent with the supplied scattering angle",
+        "Explicit electron projected EVDF, ion species, charge-density fractions and flows"
+      ],
+      "uncertainty_model": "No inverse parameter covariance is claimed by this forward solver. Supplied EVDF and geometry uncertainties must be propagated by an external joint forward ensemble; detector-response convolution is not performed by this kernel.",
+      "test_links": [
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapping",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api"
+      ],
+      "note": "Both photon-frequency shift and scattering-vector magnitude are evaluated per measured wavelength bin. The former first-order wavelength-shift approximation and fixed incident-frequency scattering wavenumber are not used.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "input_data_level": "calibrated_spectral_coordinates_and_explicit_physical_distribution_inputs",
+      "execution_scope": "physics_based_forward_model",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook",
+        "scope": "Collective Thomson scattering dynamic structure factor and frequency-space spectral conversion."
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "calibrated_spectral_coordinates_and_explicit_physical_distribution_inputs",
+    "execution_scope": "physics_based_forward_model",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density",
+      "function_links": [
+        "tokamak_analysis.thomson_generalized_dispersion.collective_tabulated_electron_spectral_density"
+      ],
+      "formula_key": "cts_tabulated_evdf_exact_frequency_geometry",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapping",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api"
+      ]
+    }
   }
 ]
