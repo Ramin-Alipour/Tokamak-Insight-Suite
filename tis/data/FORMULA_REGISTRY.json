@@ -12068,7 +12068,8 @@
         "tests/test_thomson_distribution.py::test_projected_heat_flux_propagates_density_evdf_cross_covariance",
         "tests/test_thomson_distribution.py::test_projected_heat_flux_rejects_non_psd_density_evdf_cross_covariance",
         "tests/test_thomson_distribution.py::test_projected_evdf_heat_flux_is_exposed_through_product_api"
-      ]
+      ],
+      "uncertainty_model": "First-order delta-method propagation of q_parallel^(1D)=(m_e/2)n_e*mu_3 using Var(q)=(m_e/2)^2[n_e^2 Var(mu_3)+mu_3^2 Var(n_e)+2 n_e mu_3 Cov(n_e,mu_3)]. Var(mu_3) is propagated from the normalized projected-EVDF covariance. The optional density–third-moment cross-covariance is validated against the 2x2 positive-semidefinite bound. If the EVDF covariance is unavailable, the flux estimate may be returned but its standard uncertainty is unavailable. This is conditional on the one-dimensional q-parallel marginal and is not a full 3-D heat-flux uncertainty."
     }
   },
   {
