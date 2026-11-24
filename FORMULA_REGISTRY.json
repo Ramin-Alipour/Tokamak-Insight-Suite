@@ -12029,7 +12029,7 @@
     "name": "General symmetric 3-D electron temperature tensor from Thomson projections",
     "equation": "T_q = q_hat^T T_eV q_hat; T_eV=(m_e/e)⟨δv δv^T⟩; T_q = q_x²T_xx+q_y²T_yy+q_z²T_zz+2q_xq_yT_xy+2q_xq_zT_xz+2q_yq_zT_yz; T_eV ⪰ 0",
     "inputs": "At least six linearly independent unit scattering directions q_hat and their projected second-moment temperatures T_q [eV]; optional full covariance of projected temperatures [eV²]; optional independently measured electron density n_e [m^-3] and its standard uncertainty [m^-3]",
-    "output": "General symmetric 3×3 electron second-moment temperature tensor [eV], principal temperatures/eigenvectors, residual and identifiability diagnostics; density-conditioned electron pressure tensor P_e=n_e e T_e [Pa] and first-order propagated covariance [Pa²] when identifiable",
+    "output": "General symmetric 3×3 electron second-moment temperature tensor [eV], principal temperatures/eigenvectors, residual and identifiability diagnostics; density-conditioned electron pressure tensor P_e=n_e e T_e [Pa] and first-order propagated covariance [Pa²] when identifiable The result also declares fitted projection/residual diagnostics, PSD-constraint status, geometry Jacobian and covariance decomposition, density/pressure covariance provenance, and the explicit inference/reporting gate.",
     "assumptions": "The measured projected temperatures refer to one common spatial volume and time window; the distribution has finite second moments; no gyrotropy or magnetic-axis alignment is imposed. The tensor describes only second moments and does not determine higher EVDF moments.",
     "status": "D",
     "category": "Optical Thomson scattering",
@@ -12117,6 +12117,98 @@
         {
           "name": "electron_pressure_parameter_covariance_Pa2",
           "unit": "Pa²; first-order covariance from temperature GLS and optional independent density uncertainty"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text; empirical validation status"
+        },
+        {
+          "name": "projection_equation",
+          "unit": "text; T_q = q^T T q projection relation"
+        },
+        {
+          "name": "positive_semidefinite_constraint_active",
+          "unit": "boolean; whether the PSD constraint was active"
+        },
+        {
+          "name": "electron_pressure_covariance_status",
+          "unit": "text; covariance scope for derived electron pressure"
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3; supplied density uncertainty or null"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean; rank/conditioning/consistency reporting gate"
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3; supplied density or null"
+        },
+        {
+          "name": "scattering_geometry_parameter_covariance_eV2",
+          "unit": "eV^2; geometry-induced covariance contribution"
+        },
+        {
+          "name": "projected_temperature_residual_eV",
+          "unit": "eV; measured minus predicted q-projection"
+        },
+        {
+          "name": "chi_square",
+          "unit": "dimensionless; covariance-weighted residual statistic"
+        },
+        {
+          "name": "scattering_vector_covariance_input",
+          "unit": "covariance matrix; supplied view-major Cartesian direction covariance"
+        },
+        {
+          "name": "scattering_geometry_parameter_jacobian",
+          "unit": "eV per direction-component; finite-difference geometry sensitivity"
+        },
+        {
+          "name": "physical_scope",
+          "unit": "text; directional tensor-inference scope and limitations"
+        },
+        {
+          "name": "geometry_covariance_equation",
+          "unit": "text; first-order geometry covariance propagation relation"
+        },
+        {
+          "name": "electron_pressure_equation",
+          "unit": "text; P_e = n_e e T_e"
+        },
+        {
+          "name": "consistency_status",
+          "unit": "text; measured-covariance consistency gate"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "integer; number of residual degrees of freedom"
+        },
+        {
+          "name": "parameter_order",
+          "unit": "ordered parameter-name list"
+        },
+        {
+          "name": "geometry_covariance_status",
+          "unit": "text; geometry covariance propagation status"
+        },
+        {
+          "name": "parameter_covariance_status",
+          "unit": "text; temperature-parameter covariance status"
+        },
+        {
+          "name": "parameter_covariance_with_geometry_eV2",
+          "unit": "eV^2; measurement plus geometry parameter covariance"
+        },
+        {
+          "name": "covariance_provenance",
+          "unit": "mapping; measurement and geometry covariance provenance"
+        },
+        {
+          "name": "predicted_projected_temperature_eV",
+          "unit": "eV; fitted q-direction temperature projections"
         }
       ],
       "prerequisites": [
@@ -12143,7 +12235,8 @@
         "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_does_not_infer_pressure_without_density",
         "tests/test_thomson_temperature_tensor.py::test_full_temperature_tensor_rejects_density_uncertainty_without_density",
         "tests/test_thomson_temperature_tensor_api.py::test_pressure_tensor_closure_is_exposed_through_public_analysis1_dispatcher"
-      ]
+      ],
+      "note": "The output contract includes the full tensor estimate, principal values/axes, measured and predicted projections, residual/chi-square diagnostics, PSD constraint status, measurement and geometry covariance terms, derived pressure scope and the explicit reportability gate. A single view does not identify the six independent tensor components."
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": false,
