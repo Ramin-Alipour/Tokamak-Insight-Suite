@@ -1563,8 +1563,9 @@ elif page=='Spectral Analysis':
                             channel_response=instrument_response
                             if np.asarray(channel_response).ndim==3:
                                 channel_response=np.asarray(channel_response)[channel_index]
-                            channel_result=product_api.fit_optical_thomson_poisson_counts(
-                                wavelengths[channel_index],spectra[channel_index],
+                            channel_result=product_api.run_analysis(
+                                1,wavelengths[channel_index],spectra[channel_index],
+                                likelihood='independent_Poisson',
                                 laser_wavelength_nm=laser_nm,
                                 scattering_angle_rad=angle_rad,
                                 instrument_response=channel_response,
@@ -1592,11 +1593,13 @@ elif page=='Spectral Analysis':
                             raise ValueError('The current joint spatial-spectral inverse treats laser geometry and the supplied response operator as fixed; omit their uncertainty inputs rather than having them silently ignored.')
                         for unsupported_key in ('laser_wavelength_uncertainty_nm','scattering_angle_uncertainty_rad','instrument_response_uncertainty'):
                             kwargs.pop(unsupported_key,None)
-                        result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
+                        analysis_id=46
                     elif st.session_state.pop('tis_thomson_profile_reconstruction_requested',False):
-                        result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
+                        analysis_id=46
                     else:
-                        result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
+                        analysis_id=1
+                    product_api=load_product_api('thomson-scattering')
+                    result=product_api.run_analysis(analysis_id,wavelengths,spectra,radii,**kwargs)
                     if path_profile_upload is not None:
                         path_profile=pd.read_csv(path_profile_upload)
                         required_path_columns=[

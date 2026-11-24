@@ -625,3 +625,18 @@ def test_thomson_package_root_reexports_complete_public_api():
     assert package_api.__all__ == implementation_api.__all__
     for name in implementation_api.__all__:
         assert getattr(package_api, name) is getattr(implementation_api, name)
+
+def test_main_optical_thomson_dashboard_uses_the_product_execution_api():
+    """The primary Analysis-1 UI must not bypass the registered product API."""
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    start = source.index("elif mode=='Thomson multi-channel spectral inference':")
+    end = source.index("\nelif page==", start)
+    workflow = source[start:end]
+
+    assert "product_api.run_analysis(1,wavelengths[channel_index],spectra[channel_index]" in workflow
+    assert "result=product_api.run_analysis(analysis_id,wavelengths,spectra,radii,**kwargs)" in workflow
+    assert "reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)" not in workflow
+    assert "analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)" not in workflow
+
