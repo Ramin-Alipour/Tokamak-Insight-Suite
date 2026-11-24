@@ -2658,3 +2658,22 @@ def test_product_cts_api_exposes_species_flow_solver(monkeypatch):
     assert result is sentinel
     assert captured["args"] == ("frequency", "spectrum")
     assert captured["kwargs"]["spectral_covariance"] is covariance
+
+
+def test_cts_ion_flow_fit_rejects_non_positive_definite_spectral_covariance():
+    from tis.products.thomson.physics.cts_analysis import fit_cts_ion_species_flows
+
+    with pytest.raises(ValueError, match="positive definite"):
+        fit_cts_ion_species_flows(
+            np.linspace(-1.0, 1.0, 12), np.ones(12),
+            probe_frequency_Hz=140e9,
+            scattering_geometry={"scattering_angle_rad": 1.0},
+            electron_density_m3=1e19,
+            electron_temperature_eV=100.0,
+            ion_temperature_eV=50.0,
+            ion_species=[{"name": "D+"}], ion_fractions=[1.0],
+            electron_velocity_projection_m_s=0.0,
+            instrument_response=np.eye(12),
+            ion_velocity_initial_m_s={"D+": 0.0},
+            spectral_covariance=np.zeros((12, 12)),
+        )

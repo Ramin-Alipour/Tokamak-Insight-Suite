@@ -1929,7 +1929,12 @@ def fit_cts_ion_species_flows(
         if not np.allclose(supplied_covariance, supplied_covariance.T, rtol=1e-9, atol=1e-12 * covariance_scale):
             raise ValueError("spectral_covariance must be symmetric")
         supplied_covariance = 0.5 * (supplied_covariance + supplied_covariance.T)
-        covariance_factor = np.linalg.cholesky(supplied_covariance)
+        try:
+            covariance_factor = np.linalg.cholesky(supplied_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "spectral_covariance must be positive definite for the Gaussian GLS likelihood"
+            ) from exc
         uncertainty = np.sqrt(np.diag(supplied_covariance))
     else:
         uncertainty = _array(signal_uncertainty, "signal_uncertainty", 1)
