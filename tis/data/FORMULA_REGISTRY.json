@@ -11177,6 +11177,10 @@
                 {
                         "name": "electron_flow_projection_m_s",
                         "unit": "m s^-1"
+                },
+                {
+                        "name": "electron_distribution_normalization",
+                        "unit": "dimensionless"
                 }
         ],
       "prerequisites": [
