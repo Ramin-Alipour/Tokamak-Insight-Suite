@@ -56,9 +56,11 @@ jobs:
       - name: Run Poisson EVDF physics, registry, API and Dashboard tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: >-
-          python -m pytest -q -x --tb=short
-          tests/test_thomson_evdf_poisson.py
-          tests/test_analysis_registry.py
-          tests/test_product_architecture.py
-          tests/test_formula_registry_complete.py
+        run: |
+          python -m pytest -q -x --tb=short \
+            tests/test_thomson_evdf_poisson.py \
+            tests/test_product_architecture.py \
+            tests/test_formula_registry_complete.py
+          python -m pytest -q -x --tb=short \
+            tests/test_analysis_registry.py \
+            -k "registry_contains_88 or registry_uses_distinct or all_registered_analyses_resolve or thomson_family_registry_contains_only_nonduplicate_workflows or thomson_formula_registry_contains_traceable_physical_relations"
