@@ -8326,7 +8326,9 @@
         "Exact first-order Landau limit is not implemented for higher-order poles or at tabulated derivative knots."
       ],
       "test_links": [
-        "tests/test_thomson_generalized_dispersion.py::test_tabulated_evdf_susceptibility_analytic_phase_derivative_matches_finite_difference"
+        "tests/test_thomson_generalized_dispersion.py::test_exact_landau_susceptibility_derivative_matches_phase_velocity_difference",
+        "tests/test_thomson_generalized_dispersion.py::test_tabulated_cts_forward_api_exposes_exact_electron_susceptibility_derivative",
+        "tests/test_thomson_generalized_dispersion.py::test_exact_landau_derivative_rejects_resonance_at_vdf_grid_knot"
       ],
       "note": "The second-order pole integral is the analytic derivative of the first-order susceptibility with respect to phase velocity at fixed positive retarded displacement. Angular-frequency derivative follows by d/domega=(1/k)d/dv_phase. This is a numerical contour derivative for the declared piecewise-linear, finite-support VDF model.",
       "raw_data_to_physics": false,
