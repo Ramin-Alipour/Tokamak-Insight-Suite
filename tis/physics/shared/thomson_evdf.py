@@ -269,6 +269,138 @@ def _piecewise_linear_evdf_moments(velocity, distribution):
     }
 
 
+def _piecewise_linear_evdf_moments_through_sixth(velocity, distribution):
+    """Return exact normalized central moments through sixth order and Jacobian.
+
+    The EVDF is represented by its piecewise-linear interpolant on the supplied
+    velocity grid. Every polynomial moment is integrated interval-by-interval
+    with exact polynomial weights. The Jacobian includes the dependence of the
+    central moments on the inferred mean and the unit-normalization constraint.
+    """
+    grid = np.asarray(velocity, dtype=float)
+    pdf = np.asarray(distribution, dtype=float)
+    if (grid.ndim != 1 or grid.size < 3 or pdf.shape != grid.shape
+            or np.any(~np.isfinite(grid)) or np.any(np.diff(grid) <= 0.0)
+            or np.any(~np.isfinite(pdf)) or np.any(pdf < 0.0)):
+        raise ValueError("EVDF moments require a finite non-negative density on a strictly increasing velocity grid")
+    raw_weights = [_piecewise_linear_polynomial_weights(grid, power) for power in range(7)]
+    normalization = float(raw_weights[0] @ pdf)
+    if not np.isfinite(normalization) or normalization <= 0.0:
+        raise ValueError("EVDF must have positive finite probability integral")
+    raw = np.asarray([float(weight @ pdf) / normalization for weight in raw_weights])
+    mean = float(raw[1])
+    mean_gradient = (raw_weights[1] - raw[1] * raw_weights[0]) / normalization
+    central = {0: 1.0, 1: 0.0}
+    central_weights = {}
+    central_gradients = {}
+    for order in range(2, 7):
+        weights = _piecewise_linear_polynomial_weights(grid, order, mean)
+        value = float(weights @ pdf) / normalization
+        fixed_center_gradient = (weights - value * raw_weights[0]) / normalization
+        gradient = fixed_center_gradient - order * central[order - 1] * mean_gradient
+        central[order] = value
+        central_weights[order] = weights
+        central_gradients[order] = gradient
+    variance = float(central[2])
+    if not np.isfinite(variance) or variance <= 0.0:
+        raise ValueError("EVDF has non-positive or non-finite velocity variance")
+    sigma = float(np.sqrt(variance))
+    third = float(central[3])
+    fourth = float(central[4])
+    fifth = float(central[5])
+    sixth = float(central[6])
+    g2, g3, g4, g5, g6 = (
+        central_gradients[order] for order in range(2, 7)
+    )
+    skewness = third / variance**1.5
+    excess_kurtosis = fourth / variance**2 - 3.0
+    standardized_fifth = fifth / variance**2.5
+    standardized_sixth = sixth / variance**3.0
+    standardized_sixth_cumulant = (
+        standardized_sixth
+        - 15.0 * (fourth / variance**2)
+        - 10.0 * skewness**2
+        + 30.0
+    )
+    skewness_gradient = (
+        g3 / variance**1.5
+        - 1.5 * third * g2 / variance**2.5
+    )
+    excess_kurtosis_gradient = (
+        g4 / variance**2
+        - 2.0 * fourth * g2 / variance**3
+    )
+    standardized_fifth_gradient = (
+        g5 / variance**2.5
+        - 2.5 * fifth * g2 / variance**3.5
+    )
+    standardized_sixth_gradient = (
+        g6 / variance**3
+        - 3.0 * sixth * g2 / variance**4
+    )
+    fourth_standardized_gradient = (
+        g4 / variance**2 - 2.0 * fourth * g2 / variance**3
+    )
+    sixth_cumulant_gradient = (
+        standardized_sixth_gradient
+        - 15.0 * fourth_standardized_gradient
+        - 20.0 * skewness * skewness_gradient
+    )
+    electron_mass = 9.1093837139e-31
+    elementary_charge = 1.602176634e-19
+    moment_order = (
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
+        "central_fifth_velocity_moment_m5_s5",
+        "central_sixth_velocity_moment_m6_s6",
+        "skewness",
+        "excess_kurtosis",
+        "standardized_fifth_velocity_moment",
+        "standardized_sixth_velocity_moment",
+        "standardized_sixth_cumulant",
+    )
+    moment_jacobian = np.vstack((
+        mean_gradient,
+        g2,
+        g2 / (2.0 * sigma),
+        (electron_mass / elementary_charge) * g2,
+        g3,
+        g4,
+        g5,
+        g6,
+        skewness_gradient,
+        excess_kurtosis_gradient,
+        standardized_fifth_gradient,
+        standardized_sixth_gradient,
+        sixth_cumulant_gradient,
+    ))
+    return {
+        "normalization": normalization,
+        "raw_moments": raw,
+        "mean": mean,
+        "variance": variance,
+        "sigma": sigma,
+        "third": third,
+        "fourth": fourth,
+        "fifth": fifth,
+        "sixth": sixth,
+        "skewness": float(skewness),
+        "excess_kurtosis": float(excess_kurtosis),
+        "standardized_fifth": float(standardized_fifth),
+        "standardized_sixth": float(standardized_sixth),
+        "standardized_sixth_cumulant": float(standardized_sixth_cumulant),
+        "moment_order": moment_order,
+        "normalization_weights": raw_weights[0],
+        "raw_moment_weights": raw_weights[1:],
+        "central_moment_weights": central_weights,
+        "moment_jacobian": moment_jacobian,
+    }
+
+
 def _nonuniform_second_derivative_matrix(velocity):
     """Return the three-point second-derivative operator on a monotone grid.
 

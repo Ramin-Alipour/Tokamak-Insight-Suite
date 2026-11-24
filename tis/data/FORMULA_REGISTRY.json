@@ -13252,6 +13252,26 @@
         {
           "name": "full_three_dimensional_heat_flux_identified",
           "unit": "boolean; false for one projected view"
+        },
+        {
+          "name": "central_fifth_velocity_moment_m5_s5",
+          "unit": "m^5 s^-5"
+        },
+        {
+          "name": "central_sixth_velocity_moment_m6_s6",
+          "unit": "m^6 s^-6"
+        },
+        {
+          "name": "standardized_fifth_velocity_moment",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "standardized_sixth_velocity_moment",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "standardized_sixth_cumulant",
+          "unit": "dimensionless"
         }
       ],
       "prerequisites": [
@@ -13265,7 +13285,8 @@
         "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_dispatch",
         "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_propagates_moment_covariance_and_optional_projected_heat_flux",
         "tests/test_thomson_evdf_poisson.py::test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance",
-        "tests/test_thomson_evdf_poisson.py::test_dashboard_poisson_example_executes_inside_its_declared_velocity_window"
+        "tests/test_thomson_evdf_poisson.py::test_dashboard_poisson_example_executes_inside_its_declared_velocity_window",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_evdf_piecewise_linear_sixth_order_moments_match_maxwellian_closure"
       ],
       "algorithm": "Construct the finite-bin Doppler kernel K(lambda_i|v_j), integrate over detector bins and compose the measured response R. Parameterize normalized nodal probability masses p_j=w_j f_q(v_j) by softmax logits so p_j>=0 and sum_j p_j=1 exactly; fit log(A_tot) as the positive count-amplitude nuisance. Minimize the exact independent-Poisson negative log likelihood sum_i[mu_i-y_i ln(mu_i)] plus lambda/2 ||D2 f_q||^2, with mu_i=A_tot*Delta_lambda_i*[R K f_q]_i+b_i. Compute F=J_mu^T diag(1/mu) J_mu and penalized curvature H=F+lambda P; propagate the fixed-active-set frequentist covariance H^-1 F H^-1 projected onto the normalization tangent space. Integrate the recovered piecewise-linear EVDF to obtain physical q-parallel moments through sixth order and propagate their covariance through the normalization-aware moment Jacobian. If an independent density is supplied, calculate only the one-dimensional parallel kinetic-energy-flux contribution q_q^(1D)=(m_e*n_e/2)*mu_3,q.",
       "uncertainty_model": "Conditional frequentist fixed-active-set Poisson sandwich covariance H^-1 F H^-1, with H=F+lambda P and F the expected Poisson information, projected onto the exact normalization tangent space. The full q-parallel physical-moment covariance is propagated through the exact piecewise-linear EVDF moment Jacobian. Conditional on fixed supplied background, measured response, velocity grid and selected regularization; background, response, geometry and regularization-selection uncertainties are not included. Optional density and its cross-covariance with the third moment are propagated only when explicitly supplied.",

@@ -142,7 +142,7 @@ def test_poisson_inverse_propagates_moment_covariance_and_optional_projected_hea
     assert moments["parallel_projected_heat_flux_W_m2"] is None
     if moments["moment_covariance"] is not None:
         covariance = moments["moment_covariance"]
-        assert covariance.shape == (8, 8)
+        assert covariance.shape == (13, 13)
         np.testing.assert_allclose(covariance, covariance.T, rtol=1e-9, atol=1e-30)
         scale = max(np.linalg.norm(covariance, 2), 1e-300)
         assert np.linalg.eigvalsh(covariance).min() >= -1e-8 * scale
@@ -185,3 +185,18 @@ def test_dashboard_poisson_example_executes_inside_its_declared_velocity_window(
     result = run_advanced_physics("thomson_projected_evdf_poisson", **example)
     assert result["optimizer_success"] is True
     assert result["projected_evdf_physical_moments"]["directional_equivalent_temperature_eV"] > 0.0
+
+
+def test_poisson_evdf_piecewise_linear_sixth_order_moments_match_maxwellian_closure():
+    from tis.physics.shared.thomson_evdf import _piecewise_linear_evdf_moments_through_sixth
+
+    velocity = np.linspace(-8.0, 8.0, 1601)
+    distribution = np.exp(-0.5 * velocity**2)
+    moments = _piecewise_linear_evdf_moments_through_sixth(velocity, distribution)
+    assert moments["variance"] == pytest.approx(1.0, rel=2e-5)
+    assert moments["third"] == pytest.approx(0.0, abs=1e-10)
+    assert moments["fourth"] == pytest.approx(3.0, rel=2e-5)
+    assert moments["fifth"] == pytest.approx(0.0, abs=1e-10)
+    assert moments["sixth"] == pytest.approx(15.0, rel=3e-5)
+    assert moments["standardized_sixth_cumulant"] == pytest.approx(0.0, abs=2e-4)
+    assert moments["moment_jacobian"].shape == (13, velocity.size)

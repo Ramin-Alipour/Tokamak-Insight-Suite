@@ -19,7 +19,7 @@ from .thomson_evdf import (
     _projected_evdf_forward_matrix,
     _nonuniform_second_derivative_matrix,
     _velocity_quadrature_weights,
-    _piecewise_linear_evdf_moments,
+    _piecewise_linear_evdf_moments_through_sixth,
     _C,
 )
 
@@ -226,17 +226,8 @@ def reconstruct_thomson_evdf_poisson(
 
     # Exact physical moments of the reconstructed piecewise-linear EVDF.
     # These are derived from f_q itself, not from a Gaussian spectral width.
-    moment_fit = _piecewise_linear_evdf_moments(velocity, density)
-    moment_order = (
-        "mean_velocity_parallel_m_s",
-        "velocity_parallel_variance_m2_s2",
-        "velocity_parallel_standard_deviation_m_s",
-        "directional_equivalent_temperature_eV",
-        "central_third_velocity_moment_m3_s3",
-        "central_fourth_velocity_moment_m4_s4",
-        "skewness",
-        "excess_kurtosis",
-    )
+    moment_fit = _piecewise_linear_evdf_moments_through_sixth(velocity, density)
+    moment_order = moment_fit["moment_order"]
     moment_values = np.asarray([
         moment_fit["mean"], moment_fit["variance"], moment_fit["sigma"],
         9.1093837139e-31 * moment_fit["variance"] / 1.602176634e-19,
@@ -327,8 +318,13 @@ def reconstruct_thomson_evdf_poisson(
         "directional_equivalent_temperature_eV": float(moment_values[3]),
         "central_third_velocity_moment_m3_s3": float(moment_fit["third"]),
         "central_fourth_velocity_moment_m4_s4": float(moment_fit["fourth"]),
+        "central_fifth_velocity_moment_m5_s5": float(moment_fit["fifth"]),
+        "central_sixth_velocity_moment_m6_s6": float(moment_fit["sixth"]),
         "skewness": float(moment_fit["skewness"]),
         "excess_kurtosis": float(moment_fit["excess_kurtosis"]),
+        "standardized_fifth_velocity_moment": float(moment_fit["standardized_fifth"]),
+        "standardized_sixth_velocity_moment": float(moment_fit["standardized_sixth"]),
+        "standardized_sixth_cumulant": float(moment_fit["standardized_sixth_cumulant"]),
         "moment_covariance_order": moment_order,
         "moment_covariance": moment_covariance,
         "moment_standard_uncertainty": moment_standard_uncertainty,
@@ -337,7 +333,7 @@ def reconstruct_thomson_evdf_poisson(
         "electron_density_input_m3": density_value,
         "heat_flux_equation": "q_parallel^(1D) = (m_e*n_e/2) * <(v_q-u_q)^3>_f",
         "directional_temperature_equation": "T_eq,q[eV] = (m_e/e) * Var_f(v_q)",
-        "moment_quadrature": "exact_intervalwise_three_point_Gauss_Legendre_for_piecewise_linear_EVDF_through_fourth_order",
+        "moment_quadrature": "exact_intervalwise_polynomial_integration_for_piecewise_linear_EVDF_through_sixth_order",
         "heat_flux_physical_scope": (
             "one-dimensional q-parallel kinetic-energy-flux contribution only; "
             "not the full 3-D electron heat flux, which also requires perpendicular-energy correlations"
