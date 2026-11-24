@@ -32,7 +32,9 @@ def test_multichannel_structured_background_retains_cross_channel_covariance():
 
 
 @pytest.mark.parametrize("covariance,match", [
-    (np.ones((5, 5)), "positive definite"),
+    # Two channels x five wavelength bins -> the full covariance is 10x10.
+    # A rank-one all-ones matrix has the correct shape but is not positive definite.
+    (np.ones((10, 10)), "positive definite"),
     (np.eye(4), "match"),
 ])
 def test_multichannel_background_rejects_invalid_covariance(covariance, match):
