@@ -114,3 +114,56 @@ def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_di
     )
     assert "thomson_projected_evdf_poisson" in MODEL_LABELS
     assert "thomson_projected_evdf_poisson" in MODEL_PHYSICS_NOTES
+
+
+def test_poisson_inverse_propagates_moment_covariance_and_optional_projected_heat_flux():
+    wavelength, velocity, counts, background, response, _ = _synthetic_counts()
+    common = dict(
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2.0,
+        instrument_response_matrix=response,
+        background_expected_counts=background,
+        velocity_grid_m_s=velocity,
+        regularization_strength=1.0e-4,
+        max_iter=5000,
+    )
+    without_density = reconstruct_thomson_evdf_poisson(wavelength, counts, **common)
+    moments = without_density["projected_evdf_physical_moments"]
+    assert moments["directional_equivalent_temperature_eV"] > 0.0
+    assert moments["moment_covariance_order"][4] == "central_third_velocity_moment_m3_s3"
+    assert moments["parallel_projected_heat_flux_W_m2"] is None
+    if moments["moment_covariance"] is not None:
+        covariance = moments["moment_covariance"]
+        assert covariance.shape == (8, 8)
+        np.testing.assert_allclose(covariance, covariance.T, rtol=1e-9, atol=1e-30)
+        scale = max(np.linalg.norm(covariance, 2), 1e-300)
+        assert np.linalg.eigvalsh(covariance).min() >= -1e-8 * scale
+
+    with_density = reconstruct_thomson_evdf_poisson(
+        wavelength, counts, **common,
+        electron_density_m3=2.0e19,
+        electron_density_uncertainty_m3=1.0e17,
+    )
+    flux = with_density["projected_evdf_physical_moments"]
+    expected_flux = (
+        0.5 * 9.1093837139e-31 * 2.0e19
+        * flux["central_third_velocity_moment_m3_s3"]
+    )
+    assert flux["parallel_projected_heat_flux_W_m2"] == pytest.approx(expected_flux, rel=1e-12, abs=1e-30)
+    assert flux["parallel_projected_heat_flux_standard_uncertainty_W_m2"] is not None
+    assert flux["full_three_dimensional_heat_flux_identified"] is False
+
+
+def test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance():
+    wavelength, velocity, counts, background, response, _ = _synthetic_counts()
+    with pytest.raises(ValueError, match="requires density"):
+        reconstruct_thomson_evdf_poisson(
+            wavelength, counts,
+            laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi / 2.0,
+            instrument_response_matrix=response,
+            background_expected_counts=background,
+            velocity_grid_m_s=velocity,
+            regularization_strength=1.0e-4,
+            electron_density_uncertainty_m3=1.0e17,
+        )

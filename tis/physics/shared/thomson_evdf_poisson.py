@@ -18,6 +18,7 @@ from .thomson_evdf import (
     _projected_evdf_forward_matrix,
     _nonuniform_second_derivative_matrix,
     _velocity_quadrature_weights,
+    _piecewise_linear_evdf_moments,
     _C,
 )
 
@@ -34,6 +35,9 @@ def reconstruct_thomson_evdf_poisson(
     regularization_strength,
     initial_total_counts=None,
     max_iter=3000,
+    electron_density_m3=None,
+    electron_density_uncertainty_m3=None,
+    electron_density_mu3_cross_covariance_s_minus3=None,
 ):
     """Infer normalized f_q(v) from independent Poisson detector-bin counts.
 
@@ -167,20 +171,30 @@ def reconstruct_thomson_evdf_poisson(
     free_indices = np.flatnonzero(active)
     parameter_indices = np.concatenate([free_indices, [n]])
     fisher_design = np.column_stack([amplitude * mass_operator[:, free_indices], mass_operator @ mass])
-    fisher = fisher_design.T @ (fisher_design / np.maximum(mu, tiny)[:, None])
+    data_fisher = fisher_design.T @ (fisher_design / np.maximum(mu, tiny)[:, None])
+    fisher = data_fisher.copy()
     density_penalty_jacobian = penalty[:, free_indices] / weights[free_indices][None, :]
     fisher[:free_indices.size, :free_indices.size] += (
         lam * density_penalty_jacobian.T @ density_penalty_jacobian
     )
-    # Project out the exact simplex-normalization direction before inversion.
+    # Project the exact simplex normalization constraint out of the active
+    # parameter space. For the penalized Poisson estimator, H^-1 is not its
+    # frequentist sampling covariance: use the sandwich H^-1 F H^-1, where
+    # F is expected Poisson information and H=F+P includes Tikhonov curvature.
     equality = np.concatenate([np.ones(free_indices.size), [0.0]])[None, :]
     tangent = null_space(equality)
-    reduced = tangent.T @ fisher @ tangent
+    reduced_hessian = tangent.T @ fisher @ tangent
+    reduced_data_information = tangent.T @ data_fisher @ tangent
     covariance_full = None
     covariance_status = "unavailable_singular_active_set_fisher"
     try:
-        if reduced.size and np.linalg.matrix_rank(reduced) == reduced.shape[0]:
-            covariance_reduced = np.linalg.inv(reduced)
+        if (reduced_hessian.size
+                and np.linalg.matrix_rank(reduced_hessian) == reduced_hessian.shape[0]):
+            inverse_hessian = np.linalg.inv(reduced_hessian)
+            covariance_reduced = (
+                inverse_hessian @ reduced_data_information @ inverse_hessian
+            )
+            covariance_reduced = 0.5 * (covariance_reduced + covariance_reduced.T)
             covariance_active_mass = tangent @ covariance_reduced @ tangent.T
             # Transform covariance from dimensionless masses p_j to density
             # coefficients f_j=p_j/w_j, retaining the amplitude cross terms.
@@ -188,9 +202,139 @@ def reconstruct_thomson_evdf_poisson(
             covariance_active = transform @ covariance_active_mass @ transform.T
             covariance_full = np.zeros((n + 1, n + 1))
             covariance_full[np.ix_(parameter_indices, parameter_indices)] = covariance_active
-            covariance_status = "expected_poisson_fisher_inverse_projected_to_normalization_tangent"
+            covariance_status = "frequentist_poisson_sandwich_covariance_projected_to_simplex_tangent"
     except np.linalg.LinAlgError:
         covariance_full = None
+
+    # Exact physical moments of the reconstructed piecewise-linear EVDF.
+    # These are derived from f_q itself, not from a Gaussian spectral width.
+    moment_fit = _piecewise_linear_evdf_moments(velocity, density)
+    moment_order = (
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_variance_m2_s2",
+        "velocity_parallel_standard_deviation_m_s",
+        "directional_equivalent_temperature_eV",
+        "central_third_velocity_moment_m3_s3",
+        "central_fourth_velocity_moment_m4_s4",
+        "skewness",
+        "excess_kurtosis",
+    )
+    moment_values = np.asarray([
+        moment_fit["mean"], moment_fit["variance"], moment_fit["sigma"],
+        9.1093837139e-31 * moment_fit["variance"] / 1.602176634e-19,
+        moment_fit["third"], moment_fit["fourth"],
+        moment_fit["skewness"], moment_fit["excess_kurtosis"],
+    ], dtype=float)
+    moment_covariance = None
+    moment_standard_uncertainty = None
+    if covariance_full is not None:
+        moment_covariance = (
+            moment_fit["moment_jacobian"]
+            @ covariance_full[:n, :n]
+            @ moment_fit["moment_jacobian"].T
+        )
+        moment_covariance = 0.5 * (moment_covariance + moment_covariance.T)
+        if np.all(np.isfinite(moment_covariance)):
+            moment_standard_uncertainty = {
+                name: float(np.sqrt(max(float(moment_covariance[i, i]), 0.0)))
+                for i, name in enumerate(moment_order)
+            }
+        else:
+            moment_covariance = None
+
+    density_value = None
+    density_uncertainty = 0.0
+    projected_heat_flux = None
+    projected_heat_flux_uncertainty = None
+    if electron_density_uncertainty_m3 is not None and electron_density_m3 is None:
+        raise ValueError("electron_density_uncertainty_m3 requires electron_density_m3")
+    if electron_density_mu3_cross_covariance_s_minus3 is not None and (
+        electron_density_m3 is None or electron_density_uncertainty_m3 is None
+        or moment_covariance is None
+    ):
+        raise ValueError(
+            "electron_density_mu3_cross_covariance_s_minus3 requires density, "
+            "density uncertainty and an available EVDF moment covariance"
+        )
+    if electron_density_m3 is not None:
+        if (isinstance(electron_density_m3, (bool, np.bool_))
+                or not np.isscalar(electron_density_m3)
+                or not np.isfinite(electron_density_m3)
+                or float(electron_density_m3) <= 0.0):
+            raise ValueError("electron_density_m3 must be a positive finite scalar")
+        density_value = float(electron_density_m3)
+        if electron_density_uncertainty_m3 is not None:
+            if (isinstance(electron_density_uncertainty_m3, (bool, np.bool_))
+                    or not np.isscalar(electron_density_uncertainty_m3)
+                    or not np.isfinite(electron_density_uncertainty_m3)
+                    or float(electron_density_uncertainty_m3) < 0.0):
+                raise ValueError("electron_density_uncertainty_m3 must be finite and non-negative")
+            density_uncertainty = float(electron_density_uncertainty_m3)
+        mu3 = float(moment_fit["third"])
+        mu3_variance = (
+            float(moment_covariance[4, 4]) if moment_covariance is not None else None
+        )
+        cross = 0.0
+        if electron_density_mu3_cross_covariance_s_minus3 is not None:
+            cross = float(electron_density_mu3_cross_covariance_s_minus3)
+            if not np.isfinite(cross):
+                raise ValueError("electron_density_mu3_cross_covariance_s_minus3 must be finite")
+            bound = np.sqrt(max(density_uncertainty**2 * mu3_variance, 0.0))
+            if abs(cross) > bound + 1e-10 * max(bound, abs(cross), np.finfo(float).tiny):
+                raise ValueError("density/third-moment cross-covariance violates the joint PSD bound")
+        electron_mass = 9.1093837139e-31
+        projected_heat_flux = 0.5 * electron_mass * density_value * mu3
+        if mu3_variance is not None:
+            flux_variance = (0.5 * electron_mass)**2 * (
+                density_value**2 * mu3_variance
+                + mu3**2 * density_uncertainty**2
+                + 2.0 * density_value * mu3 * cross
+            )
+            flux_scale = (0.5 * electron_mass)**2 * max(
+                density_value**2 * mu3_variance
+                + mu3**2 * density_uncertainty**2
+                + 2.0 * abs(density_value * mu3 * cross),
+                np.finfo(float).tiny,
+            )
+            if flux_variance < -1e-10 * flux_scale:
+                raise ValueError("joint density/EVDF covariance produced negative projected heat-flux variance")
+            projected_heat_flux_uncertainty = float(np.sqrt(max(flux_variance, 0.0)))
+
+    physical_moments = {
+        "status": "conditional_poisson_evdf_moments",
+        "primary_result_status": "conditional_on_poisson_inverse_regularization_and_velocity_support",
+        "mean_velocity_parallel_m_s": float(moment_fit["mean"]),
+        "velocity_parallel_variance_m2_s2": float(moment_fit["variance"]),
+        "velocity_parallel_standard_deviation_m_s": float(moment_fit["sigma"]),
+        "directional_equivalent_temperature_eV": float(moment_values[3]),
+        "central_third_velocity_moment_m3_s3": float(moment_fit["third"]),
+        "central_fourth_velocity_moment_m4_s4": float(moment_fit["fourth"]),
+        "skewness": float(moment_fit["skewness"]),
+        "excess_kurtosis": float(moment_fit["excess_kurtosis"]),
+        "moment_covariance_order": moment_order,
+        "moment_covariance": moment_covariance,
+        "moment_standard_uncertainty": moment_standard_uncertainty,
+        "parallel_projected_heat_flux_W_m2": projected_heat_flux,
+        "parallel_projected_heat_flux_standard_uncertainty_W_m2": projected_heat_flux_uncertainty,
+        "electron_density_input_m3": density_value,
+        "heat_flux_equation": "q_parallel^(1D) = (m_e*n_e/2) * <(v_q-u_q)^3>_f",
+        "directional_temperature_equation": "T_eq,q[eV] = (m_e/e) * Var_f(v_q)",
+        "moment_quadrature": "exact_intervalwise_three_point_Gauss_Legendre_for_piecewise_linear_EVDF_through_fourth_order",
+        "heat_flux_physical_scope": (
+            "one-dimensional q-parallel kinetic-energy-flux contribution only; "
+            "not the full 3-D electron heat flux, which also requires perpendicular-energy correlations"
+        ),
+        "full_three_dimensional_heat_flux_identified": False,
+        "uncertainty_interpretation": (
+            "Frequentist fixed-active-set Poisson sandwich covariance propagated "
+            "through the exact normalized piecewise-linear EVDF moment Jacobian; "
+            "conditional on the selected regularization, fixed background, "
+            "velocity grid and measured response."
+            if moment_covariance is not None else
+            "Physical moments are reported, but their uncertainty is unavailable "
+            "because the active-set Poisson covariance is singular."
+        ),
+    }
 
     from scipy.special import gammaln
     nll = float(np.sum(mu - counts * np.log(np.maximum(mu, tiny)) + gammaln(counts + 1.0)))
@@ -214,8 +358,9 @@ def reconstruct_thomson_evdf_poisson(
         "evdf_covariance": None if covariance_full is None else covariance_full[:n, :n],
         "amplitude_variance": None if covariance_full is None else float(covariance_full[n, n]),
         "evdf_amplitude_covariance": None if covariance_full is None else covariance_full[:n, n],
+        "projected_evdf_physical_moments": physical_moments,
         "covariance_status": covariance_status,
-        "covariance_interpretation": "local expected-Poisson Fisher covariance conditional on active set, explicit regularization, velocity grid, measured response and fixed background",
+        "covariance_interpretation": "frequentist fixed-active-set Poisson sandwich covariance H^-1 F H^-1 projected onto the exact EVDF normalization simplex; conditional on explicit regularization, velocity grid, measured response and fixed background",
         "forward_operator": "finite_wavelength_bin_integrated_nonrelativistic_doppler_kernel_then_measured_detector_response",
         "forward_operator_metadata": metadata,
         "likelihood": "independent_poisson_counts",
