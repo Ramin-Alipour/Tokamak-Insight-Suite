@@ -14955,6 +14955,666 @@
         {
           "name": "random_energy_moment_standard_uncertainty",
           "unit": "1-sigma uncertainties of projected random-energy mean and variance"
+        },
+        {
+          "name": "status",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "velocity_projection",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "normalization",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "projected_parallel_kinetic_energy_cdf_eV",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "mean_velocity_parallel_m_s",
+          "unit": "m s^-1",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "velocity_parallel_variance_m2_s2",
+          "unit": "m^2 s^-2",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "velocity_parallel_standard_deviation_m_s",
+          "unit": "m s^-1",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "directional_equivalent_temperature_eV",
+          "unit": "eV",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "central_third_velocity_moment_m3_s3",
+          "unit": "m^3 s^-3",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "central_fourth_velocity_moment_m4_s4",
+          "unit": "m^4 s^-4",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "central_fifth_velocity_moment_m5_s5",
+          "unit": "m^5 s^-5",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "central_sixth_velocity_moment_m6_s6",
+          "unit": "m^6 s^-6",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "skewness",
+          "unit": "dimensionless",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "excess_kurtosis",
+          "unit": "dimensionless",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "standardized_fifth_central_moment",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "standardized_sixth_central_moment",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "standardized_sixth_cumulant",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "excess_sixth_standardized_central_moment",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_projected_heat_flux_per_density_W_m",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_projected_heat_flux_per_density_standard_uncertainty_W_m",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_projected_heat_flux_W_m2",
+          "unit": "W m^-2",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_projected_heat_flux_standard_uncertainty_W_m2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_projected_pressure_Pa",
+          "unit": "Pa",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_projected_pressure_standard_uncertainty_Pa",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_uncertainty_assumption",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_heat_flux_joint_covariance",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_heat_flux_joint_covariance_order",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_heat_flux_joint_standard_uncertainty",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "density_evdf_moment_joint_covariance_order",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "density_evdf_moment_joint_covariance",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_heat_flux_covariance_interpretation",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_density_input_m3",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parallel_pressure_density_variance_cross_covariance_m_minus1_s_minus2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "heat_flux_density_input_m3",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "heat_flux_density_uncertainty_input_m3",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "heat_flux_density_mu3_cross_covariance_input_s_minus3",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "heat_flux_physical_scope",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "equations",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_covariance_order",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_covariance",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_standard_uncertainty",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "heat_flux_identifiability",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "model_averaged_evdf_s_per_m",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "evdf_probability_normalization",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "candidate_weights",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "physical_moments",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_covariance_scope",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "within_model_covariance_available",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "between_model_covariance_s2_per_m2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "total_model_averaged_covariance_s2_per_m2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "interpretation",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "scope",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "boundary_interval_probability_fraction",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "boundary_interval_bounds_m_s",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "boundary_node_density_fraction_of_peak",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "full_grid_moments",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "interior_grid_moments",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "interior_minus_full_moments",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "frame",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "distribution_scope",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "integration_method",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "normalization_method",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "mean_kinetic_energy_eV",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "mean_lorentz_factor",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "kinetic_energy_flux_per_density_W_m",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "electron_density_input_m3",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "kinetic_energy_flux_W_m2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "kinetic_energy_flux_standard_uncertainty_W_m2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "kinetic_energy_flux_uncertainty_assumption",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_order",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "kinetic_energy_definition",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "flux_definition",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "heat_flux_status",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "limitations",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "negative_area",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "signed_area",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "center",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "kurtosis",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_source",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "wavelength_nm",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_subtracted_signal",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "positive_spectral_weights",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "wavelength_quadrature_weights_nm",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "integrated_spectral_measure",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "integrated_positive_spectral_signal",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "integrated_signed_spectral_signal",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "integrated_negative_background_subtracted_signal",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "negative_area_fraction",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "negative_area_fraction_removed_by_clipping",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_weighting_method",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_clipping_bias_warning",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_estimation_method",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_identifiability_status",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_confidence_note",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_uncertainty_model",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_uncertainty_supplied",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "background_mask",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_centroid_nm",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "observed_sigma_nm",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_width_interpretation",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_width_is_physical_temperature",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "physical_temperature_source",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "observed_variance_nm2",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "instrument_response_model",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_uncertainty_scope",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_skewness",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_excess_kurtosis",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_moment_covariance_order",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_moment_covariance",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_moment_correlation",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "spectral_moment_covariance_scope",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_uncertainty_method",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "signal_uncertainty_model",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_uncertainty_successful_draws",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_uncertainty_covariance_components",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_parameters",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_parameter_uncertainties",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_covariance_valid",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_likelihood_covariance_components",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_statistical_weighting_status",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_covariance_interpretation",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "moment_interpretation",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "gaussian_fit_covariance_correlation_condition_number",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "model",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "assumptions",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "non_collective_kappa",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
+        },
+        {
+          "name": "non_collective_relativistic_maxwell_juttner",
+          "unit": "solver output; see description",
+          "description": "Returned by _projected_evdf_physical_moments. This is a q-parallel projected EVDF moment/uncertainty or explicit identifiability and covariance metadata; it is not a full 3-D moment unless a separate 3-D reconstruction is used."
         }
       ],
       "assumptions": [
@@ -14972,7 +15632,8 @@
       "test_links": [
         "tests/test_thomson_distribution.py::test_projected_evdf_energy_cdf_matches_one_dimensional_maxwellian",
         "tests/test_thomson_distribution.py::test_projected_evdf_random_energy_moments_match_one_dimensional_maxwellian",
-        "tests/test_thomson_distribution.py::test_projected_evdf_random_energy_moment_covariance_matches_finite_difference"
+        "tests/test_thomson_distribution.py::test_projected_evdf_random_energy_moment_covariance_matches_finite_difference",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ],
       "note": "The Maxwellian reference test compares the numerical CDF with erf(sqrt(E/T_e)) for a one-dimensional Gaussian velocity marginal.",
       "formula_key": "thomson_projected_evdf_parallel_random_energy_moments"
