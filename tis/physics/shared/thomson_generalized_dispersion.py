@@ -266,7 +266,16 @@ def collective_tabulated_electron_spectral_density(
         raise ValueError("ion_velocity_m_s must contain one finite subluminal vector per ion species")
     ui = vi @ qhat
     k = 4*np.pi*np.sin(angle/2)/(laser*1e-9)
-    vphase = -C*(x-laser)/(2*laser*np.sin(angle/2))
+    # Convert the measured wavelength to angular-frequency shift exactly:
+    # Delta_omega = 2*pi*c*(1/lambda - 1/lambda_0), not the
+    # first-order approximation -2*pi*c*Delta_lambda/lambda_0**2.
+    # The electrostatic resonance is v_phi = Delta_omega / |k_s-k_i|.
+    # Keeping this conversion exact matters for broad CTS spectra and avoids
+    # an avoidable wavelength-linearization error in the Landau pole.
+    angular_frequency_shift = (
+        2.0*np.pi*C*1e9*(1.0/x - 1.0/laser)
+    )
+    vphase = angular_frequency_shift/k
     if (vgrid.ndim != 1 or fgrid.shape != vgrid.shape or vgrid.size < 9
             or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
             or np.any(np.diff(vgrid) <= 0) or np.any(fgrid < 0)):
@@ -420,6 +429,9 @@ def collective_tabulated_electron_spectral_density(
         "ion_susceptibility": np.asarray(ion_chi),
         "dielectric_function": dielectric,
         "dynamic_structure_factor": dynamic_structure,
+        "angular_frequency_shift_rad_s": angular_frequency_shift,
+        "phase_velocity_m_s": vphase,
+        "phase_velocity_mapping": "exact_delta_omega_over_scattering_wavenumber_from_measured_wavelength",
         "electron_flow_projection_m_s": ue,
         "ion_flow_projections_m_s": ui,
         "electron_projected_moments": electron_moments,
