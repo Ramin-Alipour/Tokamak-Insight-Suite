@@ -517,7 +517,7 @@ EXAMPLES = {
         "scattering_angle_rad": 1.5707963267948966,
         "instrument_response_matrix": np.eye(81).tolist(),
         "background_expected_counts": [3.0] * 81,
-        "velocity_grid_m_s": np.linspace(-2.0e5, 2.0e5, 81).tolist(),
+        "velocity_grid_m_s": np.linspace(-9.0e4, 9.0e4, 81).tolist(),
         "regularization_strength": 1.0e-4
     },
     "thomson_projected_bi_kappa_evdf": {
