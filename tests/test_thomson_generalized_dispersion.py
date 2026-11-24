@@ -63,6 +63,11 @@ def test_collective_tabulated_evdf_forward_model_returns_finite_positive_spectru
     assert np.all(np.isfinite(spectrum))
     assert np.any(spectrum > 0)
     assert result["electron_distribution_model"] == "researcher_supplied_tabulated_projected_1D_EVDF"
+    np.testing.assert_allclose(
+        result["phase_velocity_m_s"],
+        result["angular_frequency_shift_rad_s"] / result["wavenumber_m_inverse"],
+        rtol=2e-14, atol=1e-8,
+    )
 
 
 
