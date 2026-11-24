@@ -1555,7 +1555,21 @@ elif page=='Spectral Analysis':
                         if joint_spatial_spectral or collective_kappa_mode or absolute_density:
                             raise ValueError('Poisson count-space inference is a per-channel shape/temperature/flow fit; joint spatial inversion, collective CTS and absolute-density inference are not part of this likelihood.')
                         if signal_uncertainty is not None or response_uncertainty is not None or model_discrepancy_covariance is not None or systematic_covariance is not None or joint_spectral_covariance is not None:
-                            raise ValueError('The current independent-Poisson route does not accept Gaussian pointwise uncertainty/covariance, response uncertainty, laser-profile convolution, path-density inputs or additive Gaussian discrepancy/systematic covariance. Remove those uploads and the selected uncertainty column.')
+                            raise ValueError('The current independent-Poisson route does not accept Gaussian pointwise uncertainty/covariance, response uncertainty, path-density inputs or additive Gaussian discrepancy/systematic covariance. Remove those uploads and the selected uncertainty column.')
+                        poisson_laser_profile_kwargs={}
+                        if channel_laser_profile_upload is not None:
+                            poisson_laser_profile_table=pd.read_csv(
+                                channel_laser_profile_upload,header=None
+                            ).to_numpy(dtype=float)
+                            if (poisson_laser_profile_table.ndim!=2
+                                    or poisson_laser_profile_table.shape[1]!=2
+                                    or poisson_laser_profile_table.shape[0]<3
+                                    or not np.all(np.isfinite(poisson_laser_profile_table))):
+                                raise ValueError('The incident laser spectrum CSV must contain at least three finite rows and exactly two columns: wavelength_nm and spectral_power_density_per_nm.')
+                            poisson_laser_profile_kwargs={
+                                'laser_spectrum_wavelength_nm':poisson_laser_profile_table[:,0],
+                                'laser_spectrum_density_per_nm':poisson_laser_profile_table[:,1],
+                            }
                         product_api=load_product_api('thomson-scattering')
                         distribution_model='kappa' if model=='non_collective_kappa' else 'maxwellian'
                         poisson_channels=[]
@@ -1573,6 +1587,7 @@ elif page=='Spectral Analysis':
                                 laser_wavelength_uncertainty_nm=0.0 if laser_unc_value is None else laser_unc_value,
                                 scattering_angle_uncertainty_rad=0.0 if angle_unc_value is None else angle_unc_value,
                                 laser_angle_covariance_nm_rad=laser_angle_covariance_value,
+                                **poisson_laser_profile_kwargs,
                             )
                             channel_result['channel_index']=channel_index
                             channel_result['radius_m']=float(radii[channel_index])

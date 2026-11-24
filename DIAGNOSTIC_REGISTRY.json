@@ -245,13 +245,13 @@
           "name": "laser_spectrum_wavelength_nm",
           "unit": "nm; strictly increasing measured incident-laser spectral samples",
           "required": false,
-          "description": "Optional measured incident-laser spectrum for non-collective optical Thomson inference. In relativistic Compton mode it is integrated through the wavelength-resolved recoil and polarized Klein-Nishina forward kernel; it is not approximated by the elastic wavelength-ratio operator."
+          "description": "Optional measured incident-laser spectrum for non-collective optical Thomson inference, including finite-bin independent-Poisson count-space inference. For elastic Thomson scattering the source profile is integrated with the wavelength-ratio source operator before the measured detector response. In relativistic Compton mode it is integrated through the wavelength-resolved recoil and polarized Klein-Nishina forward kernel."
         },
         {
           "name": "laser_spectrum_density_per_nm",
           "unit": "incident spectral power density per nm; paired with laser_spectrum_wavelength_nm",
           "required": false,
-          "description": "Non-negative measured incident-laser spectral power density. The relativistic Compton source integral converts power density to photon flux proportional to wavelength times spectral power, then weights by wavelength-dependent differential cross-section and scattered photon energy before the measured detector response."
+          "description": "Non-negative measured incident-laser spectral power density, paired with laser_spectrum_wavelength_nm. The elastic Poisson/GLS Thomson path normalizes this profile to unit spectral area and retains finite-window source losses; its profile uncertainty is not currently propagated by the Poisson likelihood. The relativistic Compton source integral converts power density to photon flux proportional to wavelength and applies wavelength-dependent scattering physics."
         },
         {
           "name": "enable_evdf_reconstruction",
@@ -482,7 +482,7 @@
         {
           "name": "laser_source_profile_used",
           "unit": "boolean",
-          "description": "True when a measured incident-laser spectral profile was integrated in the physical forward model."
+          "description": "True when a measured incident-laser spectral profile was integrated in the physical forward model, including finite-bin Poisson count-space inference."
         },
         {
           "name": "laser_source_profile_convolution",
