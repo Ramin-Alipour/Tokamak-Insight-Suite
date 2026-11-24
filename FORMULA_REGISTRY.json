@@ -5310,6 +5310,38 @@
           "name": "scattering_volume_sample_diagnostics",
           "unit": "structured; frequency x sample",
           "description": "Per-sample scattering location, magnetic field, weight and local spectral density diagnostics returned by the scattering-volume integration branch."
+        },
+        {
+          "name": "bindslev_bulk_electron_source_used",
+          "unit": "boolean; whether the Maxwellian Bindslev source operator was selected"
+        },
+        {
+          "name": "bindslev_source_operator_role",
+          "unit": "text; source-operator role in the three-wave coupling"
+        },
+        {
+          "name": "mode_conversion_at_exact_degeneracies",
+          "unit": "boolean; whether exact-degeneracy mode conversion is handled"
+        },
+        {
+          "name": "relativistic_bulk_electron_vertex_used",
+          "unit": "boolean; whether the relativistic bulk-electron three-wave vertex was used"
+        },
+        {
+          "name": "cold_plasma_mode_tracking",
+          "unit": "boolean; whether cold-plasma mode tracking was used"
+        },
+        {
+          "name": "zero_frequency_static_limit_supported",
+          "unit": "boolean; whether the static zero-frequency limit is supported"
+        },
+        {
+          "name": "resonance_damping_changes_real_frequency",
+          "unit": "boolean; whether resonance damping changes the real-frequency solution"
+        },
+        {
+          "name": "real_frequency_shift_preserved",
+          "unit": "boolean; whether the physical real-frequency shift is retained"
         }
       ],
       "prerequisites": [
