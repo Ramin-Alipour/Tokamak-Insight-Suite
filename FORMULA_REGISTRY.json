@@ -4439,6 +4439,22 @@
           "name": "electron_reference_velocity_projection_m_s",
           "unit": "m s^-1",
           "description": "Projection of the supplied reference electron velocity vector, distinct from the mixture bulk flow when population flows differ."
+        },
+        {
+          "name": "electron_population_projected_vdfs_s_m",
+          "unit": "s m⁻¹; one normalized projected EVDF per electron population"
+        },
+        {
+          "name": "electron_population_susceptibilities",
+          "unit": "dimensionless complex; one Landau susceptibility per electron population"
+        },
+        {
+          "name": "electron_populations",
+          "unit": "records; explicit electron-population density/temperature/Kappa/flow parameters"
+        },
+        {
+          "name": "ion_populations",
+          "unit": "records; explicit ion population composition and flow parameters"
         }
       ],
       "prerequisites": [
