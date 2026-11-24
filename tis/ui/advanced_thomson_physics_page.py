@@ -123,6 +123,8 @@ MODEL_LABELS = {
     "thomson_channel_path_averaged_density": "Optical Thomson — channel-resolved path-integrated density with full optical covariance",
 }
 
+MODEL_LABELS["thomson_projected_evdf_poisson"] = "Optical Thomson — finite-bin q-parallel EVDF inversion from integer photon counts (Poisson likelihood)"
+
 # Full-EM response and field-fluctuation routes are explicit Dashboard choices.
 MODEL_LABELS["landau_fdt_full_em_spectrum"] = "Full-EM CTS — end-to-end Landau–FDT current noise → Maxwell field/Stokes spectrum"
 MODEL_LABELS["landau_fdt_full_em_spectrum_converged"] = "Full-EM CTS — grid-refined Landau–FDT/Maxwell spectrum with quantitative convergence gate"
@@ -500,14 +502,18 @@ EXAMPLES = {
         "zeta_real": 0.7, "zeta_imag": 0.35, "kappa": 4.0
     },
     "thomson_projected_evdf_poisson": {
-        "wavelength_nm": np.linspace(1058.0, 1066.0, 81).tolist(),
-        "observed_counts": [0] * 81,
+        "wavelength_nm": np.linspace(1063.5, 1064.5, 81).tolist(),
+        "observed_counts": np.rint(
+            3.0 + 12000.0 * np.exp(
+                -0.5 * ((np.linspace(1063.5, 1064.5, 81) - 1064.0) / 0.12) ** 2
+            )
+        ).astype(int).tolist(),
         "laser_wavelength_nm": 1064.0,
         "scattering_angle_rad": 1.5707963267948966,
         "instrument_response_matrix": np.eye(81).tolist(),
-        "background_expected_counts": [2.0] * 81,
-        "velocity_grid_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),
-        "regularization_strength": 1.0e-3
+        "background_expected_counts": [3.0] * 81,
+        "velocity_grid_m_s": np.linspace(-2.0e5, 2.0e5, 81).tolist(),
+        "regularization_strength": 1.0e-4
     },
     "thomson_projected_bi_kappa_evdf": {
         "velocity_grid_m_s": np.linspace(-1.2e8, 1.2e8, 2401).tolist(),
