@@ -379,7 +379,7 @@ def test_flow_projection_covariance_survives_unidentifiable_temperature_anisotro
         centre = laser*(1.0-q_factor*flow/299792458.0)
         sigma_nm = laser*q_factor*sigma_v/299792458.0
         feature, _ = _gaussian_bin_average(wavelength, centre, sigma_nm)
-        spectra.append(0.03 + 0.8*feature + 1.0e-4*(wavelength-laser))
+        spectra.append(0.03 + 0.8*feature + 1.0e-5*(wavelength-laser))
 
     result = fit_gyrotropic_bi_maxwellian_thomson(
         wavelength, np.asarray(spectra), laser_wavelength_nm=laser,
@@ -500,7 +500,10 @@ def test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_clos
     from tokamak_analysis.cts_full_physics import run_advanced_thomson_physics
 
     coordinate = np.linspace(-1.0, 1.0, 161)
-    wavelength = 1064.0 + 2.0 * (coordinate + 0.12 * coordinate**3)
+    # The hottest view has sigma_lambda about 63 nm. Cover >95% of that
+    # Maxwellian feature; a +/-2 nm window mostly measures a flat local tail
+    # and cannot identify its centroid independently of the continuum.
+    wavelength = 1064.0 + 120.0 * (coordinate + 0.12 * coordinate**3)
     laser, angle = 1064.0, np.pi / 2.0
     magnetic_field = np.array([0.0, 0.0, 1.0])
     directions = np.eye(3)
@@ -537,6 +540,7 @@ def test_public_thomson_spectral_fit_routes_geometry_uncertainty_to_3d_flow_clos
     assert flow_result["geometry_condition_status"] == "well_conditioned"
     assert flow_result["cross_view_consistency_status"] == "not_testable_exactly_three_views"
     assert flow_result["reportable_as_inferred_parameter"] is True
+    assert np.all(result["captured_spectral_probability"] >= 0.95)
     np.testing.assert_allclose(
         flow_result["electron_velocity_vector_m_s"],
         common_flow,
