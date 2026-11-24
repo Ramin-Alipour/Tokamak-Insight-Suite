@@ -9610,6 +9610,101 @@
       "formula_key": "thomson_measured_laser_profile_compton_power_convolution",
       "input_specs": [
         {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing measured bin centres",
+          "required": true
+        },
+        {
+          "name": "measured_spectrum",
+          "unit": "calibrated spectral density",
+          "required": true
+        },
+        {
+          "name": "physical_model",
+          "unit": "kappa or relativistic_maxwell_juttner",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured wavelength-bin response matrix",
+          "required": true
+        },
+        {
+          "name": "physical_initial",
+          "unit": "[Te_eV, flow_projection_m_s, kappa] for Kappa; [Te_eV, flow_projection_m_s] for MJ",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "dimensionless transverse 3-vector",
+          "required": true
+        },
+        {
+          "name": "measurement_uncertainty or measurement_covariance",
+          "unit": "spectral measurement covariance",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "positive-semidefinite spectral covariance",
+          "required": false
+        },
+        {
+          "name": "systematic_covariance",
+          "unit": "positive-semidefinite spectral covariance",
+          "required": false
+        },
+        {
+          "name": "background_model",
+          "unit": "constant, linear, polynomial, spline or supplied templates",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma laser calibration uncertainty",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma scattering geometry uncertainty",
+          "required": false
+        },
+        {
+          "name": "laser_angle_covariance_nm_rad",
+          "unit": "nm·rad; supplied laser/angle cross-covariance",
+          "required": false
+        },
+        {
+          "name": "radial_order",
+          "unit": "positive integer; relativistic velocity quadrature order",
+          "required": false
+        },
+        {
+          "name": "angular_order",
+          "unit": "positive integer; relativistic angular quadrature order",
+          "required": false
+        },
+        {
+          "name": "maximum_recoil_correction_fraction",
+          "unit": "dimensionless; maximum accepted recoil correction",
+          "required": false
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean; must be true for this formula route",
+          "required": true
+        },
+        {
           "name": "laser_spectrum_wavelength_nm",
           "unit": "nm; strictly increasing measured incident-laser wavelength",
           "required": true
@@ -9620,6 +9715,21 @@
           "required": true
         },
         {
+          "name": "laser_spectrum_quadrature_order",
+          "unit": "integer 3–31; source-profile quadrature order",
+          "required": false
+        },
+        {
+          "name": "physical_bounds",
+          "unit": "finite lower/upper physical-parameter vectors",
+          "required": false
+        },
+        {
+          "name": "max_nfev",
+          "unit": "positive integer; optimizer evaluation limit",
+          "required": false
+        },
+        {
           "name": "electron_temperature_eV",
           "unit": "eV; fitted relativistic Maxwell-Juttner temperature",
           "required": true
@@ -9628,39 +9738,224 @@
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1; fitted subluminal scattering-vector flow",
           "required": true
-        },
-        {
-          "name": "incident_polarization",
-          "unit": "dimensionless transverse 3-vector",
-          "required": true
-        },
-        {
-          "name": "include_compton_recoil",
-          "unit": "boolean; must be true for this formula route",
-          "required": true
-        },
-        {
-          "name": "instrument_response",
-          "unit": "measured wavelength-bin response matrix",
-          "required": true
         }
       ],
       "output_specs": [
         {
+          "name": "electron_temperature_eV",
+          "unit": "eV; second-moment temperature"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1; q projection"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; κ>3/2"
+        },
+        {
+          "name": "fitted_thomson_spectrum",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "fitted_background",
+          "unit": "calibrated spectral density"
+        },
+        {
+          "name": "joint_parameter_covariance",
+          "unit": "full local covariance including physical/background cross terms"
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "data-Jacobian rank and conditioning"
+        },
+        {
+          "name": "physical_parameter_covariance",
+          "unit": "joint physical parameter covariance"
+        },
+        {
+          "name": "experimental_validation",
+          "unit": "text; experimental validation status"
+        },
+        {
+          "name": "physical_model",
+          "unit": "text; selected Kappa or relativistic Maxwell-Juttner model"
+        },
+        {
+          "name": "residual",
+          "unit": "calibrated spectral density; measured minus fitted"
+        },
+        {
+          "name": "geometry_uncertainty_method",
+          "unit": "text; symmetric finite-difference refit propagation"
+        },
+        {
+          "name": "joint_parameter_names",
+          "unit": "ordered physical, amplitude and background parameter names"
+        },
+        {
+          "name": "spectral_amplitude_standard_uncertainty",
+          "unit": "calibrated spectral-density units"
+        },
+        {
+          "name": "model_discrepancy_covariance_included",
+          "unit": "boolean"
+        },
+        {
           "name": "laser_source_profile_used",
           "unit": "boolean"
+        },
+        {
+          "name": "initialization_source",
+          "unit": "text; user supplied or deterministic spectral-moment seed"
+        },
+        {
+          "name": "background_model",
+          "unit": "text; detector-space background basis"
+        },
+        {
+          "name": "physical_parameter_standard_uncertainty",
+          "unit": "physical parameter 1-sigma vector"
+        },
+        {
+          "name": "geometry_covariance",
+          "unit": "2×2 laser-wavelength/scattering-angle covariance"
+        },
+        {
+          "name": "absolute_density_inferred",
+          "unit": "boolean; false for shape-only structured fit"
+        },
+        {
+          "name": "systematic_covariance_included",
+          "unit": "boolean"
+        },
+        {
+          "name": "background_coefficients",
+          "unit": "detector-background coefficient vector"
+        },
+        {
+          "name": "amplitude",
+          "unit": "calibrated spectral-density amplitude"
+        },
+        {
+          "name": "uncertainty_semantics",
+          "unit": "text; local covariance interpretation"
+        },
+        {
+          "name": "physical_parameter_names",
+          "unit": "ordered physical parameter names"
+        },
+        {
+          "name": "background_parameter_covariance",
+          "unit": "background-coefficient covariance"
+        },
+        {
+          "name": "physical_parameters",
+          "unit": "fitted physical parameter vector"
+        },
+        {
+          "name": "optimizer_message",
+          "unit": "text; optimizer termination report"
+        },
+        {
+          "name": "laser_source_quadrature_wavelength_nm",
+          "unit": "nm; fixed-order photon-flux quadrature nodes inside measured non-zero source support"
+        },
+        {
+          "name": "reportable_as_primary_inference",
+          "unit": "boolean"
+        },
+        {
+          "name": "profiled_physical_jacobian_condition_number",
+          "unit": "dimensionless; physical Jacobian after profiling background"
+        },
+        {
+          "name": "recoil_included",
+          "unit": "boolean"
+        },
+        {
+          "name": "noise_model",
+          "unit": "text; combined noise/covariance model"
+        },
+        {
+          "name": "model_validity_limits",
+          "unit": "structured physical validity bounds"
+        },
+        {
+          "name": "jacobian_condition_number",
+          "unit": "dimensionless; full joint fit Jacobian"
         },
         {
           "name": "laser_source_profile_convolution",
           "unit": "source photon-flux integration, wavelength-resolved Klein-Nishina cross-section and scattered-photon-energy weighting"
         },
         {
+          "name": "model",
+          "unit": "text; full forward-model identifier"
+        },
+        {
+          "name": "model_validity_status",
+          "unit": "text; selected model validity status"
+        },
+        {
+          "name": "geometry_uncertainty_propagated",
+          "unit": "boolean"
+        },
+        {
+          "name": "primary_result_status",
+          "unit": "text; identified or withheld status"
+        },
+        {
+          "name": "covariance_components",
+          "unit": "structured supplied covariance components"
+        },
+        {
+          "name": "physical_initial",
+          "unit": "optimizer seed vector"
+        },
+        {
+          "name": "optimizer_success",
+          "unit": "boolean"
+        },
+        {
+          "name": "jacobian_rank",
+          "unit": "integer; full joint Jacobian rank"
+        },
+        {
+          "name": "cross_section_model",
+          "unit": "text; elastic Thomson, Klein-Nishina or not applicable"
+        },
+        {
+          "name": "covariance_status",
+          "unit": "text; measurement-calibrated or residual-scaled covariance status"
+        },
+        {
+          "name": "profiled_physical_jacobian_rank",
+          "unit": "integer"
+        },
+        {
           "name": "laser_source_quadrature_nodes",
           "unit": "count"
         },
         {
-          "name": "laser_source_quadrature_wavelength_nm",
-          "unit": "nm; fixed-order photon-flux quadrature nodes inside measured non-zero source support"
+          "name": "geometry_parameter_covariance",
+          "unit": "full joint-parameter covariance contribution from geometry"
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "calibrated spectral density after response and background"
+        },
+        {
+          "name": "jacobian_parameter_count",
+          "unit": "integer; full joint parameter count"
+        },
+        {
+          "name": "physical_background_cross_covariance",
+          "unit": "physical/background cross-covariance matrix"
+        },
+        {
+          "name": "status",
+          "unit": "text; identified_from_measurement when all gates pass"
         }
       ],
       "prerequisites": [
@@ -9669,12 +9964,18 @@
         "Explicit incident polarization and scattering geometry.",
         "Measured instrument response."
       ],
-      "uncertainty_model": "Local physical/background covariance conditional on the supplied measured source profile and selected finite-order source quadrature. Source-profile covariance is not propagated.",
+      "uncertainty_model": "Joint local covariance for physical parameters, profiled spectral amplitude and detector-background coefficients, including physical/background cross-covariance. Measurement, model-discrepancy and systematic covariance components are combined for GLS; supplied laser/angle covariance is propagated by symmetric refits. The covariance is conditional on the measured source profile and selected finite-order photon-flux quadrature; source-profile uncertainty and fit/source cross-covariance are not propagated.",
       "test_links": [
         "tests/test_thomson_kinetic_background.py::test_relativistic_compton_fit_convolves_measured_laser_profile_in_photon_flux_space",
         "tests/test_thomson_kinetic_background.py::test_relativistic_source_profile_requires_a_valid_positive_spectrum"
       ],
-      "note": "This is a wavelength-resolved physical forward convolution, not the elastic wavelength-ratio source-response approximation. The measured source spectrum is integrated before the detector response."
+      "note": "This is a wavelength-resolved physical forward convolution, not the elastic wavelength-ratio source-response approximation. The measured source spectrum is integrated before the detector response.",
+      "limitations": [
+        "Single-scattering isotropic Maxwell-Juttner electron model with bulk flow parallel to the scattering vector.",
+        "Incident source-profile uncertainty and its cross-covariance with fitted plasma parameters are not propagated.",
+        "The source-profile convolution uses a fixed finite-order quadrature in photon-flux probability space.",
+        "No multiple scattering, spatially varying plasma state or full 3-D EVDF inference is performed by this channel-wise convolution."
+      ]
     },
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
