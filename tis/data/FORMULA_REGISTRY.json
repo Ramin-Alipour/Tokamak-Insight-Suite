@@ -11038,23 +11038,147 @@
         }
       ],
       "output_specs": [
-        {
-          "name": "electron_projected_moments.directional_second_moment_temperature_eV",
-          "unit": "eV"
-        },
-        {
-          "name": "electron_projected_moments.standardized_skewness",
-          "unit": "dimensionless"
-        },
-        {
-          "name": "electron_projected_moments.excess_kurtosis",
-          "unit": "dimensionless"
-        },
-        {
-          "name": "ion_projected_moments",
-          "unit": "per-species projected central-moment records"
-        }
-      ],
+                {
+                        "name": "angular_frequency_shift_rad_s",
+                        "unit": "rad s^-1"
+                },
+                {
+                        "name": "electron_susceptibility",
+                        "unit": "dimensionless complex response"
+                },
+                {
+                        "name": "ion_flow_projections_m_s",
+                        "unit": "m s^-1"
+                },
+                {
+                        "name": "dielectric_function",
+                        "unit": "dimensionless complex response"
+                },
+                {
+                        "name": "landau_limit",
+                        "unit": "boolean"
+                },
+                {
+                        "name": "wavelength_nm",
+                        "unit": "nm"
+                },
+                {
+                        "name": "ion_projected_pdf_at_resonance",
+                        "unit": "s m^-1"
+                },
+                {
+                        "name": "ion_distribution_normalization",
+                        "unit": "dimensionless"
+                },
+                {
+                        "name": "dynamic_structure_factor",
+                        "unit": "CTS spectral-density units defined by input normalization"
+                },
+                {
+                        "name": "phase_velocity_mapping",
+                        "unit": "m s^-1 per frequency sample"
+                },
+                {
+                        "name": "instrument_response_metadata",
+                        "unit": "mapping"
+                },
+                {
+                        "name": "ion_distribution_model",
+                        "unit": "model identifier"
+                },
+                {
+                        "name": "pole_imaginary_part_m_s",
+                        "unit": "m s^-1"
+                },
+                {
+                        "name": "ion_susceptibility",
+                        "unit": "dimensionless complex response"
+                },
+                {
+                        "name": "electron_susceptibility_derivative_definition",
+                        "unit": "definition identifier"
+                },
+                {
+                        "name": "pole_quadrature",
+                        "unit": "quadrature identifier"
+                },
+                {
+                        "name": "mean_velocity_relative_to_species_frame_m_s",
+                        "unit": "m s^-1"
+                },
+                {
+                        "name": "wavenumber_m_inverse",
+                        "unit": "m^-1"
+                },
+                {
+                        "name": "electron_distribution_model",
+                        "unit": "model identifier"
+                },
+                {
+                        "name": "phase_velocity_m_s",
+                        "unit": "m s^-1"
+                },
+                {
+                        "name": "spectral_density_per_nm_physical",
+                        "unit": "physical spectral density per nm"
+                },
+                {
+                        "name": "limitations",
+                        "unit": "list of model-scope limitations"
+                },
+                {
+                        "name": "excess_kurtosis",
+                        "unit": "dimensionless"
+                },
+                {
+                        "name": "standardized_skewness",
+                        "unit": "dimensionless"
+                },
+                {
+                        "name": "spectral_density_per_nm",
+                        "unit": "normalized spectral density per nm"
+                },
+                {
+                        "name": "directional_second_moment_temperature_eV",
+                        "unit": "eV"
+                },
+                {
+                        "name": "model",
+                        "unit": "model identifier"
+                },
+                {
+                        "name": "instrument_response_applied",
+                        "unit": "boolean"
+                },
+                {
+                        "name": "electron_susceptibility_phase_velocity_derivative_s_m",
+                        "unit": "s m^-1"
+                },
+                {
+                        "name": "variance_m2_s2",
+                        "unit": "m^2 s^-2"
+                },
+                {
+                        "name": "moment_definition",
+                        "unit": "moment-definition identifier"
+                },
+                {
+                        "name": "experimental_validation",
+                        "unit": "boolean; false for this numerical forward model"
+                },
+                {
+                        "name": "electron_projected_moments",
+                        "unit": "record of projected EVDF moments"
+                },
+                {
+                        "name": "velocity_support_extension",
+                        "unit": "finite-support treatment identifier"
+                },
+                {
+                        "name": "electron_flow_projection_m_s",
+                        "unit": "m s^-1"
+                }
+        ],
       "prerequisites": [
         "EVDFs are normalized by their finite-grid integral before moments are evaluated.",
         "Directional temperature is m times the central variance of the projected 1-D distribution divided by elementary charge.",
