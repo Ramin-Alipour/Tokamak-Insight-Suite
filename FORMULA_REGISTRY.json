@@ -14797,6 +14797,91 @@
           "name": "bgk_density_integral_absolute_error_estimate_s_m",
           "unit": "s m^-1",
           "description": "Adaptive quadrature error estimate for J0."
+        },
+        {
+          "name": "particle_conserving_correction",
+          "unit": "dimensionless; number-conserving correction",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "collision_frequency_s",
+          "unit": "s^-1",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "collision_model",
+          "unit": "model identifier",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "validity_domain",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "limitations",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "distribution_model",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "electron_temperature_parallel_eV",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "electron_temperature_perpendicular_eV",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "projected_temperature_eV",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "phase_velocity_lab_m_s",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "phase_velocity_in_electron_rest_frame_m_s",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "resonance_frame",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "magnetic_pitch_cosine",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "directional_temperature_relation",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "separate_parallel_perpendicular_temperatures_identifiable_from_one_view",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
+        },
+        {
+          "name": "anisotropy_model",
+          "unit": "solver metadata; see description",
+          "description": "Returned by kappa_bgk_electron_susceptibility; conditional on the supplied projected Kappa EVDF, collision frequency and declared BGK closure."
         }
       ],
       "assumptions": [
@@ -14814,7 +14899,8 @@
       "test_links": [
         "tests/test_cts_kappa.py::test_number_conserving_bgk_kappa_response_has_exact_collisionless_limit",
         "tests/test_cts_kappa.py::test_number_conserving_bgk_kappa_response_includes_density_restoring_term",
-        "tests/test_advanced_thomson_physics_page.py::test_dashboard_routes_number_conserving_bgk_kappa_physics"
+        "tests/test_advanced_thomson_physics_page.py::test_dashboard_routes_number_conserving_bgk_kappa_physics",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ]
     }
   },
