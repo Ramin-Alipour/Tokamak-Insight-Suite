@@ -6165,6 +6165,58 @@
         {
           "name": "geometry_covariance_iterations",
           "unit": "count; iterative GLS updates when geometry covariance is supplied"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "fit_residual_projection_m_s",
+          "unit": "m s⁻¹; residual vector"
+        },
+        {
+          "name": "model_adequacy_reason",
+          "unit": "text; cross-view consistency explanation"
+        },
+        {
+          "name": "electron_speed_m_s",
+          "unit": "m s⁻¹"
+        },
+        {
+          "name": "reason",
+          "unit": "text; physical reporting reason"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "integer"
+        },
+        {
+          "name": "geometry_condition_status",
+          "unit": "text; condition-number classification"
+        },
+        {
+          "name": "physicality_status",
+          "unit": "text; subluminal/physicality classification"
+        },
+        {
+          "name": "cross_view_consistency_p_value",
+          "unit": "dimensionless; chi-square survival probability"
+        },
+        {
+          "name": "geometry_reporting_reason",
+          "unit": "text; geometry identifiability reason"
+        },
+        {
+          "name": "cross_view_consistency_status",
+          "unit": "text; model-adequacy classification"
+        },
+        {
+          "name": "geometry_condition_number",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "reportable_as_inferred_parameter",
+          "unit": "boolean"
         }
       ],
       "prerequisites": [
