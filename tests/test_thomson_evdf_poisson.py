@@ -76,7 +76,7 @@ def test_poisson_inverse_rejects_noninteger_counts_and_invalid_normalization_inp
         velocity_grid_m_s=velocity,
         regularization_strength=1.0e-4,
     )
-    with pytest.raises(ValueError, match="integer detector-bin counts"):
+    with pytest.raises(ValueError, match="integer-count array"):
         reconstruct_thomson_evdf_poisson(wavelength, counts.astype(float) + 0.25, **common)
     with pytest.raises(ValueError, match="regularization_strength"):
         reconstruct_thomson_evdf_poisson(wavelength, counts, **{**common, "regularization_strength": 0.0})
