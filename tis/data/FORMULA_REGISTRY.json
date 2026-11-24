@@ -5626,7 +5626,8 @@
         "tests/test_cts_collisional_physics.py::test_spitzer_cts_collision_frequencies_match_electron_ion_reference",
         "tests/test_cts_collisional_physics.py::test_spitzer_cts_collision_frequency_scaling"
       ],
-      "note": "Physical collision-rate correction for the Full-EM magnetized Maxwellian kinetic resonance denominator. The Krook operator is explicitly non-conserving and is not represented as a complete collisional Vlasov-Landau solver."
+      "note": "Physical collision-rate correction for the Full-EM magnetized Maxwellian kinetic resonance denominator. The Krook operator is explicitly non-conserving and is not represented as a complete collisional Vlasov-Landau solver.",
+      "formula_key": "cts_full_em_species_resolved_spitzer_collision_frequencies"
     },
     "implementation_trace": {
       "function_link": "tokamak_analysis.cts_full_em.spitzer_cts_collision_frequencies",
@@ -11707,7 +11708,8 @@
         "tests/test_thomson_distribution.py::test_projected_evdf_random_energy_moments_match_one_dimensional_maxwellian",
         "tests/test_thomson_distribution.py::test_projected_evdf_random_energy_moment_covariance_matches_finite_difference"
       ],
-      "note": "The Maxwellian reference test compares the numerical CDF with erf(sqrt(E/T_e)) for a one-dimensional Gaussian velocity marginal."
+      "note": "The Maxwellian reference test compares the numerical CDF with erf(sqrt(E/T_e)) for a one-dimensional Gaussian velocity marginal.",
+      "formula_key": "thomson_projected_evdf_parallel_random_energy_moments"
     },
     "description": "CDF of parallel random kinetic energy derived from the normalized projected Thomson EVDF."
   },
