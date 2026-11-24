@@ -15403,9 +15403,9 @@
   },
   {
     "name": "Finite-bin Poisson optical Thomson inference for isotropic Kappa electrons",
-    "equation": "ν=2κ−1; s=σ_λ√((ν−2)/ν); p(λ)=Γ(κ)/[s√(νπ)Γ(κ−1/2)]·[1+(λ−μ)²/(νs²)]^(−κ), κ>3/2; μ_i=Σ_j R_ij A s√(νπ)Γ(κ−1/2)/Γ(κ)·[T_ν((e_{j+1}−μ)/s)−T_ν((e_j−μ)/s)]+b_iΔλ_i; D=2Σ_i[μ_i−n_i+n_i ln(n_i/μ_i)]; I_ab=Σ_i μ_i⁻¹(∂μ_i/∂p_a)(∂μ_i/∂p_b)",
-    "inputs": "Non-negative integer detector counts n_i; calibrated wavelength-bin edges; measured normalized response matrix R; laser wavelength λ0; scattering angle θ; optional laser/angle calibration covariance; initial and bounded Kappa index κ.",
-    "output": "Electron temperature from the finite second moment [eV], q-parallel flow [m s^-1], Kappa index, fitted expected counts, Poisson deviance and local expected-Fisher parameter covariance.",
+    "equation": "ν=2κ−1; s=σ_λ√((ν−2)/ν); p(λ)=Γ(κ)/[s√(νπ)Γ(κ−1/2)]·[1+(λ−μ)²/(νs²)]^(−κ), κ>3/2; μ_i=Σ_j R_ij A s√(νπ)Γ(κ−1/2)/Γ(κ)·[T_ν((e_{j+1}−μ)/s)−T_ν((e_j−μ)/s)]+b_iΔλ_i; D=2Σ_i[μ_i−n_i+n_i ln(n_i/μ_i)]; I_ab=Σ_i μ_i⁻¹(∂μ_i/∂p_a)(∂μ_i/∂p_b); R_total=R_detector R_laser, where R_laser integrates the measured incident-laser spectral profile using elastic wavelength scaling λ_s(λ_i)=λ_s(λ_0) λ_i/λ_0; for ν>4, μ4=3σ_v^4(ν−2)/(ν−4), γ2=6/(ν−4); for ν≤4 the fourth moment diverges",
+    "inputs": "Non-negative integer detector counts n_i; calibrated wavelength-bin edges; measured normalized response matrix R; laser wavelength λ0; scattering angle θ; optional laser/angle calibration covariance; initial and bounded Kappa index κ.; optional measured incident-laser wavelength samples and non-negative spectral power density (paired inputs)",
+    "output": "Electron temperature from the finite second moment [eV], q-parallel flow [m s^-1], Kappa index, fitted expected counts, Poisson deviance and local expected-Fisher parameter covariance. The q-parallel EVDF variance and, when mathematically finite, fourth central moment/excess kurtosis with covariance propagated from the fitted Poisson Fisher covariance.",
     "assumptions": "Single-scattering non-collective optical Thomson line shape; isotropic non-relativistic finite-variance Kappa distribution; κ>3/2; independent Poisson detector counts; known calibrated detector response and scattering geometry; non-negative linear detector-space background. The Student-t projected spectral family is not the generalized plasma dispersion function and does not represent arbitrary or unrestricted 3-D EVDFs.",
     "status": "D",
     "category": "Thomson scattering — Analysis 1",
@@ -15464,6 +15464,16 @@
           "name": "laser_angle_covariance_nm_rad",
           "unit": "nm·rad",
           "required": false
+        },
+        {
+          "name": "laser_spectrum_wavelength_nm",
+          "unit": "nm; measured incident-laser spectral samples",
+          "required": false
+        },
+        {
+          "name": "laser_spectrum_density_per_nm",
+          "unit": "non-negative incident spectral power density per nm; paired with laser_spectrum_wavelength_nm",
+          "required": false
         }
       ],
       "output_specs": [
@@ -15490,19 +15500,41 @@
         {
           "name": "poisson_deviance",
           "unit": "dimensionless"
+        },
+        {
+          "name": "projected_evdf_physical_moments.variance_velocity_q_m2_s2",
+          "unit": "m^2 s^-2; q-parallel second central moment",
+          "available_when": "finite-variance Maxwellian/Kappa model"
+        },
+        {
+          "name": "projected_evdf_physical_moments.central_fourth_moment_m4_s4",
+          "unit": "m^4 s^-4; only when Kappa degrees of freedom ν>4 (κ>2.5), or Maxwellian"
+        },
+        {
+          "name": "projected_evdf_physical_moments.excess_kurtosis",
+          "unit": "dimensionless; 6/(ν−4) for Kappa ν>4; otherwise mathematically divergent"
+        },
+        {
+          "name": "projected_evdf_physical_moments.excess_kurtosis_standard_uncertainty",
+          "unit": "dimensionless; delta-method propagation from joint fit covariance"
         }
       ],
       "uncertainty_model": "The expected Poisson Fisher matrix is I=J_mu^T diag(1/mu) J_mu, where J_mu is the derivative of the exact finite-bin, response-convolved expected-count operator with respect to amplitude, centroid, standard deviation, two background endpoint rates and kappa. The inverse is reported only after rank and condition-number checks. Laser/angle covariance and fitted-centre/geometry cross-covariance are propagated through the physical Te and q-flow transformation.",
-      "algorithm": "Integrate the Student-t CDF over each finite wavelength bin using ν=2κ−1 and s=σλ√((ν−2)/ν), apply the calibrated response to bin-integrated counts, add a non-negative detector-space linear background, and minimize the signed Poisson deviance. Fit κ jointly with the spectral width and centroid. Derive Te from the second-moment width, then transform the joint fit/geometry covariance to (Te,vq).",
+      "algorithm": "Integrate the Student-t CDF over each finite wavelength bin using ν=2κ−1 and s=σλ√((ν−2)/ν), apply the calibrated response to bin-integrated counts, add a non-negative detector-space linear background, and minimize the signed Poisson deviance. Fit κ jointly with the spectral width and centroid. Derive Te from the second-moment width, then transform the joint fit/geometry covariance to (Te,vq). If a measured incident-laser profile is supplied, normalize its spectral density, integrate the elastic wavelength-ratio source operator, compose R_total=R_detector R_laser, and preserve finite-window probability loss before the Poisson likelihood. Derive projected EVDF central moments from the fitted parametric family, not from wavelength-space moments. For Student-t Kappa marginal, report the fourth moment only for ν=2κ−1>4 and propagate its uncertainty through the fitted (σλ,κ) covariance.",
       "limitations": [
         "Kappa is constrained to κ>3/2; no infinite-variance distribution is assigned a finite Te.",
         "The model is a one-dimensional isotropic Kappa/Student-t spectral marginal, not a generalized Landau-dispersion solution or arbitrary EVDF reconstruction.",
         "Independent Poisson counts are assumed; correlated readout noise, overdispersion, response uncertainty and additive Gaussian discrepancy covariance are not included.",
-        "Counts alone do not identify absolute density or calibrated scattered power."
+        "Counts alone do not identify absolute density or calibrated scattered power.",
+        "The measured laser-profile shape is treated as fixed; its calibration covariance is not propagated in the independent-Poisson fit.",
+        "For finite-variance Kappa fits with 3/2<κ≤5/2, the projected fourth central moment and excess kurtosis diverge; they are returned as unavailable rather than clipped or regularized."
       ],
       "test_links": [
+        "tests/test_thomson_inference.py::test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index",
+        "tests/test_thomson_inference.py::test_analysis1_poisson_forward_model_convolves_measured_laser_profile_before_detector_response",
         "tests/test_thomson_inference.py::test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index"
-      ]
+      ],
+      "dashboard_path": "app.py::Thomson Poisson count-space branch"
     },
     "references": [
       {
@@ -15524,6 +15556,8 @@
       "formula_key": "thomson_kappa_finite_bin_poisson_inference",
       "implementation_link_status": "mapped",
       "test_links": [
+        "tests/test_thomson_inference.py::test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index",
+        "tests/test_thomson_inference.py::test_analysis1_poisson_forward_model_convolves_measured_laser_profile_before_detector_response",
         "tests/test_thomson_inference.py::test_poisson_optical_thomson_kappa_jointly_recovers_finite_variance_tail_index"
       ]
     }
