@@ -14605,6 +14605,51 @@
         {
           "name": "channel_count",
           "unit": "count; channel-vector mode"
+        },
+        {
+          "name": "electron_density_optical_profile_uncertainty_m3",
+          "unit": "m^-3; optical-profile contribution",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "path_coordinate_m",
+          "unit": "m; measured path coordinate",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "normalized_path_weight",
+          "unit": "dimensionless; normalized measurement-kernel weight",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "path_weighting_model",
+          "unit": "solver metadata; see description",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "density_interpretation",
+          "unit": "solver metadata; see description",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "assumptions",
+          "unit": "solver metadata; see description",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "optical_profile_covariance_order",
+          "unit": "ordered optical-profile covariance parameter names",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "scattered_power_optical_profile_cross_covariance_supplied",
+          "unit": "boolean",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
+        },
+        {
+          "name": "uncertainty_model",
+          "unit": "solver metadata; see description",
+          "description": "Returned by infer_thomson_path_averaged_density; conditional on the supplied path profile, optical kernel, and stated covariance inputs."
         }
       ],
       "uncertainty_model": "Full first-order Jacobian propagation of the joint covariance of integrated scattered power and the four path-resolved optical/geometry factors, including cross-position, cross-factor and scattered-power/profile covariance. Channel-vector mode propagates C_n=J C_input J^T through the full joint covariance, including cross-channel, cross-position and cross-optical-factor correlations.",
@@ -14617,7 +14662,8 @@
         "tests/test_thomson_channel_path_density.py::test_channel_path_density_propagates_full_cross_channel_covariance",
         "tests/test_thomson_channel_path_density.py::test_channel_path_density_rejects_invalid_joint_covariance",
         "tests/test_thomson_channel_path_density.py::test_channel_path_density_accepts_channel_specific_path_coordinates",
-        "tests/test_thomson_channel_path_density.py::test_channel_path_density_is_reachable_through_product_api_entry_87"
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_is_reachable_through_product_api_entry_87",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ],
       "note": "Analytic single-scattering path integral and first-order covariance propagation; numerical tests verify limiting and correlated cases. Experimental validation remains required."
     },
@@ -14635,8 +14681,16 @@
       "formula_key": "thomson_path_average_density_joint_covariance",
       "implementation_link_status": "mapped",
       "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_correlated_optical_profile_covariance",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_propagates_scattered_power_profile_cross_covariance",
-        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance"
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_density_rejects_non_psd_power_profile_joint_covariance",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_recovers_distinct_kernel_weighted_densities",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_propagates_full_cross_channel_covariance",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_rejects_invalid_joint_covariance",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_accepts_channel_specific_path_coordinates",
+        "tests/test_thomson_channel_path_density.py::test_channel_path_density_is_reachable_through_product_api_entry_87",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ]
     },
     "note": "Analytic single-scattering path integral and full first-order covariance propagation; scalar and channel-resolved synthetic tests verify limiting cases and correlated uncertainties. Experimental validation remains required."
