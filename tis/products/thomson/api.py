@@ -117,6 +117,11 @@ def reconstruct_projected_evdf_poisson(*args: Any, **kwargs: Any) -> Any:
     from .physics.thomson_evdf_poisson import reconstruct_thomson_evdf_poisson as solve
     return solve(*args, **kwargs)
 
+def reconstruct_thomson_evdf_poisson(*args: Any, **kwargs: Any) -> Any:
+    """Canonical registry callable for Poisson count-space projected EVDF inversion."""
+    return reconstruct_projected_evdf_poisson(*args, **kwargs)
+
+
 def fit_gyrotropic(*args: Any, **kwargs: Any) -> Any:
     """Fit multi-view gyrotropic anisotropic Thomson spectra (entry 82)."""
     return _run(82, *args, **kwargs)
@@ -261,6 +266,7 @@ __all__ = [
     "reconstruct_profiles",
     "analyze_spectral_distribution",
     "reconstruct_projected_evdf_poisson",
+    "reconstruct_thomson_evdf_poisson",
     "fit_gyrotropic",
     "fit_temperature_tensor",
     "analyze_landau_fdt_convergence",
