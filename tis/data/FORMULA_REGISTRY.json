@@ -7797,11 +7797,6 @@
           "required": true
         },
         {
-          "name": "electron_populations",
-          "unit": "list of density_fraction, isotropic temperature_ratio or bi-Kappa parallel/perpendicular temperatures and magnetic_field_unit, kappa, distribution and flow_projection_m_s mappings",
-          "required": false
-        },
-        {
           "name": "wavenumber_m_inverse",
           "unit": "m^-1",
           "required": true
