@@ -27,14 +27,23 @@ def reconstruct_thomson_evdf_poisson(*args: Any, **kwargs: Any) -> dict:
         result["velocity_parallel_m_s"],
         result["evdf_parallel_s_per_m"],
         covariance,
+        electron_density_m3=kwargs.get("electron_density_m3"),
+        electron_density_uncertainty_m3=kwargs.get("electron_density_uncertainty_m3"),
+        electron_density_mu3_cross_covariance_s_minus3=(
+            kwargs.get("electron_density_mu3_cross_covariance_s_minus3")
+        ),
+        electron_density_variance_cross_covariance_m_minus1_s_minus2=(
+            kwargs.get("electron_density_variance_cross_covariance_m_minus1_s_minus2")
+        ),
     )
     result["projected_evdf_physical_moments"] = moments
     result["physical_moment_scope"] = (
-        "one_dimensional_q_parallel_marginal_only; no absolute density or "
-        "three-dimensional heat flux inferred"
+        "one_dimensional_q_parallel_marginal_only; an optional supplied density "
+        "scales the identifiable one-dimensional kinetic-energy-flux contribution, "
+        "but does not identify the full three-dimensional heat flux"
     )
     result["physical_moment_covariance_status"] = (
-        "conditional_expected_poisson_fisher_delta_method"
+        "conditional_frequentist_poisson_sandwich_delta_method"
         if covariance is not None else "unavailable_singular_active_set_fisher"
     )
     return result

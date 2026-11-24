@@ -224,8 +224,13 @@ MODEL_PHYSICS_NOTES = {
         "sum_i(mu_i-y_i log(mu_i)) and explicit non-negative normalized f_q. The measured "
         "finite-bin Doppler operator and calibrated detector response are applied before "
         "the likelihood. The amplitude is a nuisance count scale, not an absolute density. "
-        "The local covariance is the expected Poisson Fisher inverse projected onto the "
-        "normalization tangent space and conditional on active nodes and regularization. "
+        "The local frequentist covariance uses the penalized-estimator sandwich "
+        "H^-1 F H^-1, projected onto the normalization simplex and conditional on "
+        "the active set and regularization. The normalized piecewise-linear EVDF is "
+        "integrated exactly to obtain flow, directional second-moment temperature, "
+        "third/fourth/sixth-order shape moments and their covariance. An optional "
+        "independently supplied density enables only the one-dimensional q-parallel "
+        "kinetic-energy-flux contribution; it is not the full 3-D heat flux. "
         "One view identifies only the q-parallel marginal."
     ),
     "thomson_temperature_from_spectral_width": (
@@ -1371,6 +1376,25 @@ def render_advanced_thomson_physics_page(st) -> None:
                 else:
                     result = run_advanced_physics(model, **config)
             safe = json_safe(result)
+            if model == "thomson_projected_evdf_poisson" and isinstance(result, Mapping):
+                moments = result.get("projected_evdf_physical_moments", {})
+                st.subheader("Poisson EVDF — physical q-parallel moments")
+                st.latex(r"T_{eq,q}=\frac{m_e}{e}\,\mathrm{Var}_f(v_q),\qquad q_q^{(1D)}=\frac{m_e n_e}{2}\,\mu_{3,q}")
+                st.write({
+                    "mean_velocity_parallel_m_s": moments.get("mean_velocity_parallel_m_s"),
+                    "velocity_parallel_variance_m2_s2": moments.get("velocity_parallel_variance_m2_s2"),
+                    "directional_equivalent_temperature_eV": moments.get("directional_equivalent_temperature_eV"),
+                    "central_third_velocity_moment_m3_s3": moments.get("central_third_velocity_moment_m3_s3"),
+                    "central_fourth_velocity_moment_m4_s4": moments.get("central_fourth_velocity_m4_s4"),
+                    "central_sixth_velocity_moment_m6_s6": moments.get("central_sixth_velocity_moment_m6_s6"),
+                    "skewness": moments.get("skewness"),
+                    "excess_kurtosis": moments.get("excess_kurtosis"),
+                    "parallel_projected_heat_flux_W_m2": moments.get("parallel_projected_heat_flux_W_m2"),
+                    "moment_covariance": moments.get("moment_covariance"),
+                    "moment_standard_uncertainty": moments.get("moment_standard_uncertainty"),
+                    "covariance_status": result.get("physical_moment_covariance_status"),
+                })
+                st.caption("The temperature is directional and equals the thermodynamic electron temperature only under an independently justified isotropy assumption. The optional q-parallel flux term is not the full 3-D electron heat flux; density must be supplied independently.")
             if model == "thomson_channel_path_averaged_density" and isinstance(result, Mapping):
                 st.subheader("Channel-resolved path-averaged electron density")
                 st.latex(r"n_{e,j}^{\mathrm{avg}}=\frac{P_{s,j}}{\int P_{i,j}(s)\,\frac{d\sigma_j}{d\Omega}\,\Delta\Omega_j(s)\,\eta_j(s)\,ds},\qquad C_n=J C_{\mathrm{input}}J^T")

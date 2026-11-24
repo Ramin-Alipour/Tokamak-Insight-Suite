@@ -13130,10 +13130,10 @@
   },
   {
     "name": "Poisson-likelihood projected Thomson EVDF inversion",
-    "equation": "mu_i = A_tot * Delta_lambda_i * [R K f_q]_i + b_i; minimize sum_i(mu_i - y_i ln(mu_i)) + (lambda/2)||D2 f_q||^2, subject to f_q >= 0 and sum_j w_j f_q(v_j)=1",
+    "equation": "mu_i = A_tot * Delta_lambda_i * [R K f_q]_i + b_i; minimize sum_i(mu_i - y_i ln(mu_i)) + (lambda/2)||D2 f_q||^2 subject to f_q>=0 and sum_j w_j f_q(v_j)=1; M_k=integral (v_q-u_q)^k f_q(v_q) dv_q; T_eq,q=(m_e/e)M_2; q_q^(1D)=(m_e*n_e/2)M_3",
     "inputs": "Integer detector-bin counts y_i; calibrated wavelength bins; laser wavelength; scattering angle; measured response R; supplied expected background b_i; velocity grid; explicit positive regularization lambda.",
-    "output": "Normalized q-parallel EVDF f_q(v), fitted expected counts, Poisson deviance, and constrained expected-Fisher covariance when identifiable.",
-    "assumptions": "Independent Poisson detector bins; fixed supplied background expectation; non-relativistic Doppler kinematics; one-dimensional scattering-vector marginal; measured detector response; explicit regularization strength.",
+    "output": "Normalized q-parallel EVDF f_q(v); fitted expected counts and Poisson deviance; exact piecewise-linear moments through sixth order (flow, variance, directional equivalent temperature, central moments, skewness and kurtosis); moment covariance propagated from the constrained Poisson estimator; optional density-scaled one-dimensional q-parallel kinetic-energy-flux contribution.",
+    "assumptions": "Independent Poisson detector bins; fixed supplied expected background; non-relativistic Doppler kinematics; one-dimensional scattering-vector marginal; measured detector response; explicit regularization strength. The directional temperature is not a scalar electron temperature unless isotropy is independently justified. Absolute density is not inferred; an optional density must be independently supplied. The reported q-parallel third-moment flux is only the one-dimensional parallel kinetic-energy-flux contribution, not the full 3-D heat flux.",
     "status": "D",
     "category": "Thomson scattering / statistical inverse problems",
     "execution_contract": {
@@ -13181,6 +13181,18 @@
           "name": "regularization_strength",
           "unit": "positive solver scale",
           "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3; independently supplied; optional, not inferred"
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3; optional 1-sigma uncertainty"
+        },
+        {
+          "name": "electron_density_mu3_cross_covariance_s_minus3",
+          "unit": "(m^-3)*(m^3 s^-3); optional cross-covariance"
         }
       ],
       "output_specs": [
@@ -13198,11 +13210,19 @@
         },
         {
           "name": "evdf_covariance",
-          "unit": "(s m^-1)^2; conditional, optional"
+          "unit": "(s m^-1)^2; conditional frequentist fixed-active-set sandwich covariance, optional"
         },
         {
           "name": "projected_evdf_physical_moments",
-          "unit": "q-parallel physical moments through sixth order with conditional covariance"
+          "unit": "q-parallel moments through sixth order and full moment covariance"
+        },
+        {
+          "name": "directional_equivalent_temperature_eV",
+          "unit": "eV; m_e/e times q-parallel velocity variance"
+        },
+        {
+          "name": "parallel_projected_heat_flux_W_m2",
+          "unit": "W m^-2; optional 1-D q-parallel contribution, only with independently supplied density"
         }
       ],
       "prerequisites": [
@@ -13211,7 +13231,9 @@
         "One scattering geometry identifies only the q-parallel velocity marginal."
       ],
       "tests": [
-        "tests/test_thomson_evdf_poisson.py"
+        "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_recovers_normalized_projected_evdf_from_synthetic_counts",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_inverse_propagates_moment_covariance_and_optional_projected_heat_flux",
+        "tests/test_thomson_evdf_poisson.py::test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance"
       ]
     }
   }
