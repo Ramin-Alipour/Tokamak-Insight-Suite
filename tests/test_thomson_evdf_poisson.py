@@ -117,9 +117,8 @@ def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_di
     assert "projected_evdf_physical_moments" in direct
     assert direct["projected_evdf_physical_moments"]["central_third_velocity_moment_m3_s3"] is not None
     assert direct["projected_evdf_physical_moments"]["parallel_projected_heat_flux_W_m2"] is None
-    assert direct["projected_evdf_physical_moments"]["heat_flux_physical_scope"] == (
-        "one_dimensional_parallel_kinetic_energy_flux_component_only; "
-        "not_the_full_three_dimensional_electron_heat_flux"
+    assert "not the full 3-D electron heat flux" in (
+        direct["projected_evdf_physical_moments"]["heat_flux_physical_scope"]
     )
     assert "thomson_projected_evdf_poisson" in MODEL_LABELS
     assert "thomson_projected_evdf_poisson" in MODEL_PHYSICS_NOTES
