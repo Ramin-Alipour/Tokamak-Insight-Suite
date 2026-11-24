@@ -16,6 +16,7 @@ on:
       - "tis/data/FORMULA_REGISTRY.json"
       - "tis/ui/advanced_thomson_physics_page.py"
       - "tests/test_thomson_evdf_poisson.py"
+      - "tests/test_analysis_registry.py"
       - ".github/workflows/thomson-poisson-evdf.yml"
   pull_request:
     paths:
