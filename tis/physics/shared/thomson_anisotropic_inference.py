@@ -631,9 +631,9 @@ def fit_gyrotropic_bi_maxwellian_thomson(
             None if spectrally_identifiable_anisotropy else
             "Distinct squared magnetic pitch angles are required to identify both temperatures."
             if geometry_rank != 2 else
-            "The whitened spectral Jacobian does not identify every fitted parameter."
-            if not full_rank else
             f"The measured wavelength window captures less than the required {minimum_coverage:.3g} of at least one fitted Maxwellian feature."
+            if not spectral_window_coverage_identifiable else
+            "The whitened spectral Jacobian does not identify every fitted parameter."
         ),
         "electron_velocity_projection_m_s": fit.x[2::4].copy(),
         "fitted_spectra": fitted,

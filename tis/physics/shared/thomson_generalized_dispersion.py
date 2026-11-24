@@ -349,14 +349,14 @@ def collective_tabulated_electron_spectral_density(
     if np.any(~np.isfinite(inverse_wavelength_geometry)) or np.any(inverse_wavelength_geometry <= 0.0):
         raise ValueError("measured wavelengths and scattering geometry must define a positive scattering wavenumber")
     k = 2.0*np.pi*1e9*np.sqrt(inverse_wavelength_geometry)
+    # Convert measured wavelength to angular-frequency shift exactly:
+    # Delta_omega = 2*pi*c*(1/lambda - 1/lambda_0).
+    angular_frequency_shift = 2.0*np.pi*C*1e9*(1.0/x - 1.0/laser)
     # The resonant particle speed follows the exact measured photon shift and
     # frequency-dependent scattering wave number for each wavelength bin.
     vphase = angular_frequency_shift / k
     if np.any(~np.isfinite(vphase)):
         raise ValueError("measured wavelengths produce a non-finite CTS phase velocity")
-    # Convert measured wavelength to angular-frequency shift exactly:
-    # Delta_omega = 2*pi*c*(1/lambda - 1/lambda_0).
-    angular_frequency_shift = 2.0*np.pi*C*1e9*(1.0/x - 1.0/laser)
     # The electrostatic resonance is v_phi(lambda)=Delta_omega(lambda)/k(lambda).
     if (vgrid.ndim != 1 or fgrid.shape != vgrid.shape or vgrid.size < 9
             or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
