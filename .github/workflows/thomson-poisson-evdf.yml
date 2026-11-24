@@ -19,6 +19,7 @@ on:
       - "tests/test_thomson_evdf_poisson.py"
       - "tests/test_analysis_registry.py"
       - "tests/test_product_architecture.py"
+      - "tests/test_formula_registry_complete.py"
       - ".github/workflows/thomson-poisson-evdf.yml"
   pull_request:
     paths:
