@@ -684,3 +684,43 @@ def test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapp
     # quadratically away from it; the outer-bin difference is measurable.
     assert exact_phase_velocity[wavelength > laser][-1] != linearized_phase_velocity[wavelength > laser][-1]
     assert exact_phase_velocity[wavelength > laser][-1] < linearized_phase_velocity[wavelength > laser][-1]
+
+
+def test_tabulated_cts_exact_kinematics_is_reachable_through_registered_product_api():
+    from tis.products.thomson.api import analyze_cts
+
+    wavelength = np.linspace(1060.0, 1068.0, 41)
+    velocity = np.linspace(-8.0e6, 8.0e6, 801)
+    distribution = np.exp(-0.5 * (velocity / 1.0e6) ** 2)
+    result = analyze_cts(
+        model="electrostatic_tabulated_evdf",
+        wavelength_nm=wavelength,
+        laser_wavelength_nm=1064.0,
+        scattering_angle_rad=np.pi / 2.0,
+        electron_density_m3=1.0e18,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=distribution,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[12.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+    assert result["product_execution_path"] == "thomson-scattering/analysis-30"
+    assert result["api_model"] == "electrostatic_tabulated_evdf"
+    assert result["phase_velocity_mapping"].startswith("exact_delta_omega_over_frequency_dependent")
+    assert result["wavenumber_m_inverse"].shape == wavelength.shape
+    assert result["spectral_density_per_nm"].shape == wavelength.shape
+    assert np.all(np.isfinite(result["spectral_density_per_nm"]))
+    assert np.all(result["spectral_density_per_nm"] >= 0.0)
+
+
+def test_tabulated_cts_product_api_refuses_implicit_plasma_inputs():
+    import pytest
+    from tis.products.thomson.api import analyze_cts
+
+    with pytest.raises(ValueError, match="requires explicit physical inputs"):
+        analyze_cts(model="electrostatic_tabulated_evdf", wavelength_nm=np.linspace(1.0, 2.0, 9))
