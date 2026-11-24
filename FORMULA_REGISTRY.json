@@ -10079,6 +10079,34 @@
         {
           "name": "electron_flow_projection_m_s",
           "unit": "m s^-1; supplied signed projected electron bulk velocity"
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m⁻¹; supplied positive scattering wave number"
+        },
+        {
+          "name": "phase_velocity_lab_m_s",
+          "unit": "m s⁻¹; supplied laboratory-frame phase velocity"
+        },
+        {
+          "name": "one_dimensional_velocity_variance_m2_s2",
+          "unit": "m² s⁻²; Maxwellian projected velocity variance"
+        },
+        {
+          "name": "response_model",
+          "unit": "text; collisionless unmagnetized Maxwellian longitudinal response"
+        },
+        {
+          "name": "landau_contour",
+          "unit": "text; retarded Landau-contour convention"
+        },
+        {
+          "name": "distribution_model",
+          "unit": "text; isotropic Maxwellian"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of excluded physical effects and model scope"
         }
       ],
       "prerequisites": [
