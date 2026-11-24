@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import minimize
 from scipy.linalg import null_space
+from scipy.special import softmax
 
 from .thomson_evdf import (
     _finite_vector,
@@ -110,57 +111,64 @@ def reconstruct_thomson_evdf_poisson(
     tiny = np.finfo(float).tiny
     mass_operator = operator / weights[None, :]
     mass_initial = weights / float(np.sum(weights))
-    # Optimize log(A_tot), not A_tot itself. The count amplitude is commonly
-    # O(10^5--10^9), whereas the simplex masses are O(1/n); using A directly
-    # gives SLSQP badly imbalanced parameter and gradient scales and can leave
-    # the optimizer at a background-only, formally converged solution.
+    # Softmax coordinates enforce the probability simplex exactly and avoid
+    # SLSQP's fragile active-set line search on a high-dimensional equality-
+    # constrained Poisson inverse. The final logit is fixed to zero to remove
+    # the additive gauge freedom.
+    logit_initial = np.log(mass_initial[:-1] / mass_initial[-1])
     log_amplitude_initial = float(np.log(total_initial))
-    x0 = np.concatenate([mass_initial, [log_amplitude_initial]])
+    x0 = np.concatenate([logit_initial, [log_amplitude_initial]])
     log_amplitude_upper = float(np.log(max(total_initial, float(np.sum(counts)), 1.0) * 1.0e6))
+    count_scale = max(float(np.sum(counts)), 1.0)
 
     def density_from_mass(mass):
         return mass / weights
 
+    def mass_from_parameters(parameters):
+        logits = np.concatenate([parameters[:n - 1], [0.0]])
+        return softmax(logits)
+
     def expected(parameters):
-        mass = parameters[:n]
-        amplitude = float(np.exp(parameters[n]))
+        mass = mass_from_parameters(parameters)
+        amplitude = float(np.exp(parameters[n - 1]))
         return amplitude * (mass_operator @ mass) + background
 
     def objective(parameters):
-        mass = parameters[:n]
+        mass = mass_from_parameters(parameters)
         density = density_from_mass(mass)
         mu = np.maximum(expected(parameters), tiny)
         poisson = np.sum(mu - counts * np.log(mu))
         smooth = 0.5 * lam * float(np.dot(penalty @ density, penalty @ density))
-        return float(poisson + smooth)
+        return float((poisson + smooth) / count_scale)
 
     def gradient(parameters):
-        mass = parameters[:n]
+        mass = mass_from_parameters(parameters)
         density = density_from_mass(mass)
-        amplitude = float(np.exp(parameters[n]))
+        amplitude = float(np.exp(parameters[n - 1]))
         mu = np.maximum(expected(parameters), tiny)
         score = 1.0 - counts / mu
         grad_mass = amplitude * (mass_operator.T @ score)
         grad_mass += lam * ((penalty.T @ (penalty @ density)) / weights)
+        # Jacobian of softmax: dp/dz = diag(p)-p p^T.
+        grad_logits = mass * (grad_mass - float(np.dot(mass, grad_mass)))
         grad_log_amplitude = amplitude * float(np.dot(mass_operator @ mass, score))
-        return np.concatenate([grad_mass, [grad_log_amplitude]])
+        return np.concatenate([
+            grad_logits[:-1] / count_scale,
+            [grad_log_amplitude / count_scale],
+        ])
 
-    constraint = {
-        "type": "eq",
-        "fun": lambda p: float(np.sum(p[:n]) - 1.0),
-        "jac": lambda p: np.concatenate([np.ones(n), [0.0]]),
-    }
     fit = minimize(
-        objective, x0, jac=gradient, method="SLSQP",
-        bounds=[(0.0, None)] * n + [(float(np.log(tiny)), log_amplitude_upper)],
-        constraints=[constraint],
-        options={"maxiter": int(max_iter), "ftol": 1e-10, "disp": False},
+        objective, x0, jac=gradient, method="L-BFGS-B",
+        bounds=[(-35.0, 35.0)] * (n - 1) + [
+            (float(np.log(tiny)), log_amplitude_upper)
+        ],
+        options={"maxiter": int(max_iter), "ftol": 1e-13, "gtol": 1e-8, "maxls": 50},
     )
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise ValueError(f"Poisson EVDF constrained optimizer failed: {fit.message}")
-    mass = fit.x[:n]
+    mass = mass_from_parameters(fit.x)
     density = density_from_mass(mass)
-    amplitude = float(np.exp(fit.x[n]))
+    amplitude = float(np.exp(fit.x[n - 1]))
     normalization = float(weights @ density)
     if not np.isclose(normalization, 1.0, rtol=1e-7, atol=1e-9):
         raise ArithmeticError("Poisson EVDF optimizer violated the finite-volume normalization constraint")
@@ -173,8 +181,8 @@ def reconstruct_thomson_evdf_poisson(
     term = np.where(counts > 0, counts * np.log(np.maximum(counts, tiny) / np.maximum(mu, tiny)) - (counts - mu), mu)
     deviance = 2.0 * np.maximum(term, 0.0)
     deviance_residual = np.sign(counts - mu) * np.sqrt(deviance)
-    active = mass > max(float(np.max(mass)) * 1e-8, tiny)
-    free_indices = np.flatnonzero(active)
+    active = np.ones(n, dtype=bool)
+    free_indices = np.arange(n)
     parameter_indices = np.concatenate([free_indices, [n]])
     fisher_design = np.column_stack([
         amplitude * mass_operator[:, free_indices],
