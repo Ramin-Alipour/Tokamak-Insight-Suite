@@ -5191,6 +5191,8 @@ def fit_optical_thomson_poisson_counts(
     distribution_model="maxwellian",
     kappa_initial=4.0,
     kappa_bounds=(1.5001, 50.0),
+    laser_spectrum_wavelength_nm=None,
+    laser_spectrum_density_per_nm=None,
 ):
     """Infer non-collective optical-TS temperature and q-flow from photon counts.
 
@@ -5265,11 +5267,28 @@ def fit_optical_thomson_poisson_counts(
 
     edges = _wavelength_bin_edges(wavelength)
     widths = np.diff(edges)
-    response = (
+    detector_response = (
         np.eye(wavelength.size, dtype=float)
         if instrument_response is None
         else _response_for_channel(instrument_response, 0, 1, wavelength.size, wavelength)
     )
+    laser_profile_metadata = None
+    if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
+        raise ValueError(
+            "laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm must be supplied together"
+        )
+    if laser_spectrum_wavelength_nm is None:
+        source_response = np.eye(wavelength.size, dtype=float)
+        response = detector_response
+    else:
+        source_response, laser_profile_metadata = _laser_source_response(
+            wavelength, laser_nm, laser_spectrum_wavelength_nm,
+            laser_spectrum_density_per_nm,
+        )
+        # Incident laser bandwidth is convolved before the measured detector
+        # response. Column losses at the finite wavelength-window boundaries
+        # are retained; neither operator is renormalized.
+        response = detector_response @ source_response
     span = float(wavelength[-1] - wavelength[0])
     spacing = float(np.median(np.diff(wavelength)))
     peak_index = int(np.argmax(counts))
@@ -5548,6 +5567,12 @@ def fit_optical_thomson_poisson_counts(
         "absolute_power_inference_available": False,
         "instrument_response_applied": True,
         "instrument_response_supplied": instrument_response is not None,
+        "laser_spectral_profile_applied": laser_profile_metadata is not None,
+        "laser_spectral_profile": laser_profile_metadata,
+        "laser_source_response_operator": source_response.copy() if laser_profile_metadata is not None else None,
+        "composed_source_detector_response_column_sums": response.sum(axis=0).copy(),
+        "source_detector_response_order": "measured_laser_spectral_profile_then_detector_response",
+        "laser_profile_uncertainty_included": False,
         "spectral_bin_integration": (
             "exact_Student_t_CDF_finite_volume_bin_averages"
             if distribution_model == "kappa"
@@ -5566,7 +5591,8 @@ def fit_optical_thomson_poisson_counts(
         ),
         "model": ("non-collective_non-relativistic_Kappa_optical_Thomson" if distribution_model == "kappa" else "non-collective_non-relativistic_Maxwellian_optical_Thomson"),
         "formulae": {
-            "expected_bin_counts": "mu_i = sum_j R_ij A_j + integral_bin_i b(lambda) d_lambda",
+            "expected_bin_counts": "mu_i = sum_j [R_detector R_laser]_ij A_j + integral_bin_i b(lambda) d_lambda",
+            "finite_laser_bandwidth": "R_total = R_detector R_laser; R_laser maps lambda_scattered(lambda_incident) = lambda_scattered(lambda_laser) * lambda_incident/lambda_laser for elastic Thomson kinematics",
             "poisson_deviance": "D = 2 sum_i [mu_i - n_i + n_i log(n_i/mu_i)]",
             "electron_temperature": "T_e = (m_e c^2/e) [sigma_lambda/(lambda_0 2 sin(theta/2))]^2; Kappa sigma_lambda is the standard deviation",
             "kappa_shape": "p(lambda) proportional to [1+(lambda-center)^2/(nu*s^2)]^(-kappa), nu=2*kappa-1, s=sigma_lambda*sqrt((nu-2)/nu), kappa>3/2",

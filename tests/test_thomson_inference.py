@@ -2569,3 +2569,55 @@ def test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_r
         "projected_evdf_spectral_moment_closure"
     ]
     assert closure["measured_instrument_and_laser_response_applied"] is True
+
+
+
+def test_analysis1_poisson_forward_model_convolves_measured_laser_profile_before_detector_response():
+    from scipy.special import gammaln
+    from tis.physics.shared.thomson_inference import (
+        _gaussian_bin_averaged_shape, _laser_source_response,
+        _wavelength_bin_edges, fit_optical_thomson_poisson_counts,
+    )
+    from tis.products.thomson.api import analyze_spectra
+
+    wavelength = np.linspace(525.0, 539.0, 351)
+    edges = _wavelength_bin_edges(wavelength)
+    widths = np.diff(edges)
+    laser, angle, true_te = 532.0, np.pi / 2.0, 95.0
+    sigma = laser * 2.0 * np.sin(angle / 2.0) * np.sqrt(true_te / 510998.95069)
+    intrinsic, _ = _gaussian_bin_averaged_shape(wavelength, 1.4e5, laser, sigma)
+    source_wavelength = np.linspace(531.94, 532.06, 121)
+    source_sigma = 0.012
+    source_density = np.exp(-0.5 * ((source_wavelength-laser)/source_sigma)**2)
+    source_operator, source_metadata = _laser_source_response(
+        wavelength, laser, source_wavelength, source_density
+    )
+    detector = np.eye(wavelength.size)
+    expected_signal = (detector @ source_operator) @ (intrinsic * widths)
+    expected = expected_signal + 35.0 * widths
+    counts = np.random.default_rng(20261125).poisson(expected)
+
+    result = fit_optical_thomson_poisson_counts(
+        wavelength, counts, laser_wavelength_nm=laser,
+        scattering_angle_rad=angle, instrument_response=detector,
+        laser_spectrum_wavelength_nm=source_wavelength,
+        laser_spectrum_density_per_nm=source_density,
+    )
+    assert result["laser_spectral_profile_applied"] is True
+    assert result["laser_spectral_profile"]["rms_width_nm"] == pytest.approx(
+        source_metadata["rms_width_nm"], rel=1e-12
+    )
+    assert result["source_detector_response_order"] == (
+        "measured_laser_spectral_profile_then_detector_response"
+    )
+    assert result["electron_temperature_eV"] == pytest.approx(true_te, rel=0.12)
+
+    routed = analyze_spectra(
+        wavelength_nm=wavelength, observed_counts=counts,
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=detector, likelihood="independent_Poisson",
+        laser_spectrum_wavelength_nm=source_wavelength,
+        laser_spectrum_density_per_nm=source_density,
+    )
+    assert routed["analysis_id"] == 1
+    assert routed["laser_spectral_profile_applied"] is True

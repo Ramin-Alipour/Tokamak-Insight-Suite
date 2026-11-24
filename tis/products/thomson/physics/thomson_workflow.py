@@ -101,6 +101,8 @@ def analyze_thomson_spectra(*args, **kwargs):
                 "scattering_angle_uncertainty_rad",
                 "laser_angle_covariance_nm_rad",
                 "fit_geometry_cross_covariance_nm2_rad",
+                "laser_spectrum_wavelength_nm",
+                "laser_spectrum_density_per_nm",
             )
             if name in kwargs
         }
