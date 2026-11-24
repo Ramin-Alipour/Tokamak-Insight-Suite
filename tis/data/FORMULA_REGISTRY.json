@@ -8007,6 +8007,10 @@
         {
           "name": "uncertainty_method",
           "unit": "text; estimator-sandwich/Jacobian propagation"
+        },
+        {
+          "name": "status",
+          "unit": "text; identified or conditional regularized candidate"
         }
       ],
       "prerequisites": [
