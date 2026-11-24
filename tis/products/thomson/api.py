@@ -118,8 +118,8 @@ def reconstruct_projected_evdf_poisson(*args: Any, **kwargs: Any) -> Any:
     return solve(*args, **kwargs)
 
 def reconstruct_thomson_evdf_poisson(*args: Any, **kwargs: Any) -> Any:
-    """Canonical registry callable for Poisson count-space projected EVDF inversion."""
-    return reconstruct_projected_evdf_poisson(*args, **kwargs)
+    """Execute registered Thomson analysis 89 through the product API boundary."""
+    return run_analysis(89, *args, **kwargs)
 
 
 def fit_gyrotropic(*args: Any, **kwargs: Any) -> Any:
