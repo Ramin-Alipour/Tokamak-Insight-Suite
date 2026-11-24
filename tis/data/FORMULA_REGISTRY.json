@@ -11100,7 +11100,7 @@
     "name": "Landau–FDT current-noise propagation to electromagnetic field fluctuations",
     "equation": "D = k²I − kkᵀ − (ω/c)²εᵣ; G = D⁻¹; S_E = μ₀²ω² G S_J G†; S_B = (k×/ω) S_E (k×/ω)†; Π = (1/2μ₀)Re⟨E×B*⟩; C_ab=e_a†S_Ee_b; (I,Q,U,V)=(C11+C22,C11−C22,2ReC12,2ImC12)",
     "inputs": "ω [rad s⁻¹], k [m⁻¹], εᵣ [dimensionless], S_J [A² m⁻² per rad s⁻¹]",
-    "output": "S_E [(V m⁻¹)² per rad s⁻¹], S_B [T² per rad s⁻¹], spectral Poynting flux [W m⁻² per rad s⁻¹]",
+    "output": "Angular-frequency grid, local wave number and propagation direction; electric, magnetic and cross-spectral fluctuation tensors; spectral Poynting flux; transverse analyzer basis, coherency and Stokes observables; Maxwell Green dyadic and conditioning; explicit convention, completion status, scope and limitations.",
     "assumptions": "Local homogeneous linear dielectric; exp(−iωt); frequency-diagonal classical current-noise spectrum; invertible Maxwell operator.",
     "status": "D",
     "category": "Collective Thomson / Full-EM",
@@ -11180,6 +11180,58 @@
           "name": "maxwell_operator_condition_number",
           "unit": "1",
           "description": "Condition number used to reject unresolved undamped poles."
+        },
+        {
+          "name": "angular_frequency_rad_s",
+          "unit": "rad s^-1; positive frequency grid"
+        },
+        {
+          "name": "wave_number_m_inverse",
+          "unit": "m^-1; local wave-number magnitude"
+        },
+        {
+          "name": "propagation_direction",
+          "unit": "unit vector; normalized Cartesian propagation direction"
+        },
+        {
+          "name": "transverse_analyzer_basis_cartesian",
+          "unit": "3x2 orthonormal Cartesian basis transverse to propagation"
+        },
+        {
+          "name": "stokes_convention",
+          "unit": "text; I,Q,U,V convention for exp(-i omega t)"
+        },
+        {
+          "name": "field_fluctuation_relation",
+          "unit": "text; Maxwell Green-dyadic current-noise propagation"
+        },
+        {
+          "name": "magnetic_fluctuation_relation",
+          "unit": "text; Faraday-law magnetic spectral closure"
+        },
+        {
+          "name": "spectral_poynting_relation",
+          "unit": "text; spectral Poynting-flux definition"
+        },
+        {
+          "name": "time_convention",
+          "unit": "text; harmonic time convention"
+        },
+        {
+          "name": "integration_status",
+          "unit": "text; completed numerical propagation status"
+        },
+        {
+          "name": "scope",
+          "unit": "text; local homogeneous frequency-diagonal model scope"
+        },
+        {
+          "name": "cts_three_wave_vertex_connected",
+          "unit": "boolean; whether magnetized CTS three-wave vertex is included"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of explicit physical scope limitations"
         }
       ],
       "prerequisites": [
@@ -11193,7 +11245,7 @@
         "tests/test_cts_landau_fdt_full_em_public.py::test_full_em_field_fluctuations_return_transverse_stokes_and_polarization_bounds",
         "tests/test_cts_landau_fdt_full_em_public.py::test_full_em_field_fluctuations_reject_nonphysical_current_covariance"
       ],
-      "note": "Local Maxwell field-fluctuation propagation with transverse Stokes observables; not a magnetized CTS three-wave vertex, ray solution or calibrated receiver spectrum."
+      "note": "All returned fields, including the local-model scope and explicit absence of a magnetized CTS three-wave vertex, are declared in this contract. This kernel propagates current noise through a local homogeneous Maxwell operator; it is not a full magnetized CTS wave/receiver solver."
     }
   },
   {
