@@ -165,7 +165,7 @@ def test_poisson_inverse_propagates_moment_covariance_and_optional_projected_hea
 
 def test_poisson_projected_heat_flux_rejects_unphysical_density_cross_covariance():
     wavelength, velocity, counts, background, response, _ = _synthetic_counts()
-    with pytest.raises(ValueError, match="requires density"):
+    with pytest.raises(ValueError, match="requires electron_density_m3"):
         reconstruct_thomson_evdf_poisson(
             wavelength, counts,
             laser_wavelength_nm=500.0,
