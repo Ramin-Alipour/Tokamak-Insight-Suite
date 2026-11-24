@@ -794,6 +794,30 @@
           "name": "fit_covariance",
           "unit": "local expected-Fisher parameter covariance including κ",
           "available_when": "likelihood=independent_Poisson"
+        },
+        {
+          "name": "projected_evdf_physical_moments",
+          "unit": "q-parallel EVDF moments in SI velocity units",
+          "available_when": "finite-bin independent-Poisson Maxwellian/Kappa inference",
+          "description": "Parametric velocity-space central moments derived from fitted spectral width and, for Kappa, fitted Student-t degrees of freedom. These are not wavelength-space moments."
+        },
+        {
+          "name": "projected_evdf_physical_moments.excess_kurtosis",
+          "unit": "dimensionless",
+          "available_when": "Maxwellian or Kappa with κ>2.5",
+          "description": "For Kappa, γ2=6/(2κ−5). The value is withheld when the fourth moment diverges (1.5<κ≤2.5)."
+        },
+        {
+          "name": "projected_evdf_physical_moments.excess_kurtosis_standard_uncertainty",
+          "unit": "dimensionless; 1σ",
+          "available_when": "finite Kappa fourth moment and identifiable expected-Fisher covariance",
+          "description": "Delta-method uncertainty propagated through the fitted joint (spectral width, Kappa index) covariance."
+        },
+        {
+          "name": "projected_evdf_physical_moments.moment_existence",
+          "unit": "boolean moment-existence map",
+          "available_when": "finite-bin independent-Poisson Maxwellian/Kappa inference",
+          "description": "Reports whether the third absolute and fourth central moments exist for the selected parametric EVDF."
         }
       ],
       "assumptions": [

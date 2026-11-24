@@ -2540,6 +2540,9 @@ def test_analysis1_kappa_poisson_formula_registry_and_product_contract_are_synch
         "tis.physics.shared.thomson_inference.fit_optical_thomson_poisson_counts"
     )
     assert "κ>3/2" in formula["equation"]
+    moment_outputs = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    assert "projected_evdf_physical_moments.excess_kurtosis" in moment_outputs
+    assert "projected_evdf_physical_moments.moment_existence" in moment_outputs
     assert any(item["name"] == "observed_counts" for item in entry["execution_contract"]["input_specs"])
 
 def test_projected_evdf_reuses_measured_laser_profile_without_passing_composed_response():
