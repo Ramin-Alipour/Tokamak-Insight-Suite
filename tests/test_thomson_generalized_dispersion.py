@@ -638,3 +638,45 @@ def test_tabulated_cts_forward_api_exposes_exact_electron_susceptibility_derivat
     assert np.all(np.isfinite(derivative.real))
     assert np.all(np.isfinite(derivative.imag))
     assert "fixed k and fixed projected EVDF" in result["electron_susceptibility_derivative_definition"]
+
+
+def test_tabulated_cts_uses_exact_wavelength_to_angular_frequency_resonance_mapping():
+    from tokamak_analysis.thomson_generalized_dispersion import (
+        collective_tabulated_electron_spectral_density,
+    )
+
+    wavelength = np.array([1058.0, 1060.0, 1062.0, 1064.0, 1066.0, 1068.0, 1070.0, 1072.0, 1074.0])
+    laser = 1064.0
+    angle = np.pi / 2.0
+    velocity = np.linspace(-8.0e6, 8.0e6, 801)
+    distribution = np.exp(-0.5 * (velocity / 1.0e6) ** 2)
+    result = collective_tabulated_electron_spectral_density(
+        wavelength, laser, angle,
+        electron_density_m3=1.0e18,
+        electron_velocity_grid_m_s=velocity,
+        electron_probability_density_s_m=distribution,
+        ion_species=[{"name": "H+", "charge_state": 1.0, "mass_amu": 1.00784}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[10.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        pole_imaginary_part_m_s=100.0,
+    )
+
+    scattering_wavenumber = 4.0 * np.pi * np.sin(angle / 2.0) / (laser * 1e-9)
+    exact_delta_omega = 2.0 * np.pi * 299_792_458.0 * 1e9 * (1.0 / wavelength - 1.0 / laser)
+    exact_phase_velocity = exact_delta_omega / scattering_wavenumber
+    linearized_phase_velocity = (
+        -299_792_458.0 * (wavelength - laser)
+        / (2.0 * laser * np.sin(angle / 2.0))
+    )
+
+    np.testing.assert_allclose(result["angular_frequency_shift_rad_s"], exact_delta_omega, rtol=2e-15, atol=0.0)
+    np.testing.assert_allclose(result["phase_velocity_m_s"], exact_phase_velocity, rtol=2e-15, atol=0.0)
+    assert result["phase_velocity_mapping"] == "exact_delta_omega_over_scattering_wavenumber_from_measured_wavelength"
+    # The exact and first-order maps coincide at line centre and diverge
+    # quadratically away from it; the outer-bin difference is measurable.
+    assert exact_phase_velocity[wavelength > laser][-1] != linearized_phase_velocity[wavelength > laser][-1]
+    assert exact_phase_velocity[wavelength > laser][-1] < linearized_phase_velocity[wavelength > laser][-1]
