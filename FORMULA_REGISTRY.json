@@ -6592,7 +6592,7 @@
     "name": "Gyrotropic bi-Maxwellian optical Thomson spectral inference",
     "equation": "T_q = T_perp + (T_parallel - T_perp)(b_hat·q_hat)^2; sigma_v,q²=e T_q/m_e; lambda_s/lambda_0 ≈ 1 - q_hat·v/c; P_i=Φ((λ_i^+−λ_c)/σ_λ)−Φ((λ_i^−−λ_c)/σ_λ); S̄_i=P_i/Δλ_i",
     "inputs": "Calibrated multi-view optical Thomson spectra, measured spectral response, laser wavelength, scattering angle, magnetic-field and scattering-vector directions",
-    "output": "T_parallel [eV], T_perpendicular [eV], per-view q-projected flow [m s^-1], fit and covariance diagnostics",
+    "output": "Joint fitted parallel/perpendicular temperatures, per-view directional temperatures and flow projections, spectra/residuals, fit and identifiability diagnostics, relativistic validity/tail screens, parameter and flow covariance, measurement/model-discrepancy/systematic covariance provenance, density/pressure cross-covariance inputs where supplied, and explicit model scope and experimental-validation status.",
     "assumptions": "Gyrotropic bi-Maxwellian electrons with zero heat flux; non-relativistic elastic Thomson kinematics; supplied geometry; independent squared magnetic pitch angles required to separate parallel and perpendicular temperatures; Gaussian probability is integrated exactly between midpoint-defined wavelength-bin edges before response convolution; no midpoint-sampled PDF approximation is used.",
     "status": "D",
     "category": "Thomson scattering",
@@ -6863,6 +6863,194 @@
         {
           "name": "experimental_validation",
           "unit": "text; experimental validation status"
+        },
+        {
+          "name": "primary_result_status",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "spectral_geometry_cross_covariance_used",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_temperature_flow_joint_covariance_order",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_pressure_covariance_status",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_velocity_vector_m_s",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "model_selection_uncertainty_status",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "jacobian_parameter_count",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "physical_scope",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "scattering_vector_covariance_used",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_velocity_vector_covariance_m2_s2",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "view_dyad_condition_number",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "measurement_parameter_covariance",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "geometry_covariance_method",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "kappa_index_uncertainty",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "spectral_parameter_covariance_components",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "maximum_flow_beta",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "projected_temperature_equation",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "parameter_covariance_order",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_density_temperature_tensor_cross_covariance",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "geometry_covariance_order",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "distribution_model",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "kappa_fit_status",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "maximum_projected_superluminal_tail_probability",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "spectral_forward_model",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "projected_superluminal_tail_probability_per_view",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_pressure_equation",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "model_validity_limits",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "projected_temperature_eV",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "flow_projection_equation",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "principal_axes_cartesian_columns",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "chi_square",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "covariance_status",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "model_selection_uncertainty_included",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "systematic_parameter_covariance",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "model_discrepancy_parameter_covariance",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_temperature_flow_joint_covariance",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "view_dyad_rank",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "electron_pressure_covariance_equation",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "spectral_parameter_covariance_decomposition_status",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "spectral_parameter_covariance_component_order",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "flow_model",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
+        },
+        {
+          "name": "thermal_rms_beta",
+          "unit": "as returned by the gyrotropic optical Thomson inference solver; see function output"
         }
       ],
       "prerequisites": [
@@ -6880,7 +7068,7 @@
         "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_rejects_invalid_nonrelativistic_validity_screen",
         "tests/test_thomson_anisotropic_inference.py::test_bimaxwellian_withholds_nonrelativistic_fit_outside_speed_screen"
       ],
-      "note": "The forward model integrates the normalized Gaussian projected-velocity marginal over each finite wavelength bin using the exact Gaussian CDF, then applies the measured response to bin-integrated spectral power. It reports captured probability without renormalizing truncated wavelength tails and enforces a declared non-relativistic validity screen."
+      "note": "The output contract enumerates all statically returned keys from the public gyrotropic bi-Maxwellian spectral solver. This is a non-relativistic elastic-Thomson parametric bi-Maxwellian model with per-view projected flows; it does not reconstruct a general 3-D EVDF."
     },
     "references": [
       {
