@@ -20,6 +20,68 @@ def _trapezoid(y, x):
         integrate = np.trapz
     return integrate(y, x)
 
+def _wavelength_bin_widths(wavelength_nm):
+    """Midpoint finite-volume widths for a strictly increasing wavelength grid."""
+    axis = np.asarray(wavelength_nm, dtype=float)
+    if (axis.ndim != 1 or axis.size < 2 or np.any(~np.isfinite(axis))
+            or np.any(axis <= 0.0) or np.any(np.diff(axis) <= 0.0)):
+        raise ValueError("wavelength_nm must be positive, finite and strictly increasing")
+    edges = np.empty(axis.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (axis[:-1] + axis[1:])
+    edges[0] = axis[0] - 0.5 * (axis[1] - axis[0])
+    edges[-1] = axis[-1] + 0.5 * (axis[-1] - axis[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("wavelength grid must define positive finite-volume bins")
+    return widths
+
+
+def _apply_measured_spectral_response(
+    wavelength_nm, spectral_density_per_nm, response_matrix, *,
+    allow_finite_window_response_loss=False,
+):
+    """Convolve bin-integrated spectral power with a calibrated column-stochastic response.
+
+    Matrix element R[i,j] is the fraction of photons from input bin j
+    registered in output bin i. The operator acts on integrated bin power,
+    not directly on spectral-density samples; this distinction is required
+    on nonuniform wavelength grids.
+    """
+    if not isinstance(allow_finite_window_response_loss, (bool, np.bool_)):
+        raise ValueError("allow_finite_window_response_loss must be boolean")
+    wavelength = np.asarray(wavelength_nm, dtype=float)
+    spectrum = np.asarray(spectral_density_per_nm, dtype=float)
+    response = np.asarray(response_matrix)
+    if response.dtype.kind not in "iuf":
+        raise ValueError("instrument_response_matrix must contain real numeric values")
+    response = response.astype(float, copy=False)
+    n = wavelength.size
+    if (response.shape != (n, n) or np.any(~np.isfinite(response))
+            or np.any(response < 0.0)):
+        raise ValueError("instrument_response_matrix must be finite, non-negative and square on the wavelength grid")
+    column_areas = np.sum(response, axis=0)
+    if np.any(column_areas <= 0.0):
+        raise ValueError("every instrument-response column must have positive integrated response")
+    if allow_finite_window_response_loss:
+        if np.any(column_areas > 1.0 + 1e-8):
+            raise ValueError("finite-window response columns cannot integrate to more than one")
+    elif not np.allclose(column_areas, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError(
+            "instrument-response columns must sum to one; enable "
+            "allow_finite_window_response_loss only for a calibrated finite-window operator"
+        )
+    widths = _wavelength_bin_widths(wavelength)
+    output = response @ (spectrum * widths) / widths
+    return output, {
+        "input_bin_integrated_power": spectrum * widths,
+        "output_bin_integrated_power": output * widths,
+        "column_integrated_probability": column_areas,
+        "total_input_power": float(np.sum(spectrum * widths)),
+        "total_output_power": float(np.sum(output * widths)),
+        "finite_window_probability_loss_allowed": bool(allow_finite_window_response_loss),
+        "operator_convention": "response[i,j]=fraction_of_input_bin_j_power_registered_in_output_bin_i",
+    }
+
 from .thomson_kinetic_models import (
     C, E_CHARGE, ME, EPS0, _resolve_ion_species,
     _maxwellian_pdf_and_derivatives, _landau_susceptibility,
@@ -205,6 +267,8 @@ def collective_tabulated_electron_spectral_density(
     landau_limit=False, ion_velocity_grids_m_s=None,
     ion_probability_densities_s_m=None,
     include_electron_phase_velocity_derivative=False,
+    instrument_response_matrix=None,
+    allow_finite_window_response_loss=False,
 ):
     """Unmagnetized electrostatic CTS spectrum with kinetic projected EVDFs.
 
@@ -419,11 +483,24 @@ def collective_tabulated_electron_spectral_density(
     for index, item in enumerate(species):
         ion_term += item["charge_state"]*fractions[index]*np.abs(chi_e)**2/denominator*ion_pdf[index]
     dynamic_structure = (2*np.pi/k)*(electron_term+ion_term)
-    spectral = np.maximum(dynamic_structure, 0.0)*(2*np.pi*C*1e9/(x*x))
-    if np.any(~np.isfinite(spectral)) or not np.any(spectral > 0):
+    spectral_physical = np.maximum(dynamic_structure, 0.0)*(2*np.pi*C*1e9/(x*x))
+    if np.any(~np.isfinite(spectral_physical)) or not np.any(spectral_physical > 0):
         raise ValueError("tabulated-EVDF collective CTS model produced a non-finite or zero spectrum")
+    if instrument_response_matrix is not None:
+        spectral, response_metadata = _apply_measured_spectral_response(
+            x, spectral_physical, instrument_response_matrix,
+            allow_finite_window_response_loss=allow_finite_window_response_loss,
+        )
+    else:
+        if allow_finite_window_response_loss:
+            raise ValueError("allow_finite_window_response_loss requires instrument_response_matrix")
+        spectral = spectral_physical
+        response_metadata = None
     return {
         "spectral_density_per_nm": spectral,
+        "spectral_density_per_nm_physical": spectral_physical,
+        "instrument_response_applied": instrument_response_matrix is not None,
+        "instrument_response_metadata": response_metadata,
         "electron_susceptibility": chi_e,
         "electron_susceptibility_phase_velocity_derivative_s_m": chi_e_phase_derivative,
         "electron_susceptibility_derivative_definition": (
