@@ -216,6 +216,16 @@ MODEL_PHYSICS_NOTES = {
         "are nodal probability densities [s/m], not unweighted discrete masses. "
         "The output is normalized and does not identify absolute density or a 3-D EVDF."
     ),
+    "thomson_projected_evdf_poisson": (
+        "Count-space non-parametric projected EVDF inverse. Expected detector counts are "
+        "mu_i=A_tot*Delta_lambda_i*[R K f_q]_i+b_i, with independent Poisson likelihood "
+        "sum_i(mu_i-y_i log(mu_i)) and explicit non-negative normalized f_q. The measured "
+        "finite-bin Doppler operator and calibrated detector response are applied before "
+        "the likelihood. The amplitude is a nuisance count scale, not an absolute density. "
+        "The local covariance is the expected Poisson Fisher inverse projected onto the "
+        "normalization tangent space and conditional on active nodes and regularization. "
+        "One view identifies only the q-parallel marginal."
+    ),
     "thomson_temperature_from_spectral_width": (
         "Conditional Te estimator: Te = (sigma_lambda/lambda_0)^2 m_e c^2 / "
         "[4 sin^2(theta/2)]. Valid only for an intrinsic instrument-response-fitted "
@@ -488,6 +498,16 @@ EXAMPLES = {
     },
     "kappa_dispersion_function": {
         "zeta_real": 0.7, "zeta_imag": 0.35, "kappa": 4.0
+    },
+    "thomson_projected_evdf_poisson": {
+        "wavelength_nm": np.linspace(1058.0, 1066.0, 81).tolist(),
+        "observed_counts": [0] * 81,
+        "laser_wavelength_nm": 1064.0,
+        "scattering_angle_rad": 1.5707963267948966,
+        "instrument_response_matrix": np.eye(81).tolist(),
+        "background_expected_counts": [2.0] * 81,
+        "velocity_grid_m_s": np.linspace(-2.0e6, 2.0e6, 81).tolist(),
+        "regularization_strength": 1.0e-3
     },
     "thomson_projected_bi_kappa_evdf": {
         "velocity_grid_m_s": np.linspace(-1.2e8, 1.2e8, 2401).tolist(),
