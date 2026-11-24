@@ -103,6 +103,20 @@ def analyze_spectral_distribution(*args: Any, **kwargs: Any) -> Any:
     return _run(81, *args, **kwargs)
 
 
+
+def reconstruct_projected_evdf_poisson(*args: Any, **kwargs: Any) -> Any:
+    """Infer the q-parallel optical-Thomson EVDF directly from photon counts.
+
+    This is a distinct count-space inverse: observed_counts must be integer
+    detector-bin counts, while background_expected_counts is a supplied
+    expected-count vector. The solver uses the finite-bin Doppler operator,
+    measured detector response, exact Poisson likelihood and explicit
+    second-derivative regularization. It does not convert counts to Gaussian
+    power uncertainties or infer absolute density.
+    """
+    from .physics.thomson_evdf_poisson import reconstruct_thomson_evdf_poisson as solve
+    return solve(*args, **kwargs)
+
 def fit_gyrotropic(*args: Any, **kwargs: Any) -> Any:
     """Fit multi-view gyrotropic anisotropic Thomson spectra (entry 82)."""
     return _run(82, *args, **kwargs)
@@ -244,6 +258,7 @@ __all__ = [
     "analyze_cts",
     "reconstruct_profiles",
     "analyze_spectral_distribution",
+    "reconstruct_projected_evdf_poisson",
     "fit_gyrotropic",
     "fit_temperature_tensor",
     "analyze_landau_fdt_convergence",
