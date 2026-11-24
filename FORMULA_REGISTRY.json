@@ -11252,7 +11252,7 @@
     "name": "Full-tail generalized Kappa plasma dispersion integral",
     "equation": "fκ(x)=Γ(κ)/[√(πκ)Γ(κ−1/2)](1+x²/κ)^−κ; Iκ(ζ)=∫_{−∞}^{∞} f′κ(x)/(x−ζ) dx, Im(ζ)>0; Iκ(x+i0)=PV∫f′κ(u)/(u−x)du+iπf′κ(x); I′κ(ζ)=∫f′κ(x)/(x−ζ)²dx",
     "inputs": "Dimensionless phase velocity ζ_real, ζ_imag ≥ 0; finite-variance Kappa index κ>3/2; optional positive absolute and relative quadrature tolerances.",
-    "output": "Complex full-tail Kappa dispersion integral and analytic derivative, normalization, Landau-contour method and adaptive quadrature error estimates.",
+    "output": "Complex Kappa dispersion integral and analytic derivative, normalized marginal constant, complex phase velocity and Kappa index, quadrature method and error estimates, Landau branch, full-tail treatment, Maxwellian limit and explicit validity limitations.",
     "assumptions": "Exact one-dimensional marginal of an isotropic non-relativistic 3-D Kappa EVDF; collisionless, unmagnetized longitudinal response; retarded Landau branch only. Real-axis values use Cauchy principal value plus exact Sokhotski–Plemelj residues. This dimensionless kernel is not itself a dielectric tensor or a fluctuation-dissipation closure.",
     "status": "D",
     "category": "Thomson scattering",
@@ -11333,6 +11333,26 @@
           "name": "validity_domain",
           "unit": "text",
           "description": "Isotropic, non-relativistic, unmagnetized, collisionless longitudinal response."
+        },
+        {
+          "name": "zeta",
+          "unit": "dimensionless complex retarded phase velocity"
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless Kappa index"
+        },
+        {
+          "name": "tail_treatment",
+          "unit": "text; full-real-line analytic distribution treatment"
+        },
+        {
+          "name": "maxwellian_limit",
+          "unit": "text; asymptotic Maxwellian dispersion relation"
+        },
+        {
+          "name": "limitations",
+          "unit": "list of explicit physical scope limitations"
         }
       ],
       "prerequisites": [
@@ -11351,7 +11371,7 @@
         "tests/test_kappa_dispersion_function.py::test_real_axis_uses_exact_plemelj_resonance_and_rejects_advanced_branch",
         "tests/test_kappa_dispersion_function.py::test_real_axis_kappa_dispersion_derivative_matches_boundary_finite_difference"
       ],
-      "note": "Publicly dispatched through run_advanced_thomson_physics('kappa_dispersion_function') and the advanced Thomson Dashboard. The Maxwellian limit, retarded Landau residue and real-axis analytic derivative are tested independently. Numerical verification is not experimental validation.",
+      "note": "The contract declares the complete return mapping, including the retarded phase-velocity argument, Kappa index, full-tail treatment, Maxwellian limit and model limitations. This remains a dimensionless longitudinal kernel, not a dielectric tensor or FDT closure.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "function_links": [
