@@ -83,6 +83,7 @@ def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_di
     from tis.products.thomson.api import reconstruct_projected_evdf_poisson
     from tis.products.thomson.api import run_advanced_physics, run_analysis
     from tis.products.catalog import THOMSON_ENTRY_POINTS, get_product
+    from tokamak_analysis.analysis_registry import resolve_analysis
     from tis.ui.advanced_thomson_physics_page import MODEL_LABELS, MODEL_PHYSICS_NOTES
 
     wavelength, velocity, counts, background, response, _ = _synthetic_counts()
@@ -104,6 +105,7 @@ def test_poisson_evdf_is_reachable_through_product_api_and_advanced_dashboard_di
     assert THOMSON_ENTRY_POINTS[89] == (
         "thomson_evdf_poisson", "reconstruct_thomson_evdf_poisson"
     )
+    assert resolve_analysis(89).__name__ == "reconstruct_thomson_evdf_poisson"
     assert direct["likelihood"] == dispatched["likelihood"] == registered["likelihood"] == "independent_poisson_counts"
     assert "projected_evdf_physical_moments" in direct
     assert direct["projected_evdf_physical_moments"]["central_third_velocity_moment_m3_s3"] is not None
