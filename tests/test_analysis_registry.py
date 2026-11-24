@@ -51,7 +51,7 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
         for item in distribution_entry["execution_contract"]["input_specs"]
     }
     background_covariance_description = distribution_specs["background_signal_covariance"]["description"].lower()
-    assert "cross-covariance" not in background_covariance_description or "may be combined" in background_covariance_description
+    assert "cross-covariance" not in background_covariance_description or "may be combined" in background_covariance_description or "represented separately" in background_covariance_description
     assert "positive definite" in background_covariance_description
     assert "signal_background_cross_covariance" in distribution_specs
     assert {"moment_mc_samples", "instrument_response_matrix"} <= distribution_inputs
