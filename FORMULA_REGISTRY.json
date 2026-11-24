@@ -9419,6 +9419,61 @@
           "unit": "optional one-per-ion-species list of distribution (maxwellian, kappa or bi_kappa), kappa when selected, flow_projection_m_s; bi_kappa also requires temperature_parallel_eV, temperature_perpendicular_eV and magnetic_field_unit",
           "required": false,
           "description": "Ion populations default to Maxwellian with supplied species flow. Kappa and bi-Kappa ions require kappa > 3/2; bi-Kappa additionally requires two positive second-moment temperatures and a unit magnetic-field vector. One mapping is required per ion species."
+        },
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing measured wavelength grid",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm; incident laser wavelength",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad; scattering angle",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; reference finite-variance electron Kappa index > 3/2",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata; names, charges and masses",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "dimensionless; charge-density fractions summing to one",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; one per ion species",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s⁻¹; fixed electron flow projection",
+          "required": true
+        },
+        {
+          "name": "ion_velocity_m_s",
+          "unit": "m s⁻¹; fixed per-species ion flow projections",
+          "required": true
+        },
+        {
+          "name": "incident_direction",
+          "unit": "unit 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "unit 3-vector",
+          "required": true
         }
       ],
       "output_specs": [
@@ -9433,6 +9488,90 @@
         {
           "name": "electron_population_projected_vdfs_s_m",
           "unit": "s m^-1 per population"
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "dimensionless; supplied charge-density fractions"
+        },
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "spectral density per nm; collective CTS forward spectrum"
+        },
+        {
+          "name": "model",
+          "unit": "text; unmagnetized electrostatic collective Kappa mixture model"
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s⁻¹; frequency-resolved resonant phase velocity"
+        },
+        {
+          "name": "electron_debye_length_m",
+          "unit": "m; electron Debye length"
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; reference electron Kappa index"
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; supplied per-species ion temperatures"
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m⁻¹; frequency-resolved scattering wave number"
+        },
+        {
+          "name": "scattering_parameter_alpha",
+          "unit": "dimensionless; collective scattering parameter"
+        },
+        {
+          "name": "ion_populations",
+          "unit": "structured fixed ion population mappings"
+        },
+        {
+          "name": "static_screening_status",
+          "unit": "text; static screening validity/status"
+        },
+        {
+          "name": "electron_populations",
+          "unit": "structured fixed electron population mappings"
+        },
+        {
+          "name": "ion_flow_projections_m_s",
+          "unit": "m s⁻¹; per-species projected ion flows"
+        },
+        {
+          "name": "ion_susceptibility",
+          "unit": "complex dimensionless; total species-resolved ion susceptibility"
+        },
+        {
+          "name": "electron_reference_flow_projection_m_s",
+          "unit": "m s⁻¹; reference electron flow projection"
+        },
+        {
+          "name": "dynamic_structure_factor",
+          "unit": "dimensionless; collective electron/ion dynamic structure factor"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s⁻¹; reference electron flow projection"
+        },
+        {
+          "name": "electron_mixture_moments",
+          "unit": "structured mixture moments of projected electron distributions"
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; reference electron temperature"
+        },
+        {
+          "name": "dielectric_function",
+          "unit": "complex dimensionless; common longitudinal dielectric response"
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata; supplied ion species definitions"
         }
       ],
       "prerequisites": [
@@ -9442,7 +9581,7 @@
         "Quasi-neutral ion density is n_i = alpha_i n_e / Z_i; each ion susceptibility uses omega_pi^2 = n_i Z_i^2 e^2/(epsilon_0 m_i).",
         "A bi_kappa ion population requires positive temperature_parallel_eV and temperature_perpendicular_eV, kappa > 3/2, and a finite unit magnetic_field_unit; its exact q-projected temperature enters the ion Landau susceptibility."
       ],
-      "uncertainty_model": "Population parameters are fixed external inputs in the current CTS fit. Their uncertainties are not inferred or propagated by this extension; the fitted base electron density, reference temperature and global Kappa parameter retain the existing local-fit covariance.",
+      "uncertainty_model": "Electron/ion population fractions, distribution families, temperatures, flows and species composition are fixed explicit forward-model inputs. This forward model returns the combined susceptibility, dielectric response and dynamic structure factor; it does not infer population parameters or propagate their uncertainties. Parameter inference must use an enclosing measured-spectrum inverse with supplied covariance and identifiability screening.",
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_electron_dielectric_uses_weighted_landau_responses",
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_mult_population_rejects_non_normalized_density_fractions",
