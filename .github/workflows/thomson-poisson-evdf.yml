@@ -1,0 +1,63 @@
+name: Poisson Thomson EVDF physics contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tis/physics/shared/thomson_evdf_poisson.py"
+      - "tis/products/thomson/physics/thomson_evdf_poisson.py"
+      - "tis/products/thomson/api.py"
+      - "tis/products/catalog.py"
+      - "tokamak_analysis/analysis_registry.py"
+      - "tokamak_analysis/thomson_evdf_poisson.py"
+      - "ANALYSIS_FAMILIES.json"
+      - "tis/data/ANALYSIS_FAMILIES.json"
+      - "FORMULA_REGISTRY.json"
+      - "tis/data/FORMULA_REGISTRY.json"
+      - "tis/ui/advanced_thomson_physics_page.py"
+      - "tests/test_thomson_evdf_poisson.py"
+      - ".github/workflows/thomson-poisson-evdf.yml"
+  pull_request:
+    paths:
+      - "tis/physics/shared/thomson_evdf_poisson.py"
+      - "tis/products/thomson/physics/thomson_evdf_poisson.py"
+      - "tis/products/thomson/api.py"
+      - "tis/products/catalog.py"
+      - "tokamak_analysis/analysis_registry.py"
+      - "tokamak_analysis/thomson_evdf_poisson.py"
+      - "ANALYSIS_FAMILIES.json"
+      - "tis/data/ANALYSIS_FAMILIES.json"
+      - "FORMULA_REGISTRY.json"
+      - "tis/data/FORMULA_REGISTRY.json"
+      - "tis/ui/advanced_thomson_physics_page.py"
+      - "tests/test_thomson_evdf_poisson.py"
+      - ".github/workflows/thomson-poisson-evdf.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poisson-thomson-evdf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  poisson-evdf-physics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install project and numerical test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
+      - name: Run Poisson EVDF physics, registry, API and Dashboard tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: >-
+          python -m pytest -q -x --tb=short
+          tests/test_thomson_evdf_poisson.py
+          tests/test_analysis_registry.py
+          tests/test_product_architecture.py
+          tests/test_formula_registry_complete.py
