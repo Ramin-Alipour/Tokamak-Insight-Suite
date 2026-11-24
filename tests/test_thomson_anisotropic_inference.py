@@ -586,12 +586,13 @@ def test_canonical_gyrotropic_workflow_preserves_3d_flow_geometry_options():
     magnetic_field = np.array([0.0, 0.0, 1.0])
     common_flow = np.array([8.0e3, -6.0e3, 1.0e4])
     temperatures = [300.0, 300.0, 850.0]
+    scattering_q_factor = 2.0 * np.sin((np.pi / 2.0) / 2.0)
     spectra = []
     for q, temperature in zip(directions, temperatures):
         flow = float(q @ common_flow)
         sigma_v = np.sqrt(1.602176634e-19*temperature/9.1093837015e-31)
-        centre = 1064.0*(1.0-2.0*flow/299792458.0)
-        sigma_lambda = 1064.0*2.0*sigma_v/299792458.0
+        centre = 1064.0*(1.0-scattering_q_factor*flow/299792458.0)
+        sigma_lambda = 1064.0*scattering_q_factor*sigma_v/299792458.0
         feature, _ = _gaussian_bin_average(wavelength, centre, sigma_lambda)
         spectra.append(0.02+0.9*feature)
 
