@@ -36,7 +36,12 @@ def test_bi_maxwellian_projection_reports_single_angle_nonidentifiability_and_no
         scattering_vector_unit=[2**-0.5, 0.0, 2**-0.5],
         flow_projection_m_s=1.2e5,
     )
-    assert np.trapz(result["projected_vdf_s_m"], velocity) == pytest.approx(result["velocity_grid_probability_coverage"], rel=2e-6)
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    assert integrate(result["projected_vdf_s_m"], velocity) == pytest.approx(
+        result["velocity_grid_probability_coverage"], rel=2e-6
+    )
     assert result["velocity_grid_probability_coverage"] > 0.999999
     assert result["projected_temperature_eV"] == pytest.approx(300.0)
     assert result["projected_velocity_mean_m_s"] == pytest.approx(1.2e5)
