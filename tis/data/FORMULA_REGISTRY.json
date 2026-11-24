@@ -15279,6 +15279,56 @@
           "name": "heat_flux_validity_domain",
           "unit": "structured",
           "description": "Beta threshold, actual maximum beta, and absolute-density limitation."
+        },
+        {
+          "name": "fourth_central_velocity_moment_tensor_m4_s4",
+          "unit": "m^4 s^-4; symmetric rank-4 tensor",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "candidate_fourth_central_velocity_moment_tensor_m4_s4",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "fourth_central_velocity_moment_covariance_m8_s8",
+          "unit": "(m^4 s^-4)^2 covariance",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "fourth_central_velocity_moment_covariance_status",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_m4_s4",
+          "unit": "m^4 s^-4",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "candidate_radial_fourth_central_velocity_moment_m4_s4",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_variance_m8_s8",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "radial_fourth_central_velocity_moment_standard_uncertainty_m4_s4",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "fourth_central_velocity_moment_definition",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
+        },
+        {
+          "name": "radial_fourth_moment_definition",
+          "unit": "solver metadata; see description",
+          "description": "Returned by derive_3d_evdf_third_moments. This field is a 3-D EVDF physical moment, candidate, covariance/status, or explicit validity-domain result."
         }
       ],
       "prerequisites": [
@@ -15294,7 +15344,8 @@
       "test_links": [
         "tests/test_thomson_relativistic_3d_evdf.py::test_identified_3d_evdf_reports_third_moment_and_classical_heat_flux_with_covariance",
         "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_higher_moment_helper_matches_discrete_quadrature",
-        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_third_moment_and_heat_flux_covariance_match_finite_difference"
+        "tests/test_thomson_relativistic_3d_evdf.py::test_3d_evdf_third_moment_and_heat_flux_covariance_match_finite_difference",
+        "tests/test_formula_registry_complete.py::test_registry_output_specs_cover_all_statically_returned_keys"
       ],
       "note": "Executable physical moments with analytic covariance propagation; software/physics verification uses synthetic distributions, not experimental validation."
     }
