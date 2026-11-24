@@ -2989,6 +2989,18 @@
           "name": "variance_electron_velocity_projection_m2_s2",
           "unit": "m^2 s^-2",
           "description": "First-order propagated variance using the full supplied joint covariance."
+        },
+        {
+          "name": "kinematics",
+          "unit": "text; selected Doppler approximation"
+        },
+        {
+          "name": "input_covariance_order",
+          "unit": "ordered input-name vector for the joint covariance"
+        },
+        {
+          "name": "uncertainty_model",
+          "unit": "text; optional uncertainty propagation mode"
         }
       ],
       "prerequisites": [
